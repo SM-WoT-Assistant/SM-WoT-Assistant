@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.venv-1/
+.venv-2/
+venv/
+*.egg-info/
+.eggs/
+
+# Локальні / великі дані (за потреби приберіть рядок, якщо хочете версіонувати)
+extracted_maps/
+extracted_data/
+extracted_icons/
+*.rar
+
+# Тимчасові файли і папки
+tmp/
+*.log
+build_test.log
+startup.log
+
+# Маніфести витягнення (генеруються автоматично)
+.icon_extract_manifest.json
+.tank_extract_manifest.json
+
+# AI-кеш (великий, генерується автоматично)
+ai_cache.json
+
+# Backup-файли (генеруються при помилках)
+*.broken_fallback_backup.json
+
+# Runtime артефакти вбудованого браузера (cache/history/logs)
+browser_profile/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Windows
+Thumbs.db
+Desktop.ini

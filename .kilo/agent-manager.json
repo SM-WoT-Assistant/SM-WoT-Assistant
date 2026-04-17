@@ -1,0 +1,16 @@
+{
+  "worktrees": {
+    "wt-1776259060148-1": {
+      "branch": "obsidian-handstand",
+      "path": "d:\\!WORK\\WOT\\WOTtraner\\WORK\\WoT_Assistant_5.0\\.kilo\\worktrees\\obsidian-handstand",
+      "parentBranch": "release/5.1-dev",
+      "createdAt": "2026-04-15T13:17:40.148Z"
+    }
+  },
+  "sessions": {
+    "ses_26eb5abc2ffeLwCgjQo5i671c2": {
+      "worktreeId": "wt-1776259060148-1",
+      "createdAt": "2026-04-15T13:17:41.274Z"
+    }
+  }
+}

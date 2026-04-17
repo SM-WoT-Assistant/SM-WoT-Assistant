@@ -1,0 +1,23 @@
+{
+    "norm_w": 498,
+    "norm_x": 1417,
+    "norm_y": 700,
+    "norm_alpha": 0.39999999999999997,
+    "norm_contrast": 2.0,
+    "edit_w": 658,
+    "edit_x": 97,
+    "edit_y": 336,
+    "edit_alpha": 1.0,
+    "edit_contrast": 1.0,
+    "auto_sync": true,
+    "auto_battle": true,
+    "game_version": " v.2.2.0.2 #859 ",
+    "wot_path": "C:/Games/World_of_Tanks_EU",
+    "log_path": "C:/Games/World_of_Tanks_EU\\python.log",
+    "auto_mode_filter": true,
+    "auto_vehicle_filter": true,
+    "tth_schema_version": 2,
+    "pause_tank_auto_rebuild": true,
+    "tth_decode_retry_enabled": false,
+    "disable_startup_splash": false
+}

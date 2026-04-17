@@ -1,0 +1,1244 @@
+# -*- coding: utf-8 -*-
+# main.py 4_43
+# ==========================================
+# ЧЕК-ЛИСТ ФУНКЦІОНАЛУ (НЕ ВИДАЛЯТИ І НЕ ЗМІНЮВАТИ БЕЗ ДОЗВОЛУ):
+# [v] 1. UI: Три незалежні панелі (МАПИ, СТАТ, СТАТ АІ), які повністю перемикаються. Нейтральний старт.
+# [v] 2. UI: Блок фільтрів (РЕЖИМ БОЮ з Натиском + ТЕХНІКА), пакування без накладання. Строка стану над фільтрами.
+# [v] 3. UI: Інструменти (painter.py). Магнітне прилипання. Захист від битих збережень.
+# [v] 4. UI: Налаштування (Кнопка ⚙ з коректним згортанням, перейменування мапи, авто-фільтри, AI-key). Темні діалоги.
+# [v] 5. ВІКНО: Гарячі клавіші (F10, E, Ctrl+Стрілки, Ctrl+ЛКМ). БЛОКУВАННЯ (Hotkey Lock) під час відкритих вікон.
+# [v] 6. ВІКНО: Масштабування суворо з фіксацією правого нижнього кута (apply_anchor_resize).
+# [v] 7. ВІКНО: Бойовий режим: click-through (ctypes) + приховування UI + незалежна пам'ять координат/розміру.
+# [v] 8. ДАНІ: Збереження всіх налаштувань у settings.json (окремо edit_ та norm_).
+# [v] 9. ДАНІ: Читання/запис custom_names.json та підміна назв у випадаючому списку.
+# [v] 10. МАПА: Запуск із заставки. ПОВЕРНУТО НЕЙТРАЛЬНИЙ СТАРТ.
+# [v] 11. МАПА: Дебаунс (затримка 100мс) при зміні розміру для уникнення мерехтіння.
+# [v] 12. ВІКНО: Watcher та жорстка фіксація (easy_drag=False) для WebView2.
+# [v] 13. МАПА: Кнопки МАПИ I / МАПИ II, авто-перевірка version.xml та автономний парсинг.
+# [v] 14. МАПА: Читання map_data.json, фільтрація за режимом та відмальовування порожніх білих кілець із тінями.
+# [v] 15. UI: Універсальний вибір шляху до гри (wot_path + log_path) та автовизначення.
+# [ ] 16. UPDATE CORE: Єдина глобальна логіка автооновлення всіх елементів з клієнта (МАПИ/ТАНКИ/TTH/ІКОНКИ LOADOUT) після зміни версії — заплановано після завершення дизайну ТТХ і збірок.
+# ==========================================
+# ЧЕК-ЛИСТ МОДУЛІВ ТА АРХІТЕКТУРИ:
+# [v] config.py — Конфігурація, шляхи, локалізація, словники.
+# [v] main.py — Головний GUI, масштабування, гарячі клавіші.
+# [v] map_updater.py — МАПИ I: Старий завантажувач з інтернету (ПІДКЛЮЧЕНО).
+# [v] map_extractor.py — МАПИ II: Автономний екстрактор з клієнта гри (ПІДКЛЮЧЕНО).
+# [v] painter.py — Логіка малювання, кольорові POI, магнітне прилипання, темна тема (ПІДКЛЮЧЕНО).
+# [v] tomato_viewer.py — Інтеграція статистики Tomato.gg через WebView2 (ПІДКЛЮЧЕНО).
+# [v] ai_assistant.py — СТАТ АІ: Персональний помічник Gemini для усереднення збірок (ПІДКЛЮЧЕНО).
+# [v] tactics_manager.py — Новий модуль для імпорту/експорту тактик (ГОТОВО).
+# [v] log_reader.py — Читання python.log та автоматичне перемикання (ГОТОВО).
+# [v] help_system.py — Модуль ДОПОМОГИ (ГОТОВО).
+# [ ] translator.py — Модуль перекладу на інші мови (UA/EN/PL) (У ПЛАНАХ).
+# [ ] tank_db.py — Модуль ТАНКИ: Локальна база ТТХ з клієнта (У ПЛАНАХ).
+# ==========================================
+
+import os, sys, json, ctypes, re
+
+# Ensure UTF-8 output on Windows
+if os.name == 'nt':
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except:
+        pass
+
+import threading
+import time
+import tkinter as tk
+from tkinter import ttk, filedialog, messagebox
+from PIL import Image, ImageTk, ImageOps, ImageEnhance
+import keyboard
+
+import config
+import tactics_manager
+import log_reader
+import help_system
+# import ai_assistant  # ТИМЧАСОВО ВИМКНЕНО
+import painter as pnt
+import stats_ai
+import window_manager
+import map_renderer
+import locale_manager
+import map_manager
+
+try:
+    import tomato_viewer
+except ImportError:
+    tomato_viewer = None
+
+try:
+    import map_extractor
+except ImportError:
+    map_extractor = None
+
+class WotAssistantHQ:
+    def __init__(self, root):
+        self.root = root
+        self.root.withdraw()
+        
+        self.lang = "ua"
+        self.mode = "edit" 
+        self.map_mode = 1 
+        self.dialog_open = False 
+        self.edit_focus_lock = False
+        self._last_mode_hotkey_ts = 0.0
+        self.active_view = "maps" # "maps", "stats", "ai_stats"
+        
+        self.settings = self.load_json(config.SETTINGS_FILE)
+        self.map_mgr = map_manager.MapManager(self)
+        self.map_mgr.auto_detect_wot_path()
+        self.custom_names = self.load_json(config.CUSTOM_NAMES_FILE)
+        
+        self.locale = locale_manager.LocaleManager(self)
+        self.map_renderer = map_renderer.MapRenderer(self)
+        
+        self.extractor_names = {}
+        self.map_list = []
+        self.tank_db = self.load_tank_db()
+        self.popular_tanks = [
+            "R155_Object_277", "R45_IS-7", "GB91_Super_Conqueror", "Cz17_Vz_55",
+            "Pl21_CS_63", "Pl15_60TP_Lewandowskiego", "G89_Leopard1",
+            "F108_Panhard_EBR_105", "GB100_Manticore", "Ch47_BZ_176",
+            "F116_Bat_Chatillon_Bourrasque", "Cz14_Skoda_T-56",
+            "It08_Progetto_M40_mod_65", "It13_Progetto_M35_mod_46",
+            "R97_Object_140", "R148_Object_430_U", "A16_M18_Hellcat",
+            "G119_Panzer58", "A80_T26_E4_SuperPershing", "S11_Strv_103B"
+        ]
+        self.ai_icons = {} # Кеш іконок для Treeview
+        self.ai_filters = {"nation": None, "class": None, "tier": None}
+        
+        # Зворотна таблиця compactDescr -> інформація про танк (для авто-фільтрів)
+        self.compact_descr_map = {
+            v["compact_descr"]: {"key": k, "class": v["class"], "name": v["name"]}
+            for k, v in self.tank_db.items()
+            if v.get("compact_descr")
+        }
+        
+        self.w = self.settings.get("edit_w", 800)
+        self.h = self.w + 130
+        self.alpha = self.settings.get("edit_alpha", 1.0)
+        self.contrast = self.settings.get("edit_contrast", 1.0)
+        
+        self.auto_sync_var = tk.BooleanVar(value=self.settings.get("auto_sync", False))
+        self.auto_battle_var = tk.BooleanVar(value=self.settings.get("auto_battle", False))
+        self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
+        self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
+        
+        self.win_mgr = window_manager.WindowManager(self)
+        self.win_mgr.initialize_window()
+        
+        self.map_list_eng = []
+        self.current_map_eng = None
+        self.current_tk_map = None
+        self.drag = None
+        self._menu_is_active = False
+        self.help_manager = help_system.HelpManager(self)
+
+        self.selected_battle_mode = tk.StringVar(value="Standard")
+        self.selected_classes = {
+            "ЛТ": tk.BooleanVar(value=False), "СТ": tk.BooleanVar(value=False),
+            "ТТ": tk.BooleanVar(value=False), "ПТ": tk.BooleanVar(value=False),
+            "САУ": tk.BooleanVar(value=False)
+        }
+
+        self.thread_queue = []
+        self.process_queue()
+        
+        # Ініціалізація відстеження логів
+        log_path = self.settings.get("log_path", "")
+        print(f"[INIT] log_path = {log_path}")
+        if log_path and os.path.exists(log_path):
+            print(f"[INIT] ✓ Лог знайдено: {log_path}")
+        else:
+            print(f"[INIT] ✗ Лог НЕ знайдено. Встановіть шлях у ⚙ -> WoT")
+        
+        self.last_battle_map = None
+        self.last_battle_mode = None
+        self.last_battle_map_mode = 2
+        self.log_watcher = log_reader.LogWatcher(
+            log_path,
+            self.on_battle_detected,
+            self.on_battle_ended,
+            self.on_minimap_appeared,
+            self.on_battle_countdown_started,
+            self.on_vehicle_detected,
+        )
+        self.log_watcher.start()
+
+        self.setup_ui()
+        self.refresh_mode_indicator()
+        self.bind_events()
+        self.load_logo()
+        
+        self.painter = pnt.MapPainter(self.canvas, self)
+        
+        self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
+        for var in self.selected_classes.values():
+            var.trace_add("write", lambda *args: self.painter.redraw())
+            
+        self.tomato = tomato_viewer.TomatoManager() if tomato_viewer else None
+        self.tomato_hwnd = None
+        # self.ai_stats = ai_assistant.AIAssistant(self.settings.get("ai_key", ""))  # ТИМЧАСОВО ВИМКНЕНО
+
+        # Стандартний старт: splash завжди показує прогрес фонового оновлення.
+        # Для аварійного вимкнення лишаємо технічний прапорець у settings.
+        if bool(self.settings.get("disable_startup_splash", False)):
+            self._start_startup_checks()
+        else:
+            self.show_small_loading_splash()
+            self.root.after(120, self._start_startup_checks)
+
+    def _start_startup_checks(self):
+        self.map_mgr.check_game_version(
+            progress_cb=self._on_startup_progress,
+            done_cb=self._on_startup_ready,
+            allow_map_decode=False,
+        )
+
+    # auto_detect_wot_path moved to map_manager
+
+    def t(self, cat, key):
+        if cat == "ui": return self.locale.t_ui(key)
+        if cat == "tanks": return self.locale.t_tank(key, key)
+        return self.locale.t_map(key)
+
+    def get_edit_extra_height(self):
+        """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
+        # До побудови UI повертаємо старий безпечний fallback.
+        if not hasattr(self, "top_bar"):
+            return 130
+
+        self.root.update_idletasks()
+        top_h = self.top_bar.winfo_reqheight()
+        filter_h = self.filter_panel.winfo_reqheight() if hasattr(self, "filter_panel") else 0
+        status_h = self.status_label.winfo_reqheight() if hasattr(self, "status_label") else 0
+        return top_h + filter_h + status_h
+
+    def process_queue(self):
+        while self.thread_queue:
+            try:
+                func = self.thread_queue.pop(0)
+                func()
+            except Exception as e:
+                print(f"[ШТАБ] Помилка виконання з черги: {e}")
+        self.root.after(50, self.process_queue)
+
+    def safe_execute(self, func):
+        self.thread_queue.append(func)
+
+    def load_json(self, p):
+        if os.path.exists(p):
+            try:
+                with open(p, "r", encoding="utf-8") as f: return json.load(f)
+            except: pass
+        return {}
+
+    def save_json(self, p, d):
+        try:
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump(d, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"[ДАНІ] Помилка збереження {p}: {e}")
+
+    def save_settings(self):
+        cx, cy = self.root.winfo_x(), self.root.winfo_y()
+        if cx < -5000: return 
+        
+        prefix = "edit_" if self.mode == "edit" else "norm_"
+        self.settings[f"{prefix}w"] = self.w
+        self.settings[f"{prefix}x"] = cx
+        self.settings[f"{prefix}y"] = cy
+        self.settings[f"{prefix}alpha"] = self.alpha
+        self.settings[f"{prefix}contrast"] = self.contrast
+        self.settings["auto_sync"] = self.auto_sync_var.get()
+        self.settings["auto_battle"] = self.auto_battle_var.get()
+        self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
+        self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
+        self.save_json(config.SETTINGS_FILE, self.settings)
+        
+        # Оновлюємо шлях у лог-рідері при зміні налаштувань
+        if hasattr(self, 'log_watcher'):
+            self.log_watcher.update_path(self.settings.get("log_path", ""))
+
+    def load_tank_db(self):
+        try:
+            def _estimate_tier_from_tth(tag, tth_db):
+                rec = tth_db.get(tag) if isinstance(tth_db, dict) else None
+                if not isinstance(rec, dict):
+                    return 5
+                hp = rec.get("hp")
+                try:
+                    hp = int(hp)
+                except Exception:
+                    return 5
+                if hp <= 260: return 1
+                if hp <= 360: return 2
+                if hp <= 500: return 3
+                if hp <= 700: return 4
+                if hp <= 900: return 5
+                if hp <= 1100: return 6
+                if hp <= 1300: return 7
+                if hp <= 1500: return 8
+                if hp <= 1750: return 9
+                return 10
+
+            if os.path.exists("tank_db.json"):
+                with open("tank_db.json", "r", encoding="utf-8") as f:
+                    db = json.load(f)
+                    clean_db = {}
+                    # Технічні / евентові / видалені з гри танки
+                    bad_tags = [
+                        "_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test",
+                        "_training", "tutorial", "observer", "r05_kv", "r70_t_50_2",
+                        "sherman_crab", "g00_", "_cfe", "auto_s", "auto_test",
+                        "_shxxi", "_bomber", "pillbox", "env_artillery",  # Тех об'єкти
+                        "a08_t23", "a26_t18", "a15_t57",  # USA вилучені танки
+                        "_newonboarding", "_storymode",   # Тренувальні
+                    ]
+                    icons_dir = "extracted_icons"
+                    for k, v in db.items():
+                        if any(b in k.lower() for b in bad_tags) or any(b in v["name"].lower() for b in bad_tags):
+                            continue
+                        # Не прибираємо танк зі списку, навіть якщо іконка відсутня.
+                        # Інакше при проблемі з extracted_icons список може стати порожнім.
+                        icon_path = os.path.join(icons_dir, v.get("icon", ""))
+                        if not os.path.exists(icon_path):
+                            v = dict(v)
+                            v["icon"] = ""
+                        clean_db[k] = v
+                    if clean_db:
+                        return clean_db
+
+            # Fallback: якщо tank_db порожній/битий, піднімаємо мінімальний список із tank_tth.json
+            tth_path = "tank_tth.json"
+            tth_db = {}
+            if os.path.exists(tth_path):
+                with open(tth_path, "r", encoding="utf-8") as f:
+                    tth_db = json.load(f)
+                if isinstance(tth_db, dict) and tth_db:
+                    nation_map = {
+                        "A": "USA", "R": "USSR", "G": "Germany", "F": "France", "GB": "UK",
+                        "Ch": "China", "J": "Japan", "Cz": "Czech", "Pl": "Poland", "S": "Sweden", "It": "Italy"
+                    }
+                    clean_db = {}
+                    for tag in tth_db.keys():
+                        if not isinstance(tag, str):
+                            continue
+                        m = re.match(r'^([A-Za-z]+)\d{1,4}_(.+)$', tag)
+                        pref = m.group(1) if m else ""
+                        name_part = m.group(2) if m else tag
+                        nation = nation_map.get(pref, "Unknown")
+                        display_name = name_part.replace("_", " ").replace("-", "-").strip()
+                        clean_db[tag] = {
+                            "name": display_name,
+                            "tier": _estimate_tier_from_tth(tag, tth_db),
+                            "class": "Unknown",
+                            "nation": nation,
+                            "icon": "",
+                            "is_premium": False,
+                            "compact_descr": None,
+                        }
+                    if clean_db:
+                        print(f"[DB] Fallback: завантажено {len(clean_db)} танків із tank_tth.json")
+                        return clean_db
+
+            # Last-resort fallback: будуємо список танків по іменах XML у extracted_data.
+            extracted_root = "extracted_data"
+            if os.path.isdir(extracted_root):
+                nation_map_folder = {
+                    "usa": "USA", "ussr": "USSR", "germany": "Germany", "france": "France", "uk": "UK",
+                    "china": "China", "japan": "Japan", "czech": "Czech", "poland": "Poland", "sweden": "Sweden", "italy": "Italy"
+                }
+                rough_db = {}
+                for nation_folder in os.listdir(extracted_root):
+                    npath = os.path.join(extracted_root, nation_folder)
+                    if not os.path.isdir(npath):
+                        continue
+                    if nation_folder.lower() not in nation_map_folder:
+                        continue
+                    for fname in os.listdir(npath):
+                        if not fname.endswith('.xml'):
+                            continue
+                        if fname in ("list.xml", "customization.xml"):
+                            continue
+                        tag = fname[:-4]
+                        low = tag.lower()
+                        if any(b in low for b in ["_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test", "_training", "tutorial", "observer", "_newonboarding", "_storymode"]):
+                            continue
+                        m = re.match(r'^[A-Za-z]+\d{1,4}_(.+)$', tag)
+                        name_part = m.group(1) if m else tag
+                        rough_db[tag] = {
+                            "name": name_part.replace("_", " ").strip(),
+                            "tier": _estimate_tier_from_tth(tag, tth_db),
+                            "class": "Unknown",
+                            "nation": nation_map_folder[nation_folder.lower()],
+                            "icon": "",
+                            "is_premium": False,
+                            "compact_descr": None,
+                        }
+                if rough_db:
+                    try:
+                        with open("tank_db.json", "w", encoding="utf-8") as f:
+                            json.dump(rough_db, f, ensure_ascii=False, indent=2)
+                    except Exception as e:
+                        print(f"[DB] Попередження: не вдалося зберегти fallback tank_db.json: {e}")
+                    print(f"[DB] Last-resort fallback: завантажено {len(rough_db)} танків із extracted_data")
+                    return rough_db
+        except Exception as e:
+            print(f"[DB] load_tank_db error: {e}")
+        return {}
+
+    def reload_tank_data(self):
+        self.tank_db = self.load_tank_db()
+        self.compact_descr_map = {
+            v["compact_descr"]: {"key": k, "class": v["class"], "name": v["name"]}
+            for k, v in self.tank_db.items()
+            if v.get("compact_descr")
+        }
+        if hasattr(self, "stats_ai_module") and self.stats_ai_module:
+            self.stats_ai_module.tank_db = self.tank_db
+            self.stats_ai_module.reload_tth_data()
+            self.stats_ai_module.update_search_placeholder(f"Пошук серед {len(self.tank_db)} танків...")
+            self.stats_ai_module.refresh_ai_view()
+
+
+
+
+    # check_game_version moved to map_manager
+
+    def translate_map_name(self, eng):
+        return self.locale.t_map(eng)
+
+    # sort_map_list and get_eng_map_name moved to map_manager
+
+    def ask_wot_path(self):
+        self.dialog_open = True
+        path = filedialog.askdirectory(title="Виберіть головну папку гри World of Tanks")
+        self.dialog_open = False
+        
+        if path:
+            self.settings["wot_path"] = path
+            log_path = os.path.join(path, "python.log")
+            self.settings["log_path"] = log_path
+            self.save_settings()
+            
+            # Перевірка наявності лога
+            if os.path.exists(log_path):
+                self.status_label.config(text=f"[ШТАБ] Путь та логи збережено: {path}", fg="lime")
+                print(f"[CONFIG] log_path встановлено: {log_path}")
+                self.log_watcher.update_path(log_path)
+            else:
+                self.status_label.config(text=f"[ШТАБ] ⚠ Лог не знайдено: {log_path}", fg="orange")
+                print(f"[CONFIG] ПОМИЛКА: log_path не існує: {log_path}")
+            
+            if self.btn_mode_maps_2.cget("bg") == "#ff4500":
+                self.map_mgr.run_map_updater()
+
+    def ask_rename_map(self):
+        cur = self.map_var.get()
+        if not cur: return
+        eng = self.map_mgr.get_eng_map_name(cur)
+        if not eng: return
+        
+        self.dialog_open = True
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Перейменувати")
+        dlg.geometry("300x120")
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        
+        tk.Label(dlg, text=f"Нова назва для '{eng}':", bg="#222", fg="white").pack(pady=10)
+        entry = tk.Entry(dlg, bg="#111", fg="white", insertbackground="white", width=30)
+        entry.insert(0, cur)
+        entry.pack()
+        
+        def save():
+            new_val = entry.get().strip()
+            if new_val:
+                self.custom_names[eng] = new_val
+                self.save_json(config.CUSTOM_NAMES_FILE, self.custom_names)
+                self.map_mgr._sort_map_list_eng_by_display()
+                tmaps = [self.translate_map_name(m) for m in self.map_list_eng]
+                self.map_selector.config(values=tmaps)
+                self.map_var.set(new_val)
+                self.map_renderer.show_main_splash()
+            self.dialog_open = False
+            dlg.destroy()
+            
+        def cancel():
+            self.dialog_open = False
+            dlg.destroy()
+            
+        dlg.protocol("WM_DELETE_WINDOW", cancel)
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=15)
+        tk.Button(bf, text="ОК", bg="#006400", fg="white", bd=0, width=10, command=save).pack(side="left", padx=5)
+        tk.Button(bf, text="СКАСУВАТИ", bg="#8b0000", fg="white", bd=0, width=10, command=cancel).pack(side="left", padx=5)
+        self.root.wait_window(dlg)
+
+    def ask_clear_confirm(self, map_title, on_done):
+        """Підтвердження очищення міток (викликається з painter.MapPainter.clear_all)."""
+        self.dialog_open = True
+        ok = messagebox.askyesno(
+            "Очистити малюнки",
+            f"Видалити всі мітки на карті «{map_title}»?",
+            parent=self.root,
+        )
+        self.dialog_open = False
+        on_done(ok)
+
+    def ask_ai_key(self):
+        from tkinter import simpledialog
+        new_key = simpledialog.askstring("Налаштування ШІ", "Вставте ваш Gemini API Key:", initialvalue=self.settings.get("ai_key", ""), parent=self.root)
+        if new_key is not None:
+            self.settings["ai_key"] = new_key.strip()
+            self.save_settings()
+            self.ai_stats.configure(self.settings["ai_key"])
+            self.status_label.config(text="[СТАТ АІ] Ключ оновлено успішно!", fg="lime")
+
+    # run_map_updater and load_map_list moved to map_manager
+
+    def toggle_settings(self):
+        if self._menu_is_active:
+            self.settings_menu.unpost()
+            self._menu_is_active = False
+        else:
+            x = self.settings_btn.winfo_rootx()
+            y = self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height()
+            self.settings_menu.post(x, y)
+            self._menu_is_active = True
+
+    def _on_settings_unmap(self, event):
+        self.root.after(100, self._set_menu_inactive)
+
+    def _set_menu_inactive(self):
+        self._menu_is_active = False
+
+    def toggle_editor(self):
+        if self.dialog_open: return 
+
+        # Бойовий режим дозволено лише у режимі МАПИ.
+        if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
+            msg = "[РЕЖИМ] Перехід у БОЙОВИЙ недоступний. Спочатку виберіть режим МАПИ."
+            if hasattr(self, "status_label"):
+                self.status_label.config(text=msg, fg="#ffb347")
+            print(msg)
+            return
+
+        self.save_settings() 
+        self.battle_status_top.pack_forget()
+        self.top_bar.pack_forget()
+        self.map_toolbar.pack_forget()
+        self.filter_panel.pack_forget()
+        self.status_label.pack_forget()
+        self.canvas.pack_forget()
+        self.browser_frame.pack_forget()
+        if hasattr(self, 'ai_frame'): self.ai_frame.pack_forget()
+
+        if self.mode == "edit":
+            self.mode = "norm"
+            # У бойовому режимі click-through залежить від активності форматування (F8).
+            self.win_mgr.set_clickthrough(not self.win_mgr.format_mode_enabled)
+            # НЕ показувати top_bar у боєвому режимі - тільки мапа
+            self.top_bar.pack_forget()
+            if self.active_view == "maps":
+                self.battle_status_top.pack(side="top", fill="x")
+                self.canvas.pack(side="top", fill="both", expand=True)
+            if hasattr(self, 'tomato') and self.tomato:
+                self.tomato.stop()
+                self.tomato_hwnd = None
+        else:
+            self.mode = "edit"
+            self.win_mgr.set_clickthrough(False)
+            self.top_bar.pack_forget()
+            self.top_bar.pack(side="top", fill="x")
+            
+            if self.active_view == "maps":
+                if self.btn_mode_maps_1.cget("bg") == "#ff4500" or self.btn_mode_maps_2.cget("bg") == "#ff4500":
+                    toolbar_frame = tk.Frame(self.root, bg="#1a1a1a") # Container to help packing
+                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10) 
+                    self.filter_panel.pack(side="bottom", fill="x") 
+                self.status_label.pack(side="bottom", fill="x")
+                self.canvas.pack(side="top", fill="both", expand=True) 
+            elif self.active_view == "stats":
+                self.status_label.pack(side="bottom", fill="x")
+                self.browser_frame.pack(side="top", fill="both", expand=True)
+                if hasattr(self, 'tomato') and self.tomato:
+                    self.status_label.config(text="[СТАТ] Завантаження Tomato.gg...", fg="yellow")
+                    self.tomato.launch()
+                    self.root.after(500, self.win_mgr.dock_tomato_window)
+            elif self.active_view == "ai_stats":
+                self.ai_frame.pack(side="top", fill="both", expand=True)
+                self.status_label.pack(side="bottom", fill="x")
+
+        prefix = "edit_" if self.mode == "edit" else "norm_"
+        self.w = self.settings.get(f"{prefix}w", 800 if self.mode=="edit" else 400)
+        self.h = self.w + (self.get_edit_extra_height() if self.mode=="edit" else 0)
+        self.alpha = self.settings.get(f"{prefix}alpha", 1.0)
+        self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
+        px, py = self.settings.get(f"{prefix}x", 100), self.settings.get(f"{prefix}y", 100)
+        
+        self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
+        self.root.attributes("-alpha", self.alpha)
+        self.root.after(50, self.map_renderer.show_main_splash)
+        self.refresh_mode_indicator()
+
+    def refresh_mode_indicator(self):
+        mode_text = "РЕДАГУВАННЯ" if self.mode == "edit" else "БОЙОВИЙ"
+        fmt_text = "ON" if self.win_mgr.format_mode_enabled else "OFF"
+        text = f"[РЕЖИМ] {mode_text} | [ФОРМАТУВАННЯ] {fmt_text}"
+        fg = "cyan" if self.mode == "edit" else "#bbbbbb"
+        if hasattr(self, "status_label"):
+            self.status_label.config(text=text, fg=fg)
+        if hasattr(self, "battle_status_label"):
+            self.battle_status_label.config(text=text, fg=fg)
+
+    def toggle_formatting_mode(self):
+        """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
+        if self.dialog_open:
+            return
+        now = time.time()
+        if now - self._last_mode_hotkey_ts < 0.2:
+            return
+        self._last_mode_hotkey_ts = now
+
+        new_state = not self.win_mgr.format_mode_enabled
+        self.win_mgr.set_format_mode(new_state)
+
+        if new_state:
+            self.win_mgr.set_clickthrough(False)
+            self.root.lift()
+            self.root.focus_force()
+            print("[HOTKEY] F8: ФОРМАТУВАННЯ увімкнено")
+        else:
+            if self.mode == "norm":
+                self.win_mgr.set_clickthrough(True)
+                self.win_mgr.focus_game_window()
+            print("[HOTKEY] F8: ФОРМАТУВАННЯ вимкнено")
+        self.refresh_mode_indicator()
+
+    def toggle_visibility(self):
+        """Приховати/Показати вікно (F10)"""
+        if self.root.state() == "withdrawn":
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+        else:
+            self.save_settings()
+            self.root.withdraw()
+
+    def _ensure_edit_focus(self):
+        if not self.edit_focus_lock or self.mode != "edit" or self.root.state() == "withdrawn":
+            return
+        try:
+            self.root.lift()
+            self.root.focus_force()
+            self.root.focus_set()
+        except Exception:
+            pass
+        self.root.after(250, self._ensure_edit_focus)
+
+    def toggle_editor_backspace(self):
+        """Чітке перемикання режиму для бою: Tilde."""
+        if self.dialog_open:
+            return
+        now = time.time()
+        if now - self._last_mode_hotkey_ts < 0.2:
+            return
+        self._last_mode_hotkey_ts = now
+
+        going_to_edit = self.mode != "edit"
+        self.toggle_editor()
+
+        if going_to_edit:
+            self.edit_focus_lock = True
+            self.root.after(10, self._ensure_edit_focus)
+            print("[HOTKEY] F8: увімкнено РЕДАГУВАННЯ + ФОРМАТУВАННЯ")
+        else:
+            self.edit_focus_lock = False
+            focused = self.win_mgr.focus_game_window()
+            if focused:
+                print("[HOTKEY] F8: увімкнено БОЙОВИЙ режим, форматування вимкнено")
+            else:
+                print("[HOTKEY] F8: увімкнено БОЙОВИЙ режим (вікно гри не знайдено)")
+
+    def on_map_select(self, event=None):
+        self.root.focus_set()
+        selected_ua = self.map_var.get()
+        self.current_map_eng = self.map_mgr.get_eng_map_name(selected_ua)
+        self.map_renderer.show_main_splash()
+
+    def set_painter_tool(self, tool):
+        if hasattr(self, 'painter'):
+            self.painter.set_tool(tool)
+                
+        if tool == "marker":
+            self.draw_btn.config(text="МАРКЕР", bg="#ffaa00", fg="black")
+        elif tool == "text":
+            self.draw_btn.config(text="ТЕКСТ / ЗНАК", bg="#ffaa00", fg="black")
+        else:
+            self.draw_btn.config(text="МАЛЮВАТИ", bg="#444", fg="gray")
+
+    def export_current_tactic(self):
+        if not self.current_map_eng: return
+        tactics_manager.export_tactic(
+            self.root, 
+            self.current_map_eng, 
+            self.translate_map_name(self.current_map_eng), 
+            self.painter.drawings
+        )
+
+    def import_external_tactic(self):
+        if not self.current_map_eng: return
+        def on_success():
+            self.painter.save_data()
+            self.painter.redraw()
+        
+        tactics_manager.import_tactic(
+            self.root,
+            self.current_map_eng,
+            self.translate_map_name(self.current_map_eng),
+            self.painter.drawings,
+            on_success
+        )
+
+    def on_minimap_appeared(self, map_id, mode):
+        # Викликається коли мініматa з'явилася (UI готова), ~2s після Loading space
+        print(f"[BATTLE] Мініматп з'явилася: map_id={map_id}, mode={mode}")
+
+    def on_vehicle_detected(self, compact_descr):
+        # Викликається коли виявлено техніку гравця у лозі (helpers.tips)
+        info = self.compact_descr_map.get(compact_descr)
+        if not info:
+            print(f"[VEHICLE] Невідомий compactDescr={compact_descr}")
+            return
+        print(f"[VEHICLE] Техніка гравця: {info['name']} ({info['class']}) compactDescr={compact_descr}")
+
+        if not self.auto_sync_var.get():
+            return
+        if not self.auto_vehicle_filter_var.get():
+            print(f"[VEHICLE] Авто-вибір виду техніки вимкнено (auto_vehicle_filter={self.auto_vehicle_filter_var.get()})")
+            return
+
+        cls = info["class"]
+        cls_map = {"LT": "ЛТ", "MT": "СТ", "HT": "ТТ", "TD": "ПТ", "SPG": "САУ"}
+        ui_cls = cls_map.get(cls)
+        if not ui_cls:
+            return
+
+        def apply_class_filter():
+            # Вмикаємо лише відповідний клас, решту вимикаємо
+            for c, var in self.selected_classes.items():
+                var.set(c == ui_cls)
+            print(f"[VEHICLE] Авто-фільтр: клас={ui_cls} ({cls})")
+
+        self.root.after(0, apply_class_filter)
+
+    def on_battle_countdown_started(self, map_id, arena_type):
+        # Викликається на старті передбойового відліку (classicBattlePage)
+        type_to_mode = {
+            1: "ctf",
+            2: "domination",
+            3: "assault",
+            4: "comp7"
+        }
+        mode = type_to_mode.get(arena_type, "ctf")
+        print(f"[BATTLE] Стартував передбойовий відлік: map_id={map_id}, mode={mode}")
+
+        if not self.auto_battle_var.get():
+            print(f"[BATTLE] Авто перехід до режиму бою вимкнено (auto_battle_var={self.auto_battle_var.get()})")
+            return
+
+        if self.mode != "norm":
+            print(f"[BATTLE] Перехід до боєвого режиму (по відліку)...")
+            self.root.after(100, self.toggle_editor)
+
+    def on_battle_detected(self, map_id, mode):
+        # Викликається коли "Loading space" виявлено (для синхронізації фільтрів)
+        print(f"[SYNC] Виявлено карту в логу: map_id={map_id}, mode={mode}")
+        
+        # Зберігаємо останню карту бою для повернення після ангару
+        self.last_battle_map = map_id
+        self.last_battle_mode = mode
+        self.last_battle_map_mode = self.map_mode
+        
+        if not self.auto_sync_var.get():
+            print(f"[SYNC] Авто-синхронізація вимкнена (auto_sync_var={self.auto_sync_var.get()})")
+            return
+        
+        mode_map = {
+            "ctf": "Standard",
+            "domination": "Encounter",
+            "assault": "Assault",
+            "comp7": "Onslaught"
+        }
+        ui_mode = mode_map.get(mode, "Standard")
+        print(f"[SYNC] Синхронізація фільтрів: {mode} -> {ui_mode}")
+        self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
+
+    def on_battle_ended(self):
+        # Викликається коли повертаємось в ангар
+        print(f"[BATTLE] Поверненння в ангар. Остання карта: {self.last_battle_map}, режим мап: {self.last_battle_map_mode}")
+        
+        # Спочатку зберігаємо поточні налаштування боєвого режиму
+        self.save_settings()
+        
+        if not self.last_battle_map or not self.auto_battle_var.get():
+            print(f"[BATTLE] Не повертаємось до редагування (no map або auto_battle вимкнено)")
+            return
+        
+        # Автоматично перемикаємо на РЕДАГУВАННЯ з останньою картою бою
+        self.root.after(200, lambda: self._return_to_editor_with_map(self.last_battle_map, self.last_battle_mode, self.last_battle_map_mode))
+    
+    def _return_to_editor_with_map(self, map_id, mode, map_source_mode=2):
+        """Повертаємось до РЕДАГУВАННЯ з картою з останнього бою"""
+        if self.mode != "edit":
+            print(f"[BATTLE] Переключаємось до режиму РЕДАГУВАННЯ з картою: {map_id}")
+            # Ми в бойовому режимі, перемикаємось на РЕДАГУВАННЯ
+            self.toggle_editor()  # Це збереже norm налаштування і загрузить edit налаштування
+            
+            # Після перекллючення, синхронізуємо фільтри на карту з бою
+            self.root.after(100, lambda: self._sync_battle_map_after_return(map_id, mode, map_source_mode))
+    
+    def _sync_battle_map_after_return(self, map_id, mode, map_source_mode=2):
+        """Синхронізуємо фільтри після повернення до редагування"""
+        target_map_mode = map_source_mode if map_source_mode in (1, 2) else 2
+        self.switch_to_maps(target_map_mode)
+        
+        # Конвертуємо режим
+        mode_map = {
+            "ctf": "Standard",
+            "domination": "Encounter",
+            "assault": "Assault",
+            "comp7": "Onslaught"
+        }
+        ui_mode = mode_map.get(mode, "Standard")
+        self.safe_battle_sync(map_id, ui_mode)
+        print(f"[BATTLE] Синхронізація карти після повернення: {map_id} (МАПИ {target_map_mode})")
+
+    def safe_battle_sync(self, map_id, ui_mode):
+        # Перевірка налаштування log_path
+        if not self.settings.get("log_path", ""):
+            self.status_label.config(text="[AUTO] ПОМИЛКА: Не встановлено log_path", fg="red")
+            return
+            
+        # Якщо зараз відкрито СТАТИ, автоматично перемикаємо на МАПИ II (вони актуальніші)
+            self.switch_to_maps(2)
+
+        if self.auto_mode_filter_var.get():
+            self.selected_battle_mode.set(ui_mode)
+        else:
+            print(f"[SYNC] Авто-вибір режиму бою вимкнено (auto_mode_filter={self.auto_mode_filter_var.get()})")
+        
+        # Біжи до перекладу карти з логуванням
+        target_name = self.translate_map_name(map_id)
+        print(f"[SYNC] map_id='{map_id}', ui_mode='{ui_mode}', target_name='{target_name}'")
+        
+        # Отримуємо список доступних карт
+        tmaps = self.map_selector.cget("values")
+        print(f"[SYNC] Available maps: {tmaps}")
+        
+        # 1. Спробуємо точний збіг
+        if target_name in tmaps:
+            self.map_var.set(target_name)
+            self.on_map_select()
+            self.status_label.config(text=f"[AUTO] Виявлено: {target_name} ({map_id})", fg="lime")
+            return
+            
+        # 2. Пошук без врахування регістру
+        for t in tmaps:
+            if t.lower() == target_name.lower():
+                self.map_var.set(t)
+                self.on_map_select()
+                self.status_label.config(text=f"[AUTO] Виявлено (регістр): {t} ({map_id})", fg="lime")
+                return
+        
+        # 3. Частковий збіг (если перший фрагмент збігається)
+        for t in tmaps:
+            if target_name in t or t.lower() in target_name.lower():
+                self.map_var.set(t)
+                self.on_map_select()
+                self.status_label.config(text=f"[AUTO] Виявлено (схоже): {t} ({map_id})", fg="yellow")
+                return
+        
+        # 4. Якщо нічого не знайше - показуємо помилку з map_id
+        self.status_label.config(text=f"[AUTO] ПОМИЛКА: Карта '{map_id}' ('{target_name}') не в списку", fg="red")
+
+    def show_draw_menu(self):
+        x = self.draw_btn.winfo_rootx()
+        y = self.draw_btn.winfo_rooty() + self.draw_btn.winfo_height()
+        self.draw_menu.post(x, y)
+
+    def setup_ui(self):
+        self.top_bar = tk.Frame(self.root, bg="#222", height=32)
+        self.top_bar.pack_propagate(False)
+        self.top_bar.pack(side="top", fill="x")
+        
+        # --- ПРАВА ЧАСТИНА (СТАТИЧНА) ---
+        tk.Button(self.top_bar, text="✕", bg="#800", fg="white", command=self.quit_app, bd=0, padx=10).pack(side="right", pady=2)
+        
+        self.settings_btn = tk.Button(self.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self.toggle_settings)
+        self.settings_btn.pack(side="right", padx=5)
+        
+        self.settings_menu = tk.Menu(self.settings_btn, tearoff=0, bg="#333", fg="white")
+        self.settings_menu.add_command(label="Вказати папку гри (WoT)", command=self.ask_wot_path)
+        self.settings_menu.add_separator()
+        self.settings_menu.add_command(label="Перейменувати мапу", command=self.ask_rename_map)
+        self.settings_menu.add_separator()
+        self.settings_menu.add_command(label="Оновити мапи (Примусово)", command=self.map_mgr.run_map_updater)
+        self.settings_menu.add_separator()
+        self.settings_menu.add_checkbutton(label="Авто-фільтри (за логом)", variable=self.auto_sync_var, command=self.save_settings)
+        self.settings_menu.add_checkbutton(label="Авто-вибір режиму бою", variable=self.auto_mode_filter_var, command=self.save_settings)
+        self.settings_menu.add_checkbutton(label="Авто-вибір виду техніки", variable=self.auto_vehicle_filter_var, command=self.save_settings)
+        self.settings_menu.add_checkbutton(label="Авто-бойовий режим", variable=self.auto_battle_var, command=self.save_settings)
+        self.settings_menu.add_separator()
+        self.settings_menu.add_command(label="Встановити AI Key (Gemini)", command=self.ask_ai_key)
+        self.settings_menu.add_separator()
+        self.settings_menu.add_command(label="Допомога (F1)", command=self.help_manager.toggle_overlay)
+        self.settings_menu.bind("<Unmap>", self._on_settings_unmap)
+
+        self.battle_status_top = tk.Frame(self.root, bg="#111", height=18)
+        self.battle_status_top.pack_propagate(False)
+        self.battle_status_label = tk.Label(self.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
+        self.battle_status_label.pack(side="left", padx=6)
+
+        # --- ЛІВА ЧАСТИНА (РЕЖИМИ) ---
+        self.btn_mode_ai_stats = tk.Button(self.top_bar, text=f"📊 {self.t('ui', 'ai_stats')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=self.switch_to_ai_stats)
+        self.btn_mode_ai_stats.pack(side="left", padx=5, pady=2)
+        
+        self.btn_mode_maps_1 = tk.Button(self.top_bar, text=f"🗺️ {self.t('ui', 'maps_1')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(1))
+        self.btn_mode_maps_1.pack(side="left", padx=2, pady=2)
+
+        self.btn_mode_maps_2 = tk.Button(self.top_bar, text=f"🗺️ {self.t('ui', 'maps_2')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(2))
+        self.btn_mode_maps_2.pack(side="left", padx=2, pady=2)
+
+        # --- ДИНАМІЧНА ПАНЕЛЬ (МАЛЮВАННЯ) ---
+        self.map_toolbar = tk.Frame(self.top_bar, bg="#222")
+        self.map_var = tk.StringVar()
+        self.map_selector = ttk.Combobox(self.map_toolbar, textvariable=self.map_var, state="readonly", width=15)
+        self.map_selector.bind("<<ComboboxSelected>>", self.on_map_select)
+        self.map_selector.pack(side="left", padx=5, pady=2)
+        
+        self.draw_btn = tk.Button(self.map_toolbar, text=self.t('ui', 'draw'), bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.show_draw_menu)
+        self.draw_btn.pack(side="left", padx=5, pady=2)
+        self.draw_menu = tk.Menu(self.draw_btn, tearoff=0, bg="#333", fg="white", activebackground="#ffaa00", activeforeground="black")
+        self.draw_menu.add_command(label=self.t('ui', 'marker'), command=lambda: self.set_painter_tool("marker"))
+        self.draw_menu.add_separator()
+        self.draw_menu.add_command(label=self.t('ui', 'text_sign'), command=lambda: self.set_painter_tool("text"))
+        self.draw_menu.add_separator()
+        self.draw_menu.add_command(label=self.t('ui', 'clear'), command=lambda: self.painter.clear_all())
+        self.draw_menu.add_separator()
+        self.draw_menu.add_command(label="Експорт тактики (.json)", command=self.export_current_tactic)
+        self.draw_menu.add_command(label="Імпорт тактики (.json)", command=self.import_external_tactic)
+
+        self.status_label = tk.Label(self.root, text="[HANGAR]", bg="#111", fg="gray", font=("Arial", 8))
+        self.filter_panel = tk.Frame(self.root, bg="#222", bd=1, relief="solid")
+        self.build_filters()
+
+        self.canvas = tk.Canvas(self.root, bg="black", highlightthickness=0)
+        self.browser_frame = tk.Frame(self.root, bg="#000")
+        self.browser_frame.bind("<Configure>", self.win_mgr.resize_tomato_window)
+        
+        self.ai_frame = tk.Frame(self.root, bg="#111")
+        self.stats_ai_module = stats_ai.StatsAI(self.ai_frame, self.tank_db, self.popular_tanks, self)
+        
+        self.canvas.pack(side="top", fill="both", expand=True)
+
+    def build_filters(self):
+        for w in self.filter_panel.winfo_children(): w.destroy()
+        self.filters_container = tk.Frame(self.filter_panel, bg="#222")
+        self.filters_container.pack(expand=True, pady=4)
+        m_frame = tk.LabelFrame(self.filters_container, text=" РЕЖИМ БОЮ ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
+        m_frame.pack(side="left", padx=5)
+        for t, v in [("Стандарт", "Standard"), ("Зустріч", "Encounter"), ("Штурм", "Assault"), ("НАТИСК", "Onslaught")]:
+            clr = "#ffaa00" if v == "Onslaught" else "white"
+            tk.Radiobutton(m_frame, text=t, variable=self.selected_battle_mode, value=v, bg="#222", fg=clr, selectcolor="black").pack(side="left", padx=3)
+        c_frame = tk.LabelFrame(self.filters_container, text=" ТЕХНІКА ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
+        c_frame.pack(side="left", padx=5)
+        for cls, var in self.selected_classes.items():
+            tk.Checkbutton(c_frame, text=cls, variable=var, bg="#222", fg="white", selectcolor="black").pack(side="left", padx=3)
+
+
+
+    def switch_to_maps(self, mode=1):
+        self.active_view = "maps"
+        self.map_mode = mode
+        if mode == 1:
+            self.btn_mode_maps_1.config(bg="#ff4500", fg="white")
+            self.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
+        else:
+            self.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")
+            self.btn_mode_maps_2.config(bg="#ff4500", fg="white")
+            
+        self.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
+        
+        if hasattr(self, 'tomato') and self.tomato:
+            self.tomato.stop()
+            self.tomato_hwnd = None
+            
+        self.browser_frame.pack_forget()
+        self.canvas.pack_forget() 
+        self.filter_panel.pack_forget()
+        self.status_label.pack_forget()
+        self.ai_frame.pack_forget()
+        
+        # Гарантуємо, що панель завжди нагорі
+        self.top_bar.pack_forget()
+        self.top_bar.pack(side="top", fill="x")
+        
+        self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10) 
+        self.filter_panel.pack(side="bottom", fill="x") 
+        self.status_label.pack(side="bottom", fill="x")
+        self.canvas.pack(side="top", fill="both", expand=True) 
+        
+        self.map_mgr.load_map_list()
+
+    def switch_to_stats(self):
+        self.active_view = "stats"
+        self.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")      
+        self.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
+        self.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
+        
+        self.map_toolbar.pack_forget()       
+        self.filter_panel.pack_forget()
+        self.canvas.pack_forget()
+        self.ai_frame.pack_forget()
+        
+        # Гарантуємо, що панель завжди нагорі
+        self.top_bar.pack_forget()
+        self.top_bar.pack(side="top", fill="x")
+        
+        self.status_label.config(text="[СТАТ] Запуск браузера...", fg="yellow")
+        self.status_label.pack(side="bottom", fill="x")
+        self.browser_frame.pack(side="top", fill="both", expand=True)
+        
+        # Додаємо loading message в браузер фрейм
+        loading_label = tk.Label(
+            self.browser_frame,
+            text="\n\n     ⏳ Інформація завантажується...\n\n",
+            bg="#000",
+            fg="#cccccc",
+            font=("Segoe UI", 14)
+        )
+        loading_label.pack(expand=True)
+        self.browser_frame.update()
+
+        if hasattr(self, 'tomato') and self.tomato:
+            self.tomato_hwnd = None
+            self.tomato.launch()
+            # Запускаємо докінг один раз; подальші retry робить window_manager.
+            self.root.after(200, self.win_mgr.dock_tomato_window)
+
+            def cleanup_loading_when_docked():
+                # Прибираємо напис тільки після реального докінгу вікна Tomato.
+                if self.tomato_hwnd:
+                    try:
+                        loading_label.destroy()
+                    except Exception:
+                        pass
+                else:
+                    self.root.after(200, cleanup_loading_when_docked)
+
+            self.root.after(200, cleanup_loading_when_docked)
+        else:
+            self.status_label.config(text="[ПОМИЛКА] Модуль tomato_viewer.py не знайдено!", fg="red")
+
+    def switch_to_ai_stats(self):
+        self.active_view = "ai_stats"
+        self.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
+        self.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")      
+        self.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
+        
+        if hasattr(self, 'tomato') and self.tomato:
+            self.tomato.stop()
+            self.tomato_hwnd = None
+            
+        self.map_toolbar.pack_forget()       
+        self.filter_panel.pack_forget()
+        self.canvas.pack_forget()
+        self.browser_frame.pack_forget()
+        
+        # Гарантуємо, що панель зверху
+        self.top_bar.pack_forget()
+        self.top_bar.pack(side="top", fill="x")
+        
+        self.ai_frame.pack(side="top", fill="both", expand=True)
+        self.status_label.config(text="[СТАТ АІ] Оберіть танк для отримання збірки", fg="cyan")
+        self.status_label.pack(side="bottom", fill="x")
+        if hasattr(self, 'stats_ai_module'): self.stats_ai_module.refresh_ai_view()
+
+    def quit_app(self):
+        self.save_settings()
+        if hasattr(self, 'tomato') and self.tomato:
+            self.tomato.stop()
+        keyboard.unhook_all() 
+        self.root.destroy()
+        sys.exit(0)
+
+    def bind_events(self):
+        keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
+        keyboard.add_hotkey('F10', lambda: self.safe_execute(self.toggle_visibility))  # F10: Показати/Приховати вікно
+        keyboard.add_hotkey('e', lambda: self.safe_execute(self.toggle_editor), suppress=False)
+        try:
+            keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
+            print("[HOTKEY] ФОРМАТУВАННЯ: F8")
+        except Exception as e:
+            keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
+            print(f"[HOTKEY] F8 недоступний: {e}")
+            print("[HOTKEY] Fallback форматування: Ctrl+E")
+        # Ctrl керування вікном у бойовому режимі (подвійний натиск для drag)
+        # suppress=False дозволяє одинарному Ctrl залишатись прозорим для гри
+        keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self.win_mgr.resize_up_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self.win_mgr.resize_down_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
+        self.win_mgr.bind_controls(self.top_bar, self.canvas)
+
+    def load_logo(self):
+        try:
+            img = Image.open(config.LOGO_FILE)
+            self.logo_splash = ImageTk.PhotoImage(ImageOps.contain(img, (200, 200), Image.Resampling.LANCZOS))
+            self.logo_image_object = img
+        except: self.logo_splash = self.logo_image_object = None
+
+    def _on_startup_progress(self, percent, text):
+        self.update_startup_progress(percent, text)
+
+    def _on_startup_ready(self):
+        self._startup_ready_at = time.time()
+        self.finish_startup_splash()
+
+    def update_startup_progress(self, percent, text=None):
+        if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
+            return
+        try:
+            percent = max(0, min(100, int(percent)))
+            self._startup_target_percent = max(getattr(self, "_startup_target_percent", 0), percent)
+            if text:
+                self._startup_status_text = text
+                self.splash_canvas.itemconfigure(self.splash_status_text, text=text)
+            self.splash_canvas.itemconfigure(
+                self.splash_percent_text,
+                text=f"{int(getattr(self, '_startup_display_percent', 0))}%",
+            )
+        except Exception:
+            pass
+
+    def _animate_startup_progress(self):
+        if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
+            return
+        try:
+            sw = int(self.splash_canvas["width"])
+            sh = int(self.splash_canvas["height"])
+            target = int(getattr(self, "_startup_target_percent", 0))
+            current = int(getattr(self, "_startup_display_percent", 0))
+            if current < target:
+                step = 2 if (target - current) > 8 else 1
+                current = min(target, current + step)
+                self._startup_display_percent = current
+                x2 = int((sw * current) / 100)
+                self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
+                self.splash_canvas.itemconfigure(self.splash_percent_text, text=f"{current}%")
+            self.root.after(45, self._animate_startup_progress)
+        except Exception:
+            pass
+
+    def finish_startup_splash(self):
+        shown_at = getattr(self, "_splash_shown_at", 0.0)
+        elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
+        min_visible_ms = 1200
+        if elapsed_ms < min_visible_ms:
+            self.root.after(min_visible_ms - elapsed_ms, self.finish_startup_splash)
+            return
+        ready_at = getattr(self, "_startup_ready_at", 0.0)
+        if ready_at:
+            done_elapsed_ms = int((time.time() - ready_at) * 1000)
+            min_done_visible_ms = 4000
+            if done_elapsed_ms < min_done_visible_ms:
+                self.root.after(min_done_visible_ms - done_elapsed_ms, self.finish_startup_splash)
+                return
+        try:
+            if hasattr(self, "splash") and self.splash and self.splash.winfo_exists():
+                self.splash.destroy()
+        except Exception:
+            pass
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+        self.current_map_eng = None
+        self.map_var.set("")
+        self.map_renderer.show_main_splash()
+
+    def show_small_loading_splash(self):
+        self.splash = tk.Toplevel(self.root)
+        self._splash_shown_at = time.time()
+        self._startup_target_percent = 0
+        self._startup_display_percent = 0
+        self._startup_ready_at = 0.0
+        self._startup_status_text = "Перевірка оновлень..."
+        sw, sh = 450, 300
+        self.splash.geometry(f"{sw}x{sh}+{int((self.root.winfo_screenwidth()/2)-(sw/2))}+{int((self.root.winfo_screenheight()/2)-(sh/2))}")
+        self.splash.overrideredirect(True)
+        self.splash.attributes("-topmost", True)
+        self.splash.configure(bg="black")
+        self.splash_canvas = tk.Canvas(self.splash, width=sw, height=sh, bg="black", highlightthickness=0)
+        self.splash_canvas.pack()
+        if self.logo_splash:
+            self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
+        self.splash_canvas.create_text(sw//2, sh - 72, text="WoT Assistant", fill="white", font=("Verdana", 12, "bold"))
+        self.splash_status_text = self.splash_canvas.create_text(
+            sw//2,
+            sh - 46,
+            text="Перевірка оновлень...",
+            fill="#bbbbbb",
+            font=("Arial", 9),
+        )
+        self.splash_percent_text = self.splash_canvas.create_text(
+            sw - 34,
+            sh - 18,
+            text="0%",
+            fill="#dddddd",
+            font=("Arial", 9, "bold"),
+        )
+        self.pbar = self.splash_canvas.create_rectangle(0, sh-8, 0, sh, fill="#ff4500", outline="")
+        self.update_startup_progress(3, "Підготовка до перевірки...")
+        self._animate_startup_progress()
+        # Форсуємо первинне відмалювання splash до старту фонових задач.
+        self.splash.deiconify()
+        self.splash.lift()
+        self.splash.update_idletasks()
+
+    def _startup_show_failsafe(self):
+        # Якщо вікно досі приховане через проблеми splash/таймерів — примусово показуємо.
+        try:
+            if self.root.state() == "withdrawn":
+                sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+                safe_w = max(320, min(int(self.w), max(320, sw - 40)))
+                safe_h = max(240, min(int(self.h), max(240, sh - 40)))
+                safe_x = max(0, (sw - safe_w) // 2)
+                safe_y = max(0, (sh - safe_h) // 2)
+                self.root.geometry(f"{safe_w}x{safe_h}+{safe_x}+{safe_y}")
+                self.root.attributes("-alpha", max(0.2, min(float(self.alpha), 1.0)))
+                self.root.deiconify()
+                self.root.lift()
+                self.root.focus_force()
+                self.current_map_eng = None
+                self.map_var.set("")
+                self.map_renderer.show_main_splash()
+                print("[INIT] Failsafe: головне вікно примусово показано")
+        except Exception as e:
+            print(f"[INIT] Failsafe error: {e}")
+
+if __name__ == "__main__":
+    import multiprocessing
+    multiprocessing.freeze_support()
+    root = tk.Tk()
+    app = WotAssistantHQ(root)
+    root.mainloop()
+# main.py 4_43

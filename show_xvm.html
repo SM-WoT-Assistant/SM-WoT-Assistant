@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+    @font-face {
+        font-family: 'XVMSymbol';
+        src: url('xvmsymbol.ttf') format('truetype');
+    }
+    body { font-family: Arial, sans-serif; background: #222; color: #fff; padding: 20px;}
+    .grid { display: flex; flex-wrap: wrap; gap: 10px; }
+    .cell { border: 1px solid #555; padding: 10px; text-align: center; width: 60px; background: #333;}
+    .sym { font-family: 'XVMSymbol'; font-size: 32px; color: #ffaa00; margin-bottom: 5px;}
+    .code { font-size: 12px; color: #aaa; }
+</style>
+</head>
+<body>
+    <h2>XVM Symbol Font Viewer</h2>
+    <p>Знайдіть потрібні значки (череп, техніку) і напишіть їх символи/коди.</p>
+    <div class="grid">
+        <script>
+            // Generate ASCII
+            for(let i=33; i<=255; i++) {
+                if(i>=127 && i<=160) continue; // skip non-printables
+                document.write(`<div class="cell"><div class="sym">&#${i};</div><div class="code">${String.fromCharCode(i)}<br>U+${i.toString(16).toUpperCase()}</div></div>`);
+            }
+        </script>
+    </div>
+</body>
+</html>
