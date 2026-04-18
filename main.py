@@ -436,50 +436,6 @@ class WotAssistantHQ:
             if self.btn_mode_maps_2.cget("bg") == "#ff4500":
                 self.map_mgr.run_map_updater()
 
-    def ask_rename_map(self):
-        cur = self.map_var.get()
-        if not cur: return
-        eng = self.map_mgr.get_eng_map_name(cur)
-        if not eng: return
-        
-        self.dialog_open = True
-        dlg = tk.Toplevel(self.root)
-        dlg.title("Перейменувати")
-        dlg.geometry("300x120")
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.attributes("-topmost", True)
-        dlg.grab_set()
-        
-        tk.Label(dlg, text=f"Нова назва для '{eng}':", bg="#222", fg="white").pack(pady=10)
-        entry = tk.Entry(dlg, bg="#111", fg="white", insertbackground="white", width=30)
-        entry.insert(0, cur)
-        entry.pack()
-        
-        def save():
-            new_val = entry.get().strip()
-            if new_val:
-                self.custom_names[eng] = new_val
-                self.save_json(config.CUSTOM_NAMES_FILE, self.custom_names)
-                self.map_mgr._sort_map_list_eng_by_display()
-                tmaps = [self.translate_map_name(m) for m in self.map_list_eng]
-                self.map_selector.config(values=tmaps)
-                self.map_var.set(new_val)
-                self.map_renderer.show_main_splash()
-            self.dialog_open = False
-            dlg.destroy()
-            
-        def cancel():
-            self.dialog_open = False
-            dlg.destroy()
-            
-        dlg.protocol("WM_DELETE_WINDOW", cancel)
-        bf = tk.Frame(dlg, bg="#222")
-        bf.pack(pady=15)
-        tk.Button(bf, text="ОК", bg="#006400", fg="white", bd=0, width=10, command=save).pack(side="left", padx=5)
-        tk.Button(bf, text="СКАСУВАТИ", bg="#8b0000", fg="white", bd=0, width=10, command=cancel).pack(side="left", padx=5)
-        self.root.wait_window(dlg)
-
     def ask_clear_confirm(self, map_title, on_done):
         """Підтвердження очищення міток (викликається з painter.MapPainter.clear_all)."""
         self.dialog_open = True
@@ -712,6 +668,14 @@ class WotAssistantHQ:
 
     def on_vehicle_detected(self, compact_descr):
         # Викликається коли виявлено техніку гравця у лозі (helpers.tips)
+        print(f"[VEHICLE] Detected compact_descr={compact_descr}")
+        print(f"[VEHICLE] auto_sync_var.get()={self.auto_sync_var.get()}, auto_vehicle_filter_var.get()={self.auto_vehicle_filter_var.get()}")
+        if not self.auto_sync_var.get():
+            print("[VEHICLE] Auto sync is off, returning")
+            return
+        if not self.auto_vehicle_filter_var.get():
+            print(f"[VEHICLE] Авто-вибір виду техніки вимкнено (auto_vehicle_filter={self.auto_vehicle_filter_var.get()})")
+            return
         info = self.compact_descr_map.get(compact_descr)
         if not info:
             print(f"[VEHICLE] Невідомий compactDescr={compact_descr}")
@@ -732,8 +696,11 @@ class WotAssistantHQ:
 
         def apply_class_filter():
             # Вмикаємо лише відповідний клас, решту вимикаємо
+            print(f"[VEHICLE] Applying class filter: ui_cls={ui_cls}, cls={cls}")
             for c, var in self.selected_classes.items():
-                var.set(c == ui_cls)
+                new_val = (c == ui_cls)
+                var.set(new_val)
+                print(f"[VEHICLE] Set {c} to {new_val}")
             print(f"[VEHICLE] Авто-фільтр: клас={ui_cls} ({cls})")
 
         self.root.after(0, apply_class_filter)
@@ -886,8 +853,6 @@ class WotAssistantHQ:
         
         self.settings_menu = tk.Menu(self.settings_btn, tearoff=0, bg="#333", fg="white")
         self.settings_menu.add_command(label="Вказати папку гри (WoT)", command=self.ask_wot_path)
-        self.settings_menu.add_separator()
-        self.settings_menu.add_command(label="Перейменувати мапу", command=self.ask_rename_map)
         self.settings_menu.add_separator()
         self.settings_menu.add_command(label="Оновити мапи (Примусово)", command=self.map_mgr.run_map_updater)
         self.settings_menu.add_separator()
