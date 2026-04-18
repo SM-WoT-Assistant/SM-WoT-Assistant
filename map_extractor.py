@@ -1,5 +1,5 @@
 # НЕ СКОРОЧУВАТИ І НЕ ОПТИМІЗУВАТИ КОД ЯКИЙ НЕ СТОСУЄТЬСЯ ВИПРАВЛЕНЬ!
-# map_extractor.py 2_09
+# map_extractor.py 2_12
 import os
 import shutil
 import zipfile
@@ -7,6 +7,10 @@ import json
 import re
 import xml.etree.ElementTree as ET
 import wot_decoder
+import struct
+
+print("[DEBUG] map_extractor module loaded")
+
 
 class MapExtractor:
     def __init__(self):
@@ -23,17 +27,20 @@ class MapExtractor:
             try:
                 with open(path, "r", encoding="utf-8") as f:
                     return json.load(f)
-            except: pass
+            except:
+                pass
         return {}
 
     def get_version(self):
-        if not self.wot_path: return None
+        if not self.wot_path:
+            return None
         v_path = os.path.join(self.wot_path, "version.xml")
         if os.path.exists(v_path):
             try:
                 tree = ET.parse(v_path)
                 return tree.getroot().findtext("version")
-            except: pass
+            except:
+                pass
         return None
 
     def _entry_fingerprint(self, info):
@@ -52,7 +59,103 @@ class MapExtractor:
         with open(self.manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2, ensure_ascii=False)
 
+    def _load_ukrainian_map_names_fresh(self):
+        """Load Ukrainian map names directly from the game's arenas.mo localization file"""
+        ukrainian_names = {}
+        try:
+            mo_path = os.path.join(self.wot_path, "res", "text", "lc_messages", "arenas.mo")
+            if os.path.exists(mo_path):
+                with open(mo_path, 'rb') as f:
+                    data = f.read()
+                # Parse GNU MO file format
+                magic, version, nstrings, orig_offset, trans_offset = struct.unpack('<IIIII', data[:20])
+                if magic != 0x950412de:  # Little endian
+                    # Try big endian
+                    magic, version, nstrings, orig_offset, trans_offset = struct.unpack('>IIIII', data[:20])
+                    if magic != 0x950412de:
+                        print("[ЕКСТРАКТОР] Неправильний MO файл")
+                        return ukrainian_names
+
+                # Read string tables
+                orig_table = []
+                trans_table = []
+                for i in range(nstrings):
+                    o_len, o_off = struct.unpack_from('<II', data, orig_offset + i*8)
+                    t_len, t_off = struct.unpack_from('<II', data, trans_offset + i*8)
+                    orig_table.append((o_len, o_off))
+                    trans_table.append((t_len, t_off))
+
+                # Extract all strings
+                strings = {}
+                for i, ((o_len, o_off), (t_len, t_off)) in enumerate(zip(orig_table, trans_table)):
+                    orig = data[o_off:o_off+o_len].decode('utf-8')
+                    trans = data[t_off:t_off+t_len].decode('utf-8')
+                    strings[orig] = trans
+
+                # Filter for map names (those ending with /name)
+                for orig, trans in strings.items():
+                    if orig.endswith('/name'):
+                        map_key = orig.split('/')[0]  # e.g., '120_graf_zeppelin'
+                        ukrainian_names[map_key] = trans
+
+                print(f"[ЕКСТРАКТОР] Завантажено {len(ukrainian_names)} українських назв мап з arenas.mo")
+            else:
+                print("[ЕКСТРАКТОР] Файл локалізації arenas.mo не знайдено")
+        except Exception as e:
+            print(f"[ЕКСТРАКТОР] Помилка завантаження українських назв з MO файлу: {e}")
+        return ukrainian_names
+
+    def _save_ukrainian_map_names_cache(self, ukrainian_names):
+        """Save Ukrainian map names to cache file"""
+        try:
+            cache_path = os.path.join(self.out_path, "ukrainian_map_names_cache.json")
+            os.makedirs(self.out_path, exist_ok=True)
+            with open(cache_path, "w", encoding="utf-8") as f:
+                json.dump(ukrainian_names, f, indent=4, ensure_ascii=False)
+            print(f"[ЕКСТРАКТОР] Збережено {len(ukrainian_names)} українських назв мап у кеш")
+        except Exception as e:
+            print(f"[ЕКСТРАКТОР] Помилка збереження кешу українських назв: {e}")
+
+    def _load_ukrainian_map_names_cache(self):
+        """Load Ukrainian map names from cache file"""
+        try:
+            cache_path = os.path.join(self.out_path, "ukrainian_map_names_cache.json")
+            if os.path.exists(cache_path):
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    ukrainian_names = json.load(f)
+                if isinstance(ukrainian_names, dict) and ukrainian_names:
+                    print(f"[ЕКСТРАКТОР] Завантажено {len(ukrainian_names)} українських назв мап з кеш-файлу")
+                    return ukrainian_names
+                else:
+                    print("[ЕКСТРАКТОР] Кеш-файл містить невалідні дані")
+            else:
+                print("[ЕКСТРАКТОР] Кеш-файл українських назв мап не знайдено")
+        except Exception as e:
+            print(f"[ЕКСТРАКТОР] Помилка завантаження кешу українських назв: {e}")
+        return {}
+
+    def _load_ukrainian_map_names(self):
+        """Load Ukrainian map names from the game's arenas.mo localization file with caching"""
+        # Try to load fresh from MO file first
+        ukrainian_names = self._load_ukrainian_map_names_fresh()
+        if ukrainian_names:
+            # Save to cache on successful fresh load
+            self._save_ukrainian_map_names_cache(ukrainian_names)
+            return ukrainian_names
+
+        # If fresh load failed, try to load from cache
+        print("[ЕКСТРАКТОР] Спроба завантажити кешовані українські назви мап...")
+        ukrainian_names = self._load_ukrainian_map_names_cache()
+        if ukrainian_names:
+            print(f"[ЕКСТРАКТОР] Завантажено {len(ukrainian_names)} українських назв мап з кешу")
+            return ukrainian_names
+
+        # If both failed, return empty dict (fallback to config will happen elsewhere)
+        print("[ЕКСТРАКТОР] Не вдалося завантажити українські назви мап ні з MO файлу, ні з кешу")
+        return {}
+
     def extract(self, callback_status=None, force_full=False):
+        print("[DEBUG] MapExtractor.extract called")
         if not self.wot_path:
             return False
 
@@ -130,6 +233,10 @@ class MapExtractor:
 
         # ПОКРАЩЕНИЙ МОДУЛЬ ПЕРЕКЛАДУ
         dictionary = {}
+
+        # Завантажуємо українські назви з MO файлу гри
+        ukrainian_names = self._load_ukrainian_map_names()
+
         list_xml = os.path.join(self.temp_path, "_list_.xml")
         saved_dict = self.load_json(os.path.join(self.out_path, "map_dictionary.json"))
         if isinstance(saved_dict, dict):
@@ -150,7 +257,10 @@ class MapExtractor:
 
                     if name_raw:
                         name_eng = name_raw.strip()
-                        if loc_raw:
+                        # Спочатку пробуємо взяти українську назву з MO файлу
+                        if name_eng in ukrainian_names:
+                            dictionary[name_eng] = ukrainian_names[name_eng]
+                        elif loc_raw:
                             # Переклад: очищуємо від технічного сміття
                             clean_loc = loc_raw.strip().replace("#arenas:", "").split("/")[-1]
                             if not clean_loc or clean_loc == "name":
@@ -175,5 +285,3 @@ class MapExtractor:
 
         print("[ЕКСТРАКТОР] Успішно завершено!")
         return True
-# map_extractor.py 2_09
-# НЕ СКОРОЧУВАТИ І НЕ ОПТИМІЗУВАТИ КОД ЯКИЙ НЕ СТОСУЄТЬСЯ ВИПРАВЛЕНЬ!
