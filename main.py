@@ -1156,7 +1156,18 @@ class WotAssistantHQ:
         self.splash_canvas.pack()
         if self.logo_splash:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
-        self.splash_canvas.create_text(sw//2, sh - 72, text="WoT Assistant", fill="white", font=("Verdana", 12, "bold"))
+        # Get version from git tag
+        version = "1.03"
+        try:
+            import subprocess
+            result = subprocess.run(['git', 'describe', '--tags', '--always'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+            if result.returncode == 0:
+                git_version = result.stdout.strip()
+                if git_version:
+                    version = git_version
+        except Exception:
+            pass
+        self.splash_canvas.create_text(sw//2, sh - 72, text=version, fill="white", font=("Verdana", 12, "bold"))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
             sh - 46,

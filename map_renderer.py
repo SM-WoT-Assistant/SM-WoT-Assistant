@@ -118,7 +118,18 @@ class MapRenderer:
                 
         if not map_drawn:
             if app.mode == "edit":
-                app.canvas.create_text(cw//2, ch - 20, text=app.t('ui', 'wot_assistant_editor'), fill="#ff4500", font=("Arial", 9))
+                # Get version from git tag
+                version = "1.03"
+                try:
+                    import subprocess
+                    result = subprocess.run(['git', 'describe', '--tags', '--always'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+                    if result.returncode == 0:
+                        git_version = result.stdout.strip()
+                        if git_version:
+                            version = git_version
+                except Exception:
+                    pass
+                app.canvas.create_text(cw//2, ch - 20, text=f"SETUP & MAPS WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"))
                 app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9))
                 app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'hotkeys_help'), fill="white", font=("Arial", 11, "bold"))
                 if app.logo_image_object:
