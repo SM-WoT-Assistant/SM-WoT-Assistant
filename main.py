@@ -2,7 +2,7 @@
 # main.py 4_43
 # ==========================================
 # ЧЕК-ЛИСТ ФУНКЦІОНАЛУ (НЕ ВИДАЛЯТИ І НЕ ЗМІНЮВАТИ БЕЗ ДОЗВОЛУ):
-# [v] 1. UI: Три незалежні панелі (МАПИ, СТАТ, СТАТ АІ), які повністю перемикаються. Нейтральний старт.
+# [v] 1. UI: Три незалежні панелі (СТАТ АІ - SETUP, МАПИ І - TACTIC, МАПИ ІІ - MAPS), які повністю перемикаються. Нейтральний старт.
 # [v] 2. UI: Блок фільтрів (РЕЖИМ БОЮ з Натиском + ТЕХНІКА), пакування без накладання. Строка стану над фільтрами.
 # [v] 3. UI: Інструменти (painter.py). Магнітне прилипання. Захист від битих збережень.
 # [v] 4. UI: Налаштування (Кнопка ⚙ з коректним згортанням, перейменування мапи, авто-фільтри, AI-key). Темні діалоги.
@@ -14,7 +14,7 @@
 # [v] 10. МАПА: Запуск із заставки. ПОВЕРНУТО НЕЙТРАЛЬНИЙ СТАРТ.
 # [v] 11. МАПА: Дебаунс (затримка 100мс) при зміні розміру для уникнення мерехтіння.
 # [v] 12. ВІКНО: Watcher та жорстка фіксація (easy_drag=False) для WebView2.
-# [v] 13. МАПА: Кнопки МАПИ I / МАПИ II, авто-перевірка version.xml та автономний парсинг.
+# [v] 13. МАПА: Кнопки ТАКТИКА / МАПИ, авто-перевірка version.xml та автономний парсинг.
 # [v] 14. МАПА: Читання map_data.json, фільтрація за режимом та відмальовування порожніх білих кілець із тінями.
 # [v] 15. UI: Універсальний вибір шляху до гри (wot_path + log_path) та автовизначення.
 
@@ -22,8 +22,8 @@
 # ЧЕК-ЛИСТ МОДУЛІВ ТА АРХІТЕКТУРИ:
 # [v] config.py — Конфігурація, шляхи, локалізація, словники.
 # [v] main.py — Головний GUI, масштабування, гарячі клавіші.
-# [v] map_updater.py — МАПИ I: Старий завантажувач з інтернету (ПІДКЛЮЧЕНО).
-# [v] map_extractor.py — МАПИ II: Автономний екстрактор з клієнта гри (ПІДКЛЮЧЕНО).
+# [v] map_updater.py — TACTIC: Старий завантажувач з інтернету (ПІДКЛЮЧЕНО).
+# [v] map_extractor.py — MAPS: Автономний екстрактор з клієнта гри (ПІДКЛЮЧЕНО).
 # [v] painter.py — Логіка малювання, кольорові POI, магнітне прилипання, темна тема (ПІДКЛЮЧЕНО).
 # [v] tomato_viewer.py — Інтеграція статистики Tomato.gg через WebView2 (ПІДКЛЮЧЕНО).
 # [v] ai_assistant.py — СТАТ АІ: Персональний помічник Gemini для усереднення збірок (ПІДКЛЮЧЕНО).
@@ -875,10 +875,10 @@ class WotAssistantHQ:
         self.btn_mode_ai_stats = tk.Button(self.top_bar, text=f"📊 {self.t('ui', 'ai_stats')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=self.switch_to_ai_stats)
         self.btn_mode_ai_stats.pack(side="left", padx=5, pady=2)
         
-        self.btn_mode_maps_1 = tk.Button(self.top_bar, text=f"🗺️ {self.t('ui', 'maps_1')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(1))
+        self.btn_mode_maps_1 = tk.Button(self.top_bar, text="🗺️ МАПИ І - TACTIC", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(1))
         self.btn_mode_maps_1.pack(side="left", padx=2, pady=2)
 
-        self.btn_mode_maps_2 = tk.Button(self.top_bar, text=f"🗺️ {self.t('ui', 'maps_2')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(2))
+        self.btn_mode_maps_2 = tk.Button(self.top_bar, text="🗺️ МАПИ ІІ - MAPS", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(2))
         self.btn_mode_maps_2.pack(side="left", padx=2, pady=2)
 
         # --- ДИНАМІЧНА ПАНЕЛЬ (МАЛЮВАННЯ) ---
