@@ -872,13 +872,13 @@ class WotAssistantHQ:
         self.battle_status_label.pack(side="left", padx=6)
 
         # --- ЛІВА ЧАСТИНА (РЕЖИМИ) ---
-        self.btn_mode_ai_stats = tk.Button(self.top_bar, text="📊 SETUP", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=self.switch_to_ai_stats)
+        self.btn_mode_ai_stats = tk.Button(self.top_bar, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.switch_to_ai_stats)
         self.btn_mode_ai_stats.pack(side="left", padx=5, pady=2)
         
-        self.btn_mode_maps_1 = tk.Button(self.top_bar, text="🗺️ TACTIC", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=lambda: self.switch_to_maps(1))
+        self.btn_mode_maps_1 = tk.Button(self.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.switch_to_maps(1))
         self.btn_mode_maps_1.pack(side="left", padx=5, pady=2)
 
-        self.btn_mode_maps_2 = tk.Button(self.top_bar, text="🗺️ MAPS", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=lambda: self.switch_to_maps(2))
+        self.btn_mode_maps_2 = tk.Button(self.top_bar, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.switch_to_maps(2))
         self.btn_mode_maps_2.pack(side="left", padx=5, pady=2)
 
         # --- ДИНАМІЧНА ПАНЕЛЬ (МАЛЮВАННЯ) ---
@@ -888,7 +888,7 @@ class WotAssistantHQ:
         self.map_selector.bind("<<ComboboxSelected>>", self.on_map_select)
         self.map_selector.pack(side="left", padx=5, pady=2)
         
-        self.draw_btn = tk.Button(self.map_toolbar, text=self.t('ui', 'draw'), bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.show_draw_menu)
+        self.draw_btn = tk.Button(self.map_toolbar, text=self.t('ui', 'draw'), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.show_draw_menu)
         self.draw_btn.pack(side="left", padx=5, pady=2)
         self.draw_menu = tk.Menu(self.draw_btn, tearoff=0, bg="#333", fg="white", activebackground="#ffaa00", activeforeground="black")
         self.draw_menu.add_command(label=self.t('ui', 'marker'), command=lambda: self.set_painter_tool("marker"))
