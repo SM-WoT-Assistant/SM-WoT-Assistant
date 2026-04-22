@@ -2,7 +2,7 @@
 # main.py 4_43
 # ==========================================
 # ЧЕК-ЛИСТ ФУНКЦІОНАЛУ (НЕ ВИДАЛЯТИ І НЕ ЗМІНЮВАТИ БЕЗ ДОЗВОЛУ):
-# [v] 1. UI: Три незалежні панелі (СТАТ АІ - SETUP, МАПИ І - TACTIC, МАПИ ІІ - MAPS), які повністю перемикаються. Нейтральний старт.
+# [v] 1. UI: Три незалежні панелі (SETUP, TACTIC, MAPS), які повністю перемикаються. Нейтральний старт.
 # [v] 2. UI: Блок фільтрів (РЕЖИМ БОЮ з Натиском + ТЕХНІКА), пакування без накладання. Строка стану над фільтрами.
 # [v] 3. UI: Інструменти (painter.py). Магнітне прилипання. Захист від битих збережень.
 # [v] 4. UI: Налаштування (Кнопка ⚙ з коректним згортанням, перейменування мапи, авто-фільтри, AI-key). Темні діалоги.
@@ -872,14 +872,14 @@ class WotAssistantHQ:
         self.battle_status_label.pack(side="left", padx=6)
 
         # --- ЛІВА ЧАСТИНА (РЕЖИМИ) ---
-        self.btn_mode_ai_stats = tk.Button(self.top_bar, text=f"📊 {self.t('ui', 'ai_stats')}", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=self.switch_to_ai_stats)
+        self.btn_mode_ai_stats = tk.Button(self.top_bar, text="📊 SETUP", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=self.switch_to_ai_stats)
         self.btn_mode_ai_stats.pack(side="left", padx=5, pady=2)
         
-        self.btn_mode_maps_1 = tk.Button(self.top_bar, text="🗺️ МАПИ І - TACTIC", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(1))
-        self.btn_mode_maps_1.pack(side="left", padx=2, pady=2)
+        self.btn_mode_maps_1 = tk.Button(self.top_bar, text="🗺️ TACTIC", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=lambda: self.switch_to_maps(1))
+        self.btn_mode_maps_1.pack(side="left", padx=5, pady=2)
 
-        self.btn_mode_maps_2 = tk.Button(self.top_bar, text="🗺️ МАПИ ІІ - MAPS", bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), command=lambda: self.switch_to_maps(2))
-        self.btn_mode_maps_2.pack(side="left", padx=2, pady=2)
+        self.btn_mode_maps_2 = tk.Button(self.top_bar, text="🗺️ MAPS", width=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', justify='center', command=lambda: self.switch_to_maps(2))
+        self.btn_mode_maps_2.pack(side="left", padx=5, pady=2)
 
         # --- ДИНАМІЧНА ПАНЕЛЬ (МАЛЮВАННЯ) ---
         self.map_toolbar = tk.Frame(self.top_bar, bg="#222")
