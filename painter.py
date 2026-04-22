@@ -137,11 +137,11 @@ class PainterDialog(tk.Toplevel):
         self.destroy()
 
 class MapPainter:
-    def __init__(self, canvas, app):
+    def __init__(self, canvas, app, data_mgr):
         self.canvas = canvas
         self.app = app
-        self.file_path = os.path.join(os.path.dirname(config.SETTINGS_FILE), "map_drawings.json")
-        self.drawings = self.load_data()
+        self.data_mgr = data_mgr
+        self.drawings = self.data_mgr.load_drawings()
         
         self.active_tool = None
         self.default_color = "#ffaa00"
@@ -168,17 +168,7 @@ class MapPainter:
             "САУ": 0x45,
         }
         
-    def load_data(self):
-        if os.path.exists(self.file_path):
-            try:
-                with open(self.file_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except: pass
-        return {}
-        
-    def save_data(self):
-        with open(self.file_path, "w", encoding="utf-8") as f:
-            json.dump(self.drawings, f, indent=4)
+    # load_data and save_data moved to DataManager
             
     def set_tool(self, tool):
         self.active_tool = tool
@@ -193,7 +183,7 @@ class MapPainter:
     def _do_clear(self, confirmed):
         if confirmed and self.app.current_map_eng:
             self.drawings[self.app.current_map_eng] = []
-            self.save_data()
+            self.data_mgr.save_drawings(self.drawings)
             self.redraw()
 
     def on_press(self, event):
@@ -377,7 +367,7 @@ class MapPainter:
             return
         self.move_drag_active = False
         self.move_drag = None
-        self.save_data()
+        self.data_mgr.save_drawings(self.drawings)
         return "break"
 
     def _draw_class_icons(self, x, y, class_list, color):
@@ -447,7 +437,7 @@ class MapPainter:
             map_id = self.app.current_map_eng
             if map_id not in self.drawings: self.drawings[map_id] = []
             self.drawings[map_id].append(new_obj)
-            self.save_data()
+            self.data_mgr.save_drawings(self.drawings)
         
         self.redraw()
         self.app.set_painter_tool(None)
@@ -483,7 +473,7 @@ class MapPainter:
                 
         if closest_idx != -1:
             del self.drawings[map_id][closest_idx]
-            self.save_data()
+            self.data_mgr.save_drawings(self.drawings)
             self.redraw()
 
     def is_visible(self, obj):

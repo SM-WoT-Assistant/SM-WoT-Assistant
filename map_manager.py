@@ -343,7 +343,7 @@ class MapManager:
 
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
             map_list_path = os.path.join(os.path.dirname(config.SETTINGS_FILE), "map_list.json")
-            loaded_list = self.app.load_json(map_list_path)
+            loaded_list = self.app.data_mgr.load_json(map_list_path)
             if isinstance(loaded_list, list) and loaded_list:
                 if ui_mode == "Assault":
                     self.app.map_list_eng = [m for m in loaded_list if "Assault" in m or "assault" in m.lower()]
@@ -358,8 +358,8 @@ class MapManager:
             dict_path = os.path.join("extracted_maps", "map_dictionary.json")
             data_path = os.path.join("extracted_maps", "map_data.json")
             
-            loaded_dict = self.app.load_json(dict_path)
-            self.app.map_data = self.app.load_json(data_path)
+            loaded_dict = self.app.data_mgr.load_json(dict_path)
+            self.app.map_data = self.app.data_mgr.load_json(data_path)
             
             if isinstance(loaded_dict, dict) and loaded_dict:
                 self.app.extractor_names = loaded_dict
