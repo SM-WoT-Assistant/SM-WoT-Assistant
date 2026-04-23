@@ -666,7 +666,9 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
+        self.show_loading_screen()
         self.refresh_ai_view()
+        self.hide_loading_screen()
 
     def toggle_class_filter(self, c):
         self._show_grid_if_needed()
@@ -677,7 +679,9 @@ class StatsAI:
         if not was_active:
             self.class_filters[c]["active"] = True
             self.class_filters[c]["btn"].config(bg="#444444", fg="#ffffff")
+        self.show_loading_screen()
         self.refresh_ai_view()
+        self.hide_loading_screen()
 
     def toggle_nation_filter(self, n):
         self._show_grid_if_needed()
@@ -688,7 +692,27 @@ class StatsAI:
         if not was_active:
             self.nation_filters[n]["active"] = True
             self.nation_filters[n]["btn"].config(bg="#444444")
+        self.show_loading_screen()
         self.refresh_ai_view()
+        self.hide_loading_screen()
+
+    def show_loading_screen(self):
+        self.loading_frame = tk.Frame(self.ai_grid_container, bg="black")
+        self.loading_canvas = tk.Canvas(self.loading_frame, bg="black", highlightthickness=0)
+        self.loading_canvas.pack(fill="both", expand=True)
+        # Center content
+        self.loading_canvas.update_idletasks()
+        w = self.loading_canvas.winfo_width() or 400
+        h = self.loading_canvas.winfo_height() or 300
+        if self.main_app.logo_splash:
+            self.loading_canvas.create_image(w//2, h//2 - 20, image=self.main_app.logo_splash)
+        text = self.locale_manager.t_ui("loading", "Завантаження...") if self.locale_manager else "Завантаження..."
+        self.loading_canvas.create_text(w//2, h - 46, text=text, fill="#bbbbbb", font=("Arial", 12))
+        self.loading_frame.pack(side="top", fill="both", expand=True)
+
+    def hide_loading_screen(self):
+        if hasattr(self, 'loading_frame'):
+            self.loading_frame.pack_forget()
 
     def get_small_flag(self, nation):
         cache_key = f"small_flag_{nation}"
