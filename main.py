@@ -151,7 +151,17 @@ class WotAssistantHQ:
         
         # Ініціалізація відстеження логів
         log_path = self.settings.get("log_path", "")
+        # Нормалізуємо розділювачі шляху для поточної ОС
+        if log_path:
+            log_path = os.path.normpath(log_path)
+            self.settings["log_path"] = log_path
         print(f"[INIT] log_path = {log_path}")
+        if not log_path or not os.path.exists(log_path):
+            self._auto_detect_log_path()
+            log_path = self.settings.get("log_path", "")
+            if log_path:
+                log_path = os.path.normpath(log_path)
+                self.settings["log_path"] = log_path
         if log_path and os.path.exists(log_path):
             print(f"[INIT] ✓ Лог знайдено: {log_path}")
         else:
@@ -758,6 +768,27 @@ class WotAssistantHQ:
             self.logo_splash = ImageTk.PhotoImage(ImageOps.contain(img, (200, 200), Image.Resampling.LANCZOS))
             self.logo_image_object = img
         except: self.logo_splash = self.logo_image_object = None
+
+    def _auto_detect_log_path(self):
+        """Автоматичне визначення шляху до логу."""
+        detected = None
+        common_logs = [
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks", "logs", "python.log"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Local", "Wargaming.net", "World of Tanks", "logs", "python.log"),
+            os.path.join("C:", "Games", "World_of_Tanks", "logs", "python.log"),
+            os.path.join("D:", "Games", "World_of_Tanks", "logs", "python.log"),
+            os.path.join(os.getcwd(), "logs", "python.log"),
+        ]
+        for p in common_logs:
+            if os.path.exists(p):
+                detected = p
+                break
+        if detected:
+            self.settings["log_path"] = detected
+            self.save_settings()
+            print(f"[INIT] Автоматично визначено log_path: {detected}")
+        else:
+            print("[INIT] Не вдалося автоматично знайти лог. Вкажіть шлях у ⚙ -> WoT")
 
     def _on_startup_progress(self, percent, text):
         self.update_startup_progress(percent, text)

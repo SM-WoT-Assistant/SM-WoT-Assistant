@@ -27,6 +27,9 @@ class StatsAI:
         self._field_mod_pairs_cache = {}
         self._field_mod_pairs_by_tank = self._load_field_mod_pairs_by_tank()
         self._crew_builds = self._load_crew_builds()
+
+        self.root = self.main_app.root
+        self._search_timer = None
         
         self.active_tank = None
         self._last_cols = 0
@@ -255,8 +258,16 @@ class StatsAI:
         return q.casefold()
 
     def _on_search_changed(self, *args):
-        if not hasattr(self, 'ai_grid_frame'):
+        if not hasattr(self, 'ai_grid_frame') or self.main_app.active_view != "ai_stats":
             return
+        # Cancel any pending search
+        if self._search_timer is not None:
+            self.root.after_cancel(self._search_timer)
+            self._search_timer = None
+        # Schedule new search after 700ms delay
+        self._search_timer = self.root.after(700, self._perform_search)
+
+    def _perform_search(self):
         self._show_grid_if_needed()
         self.refresh_ai_view()
 
@@ -905,6 +916,10 @@ class StatsAI:
         self.active_tank = None
         if hasattr(self, 'ai_res_f'): self.ai_res_f.pack_forget()
         if hasattr(self, 'ai_grid_container'): self.ai_grid_container.pack(side="top", fill="both", expand=True)
+        # Cancel any pending search timer
+        if self._search_timer is not None:
+            self.root.after_cancel(self._search_timer)
+            self._search_timer = None
         # Скидаємо всі фільтри та пошук
         self.ai_search_var.set(self.search_placeholder)
         for f in self.tier_filters.values(): f["active"] = False; f["btn"].config(bg="#333333", fg="#aaaaaa")
