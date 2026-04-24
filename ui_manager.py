@@ -71,7 +71,7 @@ class UIManager:
         self.app.draw_menu.add_command(label="Експорт тактики (.json)", command=self.app.export_current_tactic)
         self.app.draw_menu.add_command(label="Імпорт тактики (.json)", command=self.app.import_external_tactic)
 
-        self.app.status_label = tk.Label(self.app.root, text="[HANGAR]", bg="#111", fg="gray", font=("Arial", 8))
+        self.app.status_label = tk.Label(self.app.root, text="[HANGAR]", bg="#222", fg="gray", font=("Arial", 8))
         self.app.filter_panel = tk.Frame(self.app.root, bg="#222", bd=1, relief="solid")
         self.build_filters()
 
