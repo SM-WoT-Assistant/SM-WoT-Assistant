@@ -342,11 +342,11 @@ class StatsAI:
 
         # Строка 2: Рівні + Класи
         row3 = tk.Frame(fb, bg="#1a1a1a", height=46)
-        row3.pack(side="top", fill="x", pady=2)
+        row3.pack(side="top", fill="x", pady=2, padx=4)
         row3.pack_propagate(False)
         
         tier_f = tk.Frame(row3, bg="#1a1a1a")
-        tier_f.pack(side="left", fill="y", expand=False, padx=(5, 5))
+        tier_f.pack(side="left", fill="y", expand=False, padx=(1, 2))
         tier_f.rowconfigure(0, weight=1)
         
         roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
@@ -360,7 +360,7 @@ class StatsAI:
         for i in range(11): tier_f.columnconfigure(i, weight=1, uniform="eq2")
 
         class_f = tk.Frame(row3, bg="#1a1a1a")
-        class_f.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        class_f.pack(side="left", fill="both", expand=True, padx=(1, 2))
         class_f.rowconfigure(0, weight=1)
 
         xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}

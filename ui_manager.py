@@ -13,10 +13,13 @@ class UIManager:
         self.app.top_bar.pack_propagate(False)
         self.app.top_bar.pack(side="top", fill="x")
         
-        tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=2)
-        
+        # Spacer for 7px right indent in topbar
+        tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="right")
+
+        tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
+
         self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self.app.toggle_settings)
-        self.app.settings_btn.pack(side="right", padx=5)
+        self.app.settings_btn.pack(side="right", padx=5, pady=7)
         
         self.app.settings_menu = tk.Menu(self.app.settings_btn, tearoff=0, bg="#333", fg="white")
         self.app.settings_menu.add_command(label="Вказати папку гри (WoT)", command=self.app.ask_wot_path)
@@ -38,14 +41,17 @@ class UIManager:
         self.app.battle_status_label = tk.Label(self.app.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
         self.app.battle_status_label.pack(side="left", padx=6)
 
+        # Spacer for 7px left indent in topbar
+        tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="left")
+
         self.app.btn_mode_ai_stats = tk.Button(self.app.top_bar, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
-        self.app.btn_mode_ai_stats.pack(side="left", padx=1, pady=2)
-        
+        self.app.btn_mode_ai_stats.pack(side="left", padx=(0,1), pady=7)
+
         self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
-        self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=2)
+        self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=7)
 
         self.app.btn_mode_maps_2 = tk.Button(self.app.top_bar, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
-        self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=2)
+        self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=7)
 
         self.app.map_toolbar = tk.Frame(self.app.top_bar, bg="#222")
         self.app.map_var = tk.StringVar()
