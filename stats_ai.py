@@ -414,8 +414,8 @@ class StatsAI:
 
         self.ai_canvas = tk.Canvas(self.ai_grid_container, bg="#000", highlightthickness=0)
         self.ai_scrollbar = ttk.Scrollbar(self.ai_grid_container, orient="vertical", command=self.ai_canvas.yview, style="Dark.Vertical.TScrollbar")
-        
-        self.ai_grid_frame = tk.Frame(self.ai_canvas, bg="#000")
+
+        self.ai_grid_frame = tk.Frame(self.ai_canvas, bg="#000", padx=0.5, pady=0.5)
         self.ai_canvas_window = self.ai_canvas.create_window((0, 0), window=self.ai_grid_frame, anchor="nw")
         self.ai_canvas.configure(yscrollcommand=self.ai_scrollbar.set)
         
@@ -447,7 +447,7 @@ class StatsAI:
         def _on_canvas_resize(event):
             self.ai_canvas.coords(self.ai_canvas_window, 0, 0)
             self.ai_canvas.itemconfig(self.ai_canvas_window, width=event.width)
-            new_max_cols = max(1, event.width // 178)
+            new_max_cols = max(1, event.width // 171)
             if self._last_cols != new_max_cols:
                 self._last_cols = new_max_cols
                 if self.active_tank is not None or True: # always refresh on resize to handle grid
@@ -852,7 +852,7 @@ class StatsAI:
             if not isinstance(data, dict):
                 continue
             card_f = tk.Frame(self.ai_grid_frame, bg="#111", width=170, height=155)
-            card_f.grid(row=row, column=col, sticky="nsew", padx=4, pady=4)
+            card_f.grid(row=row, column=col, sticky="nsew", padx=0.5, pady=0.5)
             card_f.grid_propagate(False) 
             
             nation = data.get("nation", "Unknown")
