@@ -338,7 +338,7 @@ class StatsAI:
         se.bind("<FocusOut>", on_search_focus_out)
 
         # Відступ між строкою 1 і 2
-        tk.Frame(fb, height=5, bg="#111").pack(side="top", fill="x")
+        tk.Frame(fb, height=2, bg="#111").pack(side="top", fill="x")
 
         # Строка 2: Рівні + Класи
         row3 = tk.Frame(fb, bg="#1a1a1a", height=46)
@@ -374,7 +374,7 @@ class StatsAI:
             self.class_filters[c] = {"btn": btn, "active": False}
 
         # Відступ між строкою 2 і 3
-        tk.Frame(fb, height=5, bg="#111").pack(side="top", fill="x")
+        tk.Frame(fb, height=2, bg="#111").pack(side="top", fill="x")
 
         # Строка 3: Прапори на всю ширину
         row2 = tk.Frame(fb, bg="#1a1a1a", height=46)
