@@ -680,20 +680,36 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
-        # Show progress bar instead of loading screen
+        # Show progress bar
         if not self._filter_active:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
             self.filter_progress_canvas.update_idletasks()
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # DO THE WORK FIRST (measure time)
-        start = time.time()
+        # DO THE WORK (collect filtered items)
         items_to_show, is_default = self._collect_filtered_items()
-        elapsed = time.time() - start
-        duration = max(elapsed, 1.0)  # at least 1 second
-        # Start animation (progress bar fills during this time)
+        # Fill progress bar to 100% (simulate during work)
+        try:
+            canvas_width = self.filter_progress_canvas.winfo_width()
+            if canvas_width > 1:
+                self.filter_progress_canvas.coords(self._progress_rect, 0, 0, canvas_width, 4)
+                self.filter_progress_canvas.update_idletasks()
+        except Exception:
+            pass
+        # Don't show new page yet! Animation callback will do it.
+        # Store items for the callback.
         self._filter_items_to_show = items_to_show
-        self._animate_realtime(duration, lambda: self._finish_filter_with_items(self._filter_items_to_show))
+        # Start animation (2 seconds) - progress bar fills during this time.
+        # The callback will show the new page when animation completes.
+        self._animate_realtime(2.0, lambda: self._finish_filter_with_items(self._filter_items_to_show))
+        
+    def _do_filter_work(self):
+        """Collect filtered items and store them for the callback."""
+        items_to_show, is_default = self._collect_filtered_items()
+        self._filter_items_to_show = items_to_show
+        # Do NOT call callback here. Let the animation callback handle it.
+        # The callback will use self._filter_items_to_show.
+        pass
         
     def toggle_class_filter(self, c):
         self._show_grid_if_needed()
