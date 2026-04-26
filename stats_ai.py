@@ -30,6 +30,10 @@ class StatsAI:
 
         self.root = self.main_app.root
         self._search_timer = None
+        self._filter_active = False
+        self._filter_progress_canvas = None
+        self._filter_progress_rect = None
+        self._filter_hide_job = None
         
         self.active_tank = None
         self._last_cols = 0
@@ -407,7 +411,16 @@ class StatsAI:
             nf.columnconfigure(i, weight=1, uniform="eq_nf")
             nf.rowconfigure(0, weight=1)
             self.nation_filters[n] = {"btn": btn, "active": False}
-
+        
+        # Контейнер для прогрес-бару (завжди запакований)
+        self.progress_container = tk.Frame(fb, height=4, bg="#0a0a0a")
+        self.progress_container.pack(side="top", fill="x")
+        self.progress_container.pack_propagate(False)
+        
+        # Canvas для прогрес-бару (спочатку не запакований)
+        self.filter_progress_canvas = tk.Canvas(self.progress_container, height=4, bg="#0a0a0a", highlightthickness=0)
+        self._progress_rect = self.filter_progress_canvas.create_rectangle(0, 0, 0, 4, fill="#ff4500", outline="")
+        
         # ОСНОВНА ЗОНА: СІТКА
         self.ai_grid_container = tk.Frame(self.ai_frame, bg="#000")
         self.ai_grid_container.pack(side="top", fill="both", expand=True)
@@ -666,10 +679,16 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
-        self.show_loading_screen()
-        self.refresh_ai_view()
-        self.hide_loading_screen()
-
+        # Show progress bar instead of loading screen
+        if not self._filter_active:
+            self._filter_active = True
+            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
+        # Collect filtered items (old page still visible)
+        items_to_show, is_default = self._collect_filtered_items()
+        # Animate progress bar (2 seconds, 40 steps)
+        self._animate_progress(0, 40, lambda: self._finish_filter_with_items(items_to_show))
+        
     def toggle_class_filter(self, c):
         self._show_grid_if_needed()
         was_active = self.class_filters[c]["active"]
@@ -679,10 +698,16 @@ class StatsAI:
         if not was_active:
             self.class_filters[c]["active"] = True
             self.class_filters[c]["btn"].config(bg="#444444", fg="#ffffff")
-        self.show_loading_screen()
-        self.refresh_ai_view()
-        self.hide_loading_screen()
-
+        # Show progress bar instead of loading screen
+        if not self._filter_active:
+            self._filter_active = True
+            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
+        # Collect filtered items (old page still visible)
+        items_to_show, is_default = self._collect_filtered_items()
+        # Animate progress bar (2 seconds, 40 steps)
+        self._animate_progress(0, 40, lambda: self._finish_filter_with_items(items_to_show))
+        
     def toggle_nation_filter(self, n):
         self._show_grid_if_needed()
         was_active = self.nation_filters[n]["active"]
@@ -692,10 +717,16 @@ class StatsAI:
         if not was_active:
             self.nation_filters[n]["active"] = True
             self.nation_filters[n]["btn"].config(bg="#444444")
-        self.show_loading_screen()
-        self.refresh_ai_view()
-        self.hide_loading_screen()
-
+        # Show progress bar instead of loading screen
+        if not self._filter_active:
+            self._filter_active = True
+            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
+        # Collect filtered items (old page still visible)
+        items_to_show, is_default = self._collect_filtered_items()
+        # Animate progress bar (2 seconds, 40 steps)
+        self._animate_progress(0, 40, lambda: self._finish_filter_with_items(items_to_show))
+        
     def show_loading_screen(self):
         self.loading_frame = tk.Frame(self.ai_grid_container, bg="black")
         self.loading_canvas = tk.Canvas(self.loading_frame, bg="black", highlightthickness=0)
@@ -935,7 +966,197 @@ class StatsAI:
         # Очищуємо попередні ваги, якщо кількість колонок зменшилась
         for c in range(max_cols, max_cols + 15):
             self.ai_grid_frame.columnconfigure(c, weight=0)
-
+        
+    def _collect_filtered_items(self):
+        """Collect filtered items WITHOUT modifying UI. Returns (items_to_show, is_default)."""
+        search_q = self._parse_search_query()
+        active_t, active_c, active_n = self._active_filter_values()
+        max_cols = self._last_cols if self._last_cols > 0 else 5
+        
+        is_default = not search_q and not active_t and not active_c and not active_n
+        items_to_show = []
+        
+        if is_default:
+            for tag in self.popular_tanks:
+                if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
+            
+            target_rows = max(1, round(20 / max_cols))
+            target_count = target_rows * max_cols
+            
+            if len(items_to_show) > target_count:
+                items_to_show = items_to_show[:target_count]
+            elif len(items_to_show) < target_count:
+                for tag, data in self.tank_db.items():
+                    if len(items_to_show) >= target_count: break
+                    if tag not in self.popular_tanks:
+                        items_to_show.append((tag, data))
+        else:
+            for tag, data in self.tank_db.items():
+                if not isinstance(data, dict):
+                    continue
+                data_name = str(data.get("name", "")).casefold()
+                data_tag = str(tag).casefold()
+                data_tier = self._normalize_tier(data.get("tier"))
+                data_class = self._normalize_class(data.get("class"))
+                data_nation = self._normalize_nation(data.get("nation"))
+                
+                if search_q and search_q not in data_name and search_q not in data_tag: continue
+                if active_t and data_tier not in active_t: continue
+                if active_c and data_class not in active_c: continue
+                if active_n and data_nation not in active_n: continue
+                items_to_show.append((tag, data))
+            
+            def _tier_sort(item):
+                d = item[1] if isinstance(item[1], dict) else {}
+                try:
+                    return int(d.get("tier", 0) or 0)
+                except Exception:
+                    return 0
+            items_to_show.sort(key=_tier_sort, reverse=True)
+        
+        return items_to_show, is_default
+    
+    def _finish_filter_with_items(self, items_to_show):
+        """Destroy old grid and build new one from filtered items (instant)."""
+        # Destroy old grid
+        for widget in self.ai_grid_frame.winfo_children(): widget.destroy()
+        
+        row, col = 0, 0
+        max_cols = self._last_cols if self._last_cols > 0 else 5
+        
+        for tag, data in items_to_show:
+            if not isinstance(data, dict):
+                continue
+            card_f = tk.Frame(self.ai_grid_frame, bg="#111", width=170, height=155)
+            card_f.grid(row=row, column=col, sticky="nsew", padx=0.5, pady=0.5)
+            card_f.grid_propagate(False)
+            
+            nation = data.get("nation", "Unknown")
+            img = self.get_composite_icon(tag, nation)
+            card_f.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            
+            if img:
+                lbl = tk.Label(card_f, image=img, bg="#111", cursor="hand2", bd=0)
+                lbl.place(relx=0.5, y=0, width=170, height=120, anchor="n")
+                lbl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+                
+            is_prem = data.get("is_premium", False)
+            accent_color = "#e09b1b" if is_prem else "#bbbbbb"
+            
+            l1_f = tk.Frame(card_f, bg="#111")
+            l1_f.place(relx=0.5, y=133, anchor="s")
+            
+            roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
+            try:
+                tier_num = int(data.get('tier', 0) or 0)
+            except Exception:
+                tier_num = 0
+            rt = roman_tiers[tier_num - 1] if 1 <= tier_num <= 11 else str(tier_num)
+            tl = tk.Label(l1_f, text=rt, font=("Arial", 12, "bold"), fg=accent_color, bg="#111", bd=0)
+            tl.pack(side="left", padx=3)
+            
+            s_flag = self.get_small_flag(nation)
+            if s_flag:
+                fl = tk.Label(l1_f, image=s_flag, bg="#111", bd=0)
+                fl.pack(side="left", padx=3)
+                fl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            
+            xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
+            sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
+            cl = tk.Label(l1_f, text=sym, font=("XVMSymbol", 17), fg=accent_color, bg="#111", bd=0)
+            cl.pack(side="left", padx=3)
+            
+            raw_name = str(data.get("name", tag)).replace("_", " ")
+            sys_id = tag.split('_')[0].lower()
+            
+            m = re.match(r'^([a-z]+)(\d*)$', sys_id)
+            if m:
+                letters, digits = m.groups()
+                country_codes = {"gb", "uk", "usa", "ussr", "ger", "fr", "ch", "cz", "pl", "swe", "it", "jp", "cn", "r", "a", "g", "f", "s", "j"}
+                if letters in country_codes:
+                    rn_low = raw_name.lower()
+                    if rn_low.startswith(sys_id + " "):
+                        raw_name = raw_name[len(sys_id):].strip()
+                    elif digits and rn_low.startswith(f"{letters} {digits} "):
+                        raw_name = raw_name[len(letters) + len(digits) + 1:].strip()
+                    elif rn_low.startswith(letters + " "):
+                        raw_name = raw_name[len(letters):].strip()
+            
+            name_words = raw_name.split()
+            if not name_words:
+                name_words = [data["name"]]
+            
+            disp_name = ""
+            for w in name_words:
+                if len(disp_name) + len(w) <= 22:
+                    disp_name += w + " "
+                else:
+                    break
+            disp_name = disp_name.strip() if disp_name else name_words[0][:20]
+            
+            text_color = "#e09b1b" if is_prem else "#bbbbbb"
+            nl = tk.Label(card_f, text=disp_name, bg="#111", fg=text_color, font=("Arial", 9, "bold"))
+            nl.place(relx=0.5, y=152, anchor="s")
+            
+            tl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            cl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            nl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            l1_f.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            
+            col += 1
+            if col >= max_cols: col = 0; row += 1
+        
+        for c in range(max_cols):
+            self.ai_grid_frame.columnconfigure(c, weight=1)
+        for c in range(max_cols, max_cols + 15):
+            self.ai_grid_frame.columnconfigure(c, weight=0)
+        
+        # Complete progress bar and hide
+        try:
+            canvas_width = self.filter_progress_canvas.winfo_width()
+            if canvas_width > 1:
+                self.filter_progress_canvas.coords(self._progress_rect, 0, 0, canvas_width, 4)
+        except Exception:
+            pass
+        # Hide progress bar after delay
+        if self._filter_hide_job is not None:
+            self.root.after_cancel(self._filter_hide_job)
+        self._filter_hide_job = self.root.after(300, self._hide_filter_progress)
+    
+    def _animate_progress(self, step, total_steps, callback):
+        """Animate progress bar slowly (40 steps over 2 seconds)"""
+        if not self._filter_active:
+            return
+        
+        progress = step / total_steps
+        try:
+            canvas_width = self.filter_progress_canvas.winfo_width()
+            if canvas_width > 1:
+                progress_width = int(canvas_width * progress)
+                self.filter_progress_canvas.coords(self._progress_rect, 0, 0, progress_width, 4)
+        except Exception:
+            pass
+        
+        step += 1
+        if step >= total_steps:
+            # Animation complete, call callback
+            if callback:
+                callback()
+        else:
+            self.root.after(50, lambda: self._animate_progress(step, total_steps, callback))
+    
+    def _hide_filter_progress(self):
+        """Hide progress bar (canvas) but keep container (reserved space)"""
+        self._filter_active = False
+        self._filter_hide_job = None
+        if hasattr(self, 'filter_progress_canvas') and self.filter_progress_canvas.winfo_exists():
+            self.filter_progress_canvas.pack_forget()
+        # Reset rectangle to 0 width
+        try:
+            self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
+        except Exception:
+            pass
+        
     def return_to_ai_home(self):
         self.active_tank = None
         if hasattr(self, 'ai_res_f'): self.ai_res_f.pack_forget()
