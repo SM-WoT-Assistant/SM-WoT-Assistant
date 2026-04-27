@@ -1664,11 +1664,6 @@ class StatsAI:
         crew_rows = tank_info['crew_rows']
         fm_pairs = tank_info['fm_pairs']
         
-        # Now hide grid and show result frame
-        self.ai_grid_container.pack_forget()
-        self.ai_res_f.pack(side="top", fill="both", expand=True)
-        self.detail_canvas.yview_moveto(0)
-        
         # Clear old content
         for widget in self.ai_title_frame.winfo_children(): widget.destroy()
         for widget in self.ai_tth_frame.winfo_children(): widget.destroy()
@@ -1987,8 +1982,16 @@ class StatsAI:
         
         self._reflow_detail_layout()
         
+        # Hide grid and show result frame (now that UI is fully built)
+        self.ai_grid_container.pack_forget()
+        self.ai_res_f.pack(side="top", fill="both", expand=True)
+        self.detail_canvas.yview_moveto(0)
+        
         # Hide progress bar
         self._hide_filter_progress()
+
+        # Process all UI updates in one cycle to avoid flicker
+        self.root.update_idletasks()
 
     def show_ai_result(self, text):
         pass  # ШІ результати видалено — тепер відображаємо ТТХ
