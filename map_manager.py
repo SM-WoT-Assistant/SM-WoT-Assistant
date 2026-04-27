@@ -342,6 +342,7 @@ class MapManager:
         internal_mode = mode_mapping.get(ui_mode, "ctf")
 
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
+            # TACTIC mode - use map_list.json (from website)
             map_list_path = os.path.join(os.path.dirname(config.SETTINGS_FILE), "map_list.json")
             loaded_list = self.app.data_mgr.load_json(map_list_path)
             if isinstance(loaded_list, list) and loaded_list:
@@ -354,7 +355,13 @@ class MapManager:
             else:
                 self.app.map_list_eng = list(config.LANG_DATA["ua"]["maps"].keys())
             self.app.map_data = {}
+            # Still load extractor_names for consistent naming
+            dict_path = os.path.join("extracted_maps", "map_dictionary.json")
+            loaded_dict = self.app.data_mgr.load_json(dict_path)
+            if isinstance(loaded_dict, dict) and loaded_dict:
+                self.app.extractor_names = loaded_dict
         else:
+            # MAPS mode - use map_dictionary.json (from game client)
             dict_path = os.path.join("extracted_maps", "map_dictionary.json")
             data_path = os.path.join("extracted_maps", "map_data.json")
             
@@ -368,7 +375,6 @@ class MapManager:
                 for m in all_maps:
                     if m in self.app.map_data:
                         gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
-                        # Перевірка типів гри з урахуванням варіантів assault
                         has_mode = internal_mode in gameplay_types
                         if internal_mode == "assault" and "assault2" in gameplay_types:
                             has_mode = True
@@ -380,8 +386,8 @@ class MapManager:
             else:
                 self.app.extractor_names = {}
                 self.app.map_list_eng = []
-
-        # Залишаємо лише унікальні назви (після перекладу) для запобігання дублювання в списку
+        
+        # Remove duplicates based on display name
         unique_maps = []
         seen_names = set()
         for m in self.app.map_list_eng:

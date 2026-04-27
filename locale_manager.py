@@ -53,11 +53,24 @@ class LocaleManager:
         if hasattr(self.app, 'custom_names') and eng in self.app.custom_names:
             return self.app.custom_names[eng]
 
-        if hasattr(self.app, 'btn_mode_maps_2') and self.app.btn_mode_maps_2.cget("bg") == "#ff4500" and hasattr(self.app, 'extractor_names'):
-            ext = self.app.extractor_names.get(eng)
+        # Always check extractor_names for consistent naming with game client (both TACTIC and MAPS modes)
+        if hasattr(self.app, 'extractor_names') and self.app.extractor_names:
+            # For TACTIC mode, eng is English name like "Karelia"
+            # For MAPS mode, eng is internal key like "01_karelia"
+            lookup_key = eng
+            
+            # If eng is not directly in extractor_names, try to find internal key via TECH_MAPS_STAGING
+            if eng not in self.app.extractor_names:
+                # Build reverse mapping from English to internal key
+                if not hasattr(self, '_eng_to_internal'):
+                    self._eng_to_internal = {}
+                    for internal, english in config.TECH_MAPS_STAGING.items():
+                        self._eng_to_internal[english] = internal
+                lookup_key = self._eng_to_internal.get(eng, eng)
+            
+            ext = self.app.extractor_names.get(lookup_key)
             if ext and ext != eng:
-                if ext in lmaps:
-                    return lmaps[ext]
+                # ext is Ukrainian name from map_dictionary.json
                 return ext
 
         if eng in lmaps:
