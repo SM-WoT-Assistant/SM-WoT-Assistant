@@ -684,32 +684,13 @@ class StatsAI:
         if not self._filter_active:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
-            self.filter_progress_canvas.update_idletasks()
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # DO THE WORK (collect filtered items)
-        items_to_show, is_default = self._collect_filtered_items()
-        # Fill progress bar to 100% (simulate during work)
-        try:
-            canvas_width = self.filter_progress_canvas.winfo_width()
-            if canvas_width > 1:
-                self.filter_progress_canvas.coords(self._progress_rect, 0, 0, canvas_width, 4)
-                self.filter_progress_canvas.update_idletasks()
-        except Exception:
-            pass
-        # Don't show new page yet! Animation callback will do it.
-        # Store items for the callback.
-        self._filter_items_to_show = items_to_show
-        # Start animation (2 seconds) - progress bar fills during this time.
-        # The callback will show the new page when animation completes.
-        self._animate_realtime(2.0, lambda: self._finish_filter_with_items(self._filter_items_to_show))
-        
-    def _do_filter_work(self):
-        """Collect filtered items and store them for the callback."""
-        items_to_show, is_default = self._collect_filtered_items()
-        self._filter_items_to_show = items_to_show
-        # Do NOT call callback here. Let the animation callback handle it.
-        # The callback will use self._filter_items_to_show.
-        pass
+        # Collect items during animation; callback finishes UI update
+        self._animate_realtime(
+            1.5,
+            lambda: self._collect_filtered_items(),
+            lambda result: self._finish_filter_with_items(result[0] if result else [])
+        )
         
     def toggle_class_filter(self, c):
         self._show_grid_if_needed()
@@ -725,13 +706,12 @@ class StatsAI:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Measure filtering time
-        start = time.time()
-        items_to_show, is_default = self._collect_filtered_items()
-        elapsed = time.time() - start
-        duration = max(elapsed, 0.5)  # at least 0.5 seconds
-        # Start realtime animation
-        self._animate_realtime(duration, lambda: self._finish_filter_with_items(items_to_show))
+        # Animate for at least 0.8s; collect items during animation
+        self._animate_realtime(
+            0.8,
+            lambda: self._collect_filtered_items(),
+            lambda result: self._finish_filter_with_items(result[0] if result else [])
+        )
         
     def toggle_nation_filter(self, n):
         self._show_grid_if_needed()
@@ -747,13 +727,12 @@ class StatsAI:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Measure filtering time
-        start = time.time()
-        items_to_show, is_default = self._collect_filtered_items()
-        elapsed = time.time() - start
-        duration = max(elapsed, 0.5)  # at least 0.5 seconds
-        # Start realtime animation
-        self._animate_realtime(duration, lambda: self._finish_filter_with_items(items_to_show))
+        # Animate for at least 0.8s; collect items during animation
+        self._animate_realtime(
+            0.8,
+            lambda: self._collect_filtered_items(),
+            lambda result: self._finish_filter_with_items(result[0] if result else [])
+        )
         
     def show_loading_screen(self):
         self.loading_frame = tk.Frame(self.ai_grid_container, bg="black")
@@ -1151,30 +1130,51 @@ class StatsAI:
             self.root.after_cancel(self._filter_hide_job)
         self._filter_hide_job = self.root.after(300, self._hide_filter_progress)
     
-    def _animate_realtime(self, duration, callback):
-        """Animate progress bar based on real time (duration in seconds)"""
+    def _animate_realtime(self, duration, work_func, callback):
+        """Animate progress bar. work_func runs during animation; callback after both complete."""
         if not self._filter_active:
             return
         start_time = time.time()
+        result = [None]  # Mutable container for work result
+        work_done = [False]
+        
+        def do_work():
+            result[0] = work_func()
+            work_done[0] = True
+        
+        import threading
+        work_thread = threading.Thread(target=do_work, daemon=True)
+        work_thread.start()
+        
         def update():
             if not self._filter_active:
                 return
             elapsed = time.time() - start_time
-            if elapsed >= duration:
-                # Animation complete, call callback
-                if callback:
-                    callback()
-                return
-            progress = elapsed / duration
+            progress = min(elapsed / duration, 1.0)
             try:
-                canvas_width = self.filter_progress_canvas.info_width()
+                canvas_width = self.filter_progress_canvas.winfo_width()
                 if canvas_width > 1:
                     progress_width = int(canvas_width * progress)
                     self.filter_progress_canvas.coords(self._progress_rect, 0, 0, progress_width, 4)
+                    self.filter_progress_canvas.update_idletasks()
             except Exception:
                 pass
-            self.root.after(50, update)
-        update()
+            
+            # Continue animation if work still running OR time not elapsed
+            if not work_done[0] or elapsed < duration:
+                self.root.after(50, update)
+            else:
+                # Both work and minimum animation time complete
+                try:
+                    canvas_width = self.filter_progress_canvas.winfo_width()
+                    if canvas_width > 1:
+                        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, canvas_width, 4)
+                        self.filter_progress_canvas.update_idletasks()
+                except Exception:
+                    pass
+                if callback:
+                    callback(result[0])
+        
         update()
     
     def _hide_filter_progress(self):
