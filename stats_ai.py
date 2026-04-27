@@ -1609,17 +1609,67 @@ class StatsAI:
 
     def on_ai_tank_select(self, tag):
         self.active_tank = tag
+        # Show progress bar while keeping old screen visible
+        if not self._filter_active:
+            self._filter_active = True
+            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
+        # Animate for at least 0.8s; collect tank data during animation
+        self._animate_realtime(
+            0.8,
+            lambda: self._collect_tank_data(tag),
+            lambda result: self._finish_tank_detail(result)
+        )
+
+
+    def _collect_tank_data(self, tag):
+        """Collect tank data without modifying UI. Returns dict with prepared data."""
         data = self.tank_db.get(tag, {})
         if not isinstance(data, dict):
             data = {}
+        
+        # Get composite icon (image loading can be done in background)
+        img = self.get_composite_icon(tag, data.get("nation", ""), size=(196, 126))
+        
+        # Get TTH data
+        tth = self._find_tth_for_tag(tag)
+        if not tth:
+            self.reload_tth_data()
+            tth = self._find_tth_for_tag(tag)
+        
+        # Get crew rows
+        crew_rows = self._get_crew_rows_for_tank(tag)
+        
+        # Get field mod pairs
+        fm_pairs = self._get_field_mod_pairs_for_tank(tag)
+        
+        return {
+            'tag': tag,
+            'data': data,
+            'img': img,
+            'tth': tth or {},
+            'crew_rows': crew_rows,
+            'fm_pairs': fm_pairs,
+        }
+
+    def _finish_tank_detail(self, tank_info):
+        """Build tank detail UI after animation completes."""
+        if not tank_info:
+            return
+        
+        tag = tank_info['tag']
+        data = tank_info['data']
+        img = tank_info['img']
+        tth = tank_info['tth']
+        crew_rows = tank_info['crew_rows']
+        fm_pairs = tank_info['fm_pairs']
+        
+        # Now hide grid and show result frame
         self.ai_grid_container.pack_forget()
         self.ai_res_f.pack(side="top", fill="both", expand=True)
         self.detail_canvas.yview_moveto(0)
-
-        # ── Іконка танка ──
-        img = self.get_composite_icon(tag, data.get("nation", ""), size=(196, 126))
-
-        # ── Очищення ──
+        
+        # Clear old content
         for widget in self.ai_title_frame.winfo_children(): widget.destroy()
         for widget in self.ai_tth_frame.winfo_children(): widget.destroy()
         for widget in self.ai_equipment_frame.winfo_children(): widget.destroy()
@@ -1630,16 +1680,15 @@ class StatsAI:
         for widget in self.ai_ammo_frame_2.winfo_children(): widget.destroy()
         for widget in self.ai_crew_frame.winfo_children(): widget.destroy()
         for widget in self.ai_field_mod_frame.winfo_children(): widget.destroy()
-        # Очищення міток з номерами
         if hasattr(self, '_loadout_num_label') and self._loadout_num_label.winfo_exists():
             self._loadout_num_label.destroy()
         if hasattr(self, '_loadout_num_label_2') and self._loadout_num_label_2.winfo_exists():
             self._loadout_num_label_2.destroy()
-
+        
         is_prem = data.get("is_premium", False)
         acc = "#e09b1b" if is_prem else "#bbbbbb"
-
-        # ── Заголовок (tier + flag + class + name) ──
+        
+        # Build title
         hf = tk.Frame(self.ai_title_frame, bg="#111111")
         hf.pack(side="top", anchor="center", pady=(0, 8))
         roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
@@ -1648,32 +1697,26 @@ class StatsAI:
         except Exception:
             tier_val = 0
         rt = roman_tiers[tier_val - 1] if 1 <= tier_val <= 11 else str(tier_val)
-        tk.Label(hf, text=rt, font=("Arial", 16, "bold"), fg=acc, bg="#111111").pack(side="left", padx=(0,4))
+        tk.Label(hf, text=rt, font=("Arial", 16, "bold"), fg=acc, bg="#111111").pack(side="left", padx=(0, 4))
         s_flag = self.get_small_flag(data.get("nation", ""))
         if s_flag:
             fl = tk.Label(hf, image=s_flag, bg="#111111")
             fl.image = s_flag
-            fl.pack(side="left", padx=(0,4))
+            fl.pack(side="left", padx=(0, 4))
         xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
         sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
-        tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0,6))
+        tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
         tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
-
-        # ── HP (компактний центральний блок) ──
-        tth = self._find_tth_for_tag(tag)
-        if not tth:
-            self.reload_tth_data()
-            tth = self._find_tth_for_tag(tag)
-
-        # ── Повна ТТХ таблиця ──
+        
+        # Build TTH table
         tth_rows = []
         if tth.get('hp'):
             tth_rows.append(("relativeArmor.png", "Міцність (HP):", str(tth['hp'])))
         hull = tth.get('hull_armor', {})
         if isinstance(hull, dict) and hull:
             front = hull.get('front') or hull.get('f') or hull.get(list(hull.keys())[0])
-            side  = hull.get('side')  or hull.get('s')
-            rear  = hull.get('rear')  or hull.get('r')
+            side = hull.get('side') or hull.get('s')
+            rear = hull.get('rear') or hull.get('r')
             parts = [str(v) for v in [front, side, rear] if v is not None]
             if parts:
                 tth_rows.append(("relativeArmor.png", "Броня корпусу:", " / ".join(parts)))
@@ -1682,8 +1725,8 @@ class StatsAI:
         turret = tth.get('turret_armor', {})
         if isinstance(turret, dict) and turret:
             front = turret.get('front') or turret.get('f') or turret.get(list(turret.keys())[0])
-            side  = turret.get('side')  or turret.get('s')
-            rear  = turret.get('rear')  or turret.get('r')
+            side = turret.get('side') or turret.get('s')
+            rear = turret.get('rear') or turret.get('r')
             parts = [str(v) for v in [front, side, rear] if v is not None]
             if parts:
                 tth_rows.append(("relativeArmor.png", "Броня башти:", " / ".join(parts)))
@@ -1691,7 +1734,7 @@ class StatsAI:
             tth_rows.append(("relativeArmor.png", "Броня башти:", str(turret)))
         shells = tth.get('shells', [])
         if isinstance(shells, list) and shells:
-            ap = next((s for s in shells if str(s.get('type','')).upper() in ('AP','APCR','APBC','APCBC')), None)
+            ap = next((s for s in shells if str(s.get('type', '')).upper() in ('AP', 'APCR', 'APBC', 'APCBC')), None)
             sh = ap or shells[0]
             dmg = sh.get('damage') or sh.get('alphaDamage')
             pen = sh.get('piercing_power') or sh.get('piercingPower') or sh.get('penetration')
@@ -1710,24 +1753,24 @@ class StatsAI:
             tth_rows.append(("relativeMobility.png", "Швидкість (км/г):", spd_str))
         if tth.get('view_range'):
             tth_rows.append(("relativeVisibility.png", "Огляд (м):", str(tth['view_range'])))
-
+        
         tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0, width=self._detail_info_fixed_width)
         tth_wrapper.pack(side="top", anchor="center", padx=0)
         tth_wrapper.pack_propagate(False)
         tth_wrapper.grid_columnconfigure(0, weight=0)
         tth_wrapper.grid_columnconfigure(1, weight=1, minsize=self._detail_tth_fixed_width)
         tth_wrapper.grid_columnconfigure(2, weight=1)
-
+        
         left_img_f = tk.Frame(tth_wrapper, bg="#111111", bd=0, highlightthickness=0)
         left_img_f.grid(row=0, column=0, sticky="nsw", padx=(0, 8), pady=0)
         if img:
             left_img_l = tk.Label(left_img_f, image=img, bg="#111111", bd=0, highlightthickness=0)
             left_img_l.image = img
             left_img_l.pack(side="top", anchor="n", pady=(0, 20))
-
+        
         tth_table = tk.Frame(tth_wrapper, bg="#1a1a1a", width=self._detail_tth_fixed_width)
         tth_table.grid(row=0, column=1, sticky="nsew", padx=(0, 8), pady=6)
-        tth_table.grid_propagate(False)
+        tth_table.pack_propagate(False)
         for i, (icon_name, label_text, value_text) in enumerate(tth_rows):
             row_bg = "#1a1a1a" if i % 2 == 0 else "#1f1f1f"
             row_f = tk.Frame(tth_table, bg=row_bg)
@@ -1737,19 +1780,17 @@ class StatsAI:
                 il = tk.Label(row_f, image=row_icon, bg=row_bg)
                 il.image = row_icon
                 il.pack(side="left", padx=(0, 5))
-            tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg,
-                     font=("Arial", 9), width=15, anchor="w").pack(side="left")
-            tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg,
-                     font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
-
-        # ── ОКРЕМІ СЕКЦІЇ ЗБІРОК ──
+            tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
+            tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
+        
+        # Build equipment section
         equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
         ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
-
-        # ── ОБЛАДНАННЯ: спеціалізоване обладнання ──
+        
+        # Equipment items
         equip_items = [
             ("rammer", self.t("rammer", "Ухиливач")),
             ("coatedOptics", self.t("coatedOptics", "Гарячі скла")),
@@ -1770,12 +1811,12 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#2a3a28")
             lbl.pack(expand=True)
             equip_slots.append(slot)
-
-        # ── ВИТРАТНІ: амуніція та готівка ──
+        
+        # Consumables items
         cons_items = [
             ("largeRepairkit", self.t("largeRepairkit", "Великий ремонтний набір")),
             ("handExtinguishers", self.t("handExtinguishers", "Вогнегасник")),
-            ("hotCoffee", self.t("hotCoffee", "Міцна каву")),
+            ("hotCoffee", self.t("hotCoffee", "Міцна кава")),
         ]
         cons_slots = []
         for name, _label in cons_items:
@@ -1792,12 +1833,9 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#272a3a")
             lbl.pack(expand=True)
             cons_slots.append(slot)
-
-        ammo_items = [
-            "ARMOR_PIERCING",
-            "ARMOR_PIERCING_CR",
-            "HIGH_EXPLOSIVE",
-        ]
+        
+        # Ammo items
+        ammo_items = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HIGH_EXPLOSIVE"]
         ammo_slots = []
         for name in ammo_items:
             photo = self.get_loadout_icon('ammo', name, (48, 48))
@@ -1813,16 +1851,15 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#272a3a")
             lbl.pack(expand=True)
             ammo_slots.append(slot)
-
-        # ── РЯДОК 2: без заголовків ──
+        
+        # Row 2 frames
         equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
         equip_body_2.pack(side="top", fill="x", pady=3)
         cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
         cons_body_2.pack(side="top", fill="x", pady=3)
         ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
         ammo_body_2.pack(side="top", fill="x", pady=3)
-
-        # Обладнання row 2 (такі самі іконки як у рядку 1)
+        
         equip_slots_2 = []
         for name, _label in equip_items:
             photo = self.get_loadout_icon('artefacts', name, (48, 48))
@@ -1838,8 +1875,7 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#2a3a28")
             lbl.pack(expand=True)
             equip_slots_2.append(slot)
-
-        # Витратні row 2 (такі самі іконки як у рядку 1)
+        
         cons_slots_2 = []
         for name, _label in cons_items:
             photo = self.get_loadout_icon('artefacts', name, (48, 48))
@@ -1855,8 +1891,7 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#272a3a")
             lbl.pack(expand=True)
             cons_slots_2.append(slot)
-
-        # Снаряди row 2 (такі самі іконки як у рядку 1)
+        
         ammo_slots_2 = []
         for name in ammo_items:
             photo = self.get_loadout_icon('ammo', name, (48, 48))
@@ -1872,47 +1907,38 @@ class StatsAI:
                 lbl.config(width=4, height=2, bg="#272a3a")
             lbl.pack(expand=True)
             ammo_slots_2.append(slot)
-
-        # Layout для рядка 2
+        
         self._layout_tile_row(equip_body_2, equip_slots_2, gap=0)
         self._layout_tile_row(cons_body_2, cons_slots_2, gap=0)
         self._layout_tile_row(ammo_body_2, ammo_slots_2, gap=0)
-
-        # ── НАВИЧКИ ЕКІПАЖУ: по членах екіпажу, тільки іконки ──
-        crew_rows = self._get_crew_rows_for_tank(tag)
+        
+        # Crew section
         crew_slots = []
         for member, skills in crew_rows:
             slot = tk.Frame(crew_body, bg="#111111", bd=0, relief="flat")
             row = tk.Frame(slot, bg="#111111")
             row.pack(side="top", pady=(0, 3))
-
             role_icon = member.get('role')
             also_roles = member.get('also') or []
-
             role_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
             role_box.pack(side="left", padx=(0, 3))
             role_box.pack_propagate(False)
-
             role_photo = self.get_loadout_icon('crew_roles', role_icon, (24, 24))
             role_lbl = tk.Label(role_box, bg="#111111")
             if role_photo:
                 role_lbl.config(image=role_photo)
                 role_lbl.image = role_photo
             role_lbl.pack(expand=True)
-
-            # Secondary roles (e.g., commander+radioman) are shown as smaller icons.
             for sec_role in also_roles:
                 sec_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
                 sec_box.pack(side="left", padx=(0, 3))
                 sec_box.pack_propagate(False)
-
                 sec_photo = self.get_loadout_icon('crew_roles', sec_role, (24, 24))
                 sec_lbl = tk.Label(sec_box, bg="#111111")
                 if sec_photo:
                     sec_lbl.config(image=sec_photo)
                     sec_lbl.image = sec_photo
                 sec_lbl.pack(expand=True)
-
             for skill_name in skills:
                 skill_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                 skill_box.pack(side="left", padx=(0, 3))
@@ -1924,15 +1950,13 @@ class StatsAI:
                     skill_lbl.image = skill_photo
                 skill_lbl.pack(expand=True)
             crew_slots.append(slot)
-
-        # ── ПОЛЬОВА МОДЕРНІЗАЦІЯ: парні модернізації, тільки іконки ──
-        fm_pairs = self._get_field_mod_pairs_for_tank(tag)
+        
+        # Field mod section
         fm_slots = []
         for left_name, right_name in fm_pairs:
             slot = tk.Frame(fm_body, bg="#111111", bd=0, relief="flat")
             row = tk.Frame(slot, bg="#111111")
             row.pack(side="top")
-
             for name in (left_name, right_name):
                 icon_box = tk.Frame(row, bg="#1a242a", bd=1, relief="flat", width=64, height=64)
                 icon_box.pack(side="left", padx=0)
@@ -1946,23 +1970,25 @@ class StatsAI:
                     lbl.config(width=3, height=2, bg="#1e2d35")
                 lbl.pack(expand=True)
             fm_slots.append(slot)
-
-        # Адаптивна сітка всередині кожної секції.
-        # min_cell малий → cols великий → всі елементи в один рядок поки ширина дозволяє.
+        
+        # Layout
         self._layout_tile_row(equip_body, equip_slots, gap=0)
         self._layout_tile_row(cons_body, cons_slots, gap=0)
         self._layout_tile_row(ammo_body, ammo_slots, gap=0)
         self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
         self._layout_tile_row(fm_body, fm_slots, gap=0)
+        
         equip_body.bind("<Configure>", lambda e, c=equip_body, s=equip_slots: self._layout_tile_row(c, s, gap=0))
         cons_body.bind("<Configure>", lambda e, c=cons_body, s=cons_slots: self._layout_tile_row(c, s, gap=0))
         ammo_body.bind("<Configure>", lambda e, c=ammo_body, s=ammo_slots: self._layout_tile_row(c, s, gap=0))
         crew_body.bind("<Configure>", lambda e, c=crew_body, s=crew_slots: self._layout_tile_grid(c, s, min_cell=9999, gap=0, stretch=False))
         self._layout_pair_tiles_wrap(fm_body, fm_slots, pair_gap=10, row_gap=4)
         fm_body.bind("<Configure>", lambda e, c=fm_body, s=fm_slots: self._layout_pair_tiles_wrap(c, s, pair_gap=10, row_gap=4))
-
-        # Після побудови контенту перебудовуємо розкладку під поточну ширину.
+        
         self._reflow_detail_layout()
+        
+        # Hide progress bar
+        self._hide_filter_progress()
 
     def show_ai_result(self, text):
         pass  # ШІ результати видалено — тепер відображаємо ТТХ
