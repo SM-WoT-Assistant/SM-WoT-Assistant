@@ -262,19 +262,10 @@ class StatsAI:
             return ""
         return q.casefold()
 
-    def _on_search_changed(self, *args):
-        if not hasattr(self, 'ai_grid_frame') or self.main_app.active_view != "ai_stats":
-            return
-        # Cancel any pending search
-        if self._search_timer is not None:
-            self.root.after_cancel(self._search_timer)
-            self._search_timer = None
-        # Schedule new search after 700ms delay
-        self._search_timer = self.root.after(700, self._perform_search)
-
     def _perform_search(self):
         self._show_grid_if_needed()
-        self.refresh_ai_view()
+        # Запускаємо оновлення асинхронно, щоб не блокувати ввід
+        self.root.after(10, self.refresh_ai_view)
 
     def update_search_placeholder(self, new_placeholder):
         old_placeholder = self.search_placeholder
@@ -308,7 +299,8 @@ class StatsAI:
         row1.pack(side="top", fill="x", pady=2)
         row1.pack_propagate(False)
         
-        self.ai_search_var.trace_add("write", self._on_search_changed)
+        # Не використовуємо trace_add, щоб уникнути затримки вводу
+        # self.ai_search_var.trace_add("write", self._on_search_changed)
         
         placeholder = self.search_placeholder
         
@@ -339,8 +331,22 @@ class StatsAI:
                 se.insert(0, placeholder)
                 se.config(fg="gray")
 
+        def on_key_press(e):
+            # Обробляємо тільки друковані символи
+            if not e.char:
+                return
+            # Миттєво ховаємо плейсхолдер при першому введенні (якщо ще не видалено)
+            if se.get() == placeholder:
+                se.delete(0, 'end')
+                se.config(fg="white")
+            # Запускаємо пошук з затримкою 500мс (debounce)
+            if self._search_timer is not None:
+                self.root.after_cancel(self._search_timer)
+            self._search_timer = self.root.after(500, self._perform_search)
+
         se.bind("<FocusIn>", on_search_focus_in)
         se.bind("<FocusOut>", on_search_focus_out)
+        se.bind("<KeyPress>", on_key_press)
 
         # Відступ між строкою 1 і 2
         tk.Frame(fb, height=2, bg="#111").pack(side="top", fill="x")
@@ -838,23 +844,23 @@ class StatsAI:
             return None
 
     def refresh_ai_view(self):
+        """Оновлює грід за допомогою чанків, щоб не блокувати UI."""
         if not hasattr(self, 'ai_grid_frame'): return
-        for widget in self.ai_grid_frame.winfo_children(): widget.destroy()
 
+        # Збираємо список танків для відображення
         search_q = self._parse_search_query()
         active_t, active_c, active_n = self._active_filter_values()
-        row, col = 0, 0
         max_cols = self._last_cols if self._last_cols > 0 else 5
-        
+
         is_default = not search_q and not active_t and not active_c and not active_n
         items_to_show = []
         if is_default:
             for tag in self.popular_tanks:
                 if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
-                
+
             target_rows = max(1, round(20 / max_cols))
             target_count = target_rows * max_cols
-            
+
             if len(items_to_show) > target_count:
                 items_to_show = items_to_show[:target_count]
             elif len(items_to_show) < target_count:
@@ -877,7 +883,7 @@ class StatsAI:
                 if active_c and data_class not in active_c: continue
                 if active_n and data_nation not in active_n: continue
                 items_to_show.append((tag, data))
-            
+
             def _tier_sort(item):
                 d = item[1] if isinstance(item[1], dict) else {}
                 try:
@@ -885,94 +891,13 @@ class StatsAI:
                 except Exception:
                     return 0
             items_to_show.sort(key=_tier_sort, reverse=True)
-            
-        for tag, data in items_to_show:
-            if not isinstance(data, dict):
-                continue
-            card_f = tk.Frame(self.ai_grid_frame, bg="#111", width=170, height=155)
-            card_f.grid(row=row, column=col, sticky="nsew", padx=0.5, pady=0.5)
-            card_f.grid_propagate(False) 
-            
-            nation = data.get("nation", "Unknown")
-            img = self.get_composite_icon(tag, nation)
-            card_f.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
 
-            if img:
-                lbl = tk.Label(card_f, image=img, bg="#111", cursor="hand2", bd=0)
-                lbl.place(relx=0.5, y=0, width=170, height=120, anchor="n")
-                lbl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-                
-            is_prem = data.get("is_premium", False)
-            accent_color = "#e09b1b" if is_prem else "#bbbbbb"
+        # Обмежуємо кількість результатів для швидкодії
+        if len(items_to_show) > 60:
+            items_to_show = items_to_show[:60]
 
-            l1_f = tk.Frame(card_f, bg="#111")
-            l1_f.place(relx=0.5, y=133, anchor="s")
-            
-            roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
-            try:
-                tier_num = int(data.get('tier', 0) or 0)
-            except Exception:
-                tier_num = 0
-            rt = roman_tiers[tier_num - 1] if 1 <= tier_num <= 11 else str(tier_num)
-            tl = tk.Label(l1_f, text=rt, font=("Arial", 12, "bold"), fg=accent_color, bg="#111", bd=0)
-            tl.pack(side="left", padx=3)
-            
-            s_flag = self.get_small_flag(nation)
-            if s_flag:
-                fl = tk.Label(l1_f, image=s_flag, bg="#111", bd=0)
-                fl.pack(side="left", padx=3)
-                fl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            
-            xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
-            sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
-            cl = tk.Label(l1_f, text=sym, font=("XVMSymbol", 17), fg=accent_color, bg="#111", bd=0)
-            cl.pack(side="left", padx=3)
-            
-            raw_name = str(data.get("name", tag)).replace("_", " ")
-            sys_id = tag.split('_')[0].lower()
-            
-            m = re.match(r'^([a-z]+)(\d*)$', sys_id)
-            if m:
-                letters, digits = m.groups()
-                country_codes = {"gb", "uk", "usa", "ussr", "ger", "fr", "ch", "cz", "pl", "swe", "it", "jp", "cn", "r", "a", "g", "f", "s", "j"}
-                if letters in country_codes:
-                    rn_low = raw_name.lower()
-                    if rn_low.startswith(sys_id + " "):
-                        raw_name = raw_name[len(sys_id):].strip()
-                    elif digits and rn_low.startswith(f"{letters} {digits} "):
-                        raw_name = raw_name[len(letters) + len(digits) + 1:].strip()
-                    elif rn_low.startswith(letters + " "):
-                        raw_name = raw_name[len(letters):].strip()
-
-            name_words = raw_name.split()
-            if not name_words:
-                name_words = [data["name"]]
-
-            disp_name = ""
-            for w in name_words:
-                if len(disp_name) + len(w) <= 22:
-                    disp_name += w + " "
-                else:
-                    break
-            disp_name = disp_name.strip() if disp_name else name_words[0][:20]
-
-            text_color = "#e09b1b" if is_prem else "#bbbbbb"
-            nl = tk.Label(card_f, text=disp_name, bg="#111", fg=text_color, font=("Arial", 9, "bold"))
-            nl.place(relx=0.5, y=152, anchor="s")
-            
-            tl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            cl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            nl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            l1_f.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-
-            col += 1
-            if col >= max_cols: col = 0; row += 1
-
-        for c in range(max_cols):
-            self.ai_grid_frame.columnconfigure(c, weight=1)
-        # Очищуємо попередні ваги, якщо кількість колонок зменшилась
-        for c in range(max_cols, max_cols + 15):
-            self.ai_grid_frame.columnconfigure(c, weight=0)
+        # Передаємо список танків для відображення
+        self._finish_filter_with_items(items_to_show)
         
     def _collect_filtered_items(self):
         """Collect filtered items WITHOUT modifying UI. Returns (items_to_show, is_default)."""
@@ -1104,7 +1029,7 @@ class StatsAI:
                 
                 name_words = raw_name.split()
                 if not name_words:
-                    name_words = [data.get("name", tag)]
+                    name_words = [data["name"]]
                 disp_name = ""
                 for w in name_words:
                     if len(disp_name) + len(w) <= 22:
@@ -1121,15 +1046,13 @@ class StatsAI:
                     w.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
                 
                 col += 1
-                if col >= max_cols:
-                    col = 0
-                    row += 1
+                if col >= max_cols: col = 0; row += 1
             
-            # Configure columns for the new grid
-            for c in range(max_cols):
-                new_grid.columnconfigure(c, weight=1)
-            for c in range(max_cols, max_cols + 15):
-                new_grid.columnconfigure(c, weight=0)
+        # Configure columns for the new grid
+        for c in range(max_cols):
+            new_grid.columnconfigure(c, weight=1)
+        for c in range(max_cols, max_cols + 15):
+            new_grid.columnconfigure(c, weight=0)
         
         # Bind scrollregion update
         new_grid.bind("<Configure>", lambda e: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
@@ -1140,9 +1063,8 @@ class StatsAI:
         self.ai_grid_frame = new_grid
         old_grid.destroy()
         
-        # Update scrollregion
-        self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all"))
-        self.ai_canvas.update_idletasks()
+        # Update scrollregion (без блокуючого update_idletasks)
+        self.root.after(50, lambda: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
         
         # Now hide progress bar
         try:
