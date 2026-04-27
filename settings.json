@@ -5,8 +5,8 @@
     "norm_alpha": 0.39999999999999997,
     "norm_contrast": 2.0,
     "edit_w": 700,
-    "edit_x": 444,
-    "edit_y": 125,
+    "edit_x": 213,
+    "edit_y": 150,
     "edit_alpha": 1.0,
     "edit_contrast": 1.0,
     "auto_sync": true,
@@ -17,7 +17,8 @@
     "auto_mode_filter": true,
     "auto_vehicle_filter": true,
     "tth_schema_version": 2,
-    "pause_tank_auto_rebuild": true,
-    "tth_decode_retry_enabled": false,
-    "disable_startup_splash": false
+    "pause_tank_auto_rebuild": false,
+    "tth_decode_retry_enabled": true,
+    "disable_startup_splash": false,
+    "allow_map_decode_on_startup": true
 }

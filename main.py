@@ -46,6 +46,7 @@ if os.name == 'nt':
 
 import threading
 import time
+import subprocess
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk, ImageOps, ImageEnhance
@@ -204,11 +205,14 @@ class WotAssistantHQ:
             self.show_small_loading_splash()
             self.root.after(120, self._start_startup_checks)
 
+
     def _start_startup_checks(self):
+        # Дозволяємо декодування мап на старті для автоматичного оновлення
+        allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
         self.map_mgr.check_game_version(
             progress_cb=self._on_startup_progress,
             done_cb=self._on_startup_ready,
-            allow_map_decode=False,
+            allow_map_decode=allow_decode,
         )
 
     # auto_detect_wot_path moved to map_manager
@@ -246,8 +250,8 @@ class WotAssistantHQ:
 
     def save_settings(self):
         cx, cy = self.root.winfo_x(), self.root.winfo_y()
-        if cx < -5000: return 
-        
+        if cx < -5000: return
+
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
         self.settings[f"{prefix}x"] = cx
@@ -833,27 +837,42 @@ class WotAssistantHQ:
             pass
 
     def finish_startup_splash(self):
+        """Знищує splash та показує головне вікно."""
+        # Перевіряємо, чи splash відображався щонайменше 2 секунди
         shown_at = getattr(self, "_splash_shown_at", 0.0)
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
-        min_visible_ms = 1200
+        min_visible_ms = 2000  # Принаймні 2 секунди
         if elapsed_ms < min_visible_ms:
             self.root.after(min_visible_ms - elapsed_ms, self.finish_startup_splash)
             return
-        ready_at = getattr(self, "_startup_ready_at", 0.0)
-        if ready_at:
-            done_elapsed_ms = int((time.time() - ready_at) * 1000)
-            min_done_visible_ms = 4000
-            if done_elapsed_ms < min_done_visible_ms:
-                self.root.after(min_done_visible_ms - done_elapsed_ms, self.finish_startup_splash)
-                return
+        # Тепер знищуємо splash
         try:
-            if hasattr(self, "splash") and self.splash and self.splash.winfo_exists():
-                self.splash.destroy()
-        except Exception:
-            pass
-        self.root.deiconify()
-        self.root.lift()
-        self.root.focus_force()
+            if hasattr(self, "splash"):
+                if self.splash and self.splash.winfo_exists():
+                    self.splash.destroy()
+                    print("[INIT] Splash знищено")
+                # Видаляємо атрибут незалежно від результату
+                if hasattr(self, "splash"):
+                    try:
+                        del self.splash
+                    except Exception:
+                        pass
+        except Exception as e:
+            print(f"[INIT] Помилка знищення splash: {e}")
+        finally:
+            # Видаляємо атрибут незалежно від результату
+            if hasattr(self, "splash"):
+                try:
+                    del self.splash
+                except Exception:
+                    pass
+        # Показуємо головне вікно
+        try:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
+        except Exception as e:
+            print(f"[INIT] Помилка показу головного вікна: {e}")
         self.current_map_eng = None
         self.map_var.set("")
         self.map_renderer.show_main_splash()
