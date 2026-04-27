@@ -1024,17 +1024,19 @@ class StatsAI:
         return items_to_show, is_default
     
     def _finish_filter_with_items(self, items_to_show):
-        """Destroy old grid and build new one from filtered items (instant)."""
-        # Destroy old grid
-        for widget in self.ai_grid_frame.winfo_children(): widget.destroy()
-        
-        row, col = 0, 0
+        """Build new grid in background, then swap instantly to avoid black flash."""
+        if not items_to_show:
+            items_to_show = []
         max_cols = self._last_cols if self._last_cols > 0 else 5
         
+        # Build new grid in a temporary frame (not yet shown)
+        new_grid = tk.Frame(self.ai_canvas, bg="#000", padx=0.5, pady=0.5)
+        
+        row, col = 0, 0
         for tag, data in items_to_show:
             if not isinstance(data, dict):
                 continue
-            card_f = tk.Frame(self.ai_grid_frame, bg="#111", width=170, height=155)
+            card_f = tk.Frame(new_grid, bg="#111", width=170, height=155)
             card_f.grid(row=row, column=col, sticky="nsew", padx=0.5, pady=0.5)
             card_f.grid_propagate(False)
             
@@ -1067,7 +1069,7 @@ class StatsAI:
                 fl = tk.Label(l1_f, image=s_flag, bg="#111", bd=0)
                 fl.pack(side="left", padx=3)
                 fl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            
+                
             xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
             sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
             cl = tk.Label(l1_f, text=sym, font=("XVMSymbol", 17), fg=accent_color, bg="#111", bd=0)
@@ -1075,8 +1077,7 @@ class StatsAI:
             
             raw_name = str(data.get("name", tag)).replace("_", " ")
             sys_id = tag.split('_')[0].lower()
-            
-            m = re.match(r'^([a-z]+)(\d*)$', sys_id)
+            m = re.search(r'^([a-z]+)(\d*)$', sys_id)
             if m:
                 letters, digits = m.groups()
                 country_codes = {"gb", "uk", "usa", "ussr", "ger", "fr", "ch", "cz", "pl", "swe", "it", "jp", "cn", "r", "a", "g", "f", "s", "j"}
@@ -1091,8 +1092,7 @@ class StatsAI:
             
             name_words = raw_name.split()
             if not name_words:
-                name_words = [data["name"]]
-            
+                name_words = [data.get("name", tag)]
             disp_name = ""
             for w in name_words:
                 if len(disp_name) + len(w) <= 22:
@@ -1105,30 +1105,37 @@ class StatsAI:
             nl = tk.Label(card_f, text=disp_name, bg="#111", fg=text_color, font=("Arial", 9, "bold"))
             nl.place(relx=0.5, y=152, anchor="s")
             
-            tl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            cl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            nl.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
-            l1_f.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
+            for w in [tl, cl, nl, l1_f]:
+                w.bind("<Button-1>", lambda e, t=tag: self.on_ai_tank_select(t))
             
             col += 1
-            if col >= max_cols: col = 0; row += 1
+            if col >= max_cols:
+                col = 0
+                row += 1
         
         for c in range(max_cols):
-            self.ai_grid_frame.columnconfigure(c, weight=1)
-        for c in range(max_cols, max_cols + 15):
-            self.ai_grid_frame.columnconfigure(c, weight=0)
+            new_grid.columnconfigure(c, weight=1)
         
-        # Complete progress bar and hide
+        # Bind scrollregion update
+        new_grid.bind("<Configure>", lambda e: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
+        
+        # SWAP: Update canvas window to point to new frame, then destroy old
+        self.ai_canvas.itemconfig(self.ai_canvas_window, window=new_grid)
+        old_grid = self.ai_grid_frame
+        self.ai_grid_frame = new_grid
+        old_grid.destroy()
+        
+        # Update scrollregion
+        self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all"))
+        self.ai_canvas.update_idletasks()
+        
+        # Now hide progress bar
         try:
             canvas_width = self.filter_progress_canvas.winfo_width()
             if canvas_width > 1:
                 self.filter_progress_canvas.coords(self._progress_rect, 0, 0, canvas_width, 4)
         except Exception:
             pass
-        # Hide progress bar after delay
-        if self._filter_hide_job is not None:
-            self.root.after_cancel(self._filter_hide_job)
-        self._filter_hide_job = self.root.after(300, self._hide_filter_progress)
     
     def _animate_realtime(self, duration, work_func, callback):
         """Animate progress bar. work_func runs during animation; callback after both complete."""
