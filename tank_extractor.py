@@ -1105,3 +1105,4 @@ if __name__ == "__main__":
                 print("[ERROR] Не знайдено wot_path у settings.json")
     except Exception as e:
         print(f"[ERROR] Помилка запуску: {e}")
+

@@ -45,7 +45,7 @@ class StatsAI:
         self._detail_info_fixed_width = 440
         self._detail_top_row_fixed_width = 440
         # Upward shift (px) for the tank sprite inside the detail image card.
-        self._detail_image_lift_px = 36
+        self._detail_image_lift_px = 10
         # TEST MODE: keep global layout debug disabled for users.
         self._layout_debug = False
         # TEST MODE: show borders only for subsection blocks (equipment/consumables/crew/field mod).
@@ -802,24 +802,26 @@ class StatsAI:
             
             if not tank_path: return None
             tank_img = Image.open(tank_path).convert("RGBA")
-            # Trim transparent padding from source icon so visual centering is accurate.
-            bbox = tank_img.getbbox()
-            if bbox:
-                tank_img = tank_img.crop(bbox)
-
+            # Scale original image uniformly - normalize to standard size first
             card_w, card_h = size
             card = Image.new("RGBA", (card_w, card_h), (17, 17, 17, 255))
-            work_w = int(card_w * 1.10)
-            work_h = int(card_h * 1.10)
             
-            if tank_img.width < 100:
-                tank_img = tank_img.resize((round(tank_img.width * 1.5), round(tank_img.height * 1.5)), Image.NEAREST)
-            else:
-                tank_img = ImageOps.contain(tank_img, (work_w, work_h), Image.LANCZOS)
+            # Normalize all tank images to standard 380x304 canvas
+            std_w, std_h = 380, 304
+            temp = ImageOps.contain(tank_img, (std_w, std_h), Image.LANCZOS)
+            canvas = Image.new("RGBA", (std_w, std_h), (0, 0, 0, 0))
+            x = (std_w - temp.width) // 2
+            y = (std_h - temp.height) // 2
+            canvas.paste(temp, (x, y), temp)
+            tank_img = canvas
             
-            y_top_margin = max(6, int(card_h * 0.08))
-            base_y_offset = max(y_top_margin, (card_h - tank_img.height) // 2)
-            y_offset = max(0, base_y_offset - self._detail_image_lift_px)
+            # Scale to fit within work area (preserve aspect ratio)
+            work_w = int(card_w * 1.55)
+            work_h = int(card_h * 1.55)
+            tank_img = ImageOps.contain(tank_img, (work_w, work_h), Image.LANCZOS)
+            
+            # Center vertically in card, then adjust with lift (negative = shift down)
+            y_offset = (card_h - tank_img.height) // 2 - self._detail_image_lift_px
             card.paste(tank_img, ((card_w - tank_img.width)//2, y_offset), tank_img)
 
             if self._layout_debug:
