@@ -56,7 +56,7 @@ class StatsAI:
         self.LOADOUT_ICON_DIR = os.path.join(os.path.dirname(__file__), 'extracted_icons', 'loadout')
         self.FIELD_MODS_ORIGINAL_DIR = os.path.join(
             self.LOADOUT_ICON_DIR,
-            'field_mods_original',
+            'field_mods',
             'pairModifications',
             '80x80',
         )
@@ -1157,11 +1157,11 @@ class StatsAI:
 
         candidates = []
         if category == 'field_mods':
-            # Prefer original client icons (pairModifications/80x80).
-            candidates.extend([
-                os.path.join(self.FIELD_MODS_ORIGINAL_DIR, f"{name}.png"),
-                os.path.join(self.FIELD_MODS_ORIGINAL_DIR, f"{name.lower()}.png"),
-            ])
+            # Prefer larger icons: check 120x120, 100x100, then 80x80.
+            base_field = os.path.join(self.LOADOUT_ICON_DIR, 'field_mods', 'pairModifications')
+            for sub in ['120x120', '100x100', '80x80']:
+                candidates.append(os.path.join(base_field, sub, f"{name}.png"))
+                candidates.append(os.path.join(base_field, sub, f"{name.lower()}.png"))
 
         base_dir = os.path.join(self.LOADOUT_ICON_DIR, category)
         candidates.extend([
@@ -1179,11 +1179,16 @@ class StatsAI:
             if bbox:
                 img = img.crop(bbox)
             canvas = Image.new("RGBA", size, (0, 0, 0, 0))
-            # Scale to fit both up and down while preserving aspect ratio.
-            scale = min(size[0] / max(1, img.width), size[1] / max(1, img.height))
+            # For small source images, limit upscale to avoid quality loss.
+            max_upscale = 2.0  # Don't upscale more than 2x
+            scale_w = min(size[0] / max(1, img.width), max_upscale)
+            scale_h = min(size[1] / max(1, img.height), max_upscale)
+            scale = min(scale_w, scale_h)
             new_w = max(1, int(round(img.width * scale)))
             new_h = max(1, int(round(img.height * scale)))
-            fitted = img.resize((new_w, new_h), Image.LANCZOS)
+            # Use NEAREST for pixel art (small icons), LANCZOS for larger ones.
+            resample = Image.NEAREST if img.width < 48 or img.height < 48 else Image.LANCZOS
+            fitted = img.resize((new_w, new_h), resample)
             x = (size[0] - fitted.width) // 2
             y = (size[1] - fitted.height) // 2
             canvas.paste(fitted, (x, y), fitted)
@@ -1220,8 +1225,8 @@ class StatsAI:
                 ("artefacts", "gunner_sniper"),
             ],
             "field_mod": [
-                ("field_mods", "firepower_on"),
-                ("field_mods", "mobility_on"),
+                ("field_mods", "improvedEnginePower"),
+                ("field_mods", "improvedAimingHandling"),
             ],
         }
         for category, name in candidates.get(section, []):
