@@ -1157,9 +1157,9 @@ class StatsAI:
 
         candidates = []
         if category == 'field_mods':
-            # Prefer larger icons: check 120x120, 100x100, then 80x80.
+            # Prefer larger icons: check 120x120, 100x100, 80x80, then 24x24 as last resort.
             base_field = os.path.join(self.LOADOUT_ICON_DIR, 'field_mods', 'pairModifications')
-            for sub in ['120x120', '100x100', '80x80']:
+            for sub in ['120x120', '100x100', '80x80', '24x24']:
                 candidates.append(os.path.join(base_field, sub, f"{name}.png"))
                 candidates.append(os.path.join(base_field, sub, f"{name.lower()}.png"))
 
@@ -1179,15 +1179,24 @@ class StatsAI:
             if bbox:
                 img = img.crop(bbox)
             canvas = Image.new("RGBA", size, (0, 0, 0, 0))
-            # For small source images, limit upscale to avoid quality loss.
-            max_upscale = 2.0  # Don't upscale more than 2x
-            scale_w = min(size[0] / max(1, img.width), max_upscale)
-            scale_h = min(size[1] / max(1, img.height), max_upscale)
+            # crew_roles icons are very small (14-30px) — always scale freely with LANCZOS for quality.
+            # For other categories, limit upscale to 4x to avoid blurring tiny pixel-art icons.
+            if category == 'crew_roles':
+                scale_w = size[0] / max(1, img.width)
+                scale_h = size[1] / max(1, img.height)
+            else:
+                max_upscale = 4.0
+                scale_w = min(size[0] / max(1, img.width), max_upscale)
+                scale_h = min(size[1] / max(1, img.height), max_upscale)
             scale = min(scale_w, scale_h)
             new_w = max(1, int(round(img.width * scale)))
             new_h = max(1, int(round(img.height * scale)))
-            # Use NEAREST for pixel art (small icons), LANCZOS for larger ones.
-            resample = Image.NEAREST if img.width < 48 or img.height < 48 else Image.LANCZOS
+            # crew_roles: always LANCZOS for smooth upscaling of small originals.
+            # Others: LANCZOS for sources >= 48px, NEAREST for tiny pixel-art.
+            if category == 'crew_roles':
+                resample = Image.LANCZOS
+            else:
+                resample = Image.NEAREST if img.width < 48 or img.height < 48 else Image.LANCZOS
             fitted = img.resize((new_w, new_h), resample)
             x = (size[0] - fitted.width) // 2
             y = (size[1] - fitted.height) // 2
@@ -1596,23 +1605,59 @@ class StatsAI:
             if icon and icon not in icons:
                 icons.append(icon)
 
-        if len(icons) < 2:
-            self._field_mod_pairs_cache[tag] = []
-            return []
+        if len(icons) >= 2:
+            pairs = []
+            i = 0
+            while i + 1 < len(icons):
+                pairs.append((icons[i], icons[i + 1]))
+                i += 2
+            if pairs:
+                pairs = pairs[:pair_limit]
+                self._field_mod_pairs_cache[tag] = pairs
+                return pairs
 
-        pairs = []
-        i = 0
-        while i + 1 < len(icons):
-            pairs.append((icons[i], icons[i + 1]))
-            i += 2
+        # 3) Fallback по ролі класу: знаходимо пари за class -> role з наявної бази.
+        #    Клас танка (HT/MT/LT/TD/SPG) -> найближча роль з pairs_by_tank.
+        tank_info = self.tank_db.get(tag, {}) if isinstance(self.tank_db, dict) else {}
+        tank_class = str((tank_info or {}).get('class', '')).upper()
 
-        if not pairs:
-            self._field_mod_pairs_cache[tag] = []
-            return []
+        # Пріоритетний маппінг клас -> роль
+        class_role_priority = {
+            'HT':  ['role_HT_universal', 'role_HT_break', 'role_HT_assault'],
+            'MT':  ['role_MT_universal', 'role_MT_sniper', 'role_MT_assault'],
+            'LT':  ['role_LT_universal'],
+            'TD':  ['role_ATSPG_universal', 'role_ATSPG_sniper', 'role_ATSPG_assault'],
+            'SPG': ['role_ATSPG_universal', 'role_ATSPG_assault', 'role_ATSPG_sniper'],
+        }
+        # Будуємо словник роль -> пари з наявних 53 записів
+        role_pairs_map = {}
+        for _, entry in self._field_mod_pairs_by_tank.items():
+            if not isinstance(entry, dict):
+                continue
+            role = entry.get('role_normalized') or entry.get('role_raw', '')
+            raw = entry.get('pairs', [])
+            if role and raw and role not in role_pairs_map:
+                parsed = []
+                for item in raw:
+                    if isinstance(item, (list, tuple)) and len(item) >= 2:
+                        l, r = str(item[0]).strip(), str(item[1]).strip()
+                        if l and r:
+                            parsed.append((l, r))
+                if parsed:
+                    role_pairs_map[role] = parsed
 
-        pairs = pairs[:pair_limit]
+        roles_to_try = class_role_priority.get(tank_class, [])
+        for role in roles_to_try:
+            if role in role_pairs_map:
+                pairs = role_pairs_map[role][:pair_limit]
+                self._field_mod_pairs_cache[tag] = pairs
+                return pairs
+
+        # 4) Абсолютний fallback: використовуємо _default_field_mod_pairs
+        pairs = self._default_field_mod_pairs()[:pair_limit]
         self._field_mod_pairs_cache[tag] = pairs
         return pairs
+
 
     def on_ai_tank_select(self, tag):
         self.active_tank = tag

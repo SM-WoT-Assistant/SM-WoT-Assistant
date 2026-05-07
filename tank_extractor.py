@@ -428,24 +428,29 @@ class TankExtractor:
                         with open(os.path.join(ICONS_DIR, "loadout", "crew_skills", out_name), "wb") as f:
                             f.write(z.read(name))
 
-                    # 8.1 Loadout: ролі екіпажу (white role icons)
-                    elif name.startswith("gui/maps/icons/tankmen/roles/opaque/white/") and name.endswith(".png"):
+                    # 8.1 Loadout: ролі екіпажу — беремо з папки big/ (60x60, найякісніші)
+                    elif name.startswith("gui/maps/icons/tankmen/roles/big/") and name.endswith(".png"):
                         out_name = os.path.basename(name)
                         with open(os.path.join(ICONS_DIR, "loadout", "crew_roles", out_name), "wb") as f:
                             f.write(z.read(name))
 
-                    # 9. Loadout: польова модернізація (спеціалізації)
-                    elif name.startswith("gui/maps/icons/specialization/") and name.endswith(".png"):
-                        rel = name[len("gui/maps/icons/specialization/"):]
-                        # Беремо лише базові іконки гілок (без extra_large/large/medium/filter).
-                        if "/" in rel:
+                    # 9. Loadout: польова модернізація — правильний шлях vehPostProgression.
+                    # Витягуємо всі 4 розміри: 120x120, 100x100, 80x80, 24x24.
+                    # Пропускаємо _disabled варіанти (сірі заблоковані іконки).
+                    elif "gui/maps/icons/vehPostProgression/actionItems/pairModifications/" in name and name.endswith(".png"):
+                        if "_disabled" in os.path.basename(name):
                             continue
-                        if rel.startswith(("extra_large_", "large_", "medium_")):
+                        # Витягуємо розмір з шляху: .../pairModifications/120x120/foo.png
+                        rel = name.split("pairModifications/", 1)[-1]  # e.g. '120x120/foo.png'
+                        parts = rel.split("/", 1)
+                        if len(parts) != 2:
                             continue
-                        if rel.endswith("_filter.png"):
+                        size_sub, out_name = parts
+                        if size_sub not in ("120x120", "100x100", "80x80", "24x24"):
                             continue
-                        out_name = os.path.basename(rel)
-                        with open(os.path.join(ICONS_DIR, "loadout", "field_mods", out_name), "wb") as f:
+                        out_dir = os.path.join(ICONS_DIR, "loadout", "field_mods", "pairModifications", size_sub)
+                        os.makedirs(out_dir, exist_ok=True)
+                        with open(os.path.join(out_dir, out_name), "wb") as f:
                             f.write(z.read(name))
         
         print("[SUCCESS] Додаткові активи витягнуто")

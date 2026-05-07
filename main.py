@@ -333,7 +333,8 @@ class WotAssistantHQ:
         if new_key is not None:
             self.settings["ai_key"] = new_key.strip()
             self.save_settings()
-            self.ai_stats.configure(self.settings["ai_key"])
+            if hasattr(self, "ai_stats") and self.ai_stats:
+                self.ai_stats.configure(self.settings["ai_key"])
             self.status_label.config(text="[СТАТ АІ] Ключ оновлено успішно!", fg="lime")
 
     # run_map_updater and load_map_list moved to map_manager
@@ -672,9 +673,9 @@ class WotAssistantHQ:
         if not self.settings.get("log_path", ""):
             self.status_label.config(text="[AUTO] ПОМИЛКА: Не встановлено log_path", fg="red")
             return
-            
+
         # Якщо зараз відкрито СТАТИ, автоматично перемикаємо на МАПИ II (вони актуальніші)
-            self.switch_to_maps(2)
+        self.switch_to_maps(2)
 
         if self.auto_mode_filter_var.get():
             self.selected_battle_mode.set(ui_mode)
