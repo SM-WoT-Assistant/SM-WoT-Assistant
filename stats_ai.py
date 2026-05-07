@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps, ImageDraw
 import io
+from ai_engine import ai_engine_instance
 
 class StatsAI:
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
@@ -1149,9 +1150,9 @@ class StatsAI:
         for f in self.nation_filters.values(): f["active"] = False; f["btn"].config(bg="#333333")
         self.refresh_ai_view()
 
-    def get_loadout_icon(self, category, name, size=(40, 40)):
+    def get_loadout_icon(self, category, name, size=(40, 40), disabled=False):
         """Повертає PhotoImage іконки обладнання/снаряда/навички"""
-        cache_key = f"{category}_{name}_{size[0]}"
+        cache_key = f"{category}_{name}_{size[0]}_{disabled}"
         if cache_key in self.loadout_icon_cache:
             return self.loadout_icon_cache[cache_key]
 
@@ -1174,6 +1175,9 @@ class StatsAI:
             return None
         try:
             img = Image.open(icon_path).convert("RGBA")
+            if disabled:
+                from PIL import ImageEnhance
+                img = ImageEnhance.Brightness(img).enhance(0.3)
             # Keep native icon look: crop transparent margins and fit into square without stretching.
             bbox = img.getbbox()
             if bbox:
@@ -1371,7 +1375,10 @@ class StatsAI:
         if not os.path.exists(icon_path):
             return None
         try:
-            img = Image.open(icon_path).convert("RGBA").resize(size, Image.LANCZOS)
+            img = Image.open(icon_path).convert("RGBA")
+            if disabled:
+                from PIL import ImageEnhance
+                img = ImageEnhance.Brightness(img).enhance(0.3).resize(size, Image.LANCZOS)
             photo = ImageTk.PhotoImage(img)
             self.tth_icon_cache[cache_key] = photo
             return photo
@@ -1837,68 +1844,7 @@ class StatsAI:
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
         
-        # Equipment items
-        equip_items = [
-            ("rammer", self.t("rammer", "Ухиливач")),
-            ("coatedOptics", self.t("coatedOptics", "Гарячі скла")),
-            ("aimingStabilizer", self.t("aimingStabilizer", "Стабілізатор наведення")),
-        ]
-        equip_slots = []
-        for name, _label in equip_items:
-            photo = self.get_loadout_icon('artefacts', name, (48, 48))
-            slot = tk.Frame(equip_body, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1d2a1a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1d2a1a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#2a3a28")
-            lbl.pack(expand=True)
-            equip_slots.append(slot)
-        
-        # Consumables items
-        cons_items = [
-            ("largeRepairkit", self.t("largeRepairkit", "Великий ремонтний набір")),
-            ("handExtinguishers", self.t("handExtinguishers", "Вогнегасник")),
-            ("hotCoffee", self.t("hotCoffee", "Міцна кава")),
-        ]
-        cons_slots = []
-        for name, _label in cons_items:
-            photo = self.get_loadout_icon('artefacts', name, (48, 48))
-            slot = tk.Frame(cons_body, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#272a3a")
-            lbl.pack(expand=True)
-            cons_slots.append(slot)
-        
-        # Ammo items
-        ammo_items = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HIGH_EXPLOSIVE"]
-        ammo_slots = []
-        for name in ammo_items:
-            photo = self.get_loadout_icon('ammo', name, (48, 48))
-            slot = tk.Frame(ammo_body, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#272a3a")
-            lbl.pack(expand=True)
-            ammo_slots.append(slot)
-        
+
         # Row 2 frames
         equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
         equip_body_2.pack(side="top", fill="x", pady=3)
@@ -1907,128 +1853,233 @@ class StatsAI:
         ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
         ammo_body_2.pack(side="top", fill="x", pady=3)
         
-        equip_slots_2 = []
-        for name, _label in equip_items:
-            photo = self.get_loadout_icon('artefacts', name, (48, 48))
-            slot = tk.Frame(equip_body_2, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1d2a1a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1d2a1a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#2a3a28")
-            lbl.pack(expand=True)
-            equip_slots_2.append(slot)
-        
-        cons_slots_2 = []
-        for name, _label in cons_items:
-            photo = self.get_loadout_icon('artefacts', name, (48, 48))
-            slot = tk.Frame(cons_body_2, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#272a3a")
-            lbl.pack(expand=True)
-            cons_slots_2.append(slot)
-        
-        ammo_slots_2 = []
-        for name in ammo_items:
-            photo = self.get_loadout_icon('ammo', name, (48, 48))
-            slot = tk.Frame(ammo_body_2, bg="#111111", bd=0, relief="flat")
-            icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=54, height=54)
-            icon_box.pack(side="top")
-            icon_box.pack_propagate(False)
-            lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
-            if photo:
-                lbl.config(image=photo)
-                lbl.image = photo
-            else:
-                lbl.config(width=4, height=2, bg="#272a3a")
-            lbl.pack(expand=True)
-            ammo_slots_2.append(slot)
-        
-        self._layout_tile_row(equip_body_2, equip_slots_2, gap=0)
-        self._layout_tile_row(cons_body_2, cons_slots_2, gap=0)
-        self._layout_tile_row(ammo_body_2, ammo_slots_2, gap=0)
-        
+        # Show loading placeholders
+        loading_labels = []
+        for body in [equip_body, cons_body, ammo_body, crew_body, fm_body]:
+            lbl = tk.Label(body, text="ШІ Аналізує Сетап...", fg="#888888", bg="#111111", font=("Arial", 10))
+            lbl.pack(pady=20, expand=True)
+            loading_labels.append(lbl)
+            
+        tank_name = data.get("name", tag)
+        def on_build_ready(build_data, is_cached):
+            if not self.ai_equipment_frame.winfo_exists(): return
+            self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
+                build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
+                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
+            ))
+            
+        ai_engine_instance.fetch_build_async(tag, tank_name, on_build_ready)
+
+    def _map_ai_fm_text_to_icon(self, text):
+        t = text.lower()
+        if "terrain" in t or "grouser" in t: return "additionalGrousers"
+        if "lightweight" in t or "friction" in t: return "betterFriction"
+        if "parallax" in t or "aiming" in t: return "improvedAimingHandling"
+        if "powder" in t or "scope" in t: return "improvedScope"
+        if "right-angle" in t or "observation" in t: return "improvedObservationDevice"
+        if "anti-reflective" in t or "spalling" in t or "lenses" in t or "headlight" in t: return "improvedSpallingResistance"
+        if "power supply" in t or "tuning" in t or "wheels" in t: return "improvedTurretTurningWheels"
+        if "shielding" in t or "filter" in t or "isolation" in t: return "improvedLightFilters"
+        if "durability" in t or "suspension" in t: return "improvedTurretTurningWheels"
+        if "valve" in t or "gears" in t: return "improvedAimingHandling"
+        return "glow"
+
+    def _update_ai_setup_ui(self, build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs):
+        for lbl in loading_labels:
+            if lbl.winfo_exists(): lbl.destroy()
+            
+        for body in [equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2]:
+            for w in body.winfo_children(): w.destroy()
+            
+        def render_items(parent, items, category, size=(48, 48)):
+            slots = []
+            for name in items:
+                photo = self.get_loadout_icon(category, name, size)
+                slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
+                icon_box = tk.Frame(slot, bg="#1d2a1a" if category == "artefacts" else "#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
+                icon_box.pack(side="top")
+                icon_box.pack_propagate(False)
+                lbl = tk.Label(icon_box, bg="#1d2a1a" if category == "artefacts" else "#1a1d2a", padx=0, pady=0)
+                if photo:
+                    lbl.config(image=photo)
+                    lbl.image = photo
+                else:
+                    lbl.config(width=4, height=2, bg="#2a3a28" if category == "artefacts" else "#272a3a")
+                lbl.pack(expand=True, fill="both")
+                slots.append(slot)
+            self._layout_tile_row(parent, slots, gap=0)
+            return slots
+            
+        def render_ammo_items(parent, items, category="ammo", size=(48, 48)):
+            slots = []
+            for item in items:
+                if isinstance(item, tuple) and len(item) == 2:
+                    name, count = item
+                else:
+                    name, count = item, 0
+                    
+                photo = self.get_loadout_icon(category, name, size)
+                slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
+                icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
+                icon_box.pack(side="top")
+                icon_box.pack_propagate(False)
+                
+                # Image Label
+                lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
+                if photo:
+                    lbl.config(image=photo)
+                    lbl.image = photo
+                else:
+                    lbl.config(width=4, height=2, bg="#272a3a")
+                lbl.pack(expand=True, fill="both")
+                
+                # Text Label with black background for contrast
+                if count > 0:
+                    t_lbl = tk.Label(icon_box, text=str(count), fg="#ffffff", bg="#0a0b12", font=("Arial", 8, "bold"), padx=2, pady=0)
+                    t_lbl.place(relx=1.0, rely=1.0, anchor="se")
+                    
+                slots.append(slot)
+            self._layout_tile_row(parent, slots, gap=0)
+            return slots
+        # Force correct ration based on nation
+        ration_map = {
+            "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
+            "france": "hotCoffee", "china": "ration_china", "poland": "ration_poland",
+            "czech": "Buchty", "japan": "ration_japan", "italy": "ration_italy", "sweden": "ration_sweden"
+        }
+        nation = data.get("nation", "")
+        correct_ration = ration_map.get(nation.lower())
+        if correct_ration:
+            cons = build_data.get("consumables", [])
+            for i, c in enumerate(cons):
+                if c in ration_map.values():
+                    cons[i] = correct_ration
+            build_data["consumables"] = cons
+            
+        render_items(equip_body, build_data.get("equipment_1", []), "artefacts")
+        render_items(equip_body_2, build_data.get("equipment_2", []), "artefacts")
+        render_items(cons_body, build_data.get("consumables", []), "artefacts")
+        render_items(cons_body_2, build_data.get("consumables", []), "artefacts")
+        render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
+        render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
+
         # Crew section
         crew_slots = []
-        for member, skills in crew_rows:
+        ai_crew = {}
+        for role, skills in build_data.get("crew", []):
+            r_lower = role.lower()
+            if "radio" in r_lower or "radioman" in r_lower: r_lower = "radioman"
+            elif "loader" in r_lower: r_lower = "loader"
+            elif "gunner" in r_lower: r_lower = "gunner"
+            elif "driver" in r_lower: r_lower = "driver"
+            elif "commander" in r_lower: r_lower = "commander"
+            ai_crew[r_lower] = skills
+            
+        for member, _ in crew_rows:
             slot = tk.Frame(crew_body, bg="#111111", bd=0, relief="flat")
             row = tk.Frame(slot, bg="#111111")
             row.pack(side="top", pady=(0, 3))
-            role_icon = member.get('role')
-            also_roles = member.get('also') or []
+            
+            role_str = member.get("role", "commander")
+            primary_r_icon = role_str.lower()
+            if "loader" in primary_r_icon: primary_r_icon = "loader"
+            if "radio" in primary_r_icon or "radioman" in primary_r_icon: primary_r_icon = "radioman"
+            if "gunner" in primary_r_icon: primary_r_icon = "gunner"
+            if "driver" in primary_r_icon: primary_r_icon = "driver"
+            if "commander" in primary_r_icon: primary_r_icon = "commander"
+            
+            # Primary role
             role_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
             role_box.pack(side="left", padx=(0, 3))
             role_box.pack_propagate(False)
-            role_photo = self.get_loadout_icon('crew_roles', role_icon, (24, 24))
+            role_photo = self.get_loadout_icon("crew_roles", primary_r_icon + "_plus", (24, 24))
             role_lbl = tk.Label(role_box, bg="#111111")
             if role_photo:
                 role_lbl.config(image=role_photo)
                 role_lbl.image = role_photo
             role_lbl.pack(expand=True)
+            
+            # Secondary roles
+            also_roles = member.get("also") or []
             for sec_role in also_roles:
+                sec_icon = sec_role.lower()
+                if "loader" in sec_icon: sec_icon = "loader"
+                if "radio" in sec_icon or "radioman" in sec_icon: sec_icon = "radioman"
+                if "gunner" in sec_icon: sec_icon = "gunner"
+                if "driver" in sec_icon: sec_icon = "driver"
+                if "commander" in sec_icon: sec_icon = "commander"
+                
                 sec_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
                 sec_box.pack(side="left", padx=(0, 3))
                 sec_box.pack_propagate(False)
-                sec_photo = self.get_loadout_icon('crew_roles', sec_role, (24, 24))
+                sec_photo = self.get_loadout_icon("crew_roles", sec_icon + "_plus", (24, 24))
                 sec_lbl = tk.Label(sec_box, bg="#111111")
                 if sec_photo:
                     sec_lbl.config(image=sec_photo)
                     sec_lbl.image = sec_photo
                 sec_lbl.pack(expand=True)
-            for skill_name in skills:
-                skill_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
-                skill_box.pack(side="left", padx=(0, 3))
-                skill_box.pack_propagate(False)
-                skill_photo = self.get_loadout_icon('artefacts', skill_name, (24, 24))
-                skill_lbl = tk.Label(skill_box, bg="#2a1a1a")
-                if skill_photo:
-                    skill_lbl.config(image=skill_photo)
-                    skill_lbl.image = skill_photo
-                skill_lbl.pack(expand=True)
+                
+            # Skills for this member (combining primary and secondary roles)
+            skills = []
+            for r in [primary_r_icon] + [sr.lower() for sr in also_roles]:
+                if "radio" in r or "radioman" in r: r = "radioman"
+                elif "loader" in r: r = "loader"
+                elif "gunner" in r: r = "gunner"
+                elif "driver" in r: r = "driver"
+                elif "commander" in r: r = "commander"
+                skills.extend(ai_crew.get(r, []))
+            
+            # Deduplicate skills keeping order
+            seen_sk = set()
+            clean_skills = []
+            for sk in skills:
+                if sk not in seen_sk:
+                    seen_sk.add(sk)
+                    clean_skills.append(sk)
+                    
+            for sk in clean_skills:
+                sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
+                sk_box.pack(side="left", padx=(0, 3))
+                sk_box.pack_propagate(False)
+                sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
+                if sk_photo:
+                    sk_lbl.config(image=sk_photo)
+                    sk_lbl.image = sk_photo
+                sk_lbl.pack(expand=True)
             crew_slots.append(slot)
-        
-        # Field mod section
+
+        self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
+
+        # Field mods section
         fm_slots = []
-        for left_name, right_name in fm_pairs:
+        ai_fm_icons = [self._map_ai_fm_text_to_icon(text) for text in build_data.get("field_mods", [])]
+        
+        for pair in fm_pairs:
+            # pair is [mod1_id, mod2_id]
+            if len(pair) != 2: continue
+            
             slot = tk.Frame(fm_body, bg="#111111", bd=0, relief="flat")
-            row = tk.Frame(slot, bg="#111111")
-            row.pack(side="top")
-            for name in (left_name, right_name):
-                icon_box = tk.Frame(row, bg="#1a242a", bd=1, relief="flat", width=64, height=64)
-                icon_box.pack(side="left", padx=0)
+            
+            for mod_id in pair:
+                is_selected = mod_id in ai_fm_icons
+                
+                icon_box = tk.Frame(slot, bg="#1a242a" if is_selected else "#0d1215", bd=1, relief="flat", width=64, height=64)
+                icon_box.pack(side="left", padx=2)
                 icon_box.pack_propagate(False)
-                photo = self.get_loadout_icon('field_mods', name, (64, 64))
-                lbl = tk.Label(icon_box, bg="#1a242a", padx=0, pady=0)
+                
+                photo = self.get_loadout_icon('field_mods', mod_id, (64, 64), disabled=not is_selected)
+                lbl = tk.Label(icon_box, bg="#1a242a" if is_selected else "#0d1215", padx=0, pady=0)
                 if photo:
                     lbl.config(image=photo)
                     lbl.image = photo
                 else:
-                    lbl.config(width=3, height=2, bg="#1e2d35")
+                    lbl.config(width=3, height=2, bg="#1e2d35" if is_selected else "#0f161a")
                 lbl.pack(expand=True)
+                
             fm_slots.append(slot)
-        
-        # Layout
-        self._layout_tile_row(equip_body, equip_slots, gap=0)
-        self._layout_tile_row(cons_body, cons_slots, gap=0)
-        self._layout_tile_row(ammo_body, ammo_slots, gap=0)
-        self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
+
         self._layout_tile_row(fm_body, fm_slots, gap=0)
-        
-        equip_body.bind("<Configure>", lambda e, c=equip_body, s=equip_slots: self._layout_tile_row(c, s, gap=0))
-        cons_body.bind("<Configure>", lambda e, c=cons_body, s=cons_slots: self._layout_tile_row(c, s, gap=0))
-        ammo_body.bind("<Configure>", lambda e, c=ammo_body, s=ammo_slots: self._layout_tile_row(c, s, gap=0))
-        crew_body.bind("<Configure>", lambda e, c=crew_body, s=crew_slots: self._layout_tile_grid(c, s, min_cell=9999, gap=0, stretch=False))
         self._layout_pair_tiles_wrap(fm_body, fm_slots, pair_gap=10, row_gap=4)
         fm_body.bind("<Configure>", lambda e, c=fm_body, s=fm_slots: self._layout_pair_tiles_wrap(c, s, pair_gap=10, row_gap=4))
         
