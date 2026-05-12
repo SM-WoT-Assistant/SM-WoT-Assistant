@@ -2412,7 +2412,7 @@ class StatsAI:
                     lbl.config(width=4, height=2, bg="#2a3a28" if category == "artefacts" else "#272a3a")
                 lbl.pack(expand=True, fill="both")
                 slots.append(slot)
-            self._layout_tile_row(parent, slots, gap=0)
+            self._layout_tile_row(parent, slots, gap=3)
             return slots
             
         # Force correct ration based on nation
