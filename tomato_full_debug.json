@@ -1,0 +1,169 @@
+{
+  "equipment_1": [
+    "Gun Rammer",
+    "Improved Hardening",
+    "Turbocharger"
+  ],
+  "equipment_2": [
+    "Vertical Stabilizer",
+    "Additional Grousers",
+    "Innovative Loading System"
+  ],
+  "consumables": [],
+  "crew_perks": {
+    "commander": [
+      "Brothers in Arms",
+      "Repair",
+      "Sixth Sense",
+      "Emergency",
+      "Coordination",
+      "Practicality"
+    ],
+    "gunner": [
+      "Brothers in Arms",
+      "Repair",
+      "Snap Shot",
+      "Dead Eye",
+      "gunner_quickAiming",
+      "gunner_armorer"
+    ],
+    "driver": [
+      "Brothers in Arms",
+      "Repair",
+      "Smooth Ride",
+      "Off-Road Driving",
+      "driver_rammingMaster",
+      "Clutch Braking"
+    ],
+    "loader": [
+      "Brothers in Arms",
+      "Repair",
+      "Intuition",
+      "Safe Stowage",
+      "loader_ammunitionImprove",
+      "loader_melee"
+    ],
+    "loader_radio": [
+      "radioman_finder",
+      "Firefighting",
+      "radioman_sideBySide",
+      "radioman_signalInterception",
+      "radioman_expert",
+      "radioman_interference"
+    ]
+  },
+  "field_mods": {
+    "mods": [
+      {
+        "1011": {
+          "wn8": 2155,
+          "count": 8566
+        },
+        "1012": {
+          "wn8": 1747,
+          "count": 5435
+        }
+      },
+      {
+        "1021": {
+          "wn8": 2072,
+          "count": 10442
+        },
+        "1022": {
+          "wn8": 1801,
+          "count": 1927
+        }
+      },
+      {
+        "1031": {
+          "wn8": 1867,
+          "count": 3495
+        },
+        "1032": {
+          "wn8": 2087,
+          "count": 7712
+        }
+      },
+      {
+        "1241": {
+          "wn8": 2102,
+          "count": 8701
+        },
+        "1242": {
+          "wn8": 1893,
+          "count": 1879
+        }
+      },
+      {
+        "1251": {
+          "wn8": 2127,
+          "count": 4332
+        },
+        "1252": {
+          "wn8": 2006,
+          "count": 5717
+        }
+      }
+    ],
+    "name": "IS-7",
+    "modsUnicum": [
+      {
+        "1011": {
+          "wn8": 3525,
+          "count": 1276
+        },
+        "1012": {
+          "wn8": 3486,
+          "count": 292
+        }
+      },
+      {
+        "1021": {
+          "wn8": 3527,
+          "count": 1351
+        },
+        "1022": {
+          "wn8": 3473,
+          "count": 138
+        }
+      },
+      {
+        "1031": {
+          "wn8": 3429,
+          "count": 236
+        },
+        "1032": {
+          "wn8": 3531,
+          "count": 1060
+        }
+      },
+      {
+        "1241": {
+          "wn8": 3509,
+          "count": 1190
+        },
+        "1242": {
+          "wn8": 3541,
+          "count": 194
+        }
+      },
+      {
+        "1251": {
+          "wn8": 3550,
+          "count": 706
+        },
+        "1252": {
+          "wn8": 3482,
+          "count": 565
+        }
+      }
+    ],
+    "boostSlotCounts": {
+      "stealth": 0,
+      "mobility": 30052,
+      "firepower": 20479,
+      "survivability": 0
+    }
+  },
+  "source": "tomato.gg"
+}

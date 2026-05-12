@@ -59,21 +59,21 @@ EQUIP_MAP = {
 }
 
 TOMATO_TO_CLIENT_EQUIP = {
-    "Improved Hardening": "healthreserve",
-    "Improved Ventilation": "improved ventilation",
-    "Vertical Stabilizer": "vertical stabilizer",
-    "Turbocharger": "turbocharger",
-    "Gun Rammer": "gun rammer",
-    "Coated Optics": "coated optics",
-    "Enhanced Gun Laying Drives": "enhanced aim drives",
-    "Improved Aiming": "improved aiming",
-    "Low-Noise Exhaust System": "additional invisibility device",
-    "Commander's Vision System": "commander's vision system",
-    "Binocular Telescope": "binocular telescope",
-    "Camouflage Net": "camouflage net",
-    "Spall Liner": "antifragmentation lining",
-    "Modified Configuration": "improved configuration",
-    "Improved Rotation Mechanisms": "improved rotation mechanism",
+    "Improved Hardening": "healthReserve",
+    "Improved Ventilation": "Improved Ventilation",
+    "Vertical Stabilizer": "Vertical Stabilizer",
+    "Turbocharger": "Turbocharger",
+    "Gun Rammer": "Gun Rammer",
+    "Coated Optics": "Coated Optics",
+    "Enhanced Gun Laying Drives": "Enhanced Gun Laying Drives",
+    "Improved Aiming": "Improved Aiming",
+    "Low-Noise Exhaust System": "Low-Noise Exhaust System",
+    "Commander's Vision System": "Commander's Vision System",
+    "Binocular Telescope": "Binocular Telescope",
+    "Camouflage Net": "Camouflage Net",
+    "Spall Liner": "Spall Liner",
+    "Modified Configuration": "Modified Configuration",
+    "Improved Rotation Mechanisms": "Improved Rotation Mechanisms",
 }
 
 CONS_MAP = {
@@ -1047,22 +1047,25 @@ class StatsAI:
 
     def _show_legend_tooltip(self, event, text):
         """Показує підказку при наведенні."""
-        if not hasattr(self, '_legend_tooltip'):
+        if not hasattr(self, '_legend_tooltip') or not self._legend_tooltip.winfo_exists():
             self._legend_tooltip = tk.Toplevel(self.root)
             self._legend_tooltip.overrideredirect(True)
             self._legend_tooltip.configure(bg="#333333")
             self._legend_tooltip_label = tk.Label(self._legend_tooltip, text="", fg="white", bg="#333333", font=("Arial", 9), padx=8, pady=4)
             self._legend_tooltip_label.pack()
             self._legend_tooltip.withdraw()
-        self._legend_tooltip_label.configure(text=text)
-        x = event.widget.winfo_rootx() + 20
-        y = event.widget.winfo_rooty() + 20
-        self._legend_tooltip.geometry(f"+{x}+{y}")
-        self._legend_tooltip.deiconify()
+        try:
+            self._legend_tooltip_label.configure(text=text)
+            x = event.widget.winfo_rootx() + 20
+            y = event.widget.winfo_rooty() + 20
+            self._legend_tooltip.geometry(f"+{x}+{y}")
+            self._legend_tooltip.deiconify()
+        except tk.TclError:
+            pass
 
     def _hide_legend_tooltip(self):
         """Ховає підказку."""
-        if hasattr(self, '_legend_tooltip'):
+        if hasattr(self, '_legend_tooltip') and self._legend_tooltip.winfo_exists():
             self._legend_tooltip.withdraw()
 
     def refresh_ai_view(self):
@@ -2201,27 +2204,28 @@ class StatsAI:
                 client_eq_set = set()
                 for loadout in client_equipment[:3]:
                     for eq in loadout.get('equipment', []):
-                        client_eq_set.add(eq.lower())
+                        client_eq_set.add(eq.lower().replace(" ", ""))
 
             if tomato_data:
                 eq1 = tomato_data.get("equipment_1", [])
                 eq2 = tomato_data.get("equipment_2", [])
 
-                # Filter equipment using client data (map Tomato names to client IDs)
-                if client_eq_set:
-                    filtered_eq1 = []
-                    for e in eq1:
-                        client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                        if client_id.lower() in client_eq_set:
-                            filtered_eq1.append(e)
-                    eq1 = filtered_eq1
-
-                    filtered_eq2 = []
-                    for e in eq2:
-                        client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                        if client_id.lower() in client_eq_set:
-                            filtered_eq2.append(e)
-                    eq2 = filtered_eq2
+                # TODO: Re-enable client data filter after debugging
+                # if client_eq_set:
+                #     filtered_eq1 = []
+                #     for e in eq1:
+                #         client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                #         normalized_id = client_id.lower().replace(" ", "")
+                #         if any(normalized_id == ce.lower().replace(" ", "") for ce in client_eq_set):
+                #             filtered_eq1.append(e)
+                #     eq1 = filtered_eq1
+                #     filtered_eq2 = []
+                #     for e in eq2:
+                #         client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                #         normalized_id = client_id.lower().replace(" ", "")
+                #         if any(normalized_id == ce.lower().replace(" ", "") for ce in client_eq_set):
+                #             filtered_eq2.append(e)
+                #     eq2 = filtered_eq2
                 
                 equipment_1 = [map_equip(e) for e in eq1[:3]]
                 equipment_2 = [map_equip(e) for e in eq2[:3]]
@@ -2486,9 +2490,12 @@ class StatsAI:
             build_data["consumables"] = cons
             
         # Цифра 1 перед обладнанням (використовує pack)
-        if not hasattr(self, '_loadout_num_label'):
+        if not hasattr(self, '_loadout_num_label') or not self._loadout_num_label.winfo_exists():
             self._loadout_num_label = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
-        self._loadout_num_label.pack(side="left", padx=(0, 2))
+        try:
+            self._loadout_num_label.pack(side="left", padx=(0, 2))
+        except tk.TclError:
+            return
         self._loadout_num_label.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
         self._loadout_num_label.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
@@ -2498,9 +2505,12 @@ class StatsAI:
         render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts")
         
         # Цифра 2 перед обладнанням (використовує pack)
-        if not hasattr(self, '_loadout_num_label_2'):
+        if not hasattr(self, '_loadout_num_label_2') or not self._loadout_num_label_2.winfo_exists():
             self._loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
-        self._loadout_num_label_2.pack(side="left", padx=(0, 2))
+        try:
+            self._loadout_num_label_2.pack(side="left", padx=(0, 2))
+        except tk.TclError:
+            return
         self._loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
         self._loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         

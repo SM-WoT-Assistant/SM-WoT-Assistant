@@ -1,0 +1,492 @@
+{
+  "T110E5": {
+    "tank": "T110E5",
+    "equipment": {
+      "loadout_1": [
+        "Improved Hardening",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ],
+      "loadout_2": [
+        "Turbocharger",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ]
+    },
+    "ammo": {
+      "total_capacity": 42,
+      "distribution": {
+        "AP": 10,
+        "HEAT": 30,
+        "HE": 2
+      }
+    },
+    "consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Case of Cola"
+    ],
+    "crew_perks": {
+      "commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Recon",
+        "Sound Detection",
+        "Emergency",
+        "Coordination"
+      ],
+      "gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Deadeye",
+        "Quick Aiming"
+      ],
+      "driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Engineer"
+      ],
+      "loader_radio_operator": {
+        "primary": [
+          "Brothers in Arms",
+          "Repair",
+          "Safe Stowage",
+          "Intuition",
+          "Adrenaline Rush",
+          "Perfect Charge"
+        ],
+        "secondary_bonus": [
+          "Situational Awareness",
+          "Signal Interception",
+          "Side by Side",
+          "Battle Tempered"
+        ]
+      }
+    },
+    "field_modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Periscope Dish",
+      "Reinforced Platform",
+      "Lightweight Platform"
+    ]
+  },
+  "IS-7_OLD": {
+    "tank": "IS-7_OLD",
+      "loadout_1": [
+        "Improved Hardening",
+        "Turbocharger",
+        "Vertical Stabilizer"
+      ],
+      "loadout_2": [
+        "Improved Ventilation",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ]
+    },
+    "ammo": {
+      "capacity": 30,
+      "distribution": {
+        "AP": 10,
+        "APCR": 18,
+        "HE": 2
+      }
+    },
+    "consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Extra Rations (USSR)"
+    ],
+    "crew_perks": {
+      "commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Recon",
+        "Sound Detection",
+        "Coordination",
+        "Emergency"
+      ],
+      "gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Deadeye",
+        "Designated Target"
+      ],
+      "driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Controlled Impact"
+      ],
+      "loader_1": [
+        "Brothers in Arms",
+        "Repair",
+        "Safe Stowage",
+        "Intuition",
+        "Perfect Charge",
+        "Adrenaline Rush"
+      ],
+      "loader_2": [
+        "Brothers in Arms",
+        "Repair",
+        "Safe Stowage",
+        "Intuition",
+        "Perfect Charge",
+        "Adrenaline Rush",
+        "Situational Awareness",
+        "Signal Interception",
+        "Side by Side",
+        "Battle Tempered"
+      ]
+    },
+    "field_modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Periscope Dish",
+      "Passive Safety System",
+      "Reinforced Suspension"
+    ]
+  },
+  "ЙС-7": {
+    "tank": "ИС-7",
+    "equipment": {
+      "loadout_1": [
+        "improved hardening",
+        "gun rammer",
+        "turbocharger"
+      ],
+      "loadout_2": [
+        "improved hardening",
+        "gun rammer",
+        "vertical stabilizer"
+      ]
+    },
+    "ammo": {
+      "capacity": 30,
+      "distribution": {
+        "ap": 10,
+        "apcr": 18,
+        "he": 2
+      }
+    },
+    "consumables": [
+      "large repair kit",
+      "large first aid kit",
+      "extra rations (ussr)"
+    ]
+  },
+  "60TP Lewandowskiego": {
+    "tank": "60TP Lewandowskiego",
+    "equipment": {
+      "loadout_1": [
+        "Improved Hardening",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ],
+      "loadout_2": [
+        "Turbocharger",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ]
+    },
+    "ammo": {
+      "capacity": 30,
+      "distribution": {
+        "AP": 12,
+        "HEAT": 15,
+        "HE": 3
+      }
+    },
+    "consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Bread with Lard"
+    ],
+    "crew_perks": {
+      "commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Sound Detection",
+        "Recon",
+        "Hold the Line",
+        "Stay Sharp"
+      ],
+      "gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Quick Aiming",
+        "Deadeye"
+      ],
+      "driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Reliable Placement"
+      ],
+      "loader_1": [
+        "Brothers in Arms",
+        "Repair",
+        "Safe Stowage",
+        "Intuition",
+        "Perfect Charge",
+        "Close Combat"
+      ],
+      "loader_2": {
+        "primary_role": [
+          "Brothers in Arms",
+          "Repair",
+          "Adrenaline Rush",
+          "Intuition",
+          "Ammo Tuning",
+          "The Second Chance"
+        ],
+        "secondary_role_radio_operator": [
+          "Situational Awareness",
+          "Signal Interception",
+          "Side by Side",
+          "Battle Tempered"
+        ]
+      }
+    },
+    "field_modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Periscope Dish",
+      "Passive Safety System",
+      "Reinforced Suspension"
+    ]
+  },
+  "Super Conqueror": {
+    "tank": "Super Conqueror",
+    "equipment": {
+      "loadout_1": [
+        "Improved Hardening",
+        "Gun Rammer",
+        "Improved Ventilation"
+      ],
+      "loadout_2": [
+        "Turbocharger",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ]
+    },
+    "ammo": {
+      "total_capacity": 40,
+      "distribution": {
+        "AP": 5,
+        "APCR": 30,
+        "HESH": 5
+      }
+    },
+    "consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Pudding and Tea (UK)"
+    ],
+    "crew": {
+      "commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Recon",
+        "Sound Detection",
+        "Practicality",
+        "Emergency"
+      ],
+      "gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Quick Aiming",
+        "Deadeye"
+      ],
+      "driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Reliable Placement"
+      ],
+      "loader_radio_operator": [
+        "Brothers in Arms",
+        "Repair",
+        "Safe Stowage",
+        "Intuition",
+        "Adrenaline Rush",
+        "Perfect Charge",
+        "Situational Awareness",
+        "Signal Interception",
+        "Communications Expert",
+        "Battle Tempered"
+      ]
+    },
+    "field_modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Periscope Electric Drive",
+      "Passive Safety System",
+      "Reinforced Suspension"
+    ]
+  },
+  "Vz. 55": {
+    "tank": "Vz. 55",
+    "loadouts": {
+      "loadout_1": [
+        "Improved Hardening",
+        "Vertical Stabilizer",
+        "Gun Rammer"
+      ],
+      "loadout_2": [
+        "Turbocharger",
+        "Vertical Stabilizer",
+        "Gun Rammer"
+      ]
+    },
+    "ammo": {
+      "capacity": 40,
+      "distribution": {
+        "AP": 10,
+        "APCR": 26,
+        "HE": 4
+      }
+    },
+    "consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Buchty"
+    ],
+    "crew_perks": {
+      "commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Recon",
+        "Sound Detection",
+        "Emergency",
+        "Practicality"
+      ],
+      "gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Quick Aiming",
+        "Deadeye"
+      ],
+      "driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Reliable Placement"
+      ],
+      "loader_radio_operator": [
+        "Brothers in Arms",
+        "Repair",
+        "Safe Stowage",
+        "Intuition",
+        "Adrenaline Rush",
+        "Perfect Charge",
+        "Situational Awareness",
+        "Signal Interception",
+        "Side by Side",
+        "Battle Tempered"
+      ]
+    },
+    "field_modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Anti-Fragmentation Interior Lining",
+      "Lightweight Platform",
+      "Reinforced Suspension"
+    ]
+  },
+  "Об’єкт 277": {
+    "Tank": "Об’єкт 277",
+    "Equipment": {
+      "Loadout 1": [
+        "Improved Hardening",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ],
+      "Loadout 2": [
+        "Turbocharger",
+        "Gun Rammer",
+        "Vertical Stabilizer"
+      ]
+    },
+    "Ammo": {
+      "AP": 5,
+      "HEAT": 25,
+      "HE": 5
+    },
+    "Consumables": [
+      "Large Repair Kit",
+      "Large First Aid Kit",
+      "Extra Rations (USSR)"
+    ],
+    "Crew Perks": {
+      "Commander": [
+        "Brothers in Arms",
+        "Repair",
+        "Recon",
+        "Sound Detection",
+        "Practicality",
+        "Coordination"
+      ],
+      "Gunner": [
+        "Brothers in Arms",
+        "Repair",
+        "Snap Shot",
+        "Steady Aim",
+        "Deadeye",
+        "Designated Target"
+      ],
+      "Driver": [
+        "Brothers in Arms",
+        "Repair",
+        "Smooth Ride",
+        "Off-Road Driving",
+        "Clutch Braking",
+        "Field Support"
+      ],
+      "Loader": {
+        "Primary Role (Loader)": [
+          "Brothers in Arms",
+          "Repair",
+          "Safe Stowage",
+          "Intuition",
+          "Perfect Charge",
+          "Adrenaline Rush"
+        ],
+        "Secondary Role (Radio Operator)": [
+          "Situational Awareness",
+          "Signal Interception",
+          "Side by Side",
+          "Battle Tempered"
+        ]
+      }
+    },
+    "Field Modifications": [
+      "All-Terrain Suspension",
+      "Parallax Adjustment",
+      "Right-Angle Periscope",
+      "Lightweight Platform",
+      "Reinforced Suspension"
+    ]
+  }
+}

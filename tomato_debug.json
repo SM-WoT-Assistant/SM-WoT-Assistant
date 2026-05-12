@@ -1,0 +1,1543 @@
+{
+  "equipment_dist": [
+    [
+      "Gun Rammer Class 1",
+      14332
+    ],
+    [
+      "Improved Hardening Class 1",
+      13431
+    ],
+    [
+      "Turbocharger Class 1",
+      7983
+    ],
+    [
+      "Vertical Stabilizer Class 1",
+      5633
+    ],
+    [
+      "Additional Grousers Class 1",
+      5328
+    ],
+    [
+      "Innovative Loading System",
+      4613
+    ],
+    [
+      "Improved Compressor",
+      4126
+    ],
+    [
+      "Improved Ventilation Class 1",
+      3924
+    ],
+    [
+      "Increased Shell Resistance",
+      3105
+    ],
+    [
+      "Survival Improvement Suite T3",
+      2899
+    ],
+    [
+      "Mobility Improvement System T3",
+      2702
+    ],
+    [
+      "Bounty Rammer",
+      2619
+    ],
+    [
+      "Bounty Turbocharger",
+      2429
+    ],
+    [
+      "Bounty Hardening",
+      1172
+    ],
+    [
+      "Mobility Improvement System T2",
+      1001
+    ],
+    [
+      "Survival Improvement Suite T2",
+      978
+    ],
+    [
+      "Enhanced Gun Laying Drive Class 1",
+      865
+    ],
+    [
+      "Stabilizing Equipment System",
+      782
+    ],
+    [
+      "Bounty Stabilizer",
+      628
+    ],
+    [
+      "Venting System",
+      593
+    ],
+    [
+      "Heavy Spall Liner",
+      563
+    ],
+    [
+      "Improved Aiming Class 1",
+      450
+    ],
+    [
+      "Mobility Improvement System T1",
+      298
+    ],
+    [
+      "Bounty Ventilation",
+      258
+    ],
+    [
+      "Modified Configuration Class 1",
+      232
+    ],
+    [
+      "Survival Improvement Suite T1",
+      225
+    ],
+    [
+      "Coated Optics Class 1",
+      218
+    ],
+    [
+      "Improved Rotation Mechanism Class 1",
+      201
+    ],
+    [
+      "Fire-Control System T3",
+      169
+    ],
+    [
+      "Fire-Control System T2",
+      112
+    ],
+    [
+      "Fire-Control System T1",
+      106
+    ],
+    [
+      "Bounty Aiming",
+      67
+    ],
+    [
+      "Improved Configuration",
+      60
+    ],
+    [
+      "Wear-Resistant Gun Laying Drive",
+      38
+    ],
+    [
+      "Binocular Telescope Class 1",
+      31
+    ],
+    [
+      "Bounty Gun Laying Drive",
+      30
+    ],
+    [
+      "Camouflage Net Class 2",
+      28
+    ],
+    [
+      "Bounty Protection Technology",
+      28
+    ],
+    [
+      "Experimental Optics",
+      22
+    ],
+    [
+      "Bounty Rotation Mechanism",
+      20
+    ],
+    [
+      "Bounty Optics",
+      16
+    ],
+    [
+      "Innovative Targeting",
+      15
+    ],
+    [
+      "Improved Final Drive",
+      7
+    ],
+    [
+      "Low Noise Exhaust System Class 1",
+      3
+    ],
+    [
+      "Bounty Exhaust System",
+      1
+    ]
+  ],
+  "crew": {
+    "crew": [
+      {
+        "role": "commander",
+        "skills": [
+          [
+            "brotherhood",
+            {
+              "wn8": 1828,
+              "count": 19467,
+              "unicumCount": 1541
+            }
+          ],
+          [
+            "repair",
+            {
+              "wn8": 1856,
+              "count": 18588,
+              "unicumCount": 1529
+            }
+          ],
+          [
+            "commander_eagleEye",
+            {
+              "wn8": 1884,
+              "count": 15167,
+              "unicumCount": 1344
+            }
+          ],
+          [
+            "commander_emergency",
+            {
+              "wn8": 1935,
+              "count": 13181,
+              "unicumCount": 1270
+            }
+          ],
+          [
+            "commander_coordination",
+            {
+              "wn8": 1926,
+              "count": 8741,
+              "unicumCount": 908
+            }
+          ],
+          [
+            "commander_practical",
+            {
+              "wn8": 2006,
+              "count": 4765,
+              "unicumCount": 551
+            }
+          ],
+          [
+            "commander_tutor",
+            {
+              "wn8": 1719,
+              "count": 4040,
+              "unicumCount": 269
+            }
+          ],
+          [
+            "commander_enemyShotPredictor",
+            {
+              "wn8": 1877,
+              "count": 3790,
+              "unicumCount": 329
+            }
+          ],
+          [
+            "camouflage",
+            {
+              "wn8": 1558,
+              "count": 1162,
+              "unicumCount": 51
+            }
+          ],
+          [
+            "commander_holdLine",
+            {
+              "wn8": 1838,
+              "count": 330,
+              "unicumCount": 28
+            }
+          ],
+          [
+            "commander_staySharp",
+            {
+              "wn8": 2151,
+              "count": 243,
+              "unicumCount": 37
+            }
+          ],
+          [
+            "gunner_smoothTurret",
+            {
+              "wn8": 1576,
+              "count": 7,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "gunner_sniper",
+            {
+              "wn8": 1322,
+              "count": 6,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_quickAiming",
+            {
+              "wn8": 1725,
+              "count": 4,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "loader_pedant",
+            {
+              "wn8": 1474,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_intuition",
+            {
+              "wn8": 1506,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_desperado",
+            {
+              "wn8": 1692,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_badRoadsKing",
+            {
+              "wn8": 1634,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_virtuoso",
+            {
+              "wn8": 1542,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_ammunitionImprove",
+            {
+              "wn8": 1574,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_perfectCharge",
+            {
+              "wn8": 1701,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_finder",
+            {
+              "wn8": 1262,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1262,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_smoothDriving",
+            {
+              "wn8": 1647,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_motorExpert",
+            {
+              "wn8": 1888,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_sideBySide",
+            {
+              "wn8": 829,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_interference",
+            {
+              "wn8": 829,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_melee",
+            {
+              "wn8": 2044,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_armorer",
+            {
+              "wn8": 3500,
+              "count": 1,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "gunner_rancorous",
+            {
+              "wn8": 1049,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ]
+        ],
+        "secondarySkills": []
+      },
+      {
+        "role": "gunner",
+        "skills": [
+          [
+            "brotherhood",
+            {
+              "wn8": 1833,
+              "count": 19311,
+              "unicumCount": 1545
+            }
+          ],
+          [
+            "repair",
+            {
+              "wn8": 1870,
+              "count": 17956,
+              "unicumCount": 1528
+            }
+          ],
+          [
+            "gunner_smoothTurret",
+            {
+              "wn8": 1893,
+              "count": 16469,
+              "unicumCount": 1462
+            }
+          ],
+          [
+            "gunner_sniper",
+            {
+              "wn8": 1860,
+              "count": 11080,
+              "unicumCount": 936
+            }
+          ],
+          [
+            "gunner_quickAiming",
+            {
+              "wn8": 1953,
+              "count": 8450,
+              "unicumCount": 881
+            }
+          ],
+          [
+            "gunner_armorer",
+            {
+              "wn8": 2011,
+              "count": 6203,
+              "unicumCount": 758
+            }
+          ],
+          [
+            "gunner_focus",
+            {
+              "wn8": 1902,
+              "count": 2096,
+              "unicumCount": 228
+            }
+          ],
+          [
+            "gunner_rancorous",
+            {
+              "wn8": 1845,
+              "count": 1981,
+              "unicumCount": 179
+            }
+          ],
+          [
+            "camouflage",
+            {
+              "wn8": 1576,
+              "count": 965,
+              "unicumCount": 43
+            }
+          ],
+          [
+            "gunner_pointBlast",
+            {
+              "wn8": 1851,
+              "count": 351,
+              "unicumCount": 29
+            }
+          ],
+          [
+            "gunner_loneWolf",
+            {
+              "wn8": 1567,
+              "count": 44,
+              "unicumCount": 4
+            }
+          ],
+          [
+            "loader_intuition",
+            {
+              "wn8": 1529,
+              "count": 8,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_emergency",
+            {
+              "wn8": 1427,
+              "count": 8,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_eagleEye",
+            {
+              "wn8": 1692,
+              "count": 7,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_smoothDriving",
+            {
+              "wn8": 1221,
+              "count": 6,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_coordination",
+            {
+              "wn8": 1410,
+              "count": 6,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_enemyShotPredictor",
+            {
+              "wn8": 1165,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_pedant",
+            {
+              "wn8": 1264,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_tutor",
+            {
+              "wn8": 1429,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "loader_ammunitionImprove",
+            {
+              "wn8": 1235,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_motorExpert",
+            {
+              "wn8": 1634,
+              "count": 3,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "loader_perfectCharge",
+            {
+              "wn8": 960,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_practical",
+            {
+              "wn8": 832,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_virtuoso",
+            {
+              "wn8": 945,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_finder",
+            {
+              "wn8": 1869,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_rammingMaster",
+            {
+              "wn8": 1829,
+              "count": 2,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "driver_badRoadsKing",
+            {
+              "wn8": 841,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_reliablePlacement",
+            {
+              "wn8": 887,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1695,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ]
+        ],
+        "secondarySkills": []
+      },
+      {
+        "role": "driver",
+        "skills": [
+          [
+            "brotherhood",
+            {
+              "wn8": 1833,
+              "count": 19201,
+              "unicumCount": 1534
+            }
+          ],
+          [
+            "repair",
+            {
+              "wn8": 1860,
+              "count": 17532,
+              "unicumCount": 1466
+            }
+          ],
+          [
+            "driver_smoothDriving",
+            {
+              "wn8": 1878,
+              "count": 13454,
+              "unicumCount": 1156
+            }
+          ],
+          [
+            "driver_badRoadsKing",
+            {
+              "wn8": 1950,
+              "count": 11808,
+              "unicumCount": 1197
+            }
+          ],
+          [
+            "driver_rammingMaster",
+            {
+              "wn8": 1963,
+              "count": 11381,
+              "unicumCount": 1200
+            }
+          ],
+          [
+            "driver_virtuoso",
+            {
+              "wn8": 1822,
+              "count": 4875,
+              "unicumCount": 397
+            }
+          ],
+          [
+            "driver_motorExpert",
+            {
+              "wn8": 2023,
+              "count": 4841,
+              "unicumCount": 609
+            }
+          ],
+          [
+            "driver_reliablePlacement",
+            {
+              "wn8": 1727,
+              "count": 889,
+              "unicumCount": 69
+            }
+          ],
+          [
+            "camouflage",
+            {
+              "wn8": 1421,
+              "count": 787,
+              "unicumCount": 21
+            }
+          ],
+          [
+            "driver_bulletproof",
+            {
+              "wn8": 1880,
+              "count": 146,
+              "unicumCount": 17
+            }
+          ],
+          [
+            "driver_suspensionRepair",
+            {
+              "wn8": 1757,
+              "count": 64,
+              "unicumCount": 3
+            }
+          ],
+          [
+            "gunner_smoothTurret",
+            {
+              "wn8": 1329,
+              "count": 7,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_eagleEye",
+            {
+              "wn8": 1495,
+              "count": 6,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "loader_pedant",
+            {
+              "wn8": 1551,
+              "count": 5,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_finder",
+            {
+              "wn8": 1714,
+              "count": 5,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "loader_intuition",
+            {
+              "wn8": 2070,
+              "count": 4,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "gunner_quickAiming",
+            {
+              "wn8": 1223,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_sniper",
+            {
+              "wn8": 1680,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_tutor",
+            {
+              "wn8": 790,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1766,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_emergency",
+            {
+              "wn8": 1963,
+              "count": 2,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "commander_enemyShotPredictor",
+            {
+              "wn8": 1627,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_coordination",
+            {
+              "wn8": 1946,
+              "count": 2,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "gunner_armorer",
+            {
+              "wn8": 1952,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_rancorous",
+            {
+              "wn8": 620,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ]
+        ],
+        "secondarySkills": []
+      },
+      {
+        "role": "loader",
+        "skills": [
+          [
+            "brotherhood",
+            {
+              "wn8": 1832,
+              "count": 19262,
+              "unicumCount": 1537
+            }
+          ],
+          [
+            "repair",
+            {
+              "wn8": 1862,
+              "count": 18075,
+              "unicumCount": 1517
+            }
+          ],
+          [
+            "loader_intuition",
+            {
+              "wn8": 1916,
+              "count": 13582,
+              "unicumCount": 1242
+            }
+          ],
+          [
+            "loader_pedant",
+            {
+              "wn8": 1895,
+              "count": 9944,
+              "unicumCount": 889
+            }
+          ],
+          [
+            "loader_ammunitionImprove",
+            {
+              "wn8": 1950,
+              "count": 7844,
+              "unicumCount": 828
+            }
+          ],
+          [
+            "loader_melee",
+            {
+              "wn8": 1986,
+              "count": 5453,
+              "unicumCount": 621
+            }
+          ],
+          [
+            "loader_desperado",
+            {
+              "wn8": 1914,
+              "count": 4892,
+              "unicumCount": 513
+            }
+          ],
+          [
+            "loader_perfectCharge",
+            {
+              "wn8": 1856,
+              "count": 2998,
+              "unicumCount": 294
+            }
+          ],
+          [
+            "camouflage",
+            {
+              "wn8": 1543,
+              "count": 1185,
+              "unicumCount": 45
+            }
+          ],
+          [
+            "loader_secondChance",
+            {
+              "wn8": 1880,
+              "count": 598,
+              "unicumCount": 54
+            }
+          ],
+          [
+            "loader_magMastery",
+            {
+              "wn8": 1349,
+              "count": 58,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "commander_eagleEye",
+            {
+              "wn8": 1499,
+              "count": 14,
+              "unicumCount": 1
+            }
+          ],
+          [
+            "gunner_sniper",
+            {
+              "wn8": 1759,
+              "count": 6,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_finder",
+            {
+              "wn8": 1563,
+              "count": 6,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_tutor",
+            {
+              "wn8": 1476,
+              "count": 5,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_coordination",
+            {
+              "wn8": 1278,
+              "count": 5,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_quickAiming",
+            {
+              "wn8": 1202,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_smoothTurret",
+            {
+              "wn8": 2748,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_armorer",
+            {
+              "wn8": 1119,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_emergency",
+            {
+              "wn8": 1539,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1711,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_rancorous",
+            {
+              "wn8": 1109,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_enemyShotPredictor",
+            {
+              "wn8": 1761,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_practical",
+            {
+              "wn8": 829,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_battleTempered",
+            {
+              "wn8": 1680,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_smoothDriving",
+            {
+              "wn8": 1857,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_sideBySide",
+            {
+              "wn8": 1621,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ]
+        ],
+        "secondarySkills": []
+      },
+      {
+        "role": "loader",
+        "skills": [
+          [
+            "brotherhood",
+            {
+              "wn8": 1833,
+              "count": 19280,
+              "unicumCount": 1540
+            }
+          ],
+          [
+            "repair",
+            {
+              "wn8": 1864,
+              "count": 18021,
+              "unicumCount": 1520
+            }
+          ],
+          [
+            "loader_intuition",
+            {
+              "wn8": 1934,
+              "count": 13117,
+              "unicumCount": 1243
+            }
+          ],
+          [
+            "loader_pedant",
+            {
+              "wn8": 1912,
+              "count": 9215,
+              "unicumCount": 859
+            }
+          ],
+          [
+            "loader_ammunitionImprove",
+            {
+              "wn8": 1941,
+              "count": 8160,
+              "unicumCount": 841
+            }
+          ],
+          [
+            "loader_melee",
+            {
+              "wn8": 1964,
+              "count": 5764,
+              "unicumCount": 638
+            }
+          ],
+          [
+            "loader_desperado",
+            {
+              "wn8": 1929,
+              "count": 4633,
+              "unicumCount": 502
+            }
+          ],
+          [
+            "loader_perfectCharge",
+            {
+              "wn8": 1810,
+              "count": 3310,
+              "unicumCount": 283
+            }
+          ],
+          [
+            "camouflage",
+            {
+              "wn8": 1535,
+              "count": 1074,
+              "unicumCount": 33
+            }
+          ],
+          [
+            "loader_secondChance",
+            {
+              "wn8": 1900,
+              "count": 635,
+              "unicumCount": 58
+            }
+          ],
+          [
+            "loader_magMastery",
+            {
+              "wn8": 1309,
+              "count": 74,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_finder",
+            {
+              "wn8": 1403,
+              "count": 9,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_smoothDriving",
+            {
+              "wn8": 1695,
+              "count": 7,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_eagleEye",
+            {
+              "wn8": 1182,
+              "count": 7,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_emergency",
+            {
+              "wn8": 1280,
+              "count": 5,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_sideBySide",
+            {
+              "wn8": 1200,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_rammingMaster",
+            {
+              "wn8": 1399,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_quickAiming",
+            {
+              "wn8": 1183,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_smoothTurret",
+            {
+              "wn8": 1356,
+              "count": 4,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_enemyShotPredictor",
+            {
+              "wn8": 1662,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1899,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_sniper",
+            {
+              "wn8": 1609,
+              "count": 3,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_focus",
+            {
+              "wn8": 977,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_virtuoso",
+            {
+              "wn8": 1591,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_tutor",
+            {
+              "wn8": 1482,
+              "count": 2,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_expert",
+            {
+              "wn8": 864,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_badRoadsKing",
+            {
+              "wn8": 1888,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "radioman_interference",
+            {
+              "wn8": 1619,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_practical",
+            {
+              "wn8": 1220,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "commander_coordination",
+            {
+              "wn8": 1049,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "gunner_rancorous",
+            {
+              "wn8": 2012,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ],
+          [
+            "driver_motorExpert",
+            {
+              "wn8": 801,
+              "count": 1,
+              "unicumCount": 0
+            }
+          ]
+        ],
+        "secondarySkills": [
+          [
+            "radioman_finder",
+            {
+              "wn8": 1875,
+              "count": 16205,
+              "unicumCount": 1440
+            }
+          ],
+          [
+            "fireFighting",
+            {
+              "wn8": 1979,
+              "count": 12543,
+              "unicumCount": 1356
+            }
+          ],
+          [
+            "radioman_sideBySide",
+            {
+              "wn8": 1872,
+              "count": 11577,
+              "unicumCount": 991
+            }
+          ],
+          [
+            "radioman_signalInterception",
+            {
+              "wn8": 1732,
+              "count": 2241,
+              "unicumCount": 146
+            }
+          ],
+          [
+            "radioman_expert",
+            {
+              "wn8": 1613,
+              "count": 1457,
+              "unicumCount": 52
+            }
+          ],
+          [
+            "radioman_interference",
+            {
+              "wn8": 1610,
+              "count": 1273,
+              "unicumCount": 62
+            }
+          ],
+          [
+            "radioman_battleTempered",
+            {
+              "wn8": 1805,
+              "count": 406,
+              "unicumCount": 28
+            }
+          ],
+          [
+            "radioman_threatSearch",
+            {
+              "wn8": 1299,
+              "count": 57,
+              "unicumCount": 3
+            }
+          ]
+        ]
+      }
+    ],
+    "name": "IS-7",
+    "count": 20087,
+    "unicumCount": 1570
+  },
+  "field_mods": {
+    "mods": [
+      {
+        "1011": {
+          "wn8": 2155,
+          "count": 8566
+        },
+        "1012": {
+          "wn8": 1747,
+          "count": 5435
+        }
+      },
+      {
+        "1021": {
+          "wn8": 2072,
+          "count": 10442
+        },
+        "1022": {
+          "wn8": 1801,
+          "count": 1927
+        }
+      },
+      {
+        "1031": {
+          "wn8": 1867,
+          "count": 3495
+        },
+        "1032": {
+          "wn8": 2087,
+          "count": 7712
+        }
+      },
+      {
+        "1241": {
+          "wn8": 2102,
+          "count": 8701
+        },
+        "1242": {
+          "wn8": 1893,
+          "count": 1879
+        }
+      },
+      {
+        "1251": {
+          "wn8": 2127,
+          "count": 4332
+        },
+        "1252": {
+          "wn8": 2006,
+          "count": 5717
+        }
+      }
+    ],
+    "name": "IS-7",
+    "modsUnicum": [
+      {
+        "1011": {
+          "wn8": 3525,
+          "count": 1276
+        },
+        "1012": {
+          "wn8": 3486,
+          "count": 292
+        }
+      },
+      {
+        "1021": {
+          "wn8": 3527,
+          "count": 1351
+        },
+        "1022": {
+          "wn8": 3473,
+          "count": 138
+        }
+      },
+      {
+        "1031": {
+          "wn8": 3429,
+          "count": 236
+        },
+        "1032": {
+          "wn8": 3531,
+          "count": 1060
+        }
+      },
+      {
+        "1241": {
+          "wn8": 3509,
+          "count": 1190
+        },
+        "1242": {
+          "wn8": 3541,
+          "count": 194
+        }
+      },
+      {
+        "1251": {
+          "wn8": 3550,
+          "count": 706
+        },
+        "1252": {
+          "wn8": 3482,
+          "count": 565
+        }
+      }
+    ],
+    "boostSlotCounts": {
+      "stealth": 0,
+      "mobility": 30052,
+      "firepower": 20479,
+      "survivability": 0
+    }
+  }
+}

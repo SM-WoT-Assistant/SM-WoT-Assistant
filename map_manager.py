@@ -220,8 +220,8 @@ class MapManager:
                     if stability_mode:
                         emit(62, "СТАТ AI: режим стабільності (оновлюю тільки TTH)...", "orange")
                         tex = tank_extractor.TankExtractor(ext.wot_path)
-                        force_full_extract = bool(need_tank_rebuild or should_force_refresh)
-                        if tex.extract_metadata(force_full=force_full_extract):
+                        force_full = bool(need_tank_rebuild or should_force_refresh)
+                        if tex.extract_metadata(force_full=force_full):
                             emit(88, "СТАТ AI: оновлюю UI-іконки (збірки/снаряди/навички)...")
                             if not tex.extract_icons():
                                 emit(90, "СТАТ AI: іконки оновлено частково", "orange")
@@ -259,6 +259,25 @@ class MapManager:
                             tanks_ok = False
                 elif tank_extractor:
                     emit(85, "Оновлення не потрібне: СТАТ AI актуальний")
+
+                # Auto-update crew and equipment ONLY when game client version changed
+                if version_changed:
+                    try:
+                        import build_crew_builds
+                        build_crew_builds.main()
+                        emit(86, "Оновлення екіпажу з клієнта завершено")
+                    except Exception as e:
+                        print(f"[WARN] crew_builds update failed: {e}")
+
+                    try:
+                        wot_path = getattr(ext, 'wot_path', None) if ext else None
+                        if wot_path:
+                            pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+                            import extract_equipment_loadouts
+                            extract_equipment_loadouts.extract_loadouts(pkg_path, "equipment_loadouts.json")
+                            emit(87, "Оновлення обладнання з клієнта завершено")
+                    except Exception as e:
+                        print(f"[WARN] equipment_loadouts update failed: {e}")
 
                 if maps_ok and tanks_ok:
                     if version_changed:

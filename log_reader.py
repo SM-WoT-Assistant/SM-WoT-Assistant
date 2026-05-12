@@ -40,10 +40,6 @@ class LogWatcher:
         # Починаємо з кінця файлу, щоб не перемикатися на старі бої при запуску
         if os.path.exists(self.log_path):
             self._last_size = os.path.getsize(self.log_path)
-            print(f"[LOG] Початок читання логу: {self.log_path} (розмір: {self._last_size} байт)")
-        else:
-            self._last_size = 0
-            print(f"[LOG] ПОМИЛКА: Лог не знайдено: {self.log_path}")
             
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -73,14 +69,11 @@ class LogWatcher:
                         
                         for line in lines:
                             clean_line = line.rstrip()
-                            if clean_line:
-                                print(f"[GAME LOG] {clean_line}")
 
                             # Спочатку перевіряємо arenaType
                             match_type = self.arena_type_re.search(line)
                             if match_type:
                                 self.last_type = int(match_type.group("type"))
-                                print(f"[LOG] Detected arenaType: {self.last_type}")
 
                             # Виявлення техніки гравця
                             match_veh = self.vehicle_re.search(line)
@@ -88,13 +81,12 @@ class LogWatcher:
                                 cd = int(match_veh.group("cd"))
                                 if cd != self._last_vehicle_cd:
                                     self._last_vehicle_cd = cd
-                                    print(f"[LOG] Detected vehicle compactDescr: {cd}")
                                     if self.vehicle_callback:
                                         self.vehicle_callback(cd)
                             
                             # Перевіряємо повернення в ангар
                             if self.hangar_re.search(line):
-                                self._last_arena_id = None  # Скидаємо стан при поверненні
+                                self._last_arena_id = None
                                 self._countdown_fired_for_arena = None
                                 self._last_vehicle_cd = None
                                 if self.hangar_callback:
@@ -105,8 +97,6 @@ class LogWatcher:
                                 if self._last_arena_id is not None and self.countdown_callback:
                                     if self._countdown_fired_for_arena != self._last_arena_id:
                                         self._countdown_fired_for_arena = self._last_arena_id
-                                        print(f"[LOG RAW] {line.strip()}")
-                                        print(f"[LOG] Battle mode trigger for arena: {self._last_arena_id} (battle space)")
                                         self.countdown_callback(self._last_arena_id, self.last_type)
 
                             # Fallback, якщо основний маркер з якоїсь причини не зловився
@@ -114,22 +104,16 @@ class LogWatcher:
                                 if self._last_arena_id is not None and self.countdown_callback:
                                     if self._countdown_fired_for_arena != self._last_arena_id:
                                         self._countdown_fired_for_arena = self._last_arena_id
-                                        print(f"[LOG RAW] {line.strip()}")
-                                        print(f"[LOG] Battle mode trigger for arena: {self._last_arena_id} (battle loaded fallback)")
                                         self.countdown_callback(self._last_arena_id, self.last_type)
                             
                             # Перевіряємо появу мініматп (UI готова)
                             if self.minimap_re.search(line):
                                 if self._last_arena_id is not None and self.minimap_callback:
-                                    print(f"[LOG RAW] {line.strip()}")
-                                    print(f"[LOG] Minimap detected for arena: {self._last_arena_id}")
                                     self.minimap_callback(self._last_arena_id, self.last_type)
                             
                             # Перевіряємо завантаження карти (для синхронізації фільтрів)
                             match = self.arena_re.search(line)
                             if match:
-                                print(f"[LOG RAW] {line.strip()}")
-                                print(f"[LOG] Match found in line: {line.strip()}")
                                 map_id = match.group("map_id")
                                 # Пропускаємо ангар - це не бій
                                 if not map_id.startswith("hangar"):
