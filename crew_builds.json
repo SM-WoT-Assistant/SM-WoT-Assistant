@@ -1,5 +1,5 @@
 {
-  "_comment": "General crew model. Regenerate on game update with build_crew_builds.py",
+  "_comment": "General crew model. Auto-regenerated on XML change.",
   "version": 2,
   "_default_roles": {
     "HT": [
@@ -2257,13 +2257,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -3998,13 +4005,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "F17_AMX_13_90": {
@@ -4270,13 +4284,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -4502,13 +4523,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -4525,6 +4553,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -4536,6 +4568,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "loader"
       ],
@@ -4664,6 +4697,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -4671,6 +4708,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -4694,13 +4732,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "F70_SARL42": {
@@ -5620,6 +5665,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -5629,6 +5678,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -5749,6 +5799,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -5760,6 +5814,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "loader"
       ]
@@ -6382,13 +6437,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -6629,6 +6691,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -6636,6 +6702,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -6915,13 +6982,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "G12_Ltraktor": {
@@ -7112,13 +7186,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "G102_Pz_III": {
@@ -7259,13 +7340,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "G25_PzII_Luchs": {
@@ -7373,6 +7461,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7380,6 +7472,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -7468,6 +7561,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7475,6 +7572,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -7500,6 +7598,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7507,6 +7609,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -7592,6 +7695,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7599,6 +7706,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -7622,13 +7730,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "G61_G_E": {
@@ -7652,6 +7767,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7659,6 +7778,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -7684,6 +7804,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -7691,6 +7815,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -7996,6 +8121,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8003,6 +8132,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -8363,6 +8493,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8370,6 +8504,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -8446,19 +8581,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "G97_Waffentrager_IV": {
@@ -8482,6 +8629,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8489,6 +8640,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -8543,6 +8695,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8550,6 +8706,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -8724,6 +8881,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8731,6 +8892,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -8781,6 +8943,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8788,6 +8954,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -8845,6 +9012,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -8852,6 +9023,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -9217,6 +9389,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9224,6 +9400,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -9248,6 +9425,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9255,6 +9436,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -9308,6 +9490,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9315,6 +9501,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -9452,6 +9639,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9459,6 +9650,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -9484,6 +9676,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9491,6 +9687,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -9797,6 +9994,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9804,6 +10005,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -9978,6 +10180,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -9985,6 +10191,7 @@
         "driver",
         "radioman",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -10039,6 +10246,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10046,6 +10257,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -10071,6 +10283,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10078,6 +10294,7 @@
         "driver",
         "radioman",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -10134,6 +10351,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10141,6 +10362,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -10421,12 +10643,17 @@
         {
           "role": "radioman",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
         "commander",
         "driver",
-        "radioman"
+        "radioman",
+        "radioman_2"
       ]
     },
     "G33_H39_captured": {
@@ -10682,6 +10909,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10689,6 +10920,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -10742,6 +10974,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10749,6 +10985,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -10805,6 +11042,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -10812,6 +11053,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -11113,6 +11355,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -11120,6 +11366,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -11437,6 +11684,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -11444,6 +11695,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -11672,13 +11924,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -11703,6 +11962,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -11710,6 +11973,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -11793,6 +12057,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -11800,6 +12068,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -11855,6 +12124,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -11862,6 +12135,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -12128,6 +12402,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -12135,6 +12413,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -12279,6 +12558,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -12286,6 +12569,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -12311,6 +12595,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -12318,6 +12606,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -12677,6 +12966,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -12684,6 +12977,7 @@
         "radioman",
         "driver",
         "gunner",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -14289,6 +14583,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14296,6 +14594,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -14321,6 +14620,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14328,6 +14631,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -14351,13 +14655,18 @@
         {
           "role": "radioman",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "radioman"
+        "radioman",
+        "radioman_2"
       ]
     },
     "J21_Type_91": {
@@ -14379,13 +14688,18 @@
         {
           "role": "radioman",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "radioman"
+        "radioman",
+        "radioman_2"
       ]
     },
     "J27_O_I_120": {
@@ -14407,6 +14721,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14416,6 +14734,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -14439,6 +14758,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14448,6 +14771,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -14470,6 +14794,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14479,6 +14807,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -14501,6 +14830,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14510,6 +14843,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -14562,6 +14896,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14569,6 +14907,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -14593,6 +14932,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14600,6 +14943,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -14625,6 +14969,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14632,6 +14980,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -14688,6 +15037,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14695,6 +15048,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -14748,6 +15102,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14757,6 +15115,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -14781,6 +15140,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14788,6 +15151,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -14813,6 +15177,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -14820,6 +15188,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -14842,6 +15211,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -14851,6 +15224,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -15055,6 +15429,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -15062,6 +15440,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -15204,6 +15583,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -15211,6 +15594,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -17923,6 +18307,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -17931,13 +18319,21 @@
           "also": [
             "radioman"
           ]
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB20_Crusader": {
@@ -17984,6 +18380,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -17993,6 +18393,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -18013,6 +18414,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -18021,6 +18426,7 @@
         "commander",
         "driver",
         "gunner",
+        "gunner_2",
         "loader"
       ]
     },
@@ -18076,6 +18482,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -18083,6 +18493,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -18238,6 +18649,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -18253,6 +18668,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "radioman",
         "loader"
@@ -18650,6 +19066,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -18657,6 +19077,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -18736,13 +19157,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -18767,6 +19195,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -18774,6 +19206,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -18826,6 +19259,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -18833,6 +19270,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -18873,19 +19311,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB28_Bishop": {
@@ -18935,13 +19385,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB30_FV3805": {
@@ -18963,13 +19420,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -18992,13 +19456,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB79_FV206": {
@@ -19014,19 +19485,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -19043,19 +19526,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -19166,13 +19661,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -19193,13 +19695,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB45_Achilles_IIC": {
@@ -19427,6 +19936,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -19434,6 +19947,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -19641,13 +20155,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -19672,6 +20193,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -19679,6 +20204,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -19899,6 +20425,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -19906,6 +20436,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -19962,6 +20493,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -19969,6 +20504,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -20049,6 +20585,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -20056,6 +20596,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -20080,6 +20621,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -20087,6 +20632,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -20142,6 +20688,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -20149,6 +20699,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -20732,6 +21283,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -20739,6 +21294,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -21039,13 +21595,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -21068,13 +21631,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -21097,13 +21667,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "GB148_FV227_Conceiver": {
@@ -21125,13 +21702,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -21154,13 +21738,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -21501,6 +22092,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -21508,6 +22103,7 @@
         "driver",
         "radioman",
         "gunner",
+        "loader",
         "loader"
       ]
     },
@@ -21556,13 +22152,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -21681,6 +22284,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -21696,6 +22303,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "radioman",
         "loader"
@@ -21928,6 +22536,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -21935,6 +22547,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -21947,6 +22560,10 @@
         },
         {
           "role": "gunner",
+          "also": []
+        },
+        {
+          "role": "gunner_2",
           "also": []
         },
         {
@@ -21965,6 +22582,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "radioman",
         "loader"
@@ -21981,6 +22599,10 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
@@ -21996,6 +22618,7 @@
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
         "radioman",
         "loader"
@@ -22022,6 +22645,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22029,6 +22656,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -22053,6 +22681,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22060,6 +22692,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -22115,6 +22748,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22122,6 +22759,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -22147,6 +22785,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22154,6 +22796,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -22176,6 +22819,10 @@
           "also": []
         },
         {
+          "role": "radioman_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
         }
@@ -22185,6 +22832,7 @@
         "gunner",
         "driver",
         "radioman",
+        "radioman_2",
         "loader"
       ]
     },
@@ -22441,6 +23089,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22448,6 +23100,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -22471,13 +23124,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "A32_M12": {
@@ -22501,6 +23161,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22508,6 +23172,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -22561,6 +23226,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -22568,6 +23237,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -22680,13 +23350,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -22709,13 +23386,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -22738,13 +23422,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -23132,13 +23823,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -23193,13 +23891,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -23421,15 +24126,27 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "gunner_2",
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -23452,13 +24169,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "A94_T37": {
@@ -23936,13 +24660,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -24052,13 +24783,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -24185,13 +24923,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -24439,6 +25184,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -24446,6 +25195,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -24471,6 +25221,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -24478,6 +25232,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -25046,13 +25801,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "A95_T95_E6": {
@@ -25162,13 +25924,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "A106_M48A2_120": {
@@ -25342,6 +26111,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -25349,6 +26122,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -25497,6 +26271,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -25504,6 +26282,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -25618,13 +26397,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -25649,6 +26435,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -25656,6 +26446,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -26006,6 +26797,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -26013,6 +26808,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -26986,6 +27782,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
@@ -26993,7 +27793,8 @@
         "gunner",
         "radioman",
         "driver",
-        "loader"
+        "loader",
+        "radioman_2"
       ]
     },
     "R15_S-51": {
@@ -27009,19 +27810,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R12_A-20": {
@@ -27071,13 +27884,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R07_T-34-85": {
@@ -27244,19 +28064,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -27333,13 +28165,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R10_AT-1": {
@@ -27408,19 +28247,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R39_KV-3": {
@@ -27444,6 +28295,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -27451,6 +28306,7 @@
         "gunner",
         "radioman",
         "driver",
+        "loader",
         "loader"
       ]
     },
@@ -27584,13 +28440,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -27613,13 +28476,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -27702,13 +28572,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -27733,6 +28610,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -27740,6 +28621,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -27763,13 +28645,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -27964,6 +28853,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -27971,6 +28864,7 @@
         "gunner",
         "radioman",
         "driver",
+        "loader",
         "loader"
       ]
     },
@@ -27993,13 +28887,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -28024,6 +28925,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -28031,6 +28936,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -28145,13 +29051,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R57_A43": {
@@ -28292,13 +29205,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -28321,13 +29241,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R87_T62A": {
@@ -28378,13 +29305,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -28494,19 +29428,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R100_SU122A": {
@@ -28875,13 +29821,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -28991,13 +29944,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -29135,13 +30095,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -29164,13 +30131,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -29193,13 +30167,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -29305,13 +30286,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R173_K_91_2": {
@@ -29416,13 +30404,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -29529,13 +30524,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -29617,13 +30619,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -30018,13 +31027,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -30100,13 +31116,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -30438,13 +31461,18 @@
         {
           "role": "radioman",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "radioman"
+        "radioman",
+        "radioman_2"
       ]
     },
     "R140_M4_Loza": {
@@ -30497,13 +31525,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -30728,13 +31763,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -30978,6 +32020,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -30985,6 +32031,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -31142,19 +32189,31 @@
           "also": []
         },
         {
+          "role": "gunner_2",
+          "also": []
+        },
+        {
           "role": "driver",
           "also": []
         },
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
+        "gunner_2",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R89_SU122_44": {
@@ -31541,13 +32600,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R112_T54_45": {
@@ -31737,6 +32803,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "radioman_2",
+          "also": []
         }
       ],
       "crew": [
@@ -31744,7 +32814,8 @@
         "gunner",
         "radioman",
         "driver",
-        "loader"
+        "loader",
+        "radioman_2"
       ]
     },
     "R120_T22SR_A22": {
@@ -31823,6 +32894,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -31830,6 +32905,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "3 5"
@@ -31913,6 +32989,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -31920,6 +33000,7 @@
         "driver",
         "gunner",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -31943,13 +33024,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },
@@ -32001,13 +33089,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "driver",
         "gunner",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -32032,6 +33127,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -32039,6 +33138,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ]
     },
@@ -32063,6 +33163,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -32070,6 +33174,7 @@
         "gunner",
         "driver",
         "radioman",
+        "loader",
         "loader"
       ],
       "custom_role_slot_options": "2 4"
@@ -32118,13 +33223,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "3 5"
     },
@@ -32175,13 +33287,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R155_Object_277_7x7": {
@@ -32284,13 +33403,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ]
     },
     "R152_KV2_W": {
@@ -32314,6 +33440,10 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader",
+          "also": []
         }
       ],
       "crew": [
@@ -32321,6 +33451,7 @@
         "gunner",
         "radioman",
         "driver",
+        "loader",
         "loader"
       ]
     },
@@ -32632,13 +33763,20 @@
         {
           "role": "loader",
           "also": []
+        },
+        {
+          "role": "loader_radio",
+          "also": [
+            "radioman"
+          ]
         }
       ],
       "crew": [
         "commander",
         "gunner",
         "driver",
-        "loader"
+        "loader",
+        "loader_radio"
       ],
       "custom_role_slot_options": "2 4"
     },

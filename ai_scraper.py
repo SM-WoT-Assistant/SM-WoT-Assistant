@@ -24,27 +24,24 @@ Generate the optimal competitive build data for the tank: {tank_name}.
 You must ONLY use the exact names and terms provided in the lists below. Begin your response exactly with the phrase "Build Generated:" followed immediately by a markdown code block containing the requested JSON data. Do not include any other conversational text or explanations outside or inside the code block.
 
 1. EQUIPMENT (Create TWO loadouts: Loadout 1 (Main) and Loadout 2 (Alternate). Select EXACTLY 3 items for each from this list):
-Standard: Gun Rammer, Improved Ventilation, Vertical Stabilizer, Turbocharger, Improved Hardening, Low-Noise Exhaust System, Coated Optics, Binocular Telescope, Camouflage Net, Spall Liner, Modified Configuration, Improved Rotation Mechanisms, Enhanced Gun Laying Drives, Improved Aiming.
+Gun Rammer, Improved Ventilation, Vertical Stabilizer, Turbocharger, Improved Hardening, Low-Noise Exhaust System, Coated Optics, Commander's Vision System, Binocular Telescope, Camouflage Net, Spall Liner, Modified Configuration, Improved Rotation Mechanisms, Enhanced Gun Laying Drives, Improved Aiming.
 
-Experimental: Experimental Turbocharger, Experimental Hardening, Experimental Optics.
+2. AMMO CAPACITY & TYPES (You MUST list ALL shell types this tank can use. Most tanks have 3 types. Distribute the exact piece count for each type, the sum must equal the tank's max ammo capacity. Output as JSON object with type abbreviation as key and count as value):
+Types: Armor Piercing (AP), Armor Piercing Composite Rigid (APCR), High Explosive Anti-Tank (HEAT), High Explosive (HE), High Explosive Squash Head (HESH)
 
-2. AMMO CAPACITY & TYPES (Distribute exact piece count, sum must equal max ammo):
-Armor Piercing (AP), Armor Piercing Composite Rigid (APCR), High Explosive Anti-Tank (HEAT), High Explosive (HE)
+3. CONSUMABLES (Select EXACTLY 3 items from this list, use the correct nation-specific ration):
+Small Repair Kit, Large Repair Kit, Small First Aid Kit, Large First Aid Kit, Manual Fire Extinguisher, Automatic Fire Extinguisher, Removed Speed Governor, 100-octane Gasoline, 105-octane Gasoline, Extra Rations (USSR), Case of Cola (USA), Chocolate (Germany), Pudding and Tea (UK), Strong Coffee (France), Improved Rations (China), Bread with Lard (Poland), Buchty (Czechoslovakia), Spaghetti with Meat Sauce (Italy), Onigiri (Japan), Coffee with Cinnamon (Sweden).
 
-3. CONSUMABLES (Select EXACTLY 3 items from this list):
-Small Repair Kit, Large Repair Kit, Small First Aid Kit, Large First Aid Kit, Manual Fire Extinguisher, Automatic Fire Extinguisher, Extra Rations, Case of Cola, Chocolate, Pudding and Tea, Strong Coffee, Improved Rations, Bread with Lard, Smoked Lard, Buchty, Spaghetti with Meat Sauce, Onigiri, Coffee with Cinnamon.
+4. CREW PERKS — Select EXACTLY 6 perks for each crew member's primary role. If a crew member has a secondary role (e.g. Loader+Radio Operator), add 4 bonus perks from that secondary role. Use ONLY names from this list:
+- Shared (all roles): Brothers in Arms, Repair, Concealment, Firefighting.
+- Commander: Recon, Emergency, Mentor, Coordination, Sound Detection, Practicality, Hold the Line, Stay Sharp.
+- Gunner: Snap Shot, Deadeye, Designated Target, Armorer, Steady Aim, Quick Aiming, Point Blank, Lone Wolf.
+- Driver: Smooth Ride, Off-Road Driving, Clutch Braking, Controlled Impact, Reliable Placement, Engineer, Field Support, Bulletproof.
+- Loader: Adrenaline Rush, Safe Stowage, Intuition, Perfect Charge, Close Combat, Ammo Tuning, The Second Chance, Mag Mastery.
+- Radio Operator: Situational Awareness, Signal Interception, Jamming, Communications Expert, Side by Side, Threat Search, Battle Tempered.
 
-4. CREW PERKS (Select EXACTLY 4 major perks and EXACTLY 2 situational perks from this list for each role):
-Brothers in Arms, Repairs, Concealment, Firefighting, Sixteenth Sense, Eagle Eye, Sound Detection, Jack of All Trades, Armorer, Snap Shot, Designated Target, Smooth Ride, Off-Road Driving, Clutch Braking, Controlled Impact, Preventative Maintenance, Safe Stowage, Adrenaline Rush, Intuition, Situational Awareness, Call for Vengeance.
-
-5. FIELD MODIFICATION (Select EXACTLY one option per level from this list):
-Level II: "All-Terrain Suspension" OR "Lightweight Suspension" OR "No Modification"
-
-Level IV: "Parallax Adjustment" OR "Refined Powder" OR "No Modification"
-
-Level VI: "Right-Angle Optics" OR "Anti-Reflective Lenses" OR "No Modification"
-
-Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "No Modification"
+5. FIELD MODIFICATIONS:
+List the exact in-game names of the recommended field modifications for this tank. Output them as a list of strings. Do not invent names. Only include the ones that you actually recommend picking.
 """
     
     url = f"https://www.google.com/search?q={urllib.parse.quote(prompt)}&udm=50"

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+        # -*- coding: utf-8 -*-
 # main.py 4_43
 # ==========================================
 # ЧЕК-ЛИСТ ФУНКЦІОНАЛУ (НЕ ВИДАЛЯТИ І НЕ ЗМІНЮВАТИ БЕЗ ДОЗВОЛУ):
@@ -544,29 +544,15 @@ class WotAssistantHQ:
         )
 
     def on_minimap_appeared(self, map_id, mode):
-        # Викликається коли мініматa з'явилася (UI готова), ~2s після Loading space
-        print(f"[BATTLE] Мініматп з'явилася: map_id={map_id}, mode={mode}")
+        pass  # Silent
 
     def on_vehicle_detected(self, compact_descr):
-        # Викликається коли виявлено техніку гравця у лозі (helpers.tips)
-        print(f"[VEHICLE] Detected compact_descr={compact_descr}")
-        print(f"[VEHICLE] auto_sync_var.get()={self.auto_sync_var.get()}, auto_vehicle_filter_var.get()={self.auto_vehicle_filter_var.get()}")
         if not self.auto_sync_var.get():
-            print("[VEHICLE] Auto sync is off, returning")
             return
         if not self.auto_vehicle_filter_var.get():
-            print(f"[VEHICLE] Авто-вибір виду техніки вимкнено (auto_vehicle_filter={self.auto_vehicle_filter_var.get()})")
             return
         info = self.compact_descr_map.get(compact_descr)
         if not info:
-            print(f"[VEHICLE] Невідомий compactDescr={compact_descr}")
-            return
-        print(f"[VEHICLE] Техніка гравця: {info['name']} ({info['class']}) compactDescr={compact_descr}")
-
-        if not self.auto_sync_var.get():
-            return
-        if not self.auto_vehicle_filter_var.get():
-            print(f"[VEHICLE] Авто-вибір виду техніки вимкнено (auto_vehicle_filter={self.auto_vehicle_filter_var.get()})")
             return
 
         cls = info["class"]
@@ -576,46 +562,23 @@ class WotAssistantHQ:
             return
 
         def apply_class_filter():
-            # Вмикаємо лише відповідний клас, решту вимикаємо
-            print(f"[VEHICLE] Applying class filter: ui_cls={ui_cls}, cls={cls}")
             for c, var in self.selected_classes.items():
-                new_val = (c == ui_cls)
-                var.set(new_val)
-                print(f"[VEHICLE] Set {c} to {new_val}")
-            print(f"[VEHICLE] Авто-фільтр: клас={ui_cls} ({cls})")
+                var.set(c == ui_cls)
 
         self.root.after(0, apply_class_filter)
 
     def on_battle_countdown_started(self, map_id, arena_type):
-        # Викликається на старті передбойового відліку (classicBattlePage)
-        type_to_mode = {
-            1: "ctf",
-            2: "domination",
-            3: "assault",
-            4: "comp7"
-        }
-        mode = type_to_mode.get(arena_type, "ctf")
-        print(f"[BATTLE] Стартував передбойовий відлік: map_id={map_id}, mode={mode}")
-
         if not self.auto_battle_var.get():
-            print(f"[BATTLE] Авто перехід до режиму бою вимкнено (auto_battle_var={self.auto_battle_var.get()})")
             return
-
         if self.mode != "norm":
-            print(f"[BATTLE] Перехід до боєвого режиму (по відліку)...")
             self.root.after(100, self.toggle_editor)
 
     def on_battle_detected(self, map_id, mode):
-        # Викликається коли "Loading space" виявлено (для синхронізації фільтрів)
-        print(f"[SYNC] Виявлено карту в логу: map_id={map_id}, mode={mode}")
-        
-        # Зберігаємо останню карту бою для повернення після ангару
         self.last_battle_map = map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
         
         if not self.auto_sync_var.get():
-            print(f"[SYNC] Авто-синхронізація вимкнена (auto_sync_var={self.auto_sync_var.get()})")
             return
         
         mode_map = {
@@ -625,31 +588,19 @@ class WotAssistantHQ:
             "comp7": "Onslaught"
         }
         ui_mode = mode_map.get(mode, "Standard")
-        print(f"[SYNC] Синхронізація фільтрів: {mode} -> {ui_mode}")
         self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
 
     def on_battle_ended(self):
-        # Викликається коли повертаємось в ангар
-        print(f"[BATTLE] Поверненння в ангар. Остання карта: {self.last_battle_map}, режим мап: {self.last_battle_map_mode}")
-        
-        # Спочатку зберігаємо поточні налаштування боєвого режиму
         self.save_settings()
         
         if not self.last_battle_map or not self.auto_battle_var.get():
-            print(f"[BATTLE] Не повертаємось до редагування (no map або auto_battle вимкнено)")
             return
         
-        # Автоматично перемикаємо на РЕДАГУВАННЯ з останньою картою бою
         self.root.after(200, lambda: self._return_to_editor_with_map(self.last_battle_map, self.last_battle_mode, self.last_battle_map_mode))
     
     def _return_to_editor_with_map(self, map_id, mode, map_source_mode=2):
-        """Повертаємось до РЕДАГУВАННЯ з картою з останнього бою"""
         if self.mode != "edit":
-            print(f"[BATTLE] Переключаємось до режиму РЕДАГУВАННЯ з картою: {map_id}")
-            # Ми в бойовому режимі, перемикаємось на РЕДАГУВАННЯ
-            self.toggle_editor()  # Це збереже norm налаштування і загрузить edit налаштування
-            
-            # Після перекллючення, синхронізуємо фільтри на карту з бою
+            self.toggle_editor()
             self.root.after(100, lambda: self._sync_battle_map_after_return(map_id, mode, map_source_mode))
     
     def _sync_battle_map_after_return(self, map_id, mode, map_source_mode=2):

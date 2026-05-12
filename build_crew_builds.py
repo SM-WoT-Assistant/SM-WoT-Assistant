@@ -1,13 +1,13 @@
 """
 Build crew_builds.json from decoded WoT vehicle XML files.
 
-This script is version-stable and avoids per-tank hardcoded perk rules:
+Auto-update: runs only when game client version changes.
 - Extracts real crew layout (including secondary roles) from extracted_data/<nation>/*.xml
 - Fills missing tanks from class defaults
 - Stores global perk policy (tier -> perks, secondary-role bonus)
 - Stores global role skill pools/defaults
 
-Run after extraction:
+Run:
     python build_crew_builds.py
 """
 
@@ -114,15 +114,28 @@ def _parse_vehicle_crew_info(xml_path):
     if not members:
         return []
 
-    # Deduplicate same role entries while preserving first appearance.
     out = []
-    seen = set()
+    role_count = {}
+    roles = [m["role"] for m in members]
+
     for member in members:
         role = member["role"]
-        if role in seen:
-            continue
-        seen.add(role)
-        out.append(member)
+        also = member["also"]
+
+        role_count[role] = role_count.get(role, 0) + 1
+
+        if role_count[role] > 1:
+            if role == "loader":
+                has_radioman = "radioman" in roles
+                if not has_radioman:
+                    out.append({"role": "loader_radio", "also": ["radioman"]})
+                else:
+                    out.append({"role": "loader", "also": []})
+            else:
+                out.append({"role": role + "_" + str(role_count[role]), "also": also})
+        else:
+            out.append(member)
+
     slot_match = re.search(r"<customRoleSlotOptions>\s*([^<]+?)\s*</customRoleSlotOptions>", raw, re.DOTALL)
     custom_role_slot_options = None
     if slot_match:
@@ -155,13 +168,14 @@ def _collect_vehicle_sources():
                 if not fname.endswith('.xml') or fname in skip:
                     continue
                 tag = fname[:-4]
-                # Prefer decoded tmp/tth_work vehicle XML when available.
                 sources[tag] = os.path.join(root, fname)
 
     return sources
 
 
 def main():
+    print("[INFO] Building crew_builds.json from XML files...")
+
     with open(TANK_DB_PATH, "r", encoding="utf-8") as f:
         tank_db = json.load(f)
 
@@ -192,7 +206,7 @@ def main():
             tanks[tag]["custom_role_slot_options"] = custom_role_slot_options
 
     payload = {
-        "_comment": "General crew model. Regenerate on game update with build_crew_builds.py",
+        "_comment": "General crew model. Auto-regenerated on XML change.",
         "version": 2,
         "_default_roles": DEFAULT_ROLES_BY_CLASS,
         "_default_skills": DEFAULT_SKILLS,

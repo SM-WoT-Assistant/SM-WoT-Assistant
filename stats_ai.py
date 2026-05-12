@@ -8,6 +8,159 @@ from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps, ImageDraw
 import io
 from ai_engine import ai_engine_instance
+import threading
+from tomato_selenium import fetch_build as tomato_fetch_build
+
+TOMATO_TANK_MAP = {
+    "Pl15_60TP_Lewandowskiego": "60tp",
+    "R45_IS-7": "is-7",
+    "R90_IS-4M": "is-4",
+    "G42_Maus": "maus",
+    "G89_Leopard1": "leopard-1",
+    "A69_T110E5": "t110e5",
+    "F10_AMX_50B": "amx-50-b",
+    "S11_Strv_103B": "strv-103b",
+    "Ch19_121": "121",
+    "Cz17_Vz_55": "vz-55",
+    "It08_Progetto_M40_mod_65": "progretto-65",
+    "F18_Bat_Chatillon25t": "b-c-25-t",
+    "GB100_Manticore": "manticore",
+    "Pl21_CS_63": "cs-63",
+    "Cz04_T50_51": "tvp-t-50-51",
+    "S16_Kranvagn": "kranvagn",
+    "It13_Progetto_M35_mod_46": "progett-46",
+    "R97_Object_140": "object-140",
+}
+
+EQUIP_MAP = {
+    "Gun Rammer": "rammer",
+    "Improved Ventilation": "improvedVentilation",
+    "Vertical Stabilizer": "aimingStabilizer",
+    "Turbocharger": "turbocharger",
+    "Improved Hardening": "extraHealthReserve",
+    "Low-Noise Exhaust System": "additionalInvisibilityDevice",
+    "Coated Optics": "coatedOptics",
+    "Commander's Vision System": "commandersView",
+    "Binocular Telescope": "stereoscope",
+    "Camouflage Net": "camouflageNet",
+    "Spall Liner": "antifragmentationLining",
+    "Modified Configuration": "improvedConfiguration",
+    "Improved Rotation Mechanisms": "improvedRotationMechanism",
+    "Enhanced Gun Laying Drives": "enhancedAimDrives",
+    "Improved Aiming": "improvedSights",
+    "Experimental Turbocharger": "modernizedTurbochargerRotationMechanism",
+    "Experimental Hardening": "extraHealthReserve",
+    "Experimental Optics": "modernizedImprovedSightsEnhancedAimDrives",
+    "healthReserve": "extraHealthReserve",
+    "Experimental Gun Laying": "improvedSights",
+    "Innovative Loading System": "improvedSights",
+    "Additional Grousers": "grousers",
+    "Extra Health Reserve": "extraHealthReserve",
+}
+
+TOMATO_TO_CLIENT_EQUIP = {
+    "Improved Hardening": "healthreserve",
+    "Improved Ventilation": "improved ventilation",
+    "Vertical Stabilizer": "vertical stabilizer",
+    "Turbocharger": "turbocharger",
+    "Gun Rammer": "gun rammer",
+    "Coated Optics": "coated optics",
+    "Enhanced Gun Laying Drives": "enhanced aim drives",
+    "Improved Aiming": "improved aiming",
+    "Low-Noise Exhaust System": "additional invisibility device",
+    "Commander's Vision System": "commander's vision system",
+    "Binocular Telescope": "binocular telescope",
+    "Camouflage Net": "camouflage net",
+    "Spall Liner": "antifragmentation lining",
+    "Modified Configuration": "improved configuration",
+    "Improved Rotation Mechanisms": "improved rotation mechanism",
+}
+
+CONS_MAP = {
+    "Small Repair Kit": "smallRepairkit",
+    "Large Repair Kit": "largeRepairkit",
+    "Small First Aid Kit": "smallMedkit",
+    "Large First Aid Kit": "largeMedkit",
+    "Manual Fire Extinguisher": "handExtinguishers",
+    "Automatic Fire Extinguisher": "autoExtinguishers",
+    "Removed Speed Governor": "removedRpmLimiter",
+    "100-octane Gasoline": "qualityFuel",
+    "105-octane Gasoline": "excellentFuel",
+    "Extra Rations (USSR)": "ration",
+    "Case of Cola (USA)": "cocacola",
+    "Chocolate (Germany)": "chocolate",
+    "Pudding and Tea (UK)": "ration_uk",
+    "Strong Coffee (France)": "hotCoffee",
+    "Improved Rations (China)": "ration_china",
+    "Bread with Lard (Poland)": "ration_poland",
+    "Buchty (Czechoslovakia)": "ration_czech",
+    "Spaghetti with Meat Sauce (Italy)": "ration_italy",
+    "Onigiri (Japan)": "ration_japan",
+    "Coffee with Cinnamon (Sweden)": "ration_sweden",
+}
+
+CREW_SKILL_MAP = {
+    "Brothers in Arms": "brotherhood",
+    "Repair": "repair",
+    "Concealment": "camouflage",
+    "Firefighting": "fireFighting",
+    "Recon": "commander_eagleEye",
+    "Emergency": "commander_emergency",
+    "Mentor": "commander_tutor",
+    "Coordination": "commander_coordination",
+    "Sound Detection": "commander_enemyShotPredictor",
+    "Practicality": "commander_practical",
+    "Hold the Line": "commander_holdLine",
+    "Stay Sharp": "commander_staySharp",
+    "Snap Shot": "gunner_smoothTurret",
+    "Deadeye": "gunner_rancorous",
+    "Dead Eye": "gunner_rancorous",
+    "Designated Target": "gunner_sniper",
+    "Armorer": "gunner_armorer",
+    "Steady Aim": "gunner_focus",
+    "Quick Aiming": "gunner_quickAiming",
+    "Point Blank": "gunner_pointBlast",
+    "Lone Wolf": "gunner_loneWolf",
+    "Smooth Ride": "driver_smoothDriving",
+    "Off-Road Driving": "driver_badRoadsKing",
+    "Clutch Braking": "driver_virtuoso",
+    "Controlled Impact": "driver_rammingMaster",
+    "Reliable Placement": "driver_reliablePlacement",
+    "Engineer": "driver_motorExpert",
+    "Field Support": "driver_suspensionRepair",
+    "Bulletproof": "driver_bulletproof",
+    "Adrenaline Rush": "loader_desperado",
+    "Safe Stowage": "loader_pedant",
+    "Intuition": "loader_intuition",
+    "Perfect Charge": "loader_perfectCharge",
+    "Close Combat": "loader_melee",
+    "Ammo Tuning": "loader_ammunitionImprove",
+    "The Second Chance": "loader_secondChance",
+    "Mag Mastery": "loader_magMastery",
+    "Situational Awareness": "radioman_finder",
+    "Signal Interception": "radioman_signalInterception",
+    "Jamming": "radioman_interference",
+    "Communications Expert": "radioman_expert",
+    "Side by Side": "radioman_sideBySide",
+    "Threat Search": "radioman_threatSearch",
+    "Battle Tempered": "radioman_battleTempered",
+    "Sixth Sense": "commander_sixthSense",
+}
+
+TOMATO_CACHE_FILE = "tomato_build_cache.json"
+
+def _load_tomato_cache():
+    if os.path.exists(TOMATO_CACHE_FILE):
+        try:
+            with open(TOMATO_CACHE_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            pass
+    return {}
+
+def _save_tomato_cache(cache):
+    with open(TOMATO_CACHE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, ensure_ascii=False, indent=4)
 
 class StatsAI:
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
@@ -27,8 +180,10 @@ class StatsAI:
         self.loadout_icon_cache = {}
         self.tth_icon_cache = {}
         self._field_mod_pairs_cache = {}
+        self._loading_anim_active = False
         self._field_mod_pairs_by_tank = self._load_field_mod_pairs_by_tank()
         self._crew_builds = self._load_crew_builds()
+        self._equipment_loadouts = self._load_equipment_loadouts()
 
         self.root = self.main_app.root
         self._search_timer = None
@@ -75,6 +230,17 @@ class StatsAI:
     def _load_crew_builds(self):
         """Завантажує crew_builds.json з рекомендованими будовами екіпажу."""
         path = os.path.join(os.path.dirname(__file__), 'crew_builds.json')
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except Exception:
+            return {}
+
+    def _load_equipment_loadouts(self):
+        """Завантажує equipment_loadouts.json з даними про обладнання."""
+        path = os.path.join(os.path.dirname(__file__), 'equipment_loadouts.json')
         if not os.path.exists(path):
             return {}
         try:
@@ -253,6 +419,8 @@ class StatsAI:
                 self.ai_res_f.pack_forget()
             if hasattr(self, 'ai_grid_container'):
                 self.ai_grid_container.pack(side="top", fill="both", expand=True)
+            if hasattr(self, 'ai_status_bar'):
+                self.ai_status_bar.grid_forget()
 
     def _parse_search_query(self):
         raw_q = self.ai_search_var.get() or ""
@@ -520,19 +688,40 @@ class StatsAI:
             self.ai_content_panel.configure(highlightthickness=1, highlightbackground="#ffb347")
 
         self.ai_tth_frame = tk.Frame(self.ai_content_panel, bg="#111111")
+        # Row 1: Headers (ОБЛАДНАННЯ, СНАРЯДИ, ВИТРАТНІ)
+        self.ai_top_headers_row = tk.Frame(self.ai_content_panel, bg="#111111")
+        self.ai_equipment_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
+        self.ai_ammo_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
+        self.ai_consumables_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
+        # Row 2: Loadout 1
         self.ai_top_loadout_row = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_equipment_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
         self.ai_ammo_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
         self.ai_consumables_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
-        # Row 2 - without headers
+        # Row 3: Loadout 2
         self.ai_top_loadout_row_2 = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_equipment_frame_2 = tk.Frame(self.ai_top_loadout_row_2, bg="#111111")
         self.ai_ammo_frame_2 = tk.Frame(self.ai_top_loadout_row_2, bg="#111111")
         self.ai_consumables_frame_2 = tk.Frame(self.ai_top_loadout_row_2, bg="#111111")
         self.ai_crew_frame = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_field_mod_frame = tk.Frame(self.ai_content_panel, bg="#111111")
+        self.ai_status_bar = tk.Frame(self.ai_content_panel, bg="#2a2a2a", height=28)
         
         self.refresh_ai_view()
+        self._status_label = None
+
+    def update_status_bar(self, text="", fg="#aaaaaa"):
+        for w in self.ai_status_bar.winfo_children():
+            w.destroy()
+        if text:
+            self._status_label = tk.Label(
+                self.ai_status_bar, text=text, fg=fg, bg="#2a2a2a",
+                font=("Arial", 9), anchor="w", padx=10
+            )
+            self._status_label.pack(side="left", fill="x", expand=True)
+        # Always show legend
+        tk.Label(self.ai_status_bar, text="1 - Відкриті мапи  |  2 - Міські мапи", 
+                 fg="#555555", bg="#2a2a2a", font=("Arial", 8)).pack(side="right", padx=10)
 
     def _on_detail_canvas_resize(self, event):
         self.detail_canvas.itemconfig(self.detail_canvas_win, width=event.width)
@@ -549,17 +738,23 @@ class StatsAI:
         self.ai_content_panel.grid_columnconfigure(1, minsize=compact_w)
         
         # Configure row constraints to allow proper sizing
-        self.ai_content_panel.grid_rowconfigure(0, weight=0)  # TTH (fixed height based on content)
-        self.ai_content_panel.grid_rowconfigure(1, weight=0)  # Top row (fixed height)
-        self.ai_content_panel.grid_rowconfigure(2, weight=0)  # Crew (fixed height)
-        self.ai_content_panel.grid_rowconfigure(3, weight=0)  # Field mods (fixed height)
+        self.ai_content_panel.grid_rowconfigure(0, weight=0)  # TTH
+        self.ai_content_panel.grid_rowconfigure(1, weight=0)  # Headers row
+        self.ai_content_panel.grid_rowconfigure(2, weight=0)  # Loadout 1
+        self.ai_content_panel.grid_rowconfigure(3, weight=0)  # Loadout 2
+        self.ai_content_panel.grid_rowconfigure(4, weight=0)  # Crew
+        self.ai_content_panel.grid_rowconfigure(5, weight=0)  # Field mods
+        self.ai_content_panel.grid_rowconfigure(6, weight=0)  # Field mods row 2
+        self.ai_content_panel.grid_rowconfigure(7, weight=0)  # Status bar
 
         sections = [
             self.ai_tth_frame,
+            self.ai_top_headers_row,
             self.ai_top_loadout_row,
             self.ai_top_loadout_row_2,
             self.ai_crew_frame,
             self.ai_field_mod_frame,
+            self.ai_status_bar,
         ]
 
         for sec in sections:
@@ -570,57 +765,61 @@ class StatsAI:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
             elif idx == 2:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
+            elif idx == 5:  # Status bar - no top margin
+                sec.grid(row=idx, column=1, sticky="ew", padx=0, pady=(8, 0))
             else:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 8))
 
         # Hard-fixed widths in px for stable layout regardless of parent resize.
         fixed_w = min(self._detail_info_fixed_width, compact_w)
         self.ai_tth_frame.configure(width=fixed_w)
+        self.ai_top_headers_row.configure(width=fixed_w)
         self.ai_top_loadout_row.configure(width=fixed_w)
         self.ai_top_loadout_row_2.configure(width=fixed_w)
         self.ai_crew_frame.configure(width=fixed_w)
         self.ai_field_mod_frame.configure(width=fixed_w)
+        self.ai_status_bar.configure(width=fixed_w)
         self.ai_tth_frame.grid_propagate(False)
+        self.ai_top_headers_row.grid_propagate(False)
         # Don't use grid_propagate on loadout row - let it grow with content
         self.ai_crew_frame.grid_propagate(False)
         self.ai_field_mod_frame.grid_propagate(False)
+        self.ai_status_bar.grid_propagate(False)
+        
+        # Headers row layout
+        self.ai_equipment_header.grid_forget()
+        self.ai_ammo_header.grid_forget()
+        self.ai_consumables_header.grid_forget()
+        self.ai_top_headers_row.grid_columnconfigure(0, weight=0)
+        self.ai_top_headers_row.grid_columnconfigure(1, weight=1)
+        self.ai_top_headers_row.grid_columnconfigure(2, weight=1)
+        self.ai_top_headers_row.grid_columnconfigure(3, weight=1)
+        self.ai_equipment_header.grid(row=0, column=1, sticky="ew", padx=(0, 2))
+        self.ai_ammo_header.grid(row=0, column=2, sticky="ew", padx=(1, 1))
+        self.ai_consumables_header.grid(row=0, column=3, sticky="ew", padx=(2, 0))
 
-        # Top row order: equipment -> ammo -> consumables.
+        # Top row: equipment | ammo | consumables
         self.ai_equipment_frame.grid_forget()
         self.ai_ammo_frame.grid_forget()
         self.ai_consumables_frame.grid_forget()
-        self.ai_top_loadout_row.grid_columnconfigure(0, weight=0)  # column for number
-        self.ai_top_loadout_row.grid_columnconfigure(1, weight=1)  # equipment
-        self.ai_top_loadout_row.grid_columnconfigure(2, weight=1)  # ammo
-        self.ai_top_loadout_row.grid_columnconfigure(3, weight=1)  # consumables
-        self.ai_equipment_frame.grid(row=0, column=1, sticky="ew", padx=(0, 2))
-        self.ai_ammo_frame.grid(row=0, column=2, sticky="ew", padx=(1, 1))
-        self.ai_consumables_frame.grid(row=0, column=3, sticky="ew", padx=(2, 0))
+        self.ai_top_loadout_row.grid_columnconfigure(0, weight=1)
+        self.ai_top_loadout_row.grid_columnconfigure(1, weight=1)
+        self.ai_top_loadout_row.grid_columnconfigure(2, weight=1)
+        self.ai_equipment_frame.grid(row=0, column=0, sticky="ew")
+        self.ai_ammo_frame.grid(row=0, column=1, sticky="ew", padx=(1, 1))
+        self.ai_consumables_frame.grid(row=0, column=2, sticky="ew", padx=(2, 0))
 
-        # Номер варіанту "1" зліва від трьох секцій (тільки якщо ще не створено)
-        existing_num = getattr(self, '_loadout_num_label', None)
-        if existing_num is None or not existing_num.winfo_exists():
-            self._loadout_num_label = tk.Label(self.ai_top_loadout_row, text="1", font=("Arial", 10, "bold"), fg="#666666", bg="#111111")
-            self._loadout_num_label.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(5, 3), pady=(45, 0))
-
-        # Row 2 - layout (without headers)
+        # Row 2
         self.ai_top_loadout_row_2.configure(width=fixed_w)
         self.ai_equipment_frame_2.grid_forget()
         self.ai_ammo_frame_2.grid_forget()
         self.ai_consumables_frame_2.grid_forget()
-        self.ai_top_loadout_row_2.grid_columnconfigure(0, weight=0)  # column for number
-        self.ai_top_loadout_row_2.grid_columnconfigure(1, weight=1)  # equipment
-        self.ai_top_loadout_row_2.grid_columnconfigure(2, weight=1)  # ammo
-        self.ai_top_loadout_row_2.grid_columnconfigure(3, weight=1)  # consumables
-        self.ai_equipment_frame_2.grid(row=0, column=1, sticky="ew", padx=(0, 2))
-        self.ai_ammo_frame_2.grid(row=0, column=2, sticky="ew", padx=(1, 1))
-        self.ai_consumables_frame_2.grid(row=0, column=3, sticky="ew", padx=(2, 0))
-
-        # Номер варіанту "2" зліва (тільки якщо ще не створено)
-        existing_num_2 = getattr(self, '_loadout_num_label_2', None)
-        if existing_num_2 is None or not existing_num_2.winfo_exists():
-            self._loadout_num_label_2 = tk.Label(self.ai_top_loadout_row_2, text="2", font=("Arial", 10, "bold"), fg="#666666", bg="#111111")
-            self._loadout_num_label_2.grid(row=0, column=0, rowspan=3, sticky="ns", padx=(5, 3), pady=(5, 0))
+        self.ai_top_loadout_row_2.grid_columnconfigure(0, weight=1)
+        self.ai_top_loadout_row_2.grid_columnconfigure(1, weight=1)
+        self.ai_top_loadout_row_2.grid_columnconfigure(2, weight=1)
+        self.ai_equipment_frame_2.grid(row=0, column=0, sticky="ew")
+        self.ai_ammo_frame_2.grid(row=0, column=1, sticky="ew", padx=(1, 1))
+        self.ai_consumables_frame_2.grid(row=0, column=2, sticky="ew", padx=(2, 0))
 
     def _layout_tile_grid(self, container, slots, min_cell=68, gap=0, stretch=False):
         if not slots:
@@ -846,6 +1045,26 @@ class StatsAI:
             print(f"Error drawing card: {e}")
             return None
 
+    def _show_legend_tooltip(self, event, text):
+        """Показує підказку при наведенні."""
+        if not hasattr(self, '_legend_tooltip'):
+            self._legend_tooltip = tk.Toplevel(self.root)
+            self._legend_tooltip.overrideredirect(True)
+            self._legend_tooltip.configure(bg="#333333")
+            self._legend_tooltip_label = tk.Label(self._legend_tooltip, text="", fg="white", bg="#333333", font=("Arial", 9), padx=8, pady=4)
+            self._legend_tooltip_label.pack()
+            self._legend_tooltip.withdraw()
+        self._legend_tooltip_label.configure(text=text)
+        x = event.widget.winfo_rootx() + 20
+        y = event.widget.winfo_rooty() + 20
+        self._legend_tooltip.geometry(f"+{x}+{y}")
+        self._legend_tooltip.deiconify()
+
+    def _hide_legend_tooltip(self):
+        """Ховає підказку."""
+        if hasattr(self, '_legend_tooltip'):
+            self._legend_tooltip.withdraw()
+
     def refresh_ai_view(self):
         """Оновлює грід за допомогою чанків, щоб не блокувати UI."""
         if not hasattr(self, 'ai_grid_frame'): return
@@ -951,6 +1170,23 @@ class StatsAI:
         
         return items_to_show, is_default
     
+    def _get_clean_tank_name(self, tag, data):
+        raw_name = str(data.get("name", tag)).replace("_", " ")
+        sys_id = tag.split('_')[0].lower()
+        m = re.search(r'^([a-z]+)(\d*)$', sys_id)
+        if m:
+            letters, digits = m.groups()
+            country_codes = {"gb", "uk", "usa", "ussr", "ger", "fr", "ch", "cz", "pl", "swe", "it", "jp", "cn", "r", "a", "g", "f", "s", "j"}
+            if letters in country_codes:
+                rn_low = raw_name.lower()
+                if rn_low.startswith(sys_id + " "):
+                    raw_name = raw_name[len(sys_id):].strip()
+                elif digits and rn_low.startswith(f"{letters} {digits} "):
+                    raw_name = raw_name[len(letters) + len(digits) + 1:].strip()
+                elif rn_low.startswith(letters + " "):
+                    raw_name = raw_name[len(letters):].strip()
+        return raw_name
+
     def _finish_filter_with_items(self, items_to_show):
         """Build new grid in background, then swap instantly to avoid black flash."""
         max_cols = self._last_cols if self._last_cols > 0 else 5
@@ -1015,24 +1251,11 @@ class StatsAI:
                 cl = tk.Label(l1_f, text=sym, font=("XVMSymbol", 17), fg=accent_color, bg="#111", bd=0)
                 cl.pack(side="left", padx=3)
                 
-                raw_name = str(data.get("name", tag)).replace("_", " ")
-                sys_id = tag.split('_')[0].lower()
-                m = re.search(r'^([a-z]+)(\d*)$', sys_id)
-                if m:
-                    letters, digits = m.groups()
-                    country_codes = {"gb", "uk", "usa", "ussr", "ger", "fr", "ch", "cz", "pl", "swe", "it", "jp", "cn", "r", "a", "g", "f", "s", "j"}
-                    if letters in country_codes:
-                        rn_low = raw_name.lower()
-                        if rn_low.startswith(sys_id + " "):
-                            raw_name = raw_name[len(sys_id):].strip()
-                        elif digits and rn_low.startswith(f"{letters} {digits} "):
-                            raw_name = raw_name[len(letters) + len(digits) + 1:].strip()
-                        elif rn_low.startswith(letters + " "):
-                            raw_name = raw_name[len(letters):].strip()
+                raw_name = self._get_clean_tank_name(tag, data)
                 
                 name_words = raw_name.split()
                 if not name_words:
-                    name_words = [data["name"]]
+                    name_words = [data.get("name", tag)]
                 disp_name = ""
                 for w in name_words:
                     if len(disp_name) + len(w) <= 22:
@@ -1668,17 +1891,99 @@ class StatsAI:
 
     def on_ai_tank_select(self, tag):
         self.active_tank = tag
-        # Show progress bar while keeping old screen visible
-        if not self._filter_active:
-            self._filter_active = True
-            self.filter_progress_canvas.pack(fill="both", expand=True)
-        self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Animate for at least 0.8s; collect tank data during animation
-        self._animate_realtime(
-            0.8,
-            lambda: self._collect_tank_data(tag),
-            lambda result: self._finish_tank_detail(result)
-        )
+        
+        # === INSTANT SWITCH: show detail view immediately with loading ===
+        data = self.tank_db.get(tag, {})
+        if not isinstance(data, dict):
+            data = {}
+        
+        # Hide grid, show result frame immediately
+        self.ai_grid_container.pack_forget()
+        self.ai_res_f.pack(side="top", fill="both", expand=True)
+        
+        # Clear all detail frames
+        for frame in [self.ai_title_frame, self.ai_tth_frame, 
+                      self.ai_equipment_frame, self.ai_consumables_frame, self.ai_ammo_frame,
+                      self.ai_equipment_frame_2, self.ai_consumables_frame_2, self.ai_ammo_frame_2,
+                      self.ai_crew_frame, self.ai_field_mod_frame]:
+            for w in frame.winfo_children():
+                w.destroy()
+        
+        # Build title header immediately (we already have tank_db data)
+        is_prem = data.get("is_premium", False)
+        acc = "#e09b1b" if is_prem else "#bbbbbb"
+        hf = tk.Frame(self.ai_title_frame, bg="#111111")
+        hf.pack(side="top", anchor="center", pady=(0, 8))
+        roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
+        try:
+            tier_val = int(data.get('tier', 0) or 0)
+        except Exception:
+            tier_val = 0
+        rt = roman_tiers[tier_val - 1] if 1 <= tier_val <= 11 else str(tier_val)
+        tk.Label(hf, text=rt, font=("Arial", 16, "bold"), fg=acc, bg="#111111").pack(side="left", padx=(0, 4))
+        s_flag = self.get_small_flag(data.get("nation", ""))
+        if s_flag:
+            fl = tk.Label(hf, image=s_flag, bg="#111111")
+            fl.image = s_flag
+            fl.pack(side="left", padx=(0, 4))
+        xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
+        sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
+        tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
+        tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
+        
+        # Show loading indicator in the equipment area
+        loading_frame = tk.Frame(self.ai_equipment_frame, bg="#111111")
+        loading_frame.pack(fill="both", expand=True, pady=(30, 10))
+        
+        tk.Label(loading_frame, text="🔍  ПОШУК ІНФОРМАЦІЇ...", 
+                 fg="#ff8800", bg="#111111", font=("Arial", 14, "bold")).pack(pady=(20, 10))
+        
+        # Animated progress bar
+        prog_canvas = tk.Canvas(loading_frame, height=6, bg="#1a1a1a", bd=0, highlightthickness=0)
+        prog_canvas.pack(fill="x", padx=40, pady=(0, 20))
+        prog_rect = prog_canvas.create_rectangle(0, 0, 0, 6, fill="#ff6600", outline="")
+        
+        self.detail_canvas.yview_moveto(0)
+        self.root.update_idletasks()
+        
+        # Animate the loading bar
+        self._loading_anim_active = True
+        start_time = time.time()
+        
+        def animate_loading():
+            if not self._loading_anim_active:
+                return
+            try:
+                if not prog_canvas.winfo_exists():
+                    return
+                elapsed = time.time() - start_time
+                # Slow progress that never reaches 100% (asymptotic)
+                progress = min(0.9, 1.0 - 1.0 / (1.0 + elapsed * 0.3))
+                w = prog_canvas.winfo_width()
+                if w > 1:
+                    prog_canvas.coords(prog_rect, 0, 0, int(w * progress), 6)
+                self.root.after(50, animate_loading)
+            except Exception:
+                pass
+        
+        animate_loading()
+        
+        # Collect data in background thread, then build UI
+        def background_collect():
+            tank_info = self._collect_tank_data(tag)
+            # Switch back to main thread to build UI
+            if self.ai_equipment_frame.winfo_exists():
+                self.ai_equipment_frame.after(0, lambda: self._finish_tank_detail_with_loading(tank_info))
+        
+        import threading
+        threading.Thread(target=background_collect, daemon=True).start()
+
+    def _finish_tank_detail_with_loading(self, tank_info):
+        """Build tank detail UI, replacing the loading indicator."""
+        self._loading_anim_active = False
+        if not tank_info:
+            return
+        self._finish_tank_detail(tank_info)
 
 
     def _collect_tank_data(self, tag):
@@ -1842,6 +2147,7 @@ class StatsAI:
         cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
         ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
+        
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
         
 
@@ -1853,35 +2159,258 @@ class StatsAI:
         ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
         ammo_body_2.pack(side="top", fill="x", pady=3)
         
-        # Show loading placeholders
+        # Пусті loading_labels
         loading_labels = []
-        for body in [equip_body, cons_body, ammo_body, crew_body, fm_body]:
-            lbl = tk.Label(body, text="ШІ Аналізує Сетап...", fg="#888888", bg="#111111", font=("Arial", 10))
-            lbl.pack(pady=20, expand=True)
-            loading_labels.append(lbl)
             
-        tank_name = data.get("name", tag)
+        tank_name = self._get_clean_tank_name(tag, data)
+        self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
         def on_build_ready(build_data, is_cached):
             if not self.ai_equipment_frame.winfo_exists(): return
             self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
                 build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
             ))
+        
+        # Завантаження обладнання з Tomato.gg з кешуванням
+        tomato_slug = TOMATO_TANK_MAP.get(tag)
+        
+        def map_equip(name):
+            return EQUIP_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
+        
+        def map_cons(name):
+            return CONS_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
+        
+        def map_skill(name):
+            return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
+        
+        def process_tomato_data(tomato_data, cached_data):
+            equipment_1 = []
+            equipment_2 = []
+            consumables = []
+            crew_skills = []
+            field_mods = []
             
-        ai_engine_instance.fetch_build_async(tag, tank_name, on_build_ready)
+            # Validate equipment from Tomato against client data
+            # Build client key: nation:tag
+            tank_data = self.tank_db.get(tag, {})
+            nation = (tank_data.get('nation') or '').lower()
+            client_key = f"{nation}:{tag}" if nation else tag
+
+            client_equipment = self._equipment_loadouts.get(client_key, [])
+            if client_equipment:
+                client_eq_set = set()
+                for loadout in client_equipment[:3]:
+                    for eq in loadout.get('equipment', []):
+                        client_eq_set.add(eq.lower())
+
+            if tomato_data:
+                eq1 = tomato_data.get("equipment_1", [])
+                eq2 = tomato_data.get("equipment_2", [])
+
+                # Filter equipment using client data (map Tomato names to client IDs)
+                if client_eq_set:
+                    filtered_eq1 = []
+                    for e in eq1:
+                        client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                        if client_id.lower() in client_eq_set:
+                            filtered_eq1.append(e)
+                    eq1 = filtered_eq1
+
+                    filtered_eq2 = []
+                    for e in eq2:
+                        client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                        if client_id.lower() in client_eq_set:
+                            filtered_eq2.append(e)
+                    eq2 = filtered_eq2
+                
+                equipment_1 = [map_equip(e) for e in eq1[:3]]
+                equipment_2 = [map_equip(e) for e in eq2[:3]]
+                
+                cons = tomato_data.get("consumables", [])
+                consumables = [map_cons(c) for c in cons[:3]]
+                
+                crew_perks = tomato_data.get("crew_perks", {})
+                crew_skills_map = {}
+                has_loader_radio = "loader_radio" in crew_perks
+                for role, skills in crew_perks.items():
+                    if isinstance(skills, list):
+                        if role == "loader_radio":
+                            # loader_radio = 5th crew member with 6 loader skills + 4 radio skills
+                            # Store as "loader_radio" key (5th row in UI)
+                            if "loader_radio" not in crew_skills_map:
+                                crew_skills_map["loader_radio"] = []
+                            crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
+                        elif role == "loader":
+                            # Regular loader = 4th crew member (6 skills)
+                            # Keep even if loader_radio exists (5 crew members total)
+                            if "loader" not in crew_skills_map:
+                                crew_skills_map["loader"] = []
+                            crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
+                        else:
+                            skill_ids = [map_skill(s) for s in skills[:6]]
+                            if role not in crew_skills_map:
+                                crew_skills_map[role] = []
+                            crew_skills_map[role].extend(skill_ids)
+                
+                for role, skills in crew_skills_map.items():
+                    crew_skills.append((role, skills[:12]))
+                
+                fm = tomato_data.get("field_mods", {})
+                if isinstance(fm, dict):
+                    mods = fm.get("mods", [])
+            
+            if not equipment_1:
+                equipment_1 = cached_data.get("equipment_1", [])
+            if not equipment_2:
+                equipment_2 = cached_data.get("equipment_2", [])
+            if not consumables:
+                consumables = cached_data.get("consumables", [])
+            if not crew_skills:
+                crew_skills = cached_data.get("crew", [])
+            if not field_mods:
+                field_mods = cached_data.get("field_mods", [])
+            
+            if not equipment_1:
+                equipment_1 = ["rammer", "improvedVentilation", "aimingStabilizer"]
+            if not equipment_2:
+                equipment_2 = ["turbocharger", "coatedOptics", "extraHealthReserve"]
+            if not consumables:
+                consumables = ["largeRepairkit", "largeMedkit", "ration"]
+            if not crew_skills:
+                crew_skills = [
+                    ("commander", ["brotherhood", "repair", "camouflage", "fireFighting", "commander_eagleEye", "commander_emergency"]),
+                    ("gunner", ["brotherhood", "repair", "camouflage", "fireFighting", "gunner_smoothTurret", "gunner_rancorous"]),
+                    ("driver", ["brotherhood", "repair", "camouflage", "fireFighting", "driver_smoothDriving", "driver_badRoadsKing"]),
+                    ("loader", ["brotherhood", "repair", "camouflage", "fireFighting", "loader_pedant", "loader_intuition"]),
+                ]
+            if not field_mods:
+                field_mods = ["improvedEnginePower", "improvedAimingHandling", "improvedChassisDurability"]
+            
+            return {
+                "equipment_1": equipment_1,
+                "equipment_2": equipment_2,
+                "consumables": consumables,
+                "ammo": [("ARMOR_PIERCING", 10), ("ARMOR_PIERCING_CR", 18), ("HIGH_EXPLOSIVE", 2)],
+                "crew": crew_skills,
+                "field_mods": field_mods
+            }
+        
+        tomato_cache = _load_tomato_cache()
+        cached_data = tomato_cache.get(tag, {})
+        
+        if tomato_slug:
+            def fetch_and_update():
+                try:
+                    result = tomato_fetch_build(tag)
+                    if result:
+                        # Validate equipment from Tomato against client data
+                        tank_data = self.tank_db.get(tag, {})
+                        nation = (tank_data.get('nation') or '').lower()
+                        client_key = f"{nation}:{tag}" if nation else tag
+                        
+                        client_equipment = self._equipment_loadouts.get(client_key, [])
+                        client_eq_set = set()
+                        if client_equipment:
+                            for loadout in client_equipment[:3]:
+                                for eq in loadout.get('equipment', []):
+                                    client_eq_set.add(eq.lower())
+
+                        eq1 = result.get("equipment_1", [])
+                        eq2 = result.get("equipment_2", [])
+
+                        # Filter equipment using client data (map Tomato names to client IDs)
+                        if client_eq_set:
+                            filtered_eq1 = []
+                            for e in eq1:
+                                client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                                if client_id.lower() in client_eq_set:
+                                    filtered_eq1.append(e)
+                            eq1 = filtered_eq1
+
+                            filtered_eq2 = []
+                            for e in eq2:
+                                client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
+                                if client_id.lower() in client_eq_set:
+                                    filtered_eq2.append(e)
+                            eq2 = filtered_eq2
+                        
+                        mapped_result = {
+                            "equipment_1": [map_equip(e) for e in eq1[:3]],
+                            "equipment_2": [map_equip(e) for e in eq2[:3]],
+                            "consumables": [map_cons(c) for c in result.get("consumables", [])[:3]],
+                            "crew": [],
+                            "field_mods": result.get("field_mods", {}).get("mods", [])
+                        }
+                        crew_perks = result.get("crew_perks", {})
+                        crew_skills_map = {}
+                        has_loader_radio = "loader_radio" in crew_perks
+                        for role, skills in crew_perks.items():
+                            if isinstance(skills, list):
+                                if role == "loader_radio":
+                                    # loader_radio = 5th crew member with 6 loader skills + 4 radio skills
+                                    # Store as "loader_radio" key (5th row in UI)
+                                    if "loader_radio" not in crew_skills_map:
+                                        crew_skills_map["loader_radio"] = []
+                                    crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
+                                elif role == "loader":
+                                    # Regular loader = 4th crew member (6 skills)
+                                    # Keep even if loader_radio exists (5 crew members total)
+                                    if "loader" not in crew_skills_map:
+                                        crew_skills_map["loader"] = []
+                                    crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
+                                else:
+                                    skill_ids = [map_skill(s) for s in skills[:6]]
+                                    if role not in crew_skills_map:
+                                        crew_skills_map[role] = []
+                                    crew_skills_map[role].extend(skill_ids)
+                        for role, skills in crew_skills_map.items():
+                            mapped_result["crew"].append((role, skills[:12]))
+                        tomato_cache[tag] = mapped_result
+                        _save_tomato_cache(tomato_cache)
+                        cached = mapped_result
+                    else:
+                        cached = cached_data
+                except Exception as e:
+                    print(f"[TOMATO] Error: {e}")
+                    cached = cached_data
+                self.root.after(0, lambda: self._update_ai_setup_ui(
+                    process_tomato_data(cached, cached_data), equip_body, cons_body, ammo_body, crew_body, fm_body,
+                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
+                ))
+            threading.Thread(target=fetch_and_update, daemon=True).start()
+        else:
+            build_data = process_tomato_data({}, cached_data)
+            self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, 
+                                   equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
     def _map_ai_fm_text_to_icon(self, text):
         t = text.lower()
+        # Robust keyword mapping for all 25 field mod IDs
         if "terrain" in t or "grouser" in t: return "additionalGrousers"
         if "lightweight" in t or "friction" in t: return "betterFriction"
-        if "parallax" in t or "aiming" in t: return "improvedAimingHandling"
-        if "powder" in t or "scope" in t: return "improvedScope"
-        if "right-angle" in t or "observation" in t: return "improvedObservationDevice"
-        if "anti-reflective" in t or "spalling" in t or "lenses" in t or "headlight" in t: return "improvedSpallingResistance"
-        if "power supply" in t or "tuning" in t or "wheels" in t: return "improvedTurretTurningWheels"
-        if "shielding" in t or "filter" in t or "isolation" in t: return "improvedLightFilters"
-        if "durability" in t or "suspension" in t: return "improvedTurretTurningWheels"
-        if "valve" in t or "gears" in t: return "improvedAimingHandling"
+        if "durability" in t or "chassis durability" in t: return "improvedChassisDurability"
+        if "stability" in t and "chassis" in t: return "improvedChassisStability"
+        if "aiming" in t or "parallax" in t or "gears" in t or "valve" in t: return "improvedAimingHandling"
+        if "camouflage" in t or "concealment" in t: return "improvedCamouflage"
+        if "engine" in t or "power" in t: return "improvedEnginePower"
+        if "breech" in t: return "improvedGunBreech"
+        if "filter" in t or "shielding" in t or "isolation" in t: return "improvedLightFilters"
+        if "muzzle" in t: return "improvedMuzzleBreak"
+        if "observation" in t or "right-angle" in t: return "improvedObservationDevice"
+        if "reflex" in t: return "improvedReflexScopes"
+        if "scope" in t or "powder" in t: return "improvedScope"
+        if "tracks" in t or "self-repairing tracks" in t: return "improvedSelfRepairingTracks"
+        if "wheels" in t and "repairing" in t: return "improvedSelfRepairingWheels"
+        if "sharpness" in t or "visor" in t: return "improvedSharpnessVisor"
+        if "sound" in t or "insulation" in t or "spalling" in t or "lenses" in t or "reflective" in t or "headlight" in t: return "improvedSpallingResistance"
+        if "backwards" in t or "reverse" in t: return "improvedSpeedIndicatorBackwards"
+        if "speed" in t or "forward" in t: return "improvedSpeedIndicator"
+        if "ring" in t: return "improvedTurretRingStability"
+        if "tuning" in t or "turret turning" in t or "suspension" in t: return "improvedTurretTurningWheels"
+        if "sensitivity" in t or "optics" in t: return "increasedSensitivityOptics"
+        if "thickness" in t or "armor" in t: return "increasedThickness"
+        if "interior" in t or "modules" in t: return "reinforcedInteriorModules"
+        if "structure" in t: return "reinforcedStructure"
         return "glow"
 
     def _update_ai_setup_ui(self, build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs):
@@ -1945,7 +2474,7 @@ class StatsAI:
         ration_map = {
             "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
             "france": "hotCoffee", "china": "ration_china", "poland": "ration_poland",
-            "czech": "Buchty", "japan": "ration_japan", "italy": "ration_italy", "sweden": "ration_sweden"
+            "czech": "ration_czech", "japan": "ration_japan", "italy": "ration_italy", "sweden": "ration_sweden"
         }
         nation = data.get("nation", "")
         correct_ration = ration_map.get(nation.lower())
@@ -1956,37 +2485,106 @@ class StatsAI:
                     cons[i] = correct_ration
             build_data["consumables"] = cons
             
-        render_items(equip_body, build_data.get("equipment_1", []), "artefacts")
-        render_items(equip_body_2, build_data.get("equipment_2", []), "artefacts")
+        # Цифра 1 перед обладнанням (використовує pack)
+        if not hasattr(self, '_loadout_num_label'):
+            self._loadout_num_label = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
+        self._loadout_num_label.pack(side="left", padx=(0, 2))
+        self._loadout_num_label.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
+        self._loadout_num_label.bind("<Leave>", lambda e: self._hide_legend_tooltip())
+        
+        # Оборудование в отдельном фрейме с grid
+        equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
+        equip_grid_frame_1.pack(side="left", fill="none", expand=False)
+        render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts")
+        
+        # Цифра 2 перед обладнанням (використовує pack)
+        if not hasattr(self, '_loadout_num_label_2'):
+            self._loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
+        self._loadout_num_label_2.pack(side="left", padx=(0, 2))
+        self._loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
+        self._loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
+        
+        # Оборудование в отдельном фрейме с grid
+        equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
+        equip_grid_frame_2.pack(side="left", fill="none", expand=False)
+        render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
         render_items(cons_body, build_data.get("consumables", []), "artefacts")
         render_items(cons_body_2, build_data.get("consumables", []), "artefacts")
         render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
         render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
 
-        # Crew section
-        crew_slots = []
+        # Build ai_crew: normalize role names (loader_1 -> loader, loader_2 -> loader, etc.)
+        # Each normalized role maps to a LIST of skill-lists (one per crew member of that role)
         ai_crew = {}
+        ai_crew_also = {}  # Secondary role skills
+        
+        # Check how many crew members we have in UI
+        crew_member_count = len(crew_rows)
+        
         for role, skills in build_data.get("crew", []):
             r_lower = role.lower()
-            if "radio" in r_lower or "radioman" in r_lower: r_lower = "radioman"
-            elif "loader" in r_lower: r_lower = "loader"
-            elif "gunner" in r_lower: r_lower = "gunner"
-            elif "driver" in r_lower: r_lower = "driver"
-            elif "commander" in r_lower: r_lower = "commander"
-            ai_crew[r_lower] = skills
             
-        for member, _ in crew_rows:
+            # Handle loader_radio (5th crew member with 10 skills)
+            if role == "loader_radio":
+                # 5th crew member - loader + radio operator with 10 skills (6 loader + 4 radio)
+                # Show ALL 10 skills in one row - use separate key!
+                if "loader_radio" not in ai_crew:
+                    ai_crew["loader_radio"] = []
+                ai_crew["loader_radio"].append(skills[:10])
+                
+                # No secondary role needed - all 10 skills shown together
+                if "loader_radio" not in ai_crew_also:
+                    ai_crew_also["loader_radio"] = []
+                ai_crew_also["loader_radio"].append([])
+            elif role == "loader_2" and len(skills) > 6:
+                if "loader" not in ai_crew_also:
+                    ai_crew_also["loader"] = []
+                ai_crew_also["loader"].append(skills[6:])
+                if "loader" not in ai_crew:
+                    ai_crew["loader"] = []
+                ai_crew["loader"].append(skills[:6])
+            elif role == "loader_1" or role == "loader_2":
+                r_lower = "loader"
+                if r_lower not in ai_crew:
+                    ai_crew[r_lower] = []
+                ai_crew[r_lower].append(skills[:6] if len(skills) > 6 else skills)
+            else:
+                # Normalize: strip numeric suffix
+                import re as _re
+                r_lower = _re.sub(r'_\d+$', '', r_lower)
+                if "radio" in r_lower or "radioman" in r_lower: r_lower = "radioman"
+                elif "loader" in r_lower: r_lower = "loader"
+                elif "gunner" in r_lower: r_lower = "gunner"
+                elif "driver" in r_lower: r_lower = "driver"
+                elif "commander" in r_lower: r_lower = "commander"
+                if r_lower not in ai_crew:
+                    ai_crew[r_lower] = []
+                ai_crew[r_lower].append(skills)
+            
+        crew_slots = []
+        for i, (member, _) in enumerate(crew_rows):
             slot = tk.Frame(crew_body, bg="#111111", bd=0, relief="flat")
             row = tk.Frame(slot, bg="#111111")
             row.pack(side="top", pady=(0, 3))
             
             role_str = member.get("role", "commander")
             primary_r_icon = role_str.lower()
-            if "loader" in primary_r_icon: primary_r_icon = "loader"
-            if "radio" in primary_r_icon or "radioman" in primary_r_icon: primary_r_icon = "radioman"
-            if "gunner" in primary_r_icon: primary_r_icon = "gunner"
-            if "driver" in primary_r_icon: primary_r_icon = "driver"
-            if "commander" in primary_r_icon: primary_r_icon = "commander"
+            # Handle loader_radio FIRST - special case, map to loader
+            if "loader_radio" in primary_r_icon:
+                primary_r_icon = "loader"
+            elif "radio" in primary_r_icon or "radioman" in primary_r_icon:
+                primary_r_icon = "radioman"
+            elif "loader" in primary_r_icon:
+                primary_r_icon = "loader"
+            elif "gunner" in primary_r_icon:
+                primary_r_icon = "gunner"
+            elif "driver" in primary_r_icon:
+                primary_r_icon = "driver"
+            elif "commander" in primary_r_icon:
+                primary_r_icon = "commander"
+            
+            # Check if this member has secondary role from crew_builds.json
+            also_roles = member.get("also") or []
             
             # Primary role
             role_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
@@ -1999,8 +2597,8 @@ class StatsAI:
                 role_lbl.image = role_photo
             role_lbl.pack(expand=True)
             
-            # Secondary roles
-            also_roles = member.get("also") or []
+            # Secondary roles - use calculated from AI data, not from tank_db
+            # also_roles is already calculated above from ai_crew_also
             for sec_role in also_roles:
                 sec_icon = sec_role.lower()
                 if "loader" in sec_icon: sec_icon = "loader"
@@ -2021,13 +2619,26 @@ class StatsAI:
                 
             # Skills for this member (combining primary and secondary roles)
             skills = []
+            # Get the original role from crew member for special handling
+            original_role = member.get("role", "").lower()
+            
             for r in [primary_r_icon] + [sr.lower() for sr in also_roles]:
-                if "radio" in r or "radioman" in r: r = "radioman"
+                # Map roles
+                if "loader_radio" in original_role:
+                    r = "loader_radio"  # Use loader_radio key for skills
+                elif "radio" in r or "radioman" in r: r = "radioman"
                 elif "loader" in r: r = "loader"
                 elif "gunner" in r: r = "gunner"
                 elif "driver" in r: r = "driver"
                 elif "commander" in r: r = "commander"
-                skills.extend(ai_crew.get(r, []))
+                
+                if r in ai_crew and ai_crew[r]:
+                    skills.extend(ai_crew[r].pop(0))
+                # Add secondary role skills from ai_crew_also
+                if r == "loader" and r in ai_crew_also and ai_crew_also[r]:
+                    skills.extend(ai_crew_also[r].pop(0))
+                elif r == "loader_radio" and r in ai_crew_also and ai_crew_also[r]:
+                    skills.extend(ai_crew_also[r].pop(0))
             
             # Deduplicate skills keeping order
             seen_sk = set()
@@ -2052,42 +2663,84 @@ class StatsAI:
         self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
 
         # Field mods section
+        # Each pair = (mod_id_left, mod_id_right) — only ONE is selected (recommended by AI)
+        fm_raw = build_data.get("field_mods", [])
+        
+        # Handle different formats: list of strings, list of dicts, or dict with mods
+        fm_data = []
+        if isinstance(fm_raw, list):
+            for item in fm_raw:
+                if isinstance(item, str):
+                    fm_data.append(item)
+                elif isinstance(item, dict):
+                    fm_data.extend(item.keys())
+        elif isinstance(fm_raw, dict):
+            mods = fm_raw.get("mods", [])
+            if isinstance(mods, list):
+                for item in mods:
+                    if isinstance(item, dict):
+                        fm_data.extend(item.keys())
+        
         fm_slots = []
-        ai_fm_icons = [self._map_ai_fm_text_to_icon(text) for text in build_data.get("field_mods", [])]
+        ai_fm_icons = []
+        for text in fm_data:
+            if isinstance(text, str):
+                try:
+                    icon = self._map_ai_fm_text_to_icon(text)
+                    if icon:
+                        ai_fm_icons.append(icon)
+                except:
+                    pass
         
         for pair in fm_pairs:
-            # pair is [mod1_id, mod2_id]
-            if len(pair) != 2: continue
+            if len(pair) != 2:
+                continue
+            mod_left, mod_right = pair[0], pair[1]
+            is_left  = mod_left  in ai_fm_icons
+            is_right = mod_right in ai_fm_icons
+            # If AI didn't match either, highlight left by convention
+            if not is_left and not is_right:
+                is_left = True
             
-            slot = tk.Frame(fm_body, bg="#111111", bd=0, relief="flat")
+            pair_frame = tk.Frame(fm_body, bg="#111111", bd=0, relief="flat")
             
-            for mod_id in pair:
-                is_selected = mod_id in ai_fm_icons
+            for mod_id, is_selected in ((mod_left, is_left), (mod_right, is_right)):
+                bg_sel   = "#1a2e1a"
+                bg_dim   = "#0d1215"
+                bd_color = "#3a6a3a" if is_selected else "#222222"
                 
-                icon_box = tk.Frame(slot, bg="#1a242a" if is_selected else "#0d1215", bd=1, relief="flat", width=64, height=64)
-                icon_box.pack(side="left", padx=2)
+                icon_outer = tk.Frame(pair_frame, bg=bd_color, bd=0, relief="flat")
+                icon_outer.pack(side="left", padx=2, pady=2)
+                
+                icon_box = tk.Frame(icon_outer, bg=bg_sel if is_selected else bg_dim,
+                                    bd=0, relief="flat", width=62, height=62)
+                icon_box.pack(padx=1, pady=1)
                 icon_box.pack_propagate(False)
                 
-                photo = self.get_loadout_icon('field_mods', mod_id, (64, 64), disabled=not is_selected)
-                lbl = tk.Label(icon_box, bg="#1a242a" if is_selected else "#0d1215", padx=0, pady=0)
+                photo = self.get_loadout_icon('field_mods', mod_id, (56, 56), disabled=not is_selected)
+                lbl = tk.Label(icon_box, bg=bg_sel if is_selected else bg_dim, padx=0, pady=0)
                 if photo:
                     lbl.config(image=photo)
                     lbl.image = photo
                 else:
-                    lbl.config(width=3, height=2, bg="#1e2d35" if is_selected else "#0f161a")
+                    lbl.config(width=3, height=2, bg="#1e3020" if is_selected else "#0f161a")
                 lbl.pack(expand=True)
-                
-            fm_slots.append(slot)
+            
+            # Divider between pair items: a small "/" label
+            div = tk.Label(pair_frame, text="/", fg="#555555", bg="#111111", font=("Arial", 9))
+            div.place(relx=0.5, rely=0.5, anchor="center")
 
-        self._layout_tile_row(fm_body, fm_slots, gap=0)
-        self._layout_pair_tiles_wrap(fm_body, fm_slots, pair_gap=10, row_gap=4)
-        fm_body.bind("<Configure>", lambda e, c=fm_body, s=fm_slots: self._layout_pair_tiles_wrap(c, s, pair_gap=10, row_gap=4))
+            fm_slots.append(pair_frame)
+        
+        self._layout_pair_tiles_wrap(fm_body, fm_slots, pair_gap=6, row_gap=6)
+        fm_body.bind("<Configure>", lambda e, c=fm_body, s=fm_slots: self._layout_pair_tiles_wrap(c, s, pair_gap=6, row_gap=6))
         
         self._reflow_detail_layout()
         
-        # Hide grid and show result frame (now that UI is fully built)
-        self.ai_grid_container.pack_forget()
-        self.ai_res_f.pack(side="top", fill="both", expand=True)
+        tank_name = data.get('name', 'Unknown')
+        self.update_status_bar(f"✓ Завантажено: {tank_name}", "#00cc00")
+        
+        # Scroll to top and finalize
         self.detail_canvas.yview_moveto(0)
         
         # Hide progress bar
