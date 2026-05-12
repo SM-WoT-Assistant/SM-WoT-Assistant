@@ -2,6 +2,7 @@ import sys
 import json
 import re
 import time
+import os
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -87,7 +88,8 @@ def click_loadout_tab(driver):
         print(f"[TOMATO] Error clicking tab: {e}")
     return False
 
-def scrape_tank_loadouts(tank_code):
+def scrape_tank_save_page(tank_code):
+    """Завантажує сторінку, зберігає у файл і одразу закриває Chrome."""
     tank_id, tank_slug = get_tank_info(tank_code)
     if not tank_id:
         print(f"[TOMATO] Unknown tank: {tank_code}")
@@ -104,73 +106,30 @@ def scrape_tank_loadouts(tank_code):
         driver.get(url)
         
         # Wait for page to load
-        time.sleep(5)
-        
-        # Try to click Loadout tab
-        click_loadout_tab(driver)
-        
-        # Wait for content to load
-        time.sleep(8)
+        time.sleep(3)
         
         # Scroll to trigger lazy loading
-        driver.execute_script("window.scrollTo(0, 500)")
-        time.sleep(2)
+        driver.execute_script("window.scrollTo(0, 300)")
+        time.sleep(1)
         
-        # Get page text
-        text = driver.find_element(By.TAG_NAME, "body").text
-        print(f"[TOMATO] Got text, length: {len(text)}")
-        
-        # Extract __NEXT_DATA__ JSON
+        # Get page source - вся сторінка
         page_source = driver.page_source
+        print(f"[TOMATO] Got page source, length: {len(page_source)}")
         
-        # Try to extract data from page source
-        if "__NEXT_DATA__" in page_source:
-            print("[TOMATO] Found __NEXT_DATA__")
-            import re
-            match = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)</script>', page_source)
-            if match:
-                try:
-                    import json as json_module
-                    data = json_module.loads(match.group(1))
-                    next_data = data.get("props", {}).get("pageProps", {})
-                    print(f"[TOMATO] pageProps keys: {list(next_data.keys())}")
-                    
-                    # Extract ALL pageProps data (we'll parse it later)
-                    loadout_data = {}
-                    
-                    # Save full next_data for debugging
-                    loadout_data["_full_page_props"] = next_data
-                    
-                    if "equipment" in next_data:
-                        equip = next_data["equipment"]
-                        if isinstance(equip, dict) and "data" in equip:
-                            equip_data = equip["data"]
-                            if "equipmentDist" in equip_data:
-                                loadout_data["equipment_dist"] = equip_data["equipmentDist"]
-                                print(f"[TOMATO] Equipment dist count: {len(equip_data['equipmentDist'])}")
-                            # Check for loadouts
-                            if "loadouts" in equip_data:
-                                loadout_data["loadouts"] = equip_data["loadouts"]
-                                print(f"[TOMATO] Loadouts found: {len(equip_data['loadouts'])}")
-                    
-                    if "crew" in next_data:
-                        crew = next_data["crew"]
-                        if isinstance(crew, dict) and "data" in crew:
-                            loadout_data["crew"] = crew["data"]
-                            print(f"[TOMATO] Crew data extracted")
-                    
-                    if "fieldMods" in next_data:
-                        fm = next_data["fieldMods"]
-                        if isinstance(fm, dict) and "data" in fm:
-                            loadout_data["field_mods"] = fm["data"]
-                            print(f"[TOMATO] Field mods extracted")
-                    
-                    return loadout_data
-                    
-                except Exception as e:
-                    print(f"[TOMATO] JSON parse error: {e}")
+        # Створюємо папку для збереження сторінок
+        os.makedirs("temp_pages", exist_ok=True)
         
-        return {"text": text}
+        # Зберігаємо у файл
+        filename = f"temp_pages/{tank_code}.html"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(page_source)
+        print(f"[TOMATO] Page saved to: {filename}")
+        
+        # ОДРАЗУ закриваємо Chrome!
+        driver.quit()
+        driver = None
+        
+        return filename
         
     except Exception as e:
         print(f"[TOMATO] Error: {e}")
@@ -178,6 +137,77 @@ def scrape_tank_loadouts(tank_code):
     finally:
         if driver:
             driver.quit()
+
+
+def parse_tomato_from_file(filename):
+    """Парсить збережену сторінку локально."""
+    if not filename or not os.path.exists(filename):
+        print(f"[TOMATO] File not found: {filename}")
+        return None
+    
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            page_source = f.read()
+        
+        # Видаляємо файл після читання
+        try:
+            os.remove(filename)
+            print(f"[TOMATO] Temp file deleted: {filename}")
+        except:
+            pass
+        
+        # Парсимо page_source
+        if "__NEXT_DATA__" not in page_source:
+            print("[TOMATO] No __NEXT_DATA__ found")
+            return None
+            
+        import re
+        match = re.search(r'<script[^>]*id="__NEXT_DATA__"[^>]*>([^<]+)</script>', page_source)
+        if not match:
+            print("[TOMATO] Could not extract __NEXT_DATA__")
+            return None
+            
+        try:
+            import json as json_module
+            data = json_module.loads(match.group(1))
+            next_data = data.get("props", {}).get("pageProps", {})
+            print(f"[TOMATO] pageProps keys: {list(next_data.keys())}")
+            
+            loadout_data = {}
+            loadout_data["_full_page_props"] = next_data
+            
+            if "equipment" in next_data:
+                equip = next_data["equipment"]
+                if isinstance(equip, dict) and "data" in equip:
+                    equip_data = equip["data"]
+                    if "equipmentDist" in equip_data:
+                        loadout_data["equipment_dist"] = equip_data["equipmentDist"]
+                        print(f"[TOMATO] Equipment dist count: {len(equip_data['equipmentDist'])}")
+                    if "loadouts" in equip_data:
+                        loadout_data["loadouts"] = equip_data["loadouts"]
+                        print(f"[TOMATO] Loadouts found: {len(equip_data['loadouts'])}")
+            
+            if "crew" in next_data:
+                crew = next_data["crew"]
+                if isinstance(crew, dict) and "data" in crew:
+                    loadout_data["crew"] = crew["data"]
+                    print(f"[TOMATO] Crew data extracted")
+            
+            if "fieldMods" in next_data:
+                fm = next_data["fieldMods"]
+                if isinstance(fm, dict) and "data" in fm:
+                    loadout_data["field_mods"] = fm["data"]
+                    print(f"[TOMATO] Field mods extracted")
+            
+            return loadout_data
+            
+        except Exception as e:
+            print(f"[TOMATO] JSON parse error: {e}")
+            return None
+    
+    except Exception as e:
+        print(f"[TOMATO] File parse error: {e}")
+        return None
 
 def parse_tomato_data(raw_data):
     if not raw_data:
@@ -330,13 +360,19 @@ def parse_tomato_data(raw_data):
     return parsed
 
 def fetch_build(tank_code):
+    """Отримує збірку танку: зберігає сторінку, парсить локально."""
     print(f"[TOMATO] Fetching build for: {tank_code}")
     
-    result = scrape_tank_loadouts(tank_code)
+    # 1. Завантажуємо сторінку і зберігаємо у файл
+    filename = scrape_tank_save_page(tank_code)
+    if not filename:
+        return None
+    
+    # 2. Парсимо файл локально (без Chrome)
+    result = parse_tomato_from_file(filename)
     
     if result:
         parsed = parse_tomato_data(result)
-        # Include raw data for debugging
         parsed["_raw_data"] = result
         return parsed
     

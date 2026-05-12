@@ -184,6 +184,7 @@ class StatsAI:
         self._field_mod_pairs_by_tank = self._load_field_mod_pairs_by_tank()
         self._crew_builds = self._load_crew_builds()
         self._equipment_loadouts = self._load_equipment_loadouts()
+        self._tomato_lock = threading.Lock()  # Lock для синхронізації запитів до Tomato
 
         self.root = self.main_app.root
         self._search_timer = None
@@ -2148,7 +2149,8 @@ class StatsAI:
         # Build equipment section
         equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-        ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
+        # СНАРЯДИ прибрано - ammo_body = None
+        ammo_body = None
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
@@ -2159,8 +2161,8 @@ class StatsAI:
         equip_body_2.pack(side="top", fill="x", pady=3)
         cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
         cons_body_2.pack(side="top", fill="x", pady=3)
-        ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
-        ammo_body_2.pack(side="top", fill="x", pady=3)
+        # СНАРЯДИ прибрано - ammo_body_2 = None
+        ammo_body_2 = None
         
         # Пусті loading_labels
         loading_labels = []
@@ -2186,46 +2188,19 @@ class StatsAI:
         def map_skill(name):
             return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
         
-        def process_tomato_data(tomato_data, cached_data):
+        def process_tomato_data(tomato_data, cached_data, tank_tth=None):
             equipment_1 = []
             equipment_2 = []
             consumables = []
             crew_skills = []
             field_mods = []
+            ammo = []
             
-            # Validate equipment from Tomato against client data
-            # Build client key: nation:tag
-            tank_data = self.tank_db.get(tag, {})
-            nation = (tank_data.get('nation') or '').lower()
-            client_key = f"{nation}:{tag}" if nation else tag
-
-            client_equipment = self._equipment_loadouts.get(client_key, [])
-            if client_equipment:
-                client_eq_set = set()
-                for loadout in client_equipment[:3]:
-                    for eq in loadout.get('equipment', []):
-                        client_eq_set.add(eq.lower().replace(" ", ""))
-
+            # Simple mapping: Tomato equipment names -> icon file names
+            # No client validation needed - Tomato already provides valid equipment
             if tomato_data:
                 eq1 = tomato_data.get("equipment_1", [])
                 eq2 = tomato_data.get("equipment_2", [])
-
-                # TODO: Re-enable client data filter after debugging
-                # if client_eq_set:
-                #     filtered_eq1 = []
-                #     for e in eq1:
-                #         client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                #         normalized_id = client_id.lower().replace(" ", "")
-                #         if any(normalized_id == ce.lower().replace(" ", "") for ce in client_eq_set):
-                #             filtered_eq1.append(e)
-                #     eq1 = filtered_eq1
-                #     filtered_eq2 = []
-                #     for e in eq2:
-                #         client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                #         normalized_id = client_id.lower().replace(" ", "")
-                #         if any(normalized_id == ce.lower().replace(" ", "") for ce in client_eq_set):
-                #             filtered_eq2.append(e)
-                #     eq2 = filtered_eq2
                 
                 equipment_1 = [map_equip(e) for e in eq1[:3]]
                 equipment_2 = [map_equip(e) for e in eq2[:3]]
@@ -2290,11 +2265,20 @@ class StatsAI:
             if not field_mods:
                 field_mods = ["improvedEnginePower", "improvedAimingHandling", "improvedChassisDurability"]
             
+            # Отримуємо типи снарядів з tank_tth (без кількості)
+            if tank_tth and tank_tth.get('shells'):
+                shells = tank_tth['shells']
+                for shell in shells:
+                    shell_type = shell.get('type', '')
+                    if shell_type:
+                        # Маппимо тип снаряду в ім'я іконки
+                        ammo.append(shell_type)
+            
             return {
                 "equipment_1": equipment_1,
                 "equipment_2": equipment_2,
                 "consumables": consumables,
-                "ammo": [("ARMOR_PIERCING", 10), ("ARMOR_PIERCING_CR", 18), ("HIGH_EXPLOSIVE", 2)],
+                "ammo": ammo,  # Тепер типи снарядів з tank_tth, а не жорстко закодовані числа
                 "crew": crew_skills,
                 "field_mods": field_mods
             }
@@ -2304,86 +2288,57 @@ class StatsAI:
         
         if tomato_slug:
             def fetch_and_update():
-                try:
-                    result = tomato_fetch_build(tag)
-                    if result:
-                        # Validate equipment from Tomato against client data
-                        tank_data = self.tank_db.get(tag, {})
-                        nation = (tank_data.get('nation') or '').lower()
-                        client_key = f"{nation}:{tag}" if nation else tag
-                        
-                        client_equipment = self._equipment_loadouts.get(client_key, [])
-                        client_eq_set = set()
-                        if client_equipment:
-                            for loadout in client_equipment[:3]:
-                                for eq in loadout.get('equipment', []):
-                                    client_eq_set.add(eq.lower())
-
-                        eq1 = result.get("equipment_1", [])
-                        eq2 = result.get("equipment_2", [])
-
-                        # Filter equipment using client data (map Tomato names to client IDs)
-                        if client_eq_set:
-                            filtered_eq1 = []
-                            for e in eq1:
-                                client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                                if client_id.lower() in client_eq_set:
-                                    filtered_eq1.append(e)
-                            eq1 = filtered_eq1
-
-                            filtered_eq2 = []
-                            for e in eq2:
-                                client_id = TOMATO_TO_CLIENT_EQUIP.get(e, e.lower().replace(" ", "").replace("-", ""))
-                                if client_id.lower() in client_eq_set:
-                                    filtered_eq2.append(e)
-                            eq2 = filtered_eq2
-                        
-                        mapped_result = {
-                            "equipment_1": [map_equip(e) for e in eq1[:3]],
-                            "equipment_2": [map_equip(e) for e in eq2[:3]],
-                            "consumables": [map_cons(c) for c in result.get("consumables", [])[:3]],
-                            "crew": [],
-                            "field_mods": result.get("field_mods", {}).get("mods", [])
-                        }
-                        crew_perks = result.get("crew_perks", {})
-                        crew_skills_map = {}
-                        has_loader_radio = "loader_radio" in crew_perks
-                        for role, skills in crew_perks.items():
-                            if isinstance(skills, list):
-                                if role == "loader_radio":
-                                    # loader_radio = 5th crew member with 6 loader skills + 4 radio skills
-                                    # Store as "loader_radio" key (5th row in UI)
-                                    if "loader_radio" not in crew_skills_map:
-                                        crew_skills_map["loader_radio"] = []
-                                    crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
-                                elif role == "loader":
-                                    # Regular loader = 4th crew member (6 skills)
-                                    # Keep even if loader_radio exists (5 crew members total)
-                                    if "loader" not in crew_skills_map:
-                                        crew_skills_map["loader"] = []
-                                    crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
-                                else:
-                                    skill_ids = [map_skill(s) for s in skills[:6]]
-                                    if role not in crew_skills_map:
-                                        crew_skills_map[role] = []
-                                    crew_skills_map[role].extend(skill_ids)
-                        for role, skills in crew_skills_map.items():
-                            mapped_result["crew"].append((role, skills[:12]))
-                        tomato_cache[tag] = mapped_result
-                        _save_tomato_cache(tomato_cache)
-                        cached = mapped_result
-                    else:
+                # Lock ensures only one fetch runs at a time
+                with self._tomato_lock:
+                    try:
+                        result = tomato_fetch_build(tag)
+                        if result:
+                            # Simple mapping - no client validation needed
+                            eq1 = result.get("equipment_1", [])
+                            eq2 = result.get("equipment_2", [])
+                            
+                            mapped_result = {
+                                "equipment_1": [map_equip(e) for e in eq1[:3]],
+                                "equipment_2": [map_equip(e) for e in eq2[:3]],
+                                "consumables": [map_cons(c) for c in result.get("consumables", [])[:3]],
+                                "crew": [],
+                                "field_mods": result.get("field_mods", {}).get("mods", [])
+                            }
+                            crew_perks = result.get("crew_perks", {})
+                            crew_skills_map = {}
+                            has_loader_radio = "loader_radio" in crew_perks
+                            for role, skills in crew_perks.items():
+                                if isinstance(skills, list):
+                                    if role == "loader_radio":
+                                        if "loader_radio" not in crew_skills_map:
+                                            crew_skills_map["loader_radio"] = []
+                                        crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
+                                    elif role == "loader":
+                                        if "loader" not in crew_skills_map:
+                                            crew_skills_map["loader"] = []
+                                        crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
+                                    else:
+                                        skill_ids = [map_skill(s) for s in skills[:6]]
+                                        if role not in crew_skills_map:
+                                            crew_skills_map[role] = []
+                                        crew_skills_map[role].extend(skill_ids)
+                            for role, skills in crew_skills_map.items():
+                                mapped_result["crew"].append((role, skills[:12]))
+                            tomato_cache[tag] = mapped_result
+                            _save_tomato_cache(tomato_cache)
+                            cached = mapped_result
+                        else:
+                            cached = cached_data
+                    except Exception as e:
+                        print(f"[TOMATO] Error: {e}")
                         cached = cached_data
-                except Exception as e:
-                    print(f"[TOMATO] Error: {e}")
-                    cached = cached_data
-                self.root.after(0, lambda: self._update_ai_setup_ui(
-                    process_tomato_data(cached, cached_data), equip_body, cons_body, ammo_body, crew_body, fm_body,
-                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-                ))
+                    self.root.after(0, lambda: self._update_ai_setup_ui(
+                        process_tomato_data(cached, cached_data, tth), equip_body, cons_body, ammo_body, crew_body, fm_body,
+                        equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
+                    ))
             threading.Thread(target=fetch_and_update, daemon=True).start()
         else:
-            build_data = process_tomato_data({}, cached_data)
+            build_data = process_tomato_data({}, cached_data, tth)
             self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, 
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
@@ -2418,11 +2373,28 @@ class StatsAI:
         return "glow"
 
     def _update_ai_setup_ui(self, build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs):
+        # Simple safety check - exit if UI was destroyed
+        try:
+            if not equip_body.winfo_exists():
+                return
+        except:
+            return
+        
         for lbl in loading_labels:
-            if lbl.winfo_exists(): lbl.destroy()
+            try:
+                if lbl.winfo_exists(): lbl.destroy()
+            except: pass
             
-        for body in [equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2]:
-            for w in body.winfo_children(): w.destroy()
+        # Очищаємо тільки ті frames що існують (ammo_body та ammo_body_2 тепер None)
+        for body in [equip_body, cons_body, crew_body, fm_body, equip_body_2, cons_body_2]:
+            if body is None:
+                continue
+            try:
+                if body.winfo_exists():
+                    for w in body.winfo_children(): 
+                        try: w.destroy()
+                        except: pass
+            except: pass
             
         def render_items(parent, items, category, size=(48, 48)):
             slots = []
@@ -2443,37 +2415,6 @@ class StatsAI:
             self._layout_tile_row(parent, slots, gap=0)
             return slots
             
-        def render_ammo_items(parent, items, category="ammo", size=(48, 48)):
-            slots = []
-            for item in items:
-                if isinstance(item, tuple) and len(item) == 2:
-                    name, count = item
-                else:
-                    name, count = item, 0
-                    
-                photo = self.get_loadout_icon(category, name, size)
-                slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
-                icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
-                icon_box.pack(side="top")
-                icon_box.pack_propagate(False)
-                
-                # Image Label
-                lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
-                if photo:
-                    lbl.config(image=photo)
-                    lbl.image = photo
-                else:
-                    lbl.config(width=4, height=2, bg="#272a3a")
-                lbl.pack(expand=True, fill="both")
-                
-                # Text Label with black background for contrast
-                if count > 0:
-                    t_lbl = tk.Label(icon_box, text=str(count), fg="#ffffff", bg="#0a0b12", font=("Arial", 8, "bold"), padx=2, pady=0)
-                    t_lbl.place(relx=1.0, rely=1.0, anchor="se")
-                    
-                slots.append(slot)
-            self._layout_tile_row(parent, slots, gap=0)
-            return slots
         # Force correct ration based on nation
         ration_map = {
             "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
@@ -2489,30 +2430,22 @@ class StatsAI:
                     cons[i] = correct_ration
             build_data["consumables"] = cons
             
-        # Цифра 1 перед обладнанням (використовує pack)
-        if not hasattr(self, '_loadout_num_label') or not self._loadout_num_label.winfo_exists():
-            self._loadout_num_label = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
-        try:
-            self._loadout_num_label.pack(side="left", padx=(0, 2))
-        except tk.TclError:
-            return
-        self._loadout_num_label.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
-        self._loadout_num_label.bind("<Leave>", lambda e: self._hide_legend_tooltip())
+        # Цифра 1 перед обладнанням - створюємо локально, не зберігаємо в self
+        loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
+        loadout_num_label_1.pack(side="left", padx=(0, 2))
+        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
+        loadout_num_label_1.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         # Оборудование в отдельном фрейме с grid
         equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
         equip_grid_frame_1.pack(side="left", fill="none", expand=False)
         render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts")
         
-        # Цифра 2 перед обладнанням (використовує pack)
-        if not hasattr(self, '_loadout_num_label_2') or not self._loadout_num_label_2.winfo_exists():
-            self._loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
-        try:
-            self._loadout_num_label_2.pack(side="left", padx=(0, 2))
-        except tk.TclError:
-            return
-        self._loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
-        self._loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
+        # Цифра 2 перед обладнанням - створюємо локально, не зберігаємо в self
+        loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
+        loadout_num_label_2.pack(side="left", padx=(0, 2))
+        loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
+        loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         # Оборудование в отдельном фрейме с grid
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
@@ -2520,9 +2453,8 @@ class StatsAI:
         render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
         render_items(cons_body, build_data.get("consumables", []), "artefacts")
         render_items(cons_body_2, build_data.get("consumables", []), "artefacts")
-        render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
-        render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
-
+        # СНАРЯДИ прибрано - немає даних в tank_tth
+        
         # Build ai_crew: normalize role names (loader_1 -> loader, loader_2 -> loader, etc.)
         # Each normalized role maps to a LIST of skill-lists (one per crew member of that role)
         ai_crew = {}
@@ -2537,12 +2469,12 @@ class StatsAI:
             # Handle loader_radio (5th crew member with 10 skills)
             if role == "loader_radio":
                 # 5th crew member - loader + radio operator with 10 skills (6 loader + 4 radio)
-                # Show ALL 10 skills in one row - use separate key!
+                # Зберігаємо як раніше - всі 10 навичок в одному ключі
                 if "loader_radio" not in ai_crew:
                     ai_crew["loader_radio"] = []
                 ai_crew["loader_radio"].append(skills[:10])
                 
-                # No secondary role needed - all 10 skills shown together
+                # Додаткові навички (радіо) зберігаємо окремо
                 if "loader_radio" not in ai_crew_also:
                     ai_crew_also["loader_radio"] = []
                 ai_crew_also["loader_radio"].append([])
@@ -2657,17 +2589,46 @@ class StatsAI:
                 if sk not in seen_sk:
                     seen_sk.add(sk)
                     clean_skills.append(sk)
-                    
-            for sk in clean_skills:
-                sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
-                sk_box.pack(side="left", padx=(0, 3))
-                sk_box.pack_propagate(False)
-                sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
-                sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
-                if sk_photo:
-                    sk_lbl.config(image=sk_photo)
-                    sk_lbl.image = sk_photo
-                sk_lbl.pack(expand=True)
+            
+            # Рендеримо навички - якщо більше 6, розділяємо на два рядки
+            if len(clean_skills) > 6:
+                # Перший рядок - перші 6 навичок
+                for sk in clean_skills[:6]:
+                    sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
+                    sk_box.pack(side="left", padx=(0, 3))
+                    sk_box.pack_propagate(False)
+                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                    sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
+                    if sk_photo:
+                        sk_lbl.config(image=sk_photo)
+                        sk_lbl.image = sk_photo
+                    sk_lbl.pack(expand=True)
+                
+                # Другий рядок - наступні навички
+                second_row = tk.Frame(slot, bg="#111111")
+                second_row.pack(side="top", pady=(2, 0))
+                for sk in clean_skills[6:]:
+                    sk_box = tk.Frame(second_row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
+                    sk_box.pack(side="left", padx=(0, 3))
+                    sk_box.pack_propagate(False)
+                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                    sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
+                    if sk_photo:
+                        sk_lbl.config(image=sk_photo)
+                        sk_lbl.image = sk_photo
+                    sk_lbl.pack(expand=True)
+            else:
+                # Звичайний випадок - всі навички в одному рядку
+                for sk in clean_skills:
+                    sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
+                    sk_box.pack(side="left", padx=(0, 3))
+                    sk_box.pack_propagate(False)
+                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                    sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
+                    if sk_photo:
+                        sk_lbl.config(image=sk_photo)
+                        sk_lbl.image = sk_photo
+                    sk_lbl.pack(expand=True)
             crew_slots.append(slot)
 
         self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
