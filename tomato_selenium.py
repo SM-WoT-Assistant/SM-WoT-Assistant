@@ -3,6 +3,7 @@ import json
 import re
 import time
 import os
+from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
@@ -374,9 +375,203 @@ def fetch_build(tank_code):
     if result:
         parsed = parse_tomato_data(result)
         parsed["_raw_data"] = result
+        
+        # 3. Отримуємо витратні (поки що повертає порожні дані через проблеми з headless)
+        # TODO: Коли вирішимо проблему з динамічним завантаженням, розкоментуємо:
+        # consumables_data = fetch_consumables(tank_code)
+        # if consumables_data:
+        #     parsed["consumables_1"] = consumables_data.get("consumables_1", [])
+        #     parsed["consumables_2"] = consumables_data.get("consumables_2", [])
+        
         return parsed
     
     return None
+
+def scrape_tank_consumables_page(tank_code):
+    """Завантажує сторінку з витратними, зберігає у файл."""
+    tank_id, tank_slug = get_tank_info(tank_code)
+    if not tank_id:
+        print(f"[TOMATO] Unknown tank: {tank_code}")
+        return None
+    
+    print(f"[TOMATO] Fetching consumables for: {tank_code}")
+    
+    driver = None
+    try:
+        driver = create_driver()
+        
+        url = f"https://tomato.gg/tanks/{tank_id}/{tank_slug}/EU?tab=loadouts"
+        print(f"[TOMATO] Loading: {url}")
+        driver.get(url)
+        
+        # Wait for page to load
+        time.sleep(10)
+        
+        # Scroll to make sure content is loaded
+        driver.execute_script("window.scrollTo(0, 500)")
+        time.sleep(2)
+        
+        # Find and click on "Consumables" button/tab
+        print("[TOMATO] Looking for Consumables tab...")
+        try:
+            from selenium.webdriver.common.by import By
+            from selenium.webdriver.support.ui import WebDriverWait
+            from selenium.webdriver.support import expected_conditions as EC
+            
+            # Try to find button with text "Consumables"
+            buttons = driver.find_elements(By.TAG_NAME, "button")
+            for btn in buttons:
+                try:
+                    text = btn.text.strip()
+                    if "Consumable" in text:
+                        print(f"[TOMATO] Clicking: {text}")
+                        driver.execute_script("arguments[0].click();", btn)
+                        time.sleep(5)
+                        break
+                except:
+                    continue
+        except Exception as e:
+            print(f"[TOMATO] Could not click Consumables: {e}")
+        
+        # Wait for content to load after click
+        time.sleep(5)
+        
+        # Get page source
+        page_source = driver.page_source
+        print(f"[TOMATO] Got page source, length: {len(page_source)}")
+        
+        # Save to file
+        os.makedirs("temp_pages", exist_ok=True)
+        filename = f"temp_pages/{tank_code}_consumables.html"
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write(page_source)
+        print(f"[TOMATO] Page saved to: {filename}")
+        
+        driver.quit()
+        driver = None
+        
+        return filename
+        
+    except Exception as e:
+        print(f"[TOMATO] Error: {e}")
+        return None
+    finally:
+        if driver:
+            driver.quit()
+
+
+def parse_consumables_from_file(filename):
+    """Парсить витратні з збереженої сторінки."""
+    if not filename or not os.path.exists(filename):
+        print(f"[TOMATO] File not found: {filename}")
+        return None
+    
+    try:
+        with open(filename, "r", encoding="utf-8") as f:
+            page_source = f.read()
+        
+        # Delete temp file
+        try:
+            os.remove(filename)
+        except:
+            pass
+        
+        # Parse HTML to find consumables table
+        from bs4 import BeautifulSoup
+        soup = BeautifulSoup(page_source, 'html.parser')
+        
+        # Find the table with consumables - look for img elements in tables
+        tables = soup.find_all('table')
+        
+        consumables_data = {
+            "consumables_1": [],
+            "consumables_2": [],
+            "consumables_1_pct": 0,
+            "consumables_2_pct": 0
+        }
+        
+        # Map from Tomato names to icon names
+        CONS_NAME_TO_ICON = {
+            "Small Repair Kit": "smallRepairkit",
+            "Large Repair Kit": "largeRepairkit",
+            "Small First Aid Kit": "smallMedkit",
+            "Large First Aid Kit": "largeMedkit",
+            "Manual Fire Extinguisher": "handExtinguishers",
+            "Automatic Fire Extinguisher": "autoExtinguishers",
+            "Removed Speed Governor": "removedRpmLimiter",
+            "100-octane Gasoline": "qualityFuel",
+            "105-octane Gasoline": "excellentFuel",
+            "Extra Rations (USSR)": "ration",
+            "Case of Cola (USA)": "cocacola",
+            "Chocolate (Germany)": "chocolate",
+            "Pudding and Tea (UK)": "ration_uk",
+            "Strong Coffee (France)": "hotCoffee",
+            "Improved Rations (China)": "ration_china",
+            "Bread with Lard (Poland)": "ration_poland",
+            "Buchty (Czechoslovakia)": "ration_czech",
+            "Spaghetti with Meat Sauce (Italy)": "ration_italy",
+            "Onigiri (Japan)": "ration_japan",
+            "Coffee with Cinnamon (Sweden)": "ration_sweden",
+        }
+        
+        # Find all rows in all tables that might contain consumables
+        for table in tables:
+            rows = table.find_all('tr')
+            for row_idx, row in enumerate(rows[:2]):  # First 2 rows = top 2 setups
+                cells = row.find_all('td')
+                row_consumables = []
+                
+                for cell in cells:
+                    # Look for img elements
+                    imgs = cell.find_all('img')
+                    for img in imgs:
+                        alt = img.get('alt', '')
+                        title = img.get('title', '')
+                        name = alt or title
+                        if name:
+                            # Try to find matching icon name
+                            icon_name = CONS_NAME_TO_ICON.get(name, name.lower().replace(" ", "").replace("-", ""))
+                            row_consumables.append(icon_name)
+                
+                # Also check for text content in cells
+                for cell in cells[:3]:
+                    text = cell.get_text(strip=True)
+                    # Look for percentage
+                    if '%' in text:
+                        pct = float(text.replace('%', '').strip())
+                        if row_idx == 0:
+                            consumables_data["consumables_1_pct"] = pct
+                        elif row_idx == 1:
+                            consumables_data["consumables_2_pct"] = pct
+                
+                if row_consumables:
+                    if row_idx == 0:
+                        consumables_data["consumables_1"] = row_consumables[:3]
+                    elif row_idx == 1:
+                        consumables_data["consumables_2"] = row_consumables[:3]
+        
+        print(f"[TOMATO] Consumables parsed: {consumables_data}")
+        return consumables_data
+        
+    except Exception as e:
+        print(f"[TOMATO] Parse error: {e}")
+        return None
+
+
+def fetch_consumables(tank_code):
+    """Отримує витратні для танку."""
+    print(f"[TOMATO] Fetching consumables for: {tank_code}")
+    
+    # 1. Завантажуємо сторінку з витратними
+    filename = scrape_tank_consumables_page(tank_code)
+    if not filename:
+        return None
+    
+    # 2. Парсимо файл
+    result = parse_consumables_from_file(filename)
+    
+    return result
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

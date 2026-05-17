@@ -2205,8 +2205,16 @@ class StatsAI:
                 equipment_1 = [map_equip(e) for e in eq1[:3]]
                 equipment_2 = [map_equip(e) for e in eq2[:3]]
                 
-                cons = tomato_data.get("consumables", [])
-                consumables = [map_cons(c) for c in cons[:3]]
+                # Get consumables for both loadouts from Tomato
+                cons_1 = tomato_data.get("consumables_1", [])
+                cons_2 = tomato_data.get("consumables_2", [])
+                consumables_1 = [map_cons(c) for c in cons_1[:3]] if cons_1 else []
+                consumables_2 = [map_cons(c) for c in cons_2[:3]] if cons_2 else []
+                
+                # Fallback to old single consumables field if new fields not available
+                if not consumables_1:
+                    cons = tomato_data.get("consumables", [])
+                    consumables_1 = [map_cons(c) for c in cons[:3]]
                 
                 crew_perks = tomato_data.get("crew_perks", {})
                 crew_skills_map = {}
@@ -2242,8 +2250,16 @@ class StatsAI:
                 equipment_1 = cached_data.get("equipment_1", [])
             if not equipment_2:
                 equipment_2 = cached_data.get("equipment_2", [])
-            if not consumables:
-                consumables = cached_data.get("consumables", [])
+            if not consumables_1:
+                consumables_1 = cached_data.get("consumables_1", [])
+            if not consumables_2:
+                consumables_2 = cached_data.get("consumables_2", [])
+            # Fallback: if only old format available, use for both
+            if not consumables_1 and not consumables_2:
+                old_cons = cached_data.get("consumables", [])
+                if old_cons:
+                    consumables_1 = old_cons[:3]
+                    consumables_2 = old_cons[:3]
             if not crew_skills:
                 crew_skills = cached_data.get("crew", [])
             if not field_mods:
@@ -2253,8 +2269,10 @@ class StatsAI:
                 equipment_1 = ["rammer", "improvedVentilation", "aimingStabilizer"]
             if not equipment_2:
                 equipment_2 = ["turbocharger", "coatedOptics", "extraHealthReserve"]
-            if not consumables:
-                consumables = ["largeRepairkit", "largeMedkit", "ration"]
+            if not consumables_1:
+                consumables_1 = ["largeRepairkit", "largeMedkit", "ration"]
+            if not consumables_2:
+                consumables_2 = ["largeRepairkit", "largeMedkit", "autoExtinguishers"]
             if not crew_skills:
                 crew_skills = [
                     ("commander", ["brotherhood", "repair", "camouflage", "fireFighting", "commander_eagleEye", "commander_emergency"]),
@@ -2277,7 +2295,8 @@ class StatsAI:
             return {
                 "equipment_1": equipment_1,
                 "equipment_2": equipment_2,
-                "consumables": consumables,
+                "consumables_1": consumables_1,
+                "consumables_2": consumables_2,
                 "ammo": ammo,  # Тепер типи снарядів з tank_tth, а не жорстко закодовані числа
                 "crew": crew_skills,
                 "field_mods": field_mods
@@ -2300,7 +2319,8 @@ class StatsAI:
                             mapped_result = {
                                 "equipment_1": [map_equip(e) for e in eq1[:3]],
                                 "equipment_2": [map_equip(e) for e in eq2[:3]],
-                                "consumables": [map_cons(c) for c in result.get("consumables", [])[:3]],
+                                "consumables_1": [map_cons(c) for c in result.get("consumables_1", result.get("consumables", [])[:3])],
+                                "consumables_2": [map_cons(c) for c in result.get("consumables_2", [])[:3]],
                                 "crew": [],
                                 "field_mods": result.get("field_mods", {}).get("mods", [])
                             }
@@ -2451,8 +2471,8 @@ class StatsAI:
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
         equip_grid_frame_2.pack(side="left", fill="none", expand=False)
         render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
-        render_items(cons_body, build_data.get("consumables", []), "artefacts")
-        render_items(cons_body_2, build_data.get("consumables", []), "artefacts")
+        render_items(cons_body, build_data.get("consumables_1", build_data.get("consumables", [])), "artefacts")
+        render_items(cons_body_2, build_data.get("consumables_2", build_data.get("consumables", [])), "artefacts")
         # СНАРЯДИ прибрано - немає даних в tank_tth
         
         # Build ai_crew: normalize role names (loader_1 -> loader, loader_2 -> loader, etc.)
