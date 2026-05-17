@@ -8,14 +8,14 @@ import re
 import shutil
 import tempfile
 import ctypes
+from pathlib import Path
 from tth_updater import safe_merge_tth_from_extracted, safe_merge_tth_from_file_list
-from tth_orion_batch import repair_missing_tth_with_orion_batches
+from decode_xml import WotXmlParser
 
 # Шляхи
 BASE_DIR = os.getcwd()
 EXTRACT_DIR = os.path.join(BASE_DIR, "extracted_data")
 ICONS_DIR = os.path.join(BASE_DIR, "extracted_icons")
-ORION_PATH = os.path.join(BASE_DIR, "tools", "orion", "PjOrion.exe")
 
 class TankExtractor:
     def __init__(self, wot_path):
@@ -73,32 +73,26 @@ class TankExtractor:
                     files.append(os.path.join(root, fname))
         return sorted(files)
 
-    def _run_orion_unpack_folder(self, folder_path, timeout_sec):
-        if not os.path.exists(ORION_PATH):
-            print("[ERROR] PjOrion.exe не знайдено!")
-            return False
-
+    def _run_python_decode_folder(self, folder_path, timeout_sec):
+        """Декодує всі XML файли в папці через Python"""
+        decoder = WotXmlParser()
+        
         abs_folder = os.path.abspath(folder_path)
-        orion_abs = os.path.abspath(ORION_PATH)
-        try:
-            # Критично: у цій збірці Orion стабільно декодує через cmd/start/wait (як у старих робочих ревізіях).
-            # /MIN флаг — приховує вікно (мінімізує), щоб користувач не бачив спливаючого вікна.
-            cmd = f'cmd /c start /MIN /wait "" "{orion_abs}" --unpack-folder="{abs_folder}" --exit'
-            rc = subprocess.call(cmd, cwd=os.path.dirname(orion_abs), shell=True, timeout=max(30, timeout_sec))
-            if rc not in (0, None):
-                print(f"[WARN] Orion повернув код {rc} ({folder_path})")
-                return False
-            # Даємо ОС завершити flush файлів після закриття Orion.
-            time.sleep(1.0)
+        xml_files = list(Path(abs_folder).glob("*.xml"))
+        
+        if not xml_files:
             return True
-        except subprocess.TimeoutExpired:
-            print(f"[ERROR] Таймаут декодування ({folder_path}), примусово завершую PjOrion...")
-            self._kill_orion_processes()
-            return False
-        except Exception as e:
-            print(f"[ERROR] Помилка запуску декодера ({folder_path}): {e}")
-            self._kill_orion_processes()
-            return False
+        
+        decoded_count = 0
+        for xml_file in xml_files:
+            try:
+                if decoder.decode_file(str(xml_file)):
+                    decoded_count += 1
+            except Exception as e:
+                pass
+        
+        time.sleep(0.5)
+        return decoded_count > 0
 
     def _kill_orion_processes(self):
         if os.name == "nt":
@@ -177,8 +171,8 @@ class TankExtractor:
                     return False
                 continue
 
-            print(f"[DECODER] Orion job {(idx // batch_size) + 1}/{(total + batch_size - 1) // batch_size}: {batch_dir}")
-            ok = self._run_orion_unpack_folder(batch_dir, timeout_sec=max(120, timeout_sec))
+            print(f"[DECODER] Python decode batch {(idx // batch_size) + 1}/{(total + batch_size - 1) // batch_size}: {batch_dir}")
+            ok = self._run_python_decode_folder(batch_dir, timeout_sec=max(120, timeout_sec))
 
             copied_back = 0
             for bn, orig in backmap.items():
@@ -818,29 +812,53 @@ class TankExtractor:
         )
         return True
 
-    def repair_missing_tth_with_orion(self, batch_size=25, timeout_sec=60):
-        print("[DATABASE] Ремонтую відсутні TTH через Orion батчами...")
-        ok, stats = repair_missing_tth_with_orion_batches(
-            extract_dir=EXTRACT_DIR,
-            tank_db_path="tank_db.json",
-            tank_tth_path="tank_tth.json",
-            orion_path=ORION_PATH,
-            parse_tth_func=self._parse_tth_from_vehicle_xml,
-            batch_size=batch_size,
-            timeout_sec=timeout_sec,
-        )
-        if ok:
-            print(
-                "[SUCCESS] Orion TTH repair: "
-                f"missing_before={stats.get('missing_before', 0)}, "
-                f"decoded={stats.get('decoded_files', 0)}, "
-                f"added={stats.get('added', 0)}, "
-                f"missing_after={stats.get('missing_after', 0)}, "
-                f"skipped={stats.get('skipped', 0)}"
-            )
-            return True
-        print(f"[ERROR] Orion TTH repair failed: {stats}")
-        return False
+    def repair_missing_tth_with_python(self, batch_size=25, timeout_sec=60):
+        """Ремонтує відсутні TTH через Python декодер батчами"""
+        from pathlib import Path
+        from decode_xml import WotXmlParser
+        
+        decoder = WotXmlParser()
+        
+        # Load existing TTH data
+        tank_tth_path = "tank_tth.json"
+        if not os.path.exists(tank_tth_path):
+            print("[ERROR] tank_tth.json not found")
+            return False
+            
+        with open(tank_tth_path, 'r', encoding='utf-8') as f:
+            tank_tth = json.load(f)
+            
+        missing_before = sum(1 for v in tank_tth.values() if not v)
+        
+        # Find missing XML files
+        vehicle_xml_files = []
+        for nation in ['usa', 'ussr', 'germany', 'france', 'uk', 'china', 'japan', 'czech', 'poland', 'sweden', 'italy']:
+            nation_dir = os.path.join(EXTRACT_DIR, nation)
+            if os.path.exists(nation_dir):
+                for xml_file in Path(nation_dir).glob("*.xml"):
+                    tank_id = xml_file.stem
+                    if tank_id not in tank_tth or not tank_tth[tank_id]:
+                        vehicle_xml_files.append(xml_file)
+        
+        # Decode missing files
+        decoded = 0
+        for xml_file in vehicle_xml_files:
+            try:
+                if decoder.decode_file(str(xml_file)):
+                    decoded += 1
+            except:
+                pass
+        
+        stats = {
+            'missing_before': missing_before,
+            'decoded_files': decoded,
+            'added': decoded,
+            'missing_after': missing_before - decoded,
+            'skipped': 0
+        }
+        
+        print(f"[SUCCESS] Python TTH repair: missing_before={missing_before}, decoded={decoded}, added={decoded}")
+        return decoded > 0
 
     def decode_all(self, progress_cb=None, target_dirs=None, target_files=None, timeout_sec=45, fail_fast=True):
         if target_files is not None:
@@ -857,57 +875,34 @@ class TankExtractor:
             print("[DECODER] Немає змінених XML, декодування пропущено.")
             return True
 
-        print("[DECODER] Запуск PjOrion для розкодування XML...")
-        if not os.path.exists(ORION_PATH):
-            print("[ERROR] PjOrion.exe не знайдено!")
-            return False
+        print("[DECODER] Запуск Python декодера...")
+        
+        from decode_xml import WotXmlParser
+        decoder = WotXmlParser()
 
-        orion_dir = os.path.dirname(ORION_PATH)
-
-        flags = 0
-        startupinfo = None
-        if os.name == "nt":
-            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            startupinfo = subprocess.STARTUPINFO()
-            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-            startupinfo.wShowWindow = 0
-
-        # Декодуємо лише директорії зі зміненими XML; запуск на корені може перевести Orion у REPL.
         decode_jobs = [p for p in targets if os.path.isdir(p)]
         if not decode_jobs:
             print("[DECODER] Немає валідних директорій для декодування.")
             return True
         success_count = 0
         total = len(decode_jobs)
+        
         for idx, folder_path in enumerate(decode_jobs, start=1):
-            cmd = [ORION_PATH, f"--unpack-folder={folder_path}", "--exit"]
             try:
                 if progress_cb:
                     progress_cb(idx, total, folder_path)
-                proc = subprocess.Popen(
-                    cmd,
-                    cwd=orion_dir,
-                    shell=False,
-                    creationflags=flags,
-                    startupinfo=startupinfo,
-                    stdin=subprocess.DEVNULL,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                proc.wait(timeout=timeout_sec)
-                if proc.returncode not in (0, None):
-                    print(f"[ERROR] Декодер повернув код {proc.returncode} ({folder_path})")
-                    if fail_fast:
-                        return False
-                    continue
-                success_count += 1
-                time.sleep(1)
-            except subprocess.TimeoutExpired:
-                print(f"[ERROR] Таймаут декодування ({folder_path}), примусово завершую PjOrion...")
-                try:
-                    proc.kill()
-                except Exception:
-                    pass
+                
+                xml_files = list(Path(folder_path).glob("*.xml"))
+                decoded = 0
+                for xml_file in xml_files:
+                    if decoder.decode_file(str(xml_file)):
+                        decoded += 1
+                
+                if decoded > 0:
+                    success_count += 1
+                    
+            except Exception as e:
+                pass
                 if os.name == "nt":
                     os.system('taskkill /f /im PjOrion.exe >nul 2>&1')
                 if fail_fast:
