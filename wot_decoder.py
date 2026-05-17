@@ -1,49 +1,36 @@
-# НЕ СКОРОЧУВАТИ І НЕ ОПТИМІЗУВАТИ КОД ЯКИЙ НЕ СТОСУЄТЬСЯ ВИПРАВЛЕНЬ!
-# wot_decoder.py 2_14
+# wot_decoder.py 2_15 - тепер без PjOrion!
 import os
 import time
 import subprocess
 import re
 import xml.etree.ElementTree as ET
+from pathlib import Path
+from decode_xml import WotXmlParser
 
 class WotXmlDecoder:
     def __init__(self):
-        self.orion_path = os.path.abspath(os.path.join(os.getcwd(), "tools", "orion", "PjOrion.exe"))
+        self.decoder = WotXmlParser()
 
     def decode_folder(self, folder_path, timeout=10):
-        if not os.path.exists(self.orion_path):
-            print(f"[ПОМИЛКА] Не знайдено PjOrion за шляхом: {self.orion_path}")
-            return {}
-
         abs_folder_path = os.path.abspath(folder_path)
         xml_files = [n for n in os.listdir(abs_folder_path) if n.endswith('.xml')]
         if not xml_files:
-            print("[ШТАБ] Немає XML для декодування, запуск PjOrion пропущено.")
+            print("[INFO] No XML files to decode.")
             return {}
-        orion_dir = os.path.dirname(self.orion_path)
         
-        print(f"[ШТАБ] Запуск PjOrion (Тайм-аут: {timeout} сек)...")
-        cmd = [self.orion_path, f"--unpack-folder={abs_folder_path}", "--exit"]
+        print(f"[INFO] Decoding {len(xml_files)} files via Python...")
         
-        try:
-            flags = 0
-            startupinfo = None
-            if os.name == "nt":
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-            proc = subprocess.Popen(cmd, cwd=orion_dir, shell=False, creationflags=flags, startupinfo=startupinfo)
+        decoded_count = 0
+        for file_name in xml_files:
+            xml_path = os.path.join(abs_folder_path, file_name)
             try:
-                proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                os.system('taskkill /f /im PjOrion.exe >nul 2>&1')
-            
-            time.sleep(1.5)
-        except Exception as e:
-            print(f"[ПОМИЛКА] Збій запуску декодера: {e}")
-            return {}
-            
+                if self.decoder.decode_file(xml_path):
+                    decoded_count += 1
+            except Exception as e:
+                pass
+        
+        print(f"[INFO] Decoded: {decoded_count} files")
+        
         map_data = {}
         for file_name in xml_files:
             

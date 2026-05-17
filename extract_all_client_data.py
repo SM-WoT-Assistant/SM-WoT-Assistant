@@ -2,6 +2,8 @@ import os
 import zipfile
 import subprocess
 import shutil
+from pathlib import Path
+from decode_xml import WotXmlParser
 
 BASE_DIR = os.getcwd()
 WOT_PATH = r"C:\Games\World_of_Tanks_EU"
@@ -36,8 +38,8 @@ def extract_all_packages():
             z.extractall(output_dir)
             print(f"  Extracted to: {output_dir}")
 
-def decode_with_orion():
-    """Крок 2: Декодувати XML через PjOrion"""
+def decode_with_python():
+    """Крок 2: Декодувати XML через Python (без PjOrion)"""
     
     folders_to_decode = [
         "extracted_data/common",
@@ -46,7 +48,8 @@ def decode_with_orion():
         "extracted_data/germany",
     ]
     
-    orion_path = os.path.join(BASE_DIR, "tools", "orion", "PjOrion.exe")
+    decoder = WotXmlParser()
+    total_decoded = 0
     
     for folder in folders_to_decode:
         folder_path = os.path.join(BASE_DIR, folder)
@@ -56,10 +59,20 @@ def decode_with_orion():
             
         print(f"\n[2] Decoding {folder}...")
         
-        cmd = f'cmd /c start /MIN /wait "" "{orion_path}" "--unpack-folder="{folder_path}" "--exit"'
-        subprocess.call(cmd, shell=True)
+        xml_files = list(Path(folder_path).rglob("*.xml"))
+        decoded = 0
         
-    print("\n[2] Decode complete!")
+        for xml_file in xml_files:
+            try:
+                if decoder.decode_file(str(xml_file)):
+                    decoded += 1
+            except Exception as e:
+                pass
+        
+        print(f"  Decoded: {decoded} files")
+        total_decoded += decoded
+    
+    print(f"\n[2] Total decoded: {total_decoded} files")
 
 def main():
     print("=" * 60)
@@ -67,7 +80,7 @@ def main():
     print("=" * 60)
     
     extract_all_packages()
-    decode_with_orion()
+    decode_with_python()
     
     print("\n" + "=" * 60)
     print("DONE!")
