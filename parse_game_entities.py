@@ -13,16 +13,120 @@ parse_game_entities.py - КРОК 1
 import os
 import re
 import json
-import time
-import subprocess
+import struct
+import base64
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+class BWXmlDecoder:
+    """Native Python BigWorld XML decoder"""
+    def __init__(self):
+        self.dictionary = []
+        self.data = b''
+        self.offset = 0
+    
+    def read_string(self):
+        start = self.offset
+        while self.offset < len(self.data) and self.data[self.offset] != 0:
+            self.offset += 1
+        s = self.data[start:self.offset].decode('utf-8', errors='ignore')
+        self.offset += 1
+        return s
+    
+    def decode_file(self, input_path, output_path):
+        if not os.path.exists(input_path):
+            return False
+        
+        with open(input_path, 'rb') as f:
+            self.data = f.read()
+        
+        if len(self.data) < 4 or self.data[:4] != b'\x45\x4e\xa1\x62':
+            return True
+        
+        self.offset = 5
+        self.dictionary = []
+        
+        while True:
+            s = self.read_string()
+            if not s:
+                break
+            self.dictionary.append(s)
+        
+        root_name = os.path.basename(input_path).split('.')[0]
+        xml_content = self._read_element(root_name, 0)
+        
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
+            f.write(xml_content)
+        
+        return True
+    
+    def _read_element(self, name, depth):
+        if self.offset >= len(self.data):
+            return ""
+        
+        children_count = struct.unpack_from('<H', self.data, self.offset)[0]
+        self.offset += 2
+        struct.unpack_from('<I', self.data, self.offset)[0]
+        self.offset += 4
+        
+        children = []
+        for _ in range(children_count):
+            child_id = struct.unpack_from('<H', self.data, self.offset)[0]
+            self.offset += 2
+            data_desc = struct.unpack_from('<I', self.data, self.offset)[0]
+            self.offset += 4
+            children.append({'id': child_id, 'desc': data_desc})
+        
+        data_start = self.offset
+        
+        result = f"{'  ' * depth}<{name}>\n"
+        
+        for child in children:
+            tag_name = self.dictionary[child['id']]
+            end_address = child['desc'] & 0x0FFFFFFF
+            data_type = child['desc'] >> 28
+            
+            child_end_offset = data_start + end_address
+            length = child_end_offset - self.offset
+            
+            if data_type == 0:
+                if length == 0:
+                    result += f"{'  ' * (depth+1)}<{tag_name}></{tag_name}>\n"
+                else:
+                    result += self._read_element(tag_name, depth + 1)
+            else:
+                val = ""
+                if data_type == 1:
+                    val = self.data[self.offset:child_end_offset].decode('utf-8', errors='ignore')
+                elif data_type == 2:
+                    if length == 1: val = struct.unpack_from('<b', self.data, self.offset)[0]
+                    elif length == 2: val = struct.unpack_from('<h', self.data, self.offset)[0]
+                    elif length == 4: val = struct.unpack_from('<i', self.data, self.offset)[0]
+                    elif length == 8: val = struct.unpack_from('<q', self.data, self.offset)[0]
+                    else: val = 0
+                elif data_type == 3:
+                    num_floats = length // 4
+                    floats = struct.unpack_from(f'<{num_floats}f', self.data, self.offset)
+                    val = " ".join(f"{f:.6g}" for f in floats)
+                elif data_type == 4:
+                    val = "true" if (length > 0 and struct.unpack_from('<b', self.data, self.offset)[0]) else "false"
+                else:
+                    val = base64.b64encode(self.data[self.offset:child_end_offset]).decode('utf-8')
+                
+                result += f"{'  ' * (depth+1)}<{tag_name}>\t{val}\t</{tag_name}>\n"
+            
+            self.offset = child_end_offset
+        
+        result += f"{'  ' * depth}</{name}>\n"
+        return result
+
 
 class GameEntitiesExtractor:
     def __init__(self):
         self.project_root = Path(__file__).parent
         self.extracted_data = self.project_root / "extracted_data"
-        self.orion_path = self.project_root / "tools" / "orion" / "PjOrion.exe"
+        self.decoder = BWXmlDecoder()
         
         self.game_entities = {
             "equipment": {},
@@ -34,43 +138,42 @@ class GameEntitiesExtractor:
         
         self.icons_base = self.project_root / "extracted_icons" / "loadout"
         
-    def run_orion_decode(self, folder_path, timeout=15):
-        """Декодує XML файли в папці через Orion"""
-        if not self.orion_path.exists():
-            print(f"[ПОМИЛКА] Orion не знайдено: {self.orion_path}")
-            return {}
-            
+    def is_encoded(self, file_path):
+        """Перевіряє чи файл закодований (перші байти 'ENb')"""
+        try:
+            with open(file_path, 'rb') as f:
+                first = f.read(4)
+                return first == b'ENb' or (first[0] == 69 and first[1] == 78 and first[2] == 161)
+        except:
+            return False
+    
+    def decode_xml_file(self, file_path):
+        """Декодує один XML файл через Python (без PjOrion)"""
+        if not self.is_encoded(file_path):
+            return True
+        
+        try:
+            self.decoder.decode_file(str(file_path), str(file_path))
+            return True
+        except Exception as e:
+            print(f"[ПОМИЛКА] Декодування {file_path}: {e}")
+            return False
+            return False
+    
+    def run_orion_decode(self, folder_path):
+        """Декодує XML файли в папці через Python"""
         abs_folder = os.path.abspath(str(folder_path))
         xml_files = [f for f in os.listdir(abs_folder) if f.endswith('.xml')]
         
         if not xml_files:
-            print(f"[ШТАБ] Немає XML в: {abs_folder}")
+            print(f"[INFO] No XML files in: {abs_folder}")
             return {}
             
-        orion_dir = os.path.dirname(os.path.abspath(str(self.orion_path)))
-        print(f"[ШТАБ] Декодування через Orion ({len(xml_files)} файлів)...")
+        print(f"[INFO] Decoding {len(xml_files)} files via Python...")
         
-        cmd = [str(self.orion_path), f"--unpack-folder={abs_folder}", "--exit"]
-        
-        try:
-            flags = 0
-            startupinfo = None
-            if os.name == "nt":
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
-                
-            proc = subprocess.Popen(cmd, cwd=orion_dir, shell=False, creationflags=flags, startupinfo=startupinfo)
-            try:
-                proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                os.system('taskkill /f /im PjOrion.exe >nul 2>&1')
-            
-            time.sleep(0.5)
-        except Exception as e:
-            print(f"[ПОМИЛКА] Збій Orion: {e}")
-            return {}
+        for xml_file in xml_files:
+            file_path = Path(abs_folder) / xml_file
+            self.decode_xml_file(file_path)
             
     def parse_xml_file(self, xml_path):
         """Парсить XML файл"""
@@ -239,7 +342,7 @@ class GameEntitiesExtractor:
             return False
             
         # 1. Парсимо equipments.xml
-        equip_file = common_dir / "equipments.xml"
+        equip_file = common_dir / "equipments-1.xml"
         if equip_file.exists():
             print(f"\n[1] Парсинг {equip_file.name}...")
             
