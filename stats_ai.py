@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timezone
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
 
-ENABLE_POPULAR_TANK_CACHE = True
+ENABLE_POPULAR_TANK_CACHE = False
 
 _CACHE_PATH = os.path.join(os.path.dirname(__file__), "popular_tanks_cache.json")
 
@@ -2101,8 +2101,8 @@ class StatsAI:
         # Build equipment section
         equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-        # СНАРЯДИ прибрано - ammo_body = None
-        ammo_body = None
+        # СНАРЯДИ
+        ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
@@ -2113,8 +2113,9 @@ class StatsAI:
         equip_body_2.pack(side="top", fill="x", pady=3)
         cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
         cons_body_2.pack(side="top", fill="x", pady=3)
-        # СНАРЯДИ прибрано - ammo_body_2 = None
-        ammo_body_2 = None
+        # СНАРЯДИ
+        ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
+        ammo_body_2.pack(side="top", fill="x", pady=3)
         
         # Пусті loading_labels
         loading_labels = []
@@ -2143,6 +2144,41 @@ class StatsAI:
         def process_tomato_data(tomato_data, cached_data, tank_tth=None):
             if cached_data is None:
                 cached_data = {}
+            
+            def _map_shell_type(raw_type):
+                """Map game-internal shell type to canonical icon filename."""
+                canon = {
+                    "ARMOR_PIERCING": "ARMOR_PIERCING",
+                    "AP": "ARMOR_PIERCING",
+                    "ARMOR_PIERCING_CR": "ARMOR_PIERCING_CR",
+                    "APCR": "ARMOR_PIERCING_CR",
+                    "ARMOR_PIERCING_HE": "ARMOR_PIERCING_HE",
+                    "APHE": "ARMOR_PIERCING_HE",
+                    "HOLLOW_CHARGE": "HOLLOW_CHARGE",
+                    "HEAT": "HOLLOW_CHARGE",
+                    "HIGH_EXPLOSIVE": "HIGH_EXPLOSIVE",
+                    "HE": "HIGH_EXPLOSIVE",
+                    "HIGH_EXPLOSIVE_MODERN": "HIGH_EXPLOSIVE_MODERN",
+                    "HIGH_EXPLOSIVE_SPG": "HIGH_EXPLOSIVE_SPG",
+                }
+                raw = raw_type.upper().replace('_', '').replace('-', '').replace(' ', '')
+                for k, v in canon.items():
+                    if k.replace('_', '') in raw or raw in k.replace('_', ''):
+                        return v
+                return None
+
+            def _default_ammo_for_tank(tier, tank_class):
+                """Return default shell types based on tier and class."""
+                if tank_class == "SPG":
+                    base = ["HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_SPG"]
+                    if tier >= 8:
+                        base.append("HIGH_EXPLOSIVE_PREMIUM")
+                    return base
+                base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HOLLOW_CHARGE", "HIGH_EXPLOSIVE"]
+                if tier >= 8:
+                    base.extend(["ARMOR_PIERCING_CR_PREMIUM", "HOLLOW_CHARGE_PREMIUM", "HIGH_EXPLOSIVE_PREMIUM"])
+                return base
+
             equipment_1 = []
             equipment_2 = []
             consumables = []
@@ -2244,7 +2280,13 @@ class StatsAI:
                     shell_type = shell.get('type', '')
                     if shell_type:
                         # Маппимо тип снаряду в ім'я іконки
-                        ammo.append(shell_type)
+                        mapped = _map_shell_type(shell_type)
+                        if mapped:
+                            ammo.append(mapped)
+            if not ammo:
+                # Fallback: стандартний набір за tier/class
+                cls = data.get('class', 'MT') if isinstance(data, dict) else 'MT'
+                ammo = _default_ammo_for_tank(data.get('tier', 8) if isinstance(data, dict) else 8, cls)
             
             return {
                 "equipment_1": equipment_1,
@@ -2353,8 +2395,8 @@ class StatsAI:
                 if lbl.winfo_exists(): lbl.destroy()
             except: pass
             
-        # Очищаємо тільки ті frames що існують (ammo_body та ammo_body_2 тепер None)
-        for body in [equip_body, cons_body, crew_body, fm_body, equip_body_2, cons_body_2]:
+        # Очищаємо всі frames
+        for body in [equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2]:
             if body is None:
                 continue
             try:
@@ -2382,7 +2424,33 @@ class StatsAI:
                 slots.append(slot)
             self._layout_tile_row(parent, slots, gap=3)
             return slots
-            
+
+        def render_ammo_items(parent, items, category="ammo", size=(48, 48)):
+            slots = []
+            for item in items:
+                if isinstance(item, tuple) and len(item) == 2:
+                    name, count = item
+                else:
+                    name, count = item, 0
+                photo = self.get_loadout_icon(category, name, size)
+                slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
+                icon_box = tk.Frame(slot, bg="#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
+                icon_box.pack(side="top")
+                icon_box.pack_propagate(False)
+                lbl = tk.Label(icon_box, bg="#1a1d2a", padx=0, pady=0)
+                if photo:
+                    lbl.config(image=photo)
+                    lbl.image = photo
+                else:
+                    lbl.config(width=4, height=2, bg="#272a3a")
+                lbl.pack(expand=True, fill="both")
+                if count > 0:
+                    t_lbl = tk.Label(icon_box, text=str(count), fg="#ffffff", bg="#0a0b12", font=("Arial", 8, "bold"), padx=2, pady=0)
+                    t_lbl.place(relx=1.0, rely=1.0, anchor="se")
+                slots.append(slot)
+            self._layout_tile_row(parent, slots, gap=0)
+            return slots
+
         # Force correct ration based on nation
         ration_map = {
             "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
@@ -2421,7 +2489,8 @@ class StatsAI:
         render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
         render_items(cons_body, build_data.get("consumables_1", build_data.get("consumables", [])), "artefacts")
         render_items(cons_body_2, build_data.get("consumables_2", build_data.get("consumables", [])), "artefacts")
-        # СНАРЯДИ прибрано - немає даних в tank_tth
+        render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
+        render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
         
         # Build ai_crew: normalize role names (loader_1 -> loader, loader_2 -> loader, etc.)
         # Each normalized role maps to a LIST of skill-lists (one per crew member of that role)

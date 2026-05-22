@@ -199,6 +199,20 @@ EQUIPMENT_BY_TIER = {
         "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
         "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
         "deluxeCamouflageNet"
+    ],
+    11: [  # Tier 11 — той самий набір що і Tier 10
+        "camouflageNet_tier1", "coatedOptics_tier1", "enhancedAimDrives_tier1",
+        "grousers_tier1", "improvedVentilation_tier1", "improvedSights_tier1",
+        "stereoscope_tier1", "tankRammer_tier1", "binocularTelescope_tier1",
+        "improvedConfiguration_tier1", "improvedRotationMechanism_tier1",
+        "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
+        "turbocharger_tier1", "extraHealthReserve_tier1",
+        "antifragmentationLining_tier1",
+        "deluxRammer", "deluxCoatedOptics", "deluxAimingStabilizer",
+        "deluxEnhancedAimDrives", "deluxImprovedConfiguration", "deluxImprovedVentilation",
+        "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
+        "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
+        "deluxeCamouflageNet"
     ]
 }
 
@@ -318,13 +332,43 @@ def get_equipment_for_tank(tank_id, tier, tank_class):
     return result
 
 
-def get_ammo_types():
+def get_ammo_types(tier=10, tank_class="MT"):
     """
-    Повертає список типів снарядів (з клієнта гри).
-    Джерело: game_entities_english.json
+    Повертає список типів снарядів для танка.
+    Імена відповідають файлам іконок у extracted_icons/loadout/ammo/.
+    Джерело: клієнт гри (icon filenames extracted from client).
     """
-    return ["Armor Piercing (AP)", "Armor Piercing Composite Rigid (APCR)",
-            "High Explosive Anti-Tank (HEAT)", "High Explosive (HE)"]
+    all_types = [
+        "ARMOR_PIERCING",
+        "ARMOR_PIERCING_CR",
+        "ARMOR_PIERCING_CR_PREMIUM",
+        "ARMOR_PIERCING_PREMIUM",
+        "ARMOR_PIERCING_HE",
+        "HOLLOW_CHARGE",
+        "HOLLOW_CHARGE_PREMIUM",
+        "HIGH_EXPLOSIVE",
+        "HIGH_EXPLOSIVE_PREMIUM",
+        "HIGH_EXPLOSIVE_MODERN",
+        "HIGH_EXPLOSIVE_MODERN_PREMIUM",
+        "HIGH_EXPLOSIVE_SPG",
+        "HIGH_EXPLOSIVE_SPG_STUN",
+        "HIGH_EXPLOSIVE_ZERO_SPLASH",
+    ]
+    # Фільтр за класом
+    if tank_class == "SPG":
+        # SPG зазвичай тільки HE
+        base = ["HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE_SPG_STUN"]
+        if tier >= 8 and tier <= 11:
+            base.append("HIGH_EXPLOSIVE_PREMIUM")
+        return base
+    # Для всіх інших класів
+    base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HOLLOW_CHARGE", "HIGH_EXPLOSIVE"]
+    if tier >= 8 and tier <= 11:
+        base.append("ARMOR_PIERCING_CR_PREMIUM")
+        base.append("ARMOR_PIERCING_PREMIUM")
+        base.append("HOLLOW_CHARGE_PREMIUM")
+        base.append("HIGH_EXPLOSIVE_PREMIUM")
+    return base
 
 
 # ==============================================================================
@@ -473,10 +517,11 @@ def generate_prompt(tank_id, tank_name=None):
     tier = tank_info.get('tier', 8) if tank_info else 8
     tank_class = tank_info.get('class', 'MT') if tank_info else 'MT'
     nation = tank_info.get('nation', 'ussr') if tank_info else 'ussr'
+    nation = nation.split('_')[0] if '_' in nation else nation
     
     equip_slot_count = tank_data.get('equipment_slots', 3)
     equipment_list = get_equipment_for_tank(tank_id, tier, tank_class)
-    ammo_list = get_ammo_types()
+    ammo_list = get_ammo_types(tier, tank_class)
     consumables_list = get_consumables_list(nation)
     nation_ration = get_nation_ration(nation)
     
