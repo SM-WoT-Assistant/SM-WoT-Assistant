@@ -34,6 +34,34 @@ ai_cache.json
 # Runtime артефакти вбудованого браузера (cache/history/logs)
 browser_profile/
 
+# Runtime артефакти вбудованого браузера (cache/history/logs)
+browser_profile/
+
+# Автоматично згенеровані дані з клієнта гри
+tank_db.json
+tank_tth.json
+
+# Налаштування користувача (генеруються при першому запуску)
+settings.json
+
+# Локалізація (оновлюється автоматично)
+locales.json
+
+# Кеш популярних танків (AI)
+popular_tanks_cache.json
+
+# Збірки обладнання/екіпажу (оновлюються авто-апдейтером)
+crew_builds.json
+
+# Архів старих файлів
+_archive/
+
+# opencode worktree tracking
+.kilo/
+
+# opencode historian session data (regenerates each session)
+.opencode/magic-context/historian/
+
 # IDE
 .idea/
 .vscode/
