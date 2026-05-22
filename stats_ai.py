@@ -312,7 +312,9 @@ class StatsAI:
     def _normalize_nation(self, nation_value):
         if nation_value is None:
             return ""
-        return str(nation_value).strip().lower()
+        raw = str(nation_value).strip()
+        base = raw.split('_')[0] if '_' in raw else raw
+        return base.lower()
 
     def _active_filter_values(self):
         active_t = {self._normalize_tier(t) for t, v in self.tier_filters.items() if v["active"]}
@@ -525,7 +527,10 @@ class StatsAI:
             if self._last_cols != new_max_cols:
                 self._last_cols = new_max_cols
                 if not self.active_tank:
-                    self.refresh_ai_view()
+                    if hasattr(self, '_resize_timer') and self._resize_timer:
+                        try: self.root.after_cancel(self._resize_timer)
+                        except: pass
+                    self._resize_timer = self.root.after(300, self.refresh_ai_view)
         self.refresh_ai_view()
 
         self.ai_canvas.bind("<Configure>", _on_canvas_resize)
@@ -2136,6 +2141,8 @@ class StatsAI:
             return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
         
         def process_tomato_data(tomato_data, cached_data, tank_tth=None):
+            if cached_data is None:
+                cached_data = {}
             equipment_1 = []
             equipment_2 = []
             consumables = []
@@ -2248,7 +2255,9 @@ class StatsAI:
                 "crew": crew_skills,
                 "field_mods": field_mods
             }
-        
+
+        build_data = process_tomato_data(None, None, tank_tth=tth)
+
         # Override equipment with real data from equipment_loadouts.json
         if self._equipment_loadouts:
             equip_key = self._find_equip_key(tag, data)
