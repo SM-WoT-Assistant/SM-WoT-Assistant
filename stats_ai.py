@@ -7,168 +7,72 @@ import tkinter as tk
 from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps, ImageDraw
 import io
-from ai_engine import ai_engine_instance
 import threading
-from tomato_selenium import fetch_build as tomato_fetch_build
+import subprocess
+import sys
+from datetime import datetime, timezone
+from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
 
-TOMATO_TANK_MAP = {
-    "Pl15_60TP_Lewandowskiego": "60tp",
-    "R45_IS-7": "is-7",
-    "R90_IS-4M": "is-4",
-    "G42_Maus": "maus",
-    "G89_Leopard1": "leopard-1",
-    "A69_T110E5": "t110e5",
-    "F10_AMX_50B": "amx-50-b",
-    "S11_Strv_103B": "strv-103b",
-    "Ch19_121": "121",
-    "Cz17_Vz_55": "vz-55",
-    "It08_Progetto_M40_mod_65": "progretto-65",
-    "F18_Bat_Chatillon25t": "b-c-25-t",
-    "GB100_Manticore": "manticore",
-    "Pl21_CS_63": "cs-63",
-    "Cz04_T50_51": "tvp-t-50-51",
-    "S16_Kranvagn": "kranvagn",
-    "It13_Progetto_M35_mod_46": "progett-46",
-    "R97_Object_140": "object-140",
-}
+ENABLE_POPULAR_TANK_CACHE = True
 
-EQUIP_MAP = {
-    "Gun Rammer": "rammer",
-    "Improved Ventilation": "improvedVentilation",
-    "Vertical Stabilizer": "aimingStabilizer",
-    "Turbocharger": "turbocharger",
-    "Improved Hardening": "extraHealthReserve",
-    "Low-Noise Exhaust System": "additionalInvisibilityDevice",
-    "Coated Optics": "coatedOptics",
-    "Commander's Vision System": "commandersView",
-    "Binocular Telescope": "stereoscope",
-    "Camouflage Net": "camouflageNet",
-    "Spall Liner": "antifragmentationLining",
-    "Modified Configuration": "improvedConfiguration",
-    "Improved Rotation Mechanisms": "improvedRotationMechanism",
-    "Enhanced Gun Laying Drives": "enhancedAimDrives",
-    "Improved Aiming": "improvedSights",
-    "Experimental Turbocharger": "modernizedTurbochargerRotationMechanism",
-    "Experimental Hardening": "extraHealthReserve",
-    "Experimental Optics": "modernizedImprovedSightsEnhancedAimDrives",
-    "healthReserve": "extraHealthReserve",
-    "Experimental Gun Laying": "improvedSights",
-    "Innovative Loading System": "improvedSights",
-    "Additional Grousers": "grousers",
-    "Extra Health Reserve": "extraHealthReserve",
-}
+_CACHE_PATH = os.path.join(os.path.dirname(__file__), "popular_tanks_cache.json")
 
-TOMATO_TO_CLIENT_EQUIP = {
-    "Improved Hardening": "healthReserve",
-    "Improved Ventilation": "Improved Ventilation",
-    "Vertical Stabilizer": "Vertical Stabilizer",
-    "Turbocharger": "Turbocharger",
-    "Gun Rammer": "Gun Rammer",
-    "Coated Optics": "Coated Optics",
-    "Enhanced Gun Laying Drives": "Enhanced Gun Laying Drives",
-    "Improved Aiming": "Improved Aiming",
-    "Low-Noise Exhaust System": "Low-Noise Exhaust System",
-    "Commander's Vision System": "Commander's Vision System",
-    "Binocular Telescope": "Binocular Telescope",
-    "Camouflage Net": "Camouflage Net",
-    "Spall Liner": "Spall Liner",
-    "Modified Configuration": "Modified Configuration",
-    "Improved Rotation Mechanisms": "Improved Rotation Mechanisms",
-}
 
-CONS_MAP = {
-    "Small Repair Kit": "smallRepairkit",
-    "Large Repair Kit": "largeRepairkit",
-    "Small First Aid Kit": "smallMedkit",
-    "Large First Aid Kit": "largeMedkit",
-    "Manual Fire Extinguisher": "handExtinguishers",
-    "Automatic Fire Extinguisher": "autoExtinguishers",
-    "Removed Speed Governor": "removedRpmLimiter",
-    "100-octane Gasoline": "qualityFuel",
-    "105-octane Gasoline": "excellentFuel",
-    "Extra Rations (USSR)": "ration",
-    "Case of Cola (USA)": "cocacola",
-    "Chocolate (Germany)": "chocolate",
-    "Pudding and Tea (UK)": "ration_uk",
-    "Strong Coffee (France)": "hotCoffee",
-    "Improved Rations (China)": "ration_china",
-    "Bread with Lard (Poland)": "ration_poland",
-    "Buchty (Czechoslovakia)": "ration_czech",
-    "Spaghetti with Meat Sauce (Italy)": "ration_italy",
-    "Onigiri (Japan)": "ration_japan",
-    "Coffee with Cinnamon (Sweden)": "ration_sweden",
-}
-
-CREW_SKILL_MAP = {
-    "Brothers in Arms": "brotherhood",
-    "Repair": "repair",
-    "Concealment": "camouflage",
-    "Firefighting": "fireFighting",
-    "Recon": "commander_eagleEye",
-    "Emergency": "commander_emergency",
-    "Mentor": "commander_tutor",
-    "Coordination": "commander_coordination",
-    "Sound Detection": "commander_enemyShotPredictor",
-    "Practicality": "commander_practical",
-    "Hold the Line": "commander_holdLine",
-    "Stay Sharp": "commander_staySharp",
-    "Snap Shot": "gunner_smoothTurret",
-    "Deadeye": "gunner_rancorous",
-    "Dead Eye": "gunner_rancorous",
-    "Designated Target": "gunner_sniper",
-    "Armorer": "gunner_armorer",
-    "Steady Aim": "gunner_focus",
-    "Quick Aiming": "gunner_quickAiming",
-    "Point Blank": "gunner_pointBlast",
-    "Lone Wolf": "gunner_loneWolf",
-    "Smooth Ride": "driver_smoothDriving",
-    "Off-Road Driving": "driver_badRoadsKing",
-    "Clutch Braking": "driver_virtuoso",
-    "Controlled Impact": "driver_rammingMaster",
-    "Reliable Placement": "driver_reliablePlacement",
-    "Engineer": "driver_motorExpert",
-    "Field Support": "driver_suspensionRepair",
-    "Bulletproof": "driver_bulletproof",
-    "Adrenaline Rush": "loader_desperado",
-    "Safe Stowage": "loader_pedant",
-    "Intuition": "loader_intuition",
-    "Perfect Charge": "loader_perfectCharge",
-    "Close Combat": "loader_melee",
-    "Ammo Tuning": "loader_ammunitionImprove",
-    "The Second Chance": "loader_secondChance",
-    "Mag Mastery": "loader_magMastery",
-    "Situational Awareness": "radioman_finder",
-    "Signal Interception": "radioman_signalInterception",
-    "Jamming": "radioman_interference",
-    "Communications Expert": "radioman_expert",
-    "Side by Side": "radioman_sideBySide",
-    "Threat Search": "radioman_threatSearch",
-    "Battle Tempered": "radioman_battleTempered",
-    "Sixth Sense": "commander_sixthSense",
-}
-
-TOMATO_CACHE_FILE = "tomato_build_cache.json"
-
-def _load_tomato_cache():
-    if os.path.exists(TOMATO_CACHE_FILE):
+def _load_popular_tank_cache():
+    """Load cached popular tanks. Returns (list_of_tags, updated_iso, fail_count)."""
+    if os.path.exists(_CACHE_PATH):
         try:
-            with open(TOMATO_CACHE_FILE, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except:
+            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                tanks = [t.get('tag') or t.get('name', '').lower().replace(' ', '_') for t in data.get('tanks', [])]
+                updated = data.get('updated')
+                fail_count = data.get('fail_count', 0)
+                return tanks, updated, fail_count
+        except Exception:
             pass
-    return {}
+    return [], None, 0
 
-def _save_tomato_cache(cache):
-    with open(TOMATO_CACHE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(cache, f, ensure_ascii=False, indent=4)
+
+def _is_cache_expired(updated_iso):
+    """Returns True if cache is older than 30 days or missing."""
+    if not updated_iso:
+        return True
+    try:
+        updated = datetime.fromisoformat(updated_iso)
+        now = datetime.now(timezone.utc if updated.tzinfo else None)
+        if updated.tzinfo is None:
+            now = datetime.now()
+        delta = now - updated
+        return delta.days >= 30
+    except Exception:
+        return True
 
 class StatsAI:
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
         self.ai_frame = ai_frame
         self.tank_db = tank_db
-        self.popular_tanks = popular_tanks
+        # Завантажуємо кеш популярних танків, якщо він є і кешування увімкнено
+        self._cache_data = None
+        self._cache_fresh = False
+        if ENABLE_POPULAR_TANK_CACHE:
+            cached_tanks, updated, fail_count = _load_popular_tank_cache()
+            if cached_tanks:
+                self._cache_data = {"tanks": [{"tag": t} for t in cached_tanks], "updated": updated, "fail_count": fail_count}
+            if not _is_cache_expired(updated) and cached_tanks:
+                self.popular_tanks = cached_tanks
+                self._cache_fresh = True
+                print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу")
+            else:
+                self.popular_tanks = []
+                if cached_tanks:
+                    print(f"[AI Browser] Кеш прострочений (оновлено: {updated}), запуск AI...")
+                else:
+                    print(f"[AI Browser] Кеш відсутній, запуск AI...")
+        else:
+            self.popular_tanks = []
         self.main_app = main_app  # Reference to WotAssistantHQ
-        self.locale_manager = getattr(main_app, 'locale_manager', None)  # Localization support
+        self.locale_manager = getattr(main_app, 'locale', None)  # Localization support
+
         
         self.ai_search_var = tk.StringVar()
         self.nation_filters = {}
@@ -227,6 +131,10 @@ class StatsAI:
         self.search_placeholder = f"Пошук серед {len(self.tank_db)} танків..."
         
         self.build_ai_ui()
+        # Immediately refresh UI (empty) then start AI fetch
+        self.refresh_ai_view()
+        # Глобальний MouseWheel для скролінгу canvas, навіть коли миша над дочірніми Labels
+        self.root.bind_all("<MouseWheel>", self._global_mousewheel, add="+")
 
     def _load_crew_builds(self):
         """Завантажує crew_builds.json з рекомендованими будовами екіпажу."""
@@ -609,30 +517,6 @@ class StatsAI:
         self.ai_canvas_window = self.ai_canvas.create_window((0, 0), window=self.ai_grid_frame, anchor="nw")
         self.ai_canvas.configure(yscrollcommand=self.ai_scrollbar.set)
         
-        # Обробник прокрутки колесиком миші для всього режиму AI Stats.
-        def _wheel_units(event):
-            if getattr(event, "delta", 0):
-                return int(-1 * (event.delta / 120))
-            if getattr(event, "num", 0) == 4:
-                return -1
-            if getattr(event, "num", 0) == 5:
-                return 1
-            return 0
-
-        def _on_ai_mousewheel(event):
-            if self.main_app.active_view != "ai_stats":
-                return
-            units = _wheel_units(event)
-            if units == 0:
-                return
-            if self.active_tank:
-                self.detail_canvas.yview_scroll(units, "units")
-            else:
-                self.ai_canvas.yview_scroll(units, "units")
-
-        self.ai_canvas.bind_all("<MouseWheel>", _on_ai_mousewheel)
-        self.ai_canvas.bind_all("<Button-4>", _on_ai_mousewheel)
-        self.ai_canvas.bind_all("<Button-5>", _on_ai_mousewheel)
         
         def _on_canvas_resize(event):
             self.ai_canvas.coords(self.ai_canvas_window, 0, 0)
@@ -640,14 +524,20 @@ class StatsAI:
             new_max_cols = max(1, event.width // 171)
             if self._last_cols != new_max_cols:
                 self._last_cols = new_max_cols
-                if self.active_tank is not None or True: # always refresh on resize to handle grid
+                if not self.active_tank:
                     self.refresh_ai_view()
+        self.refresh_ai_view()
 
         self.ai_canvas.bind("<Configure>", _on_canvas_resize)
         
         self.ai_canvas.pack(side="left", fill="both", expand=True)
         self.ai_scrollbar.pack(side="right", fill="y")
-        self.ai_grid_frame.bind("<Configure>", lambda e: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
+        self.ai_canvas.bind("<Enter>", lambda e: self.ai_canvas.focus_set())
+        self.ai_canvas.bind("<MouseWheel>", lambda e: (self.ai_canvas.yview_scroll(int(-1*(e.delta/120)), "units"), "break")[1])
+        self.ai_canvas.bind("<Button-4>", lambda e: (self.ai_canvas.yview_scroll(-1, "units"), "break")[1])
+        self.ai_canvas.bind("<Button-5>", lambda e: (self.ai_canvas.yview_scroll(1, "units"), "break")[1])
+        self.ai_grid_frame.bind("<Configure>", lambda e: self.ai_canvas.configure(
+            scrollregion=(0, 0, e.width, e.height)))
         
         # Вікно результату — скролюємо весь вміст
         self.ai_res_f = tk.Frame(self.ai_frame, bg="#111111")
@@ -665,6 +555,10 @@ class StatsAI:
         self.detail_canvas.bind("<Configure>", self._on_detail_canvas_resize)
         self.detail_canvas.pack(side="left", fill="both", expand=True)
         self.detail_scroll.pack(side="right", fill="y")
+        self.detail_canvas.bind("<Enter>", lambda e: self.detail_canvas.focus_set())
+        self.detail_canvas.bind("<MouseWheel>", lambda e: (self.detail_canvas.yview_scroll(int(-1*(e.delta/120)), "units"), "break")[1])
+        self.detail_canvas.bind("<Button-4>", lambda e: (self.detail_canvas.yview_scroll(-1, "units"), "break")[1])
+        self.detail_canvas.bind("<Button-5>", lambda e: (self.detail_canvas.yview_scroll(1, "units"), "break")[1])
         
         # Назва: пряме пакування в detail_inner
         self.ai_title_frame = tk.Frame(self.detail_inner, bg="#111111")
@@ -711,18 +605,26 @@ class StatsAI:
         self.refresh_ai_view()
         self._status_label = None
 
+    def _global_mousewheel(self, event):
+        try:
+            w = self.root.winfo_containing(event.x_root, event.y_root)
+            while w:
+                if w == self.ai_canvas:
+                    self.ai_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                    return "break"
+                if w == self.detail_canvas:
+                    self.detail_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+                    return "break"
+                w = w.master if hasattr(w, 'master') else None
+        except Exception:
+            pass
+        return None
+
     def update_status_bar(self, text="", fg="#aaaaaa"):
-        for w in self.ai_status_bar.winfo_children():
-            w.destroy()
-        if text:
-            self._status_label = tk.Label(
-                self.ai_status_bar, text=text, fg=fg, bg="#2a2a2a",
-                font=("Arial", 9), anchor="w", padx=10
-            )
-            self._status_label.pack(side="left", fill="x", expand=True)
-        # Always show legend
-        tk.Label(self.ai_status_bar, text="1 - Відкриті мапи  |  2 - Міські мапи", 
-                 fg="#555555", bg="#2a2a2a", font=("Arial", 8)).pack(side="right", padx=10)
+        try:
+            self.main_app.status_label.config(text=text, fg=fg)
+        except Exception:
+            pass
 
     def _on_detail_canvas_resize(self, event):
         self.detail_canvas.itemconfig(self.detail_canvas_win, width=event.width)
@@ -749,29 +651,25 @@ class StatsAI:
         self.ai_content_panel.grid_rowconfigure(7, weight=0)  # Status bar
 
         sections = [
-            self.ai_tth_frame,
             self.ai_top_headers_row,
             self.ai_top_loadout_row,
             self.ai_top_loadout_row_2,
             self.ai_crew_frame,
             self.ai_field_mod_frame,
-            self.ai_status_bar,
         ]
 
-        for sec in sections:
-            sec.grid_forget()
 
-        for idx, sec in enumerate(sections):
+        # Тепер розташовуємо інші секції, починаючи з рядка 1
+        for idx, sec in enumerate(sections, start=1):
             if idx == 1:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
             elif idx == 2:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
-            elif idx == 5:  # Status bar - no top margin
-                sec.grid(row=idx, column=1, sticky="ew", padx=0, pady=(8, 0))
             else:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 8))
 
-        # Hard-fixed widths in px for stable layout regardless of parent resize.
+
+
         fixed_w = min(self._detail_info_fixed_width, compact_w)
         self.ai_tth_frame.configure(width=fixed_w)
         self.ai_top_headers_row.configure(width=fixed_w)
@@ -779,13 +677,10 @@ class StatsAI:
         self.ai_top_loadout_row_2.configure(width=fixed_w)
         self.ai_crew_frame.configure(width=fixed_w)
         self.ai_field_mod_frame.configure(width=fixed_w)
-        self.ai_status_bar.configure(width=fixed_w)
         self.ai_tth_frame.grid_propagate(False)
         self.ai_top_headers_row.grid_propagate(False)
-        # Don't use grid_propagate on loadout row - let it grow with content
         self.ai_crew_frame.grid_propagate(False)
         self.ai_field_mod_frame.grid_propagate(False)
-        self.ai_status_bar.grid_propagate(False)
         
         # Headers row layout
         self.ai_equipment_header.grid_forget()
@@ -1069,6 +964,36 @@ class StatsAI:
         if hasattr(self, '_legend_tooltip') and self._legend_tooltip.winfo_exists():
             self._legend_tooltip.withdraw()
 
+    def _build_name_to_tag_lookup(self):
+        lookup = {}
+        for tag, data in self.tank_db.items():
+            clean = self._get_clean_tank_name(tag, data)
+            if clean:
+                key = clean.lower()
+                if key not in lookup:
+                    lookup[key] = tag
+        return lookup
+
+    def _find_tank_tag(self, name, lookup):
+        key = name.strip().lower()
+        if key in lookup:
+            return lookup[key]
+        for lk, lt in lookup.items():
+            if key == lk or key in lk or lk in key:
+                return lt
+        words = set(key.split())
+        best = None
+        best_score = 0
+        for lk, lt in lookup.items():
+            lw = set(lk.split())
+            overlap = len(words & lw)
+            if overlap > best_score:
+                best_score = overlap
+                best = lt
+        if best_score >= 2:
+            return best
+        return None
+
     def refresh_ai_view(self):
         """Оновлює грід за допомогою чанків, щоб не блокувати UI."""
         if not hasattr(self, 'ai_grid_frame'): return
@@ -1083,6 +1008,21 @@ class StatsAI:
         if is_default:
             for tag in self.popular_tanks:
                 if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
+
+            # Якщо список популярних танків порожній – показуємо інформаційне повідомлення
+            if not self.popular_tanks:
+                for widget in self.ai_grid_frame.winfo_children():
+                    widget.destroy()
+                placeholder = tk.Label(self.ai_grid_frame, text="Отримання популярних танків...",
+                                       bg="#000", fg="#555", font=("Arial", 12))
+                placeholder.pack(expand=True)
+                return
+
+            # Сортуємо за рівнем: найвищі зверху
+            def _tier_sort(item):
+                d = item[1] if isinstance(item[1], dict) else {}
+                return int(d.get("tier", 0) or 0)
+            items_to_show.sort(key=_tier_sort, reverse=True)
 
             target_rows = max(1, round(20 / max_cols))
             target_count = target_rows * max_cols
@@ -1285,7 +1225,8 @@ class StatsAI:
             new_grid.columnconfigure(c, weight=0)
         
         # Bind scrollregion update
-        new_grid.bind("<Configure>", lambda e: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
+        new_grid.bind("<Configure>", lambda e: self.ai_canvas.configure(
+            scrollregion=(0, 0, e.width, e.height)))
         
         # SWAP: Update canvas window to point to new frame, then destroy old
         self.ai_canvas.itemconfig(self.ai_canvas_window, window=new_grid)
@@ -1294,7 +1235,11 @@ class StatsAI:
         old_grid.destroy()
         
         # Update scrollregion (без блокуючого update_idletasks)
-        self.root.after(50, lambda: self.ai_canvas.configure(scrollregion=self.ai_canvas.bbox("all")))
+        self.root.after(50, lambda: (
+            self.ai_grid_frame.update_idletasks(),
+            self.ai_canvas.configure(
+                scrollregion=(0, 0, self.ai_grid_frame.winfo_width(), self.ai_grid_frame.winfo_height()))
+        )[-1])
         
         # Now hide progress bar
         try:
@@ -1734,6 +1679,8 @@ class StatsAI:
             return 4
         if tier == 10:
             return 5
+        if tier == 11:
+            return 5  # same limit for new top tier
         return 0
 
     def _field_mod_lookup_tags(self, tag):
@@ -2177,7 +2124,7 @@ class StatsAI:
             ))
         
         # Завантаження обладнання з Tomato.gg з кешуванням
-        tomato_slug = TOMATO_TANK_MAP.get(tag)
+        tomato_slug = None  # Tomato integration removed
         
         def map_equip(name):
             return EQUIP_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
@@ -2302,65 +2249,57 @@ class StatsAI:
                 "field_mods": field_mods
             }
         
-        tomato_cache = _load_tomato_cache()
-        cached_data = tomato_cache.get(tag, {})
-        
-        if tomato_slug:
-            def fetch_and_update():
-                # Lock ensures only one fetch runs at a time
-                with self._tomato_lock:
-                    try:
-                        result = tomato_fetch_build(tag)
-                        if result:
-                            # Simple mapping - no client validation needed
-                            eq1 = result.get("equipment_1", [])
-                            eq2 = result.get("equipment_2", [])
-                            
-                            mapped_result = {
-                                "equipment_1": [map_equip(e) for e in eq1[:3]],
-                                "equipment_2": [map_equip(e) for e in eq2[:3]],
-                                "consumables_1": [map_cons(c) for c in result.get("consumables_1", result.get("consumables", [])[:3])],
-                                "consumables_2": [map_cons(c) for c in result.get("consumables_2", [])[:3]],
-                                "crew": [],
-                                "field_mods": result.get("field_mods", {}).get("mods", [])
-                            }
-                            crew_perks = result.get("crew_perks", {})
-                            crew_skills_map = {}
-                            has_loader_radio = "loader_radio" in crew_perks
-                            for role, skills in crew_perks.items():
-                                if isinstance(skills, list):
-                                    if role == "loader_radio":
-                                        if "loader_radio" not in crew_skills_map:
-                                            crew_skills_map["loader_radio"] = []
-                                        crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
-                                    elif role == "loader":
-                                        if "loader" not in crew_skills_map:
-                                            crew_skills_map["loader"] = []
-                                        crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
-                                    else:
-                                        skill_ids = [map_skill(s) for s in skills[:6]]
-                                        if role not in crew_skills_map:
-                                            crew_skills_map[role] = []
-                                        crew_skills_map[role].extend(skill_ids)
-                            for role, skills in crew_skills_map.items():
-                                mapped_result["crew"].append((role, skills[:12]))
-                            tomato_cache[tag] = mapped_result
-                            _save_tomato_cache(tomato_cache)
-                            cached = mapped_result
-                        else:
-                            cached = cached_data
-                    except Exception as e:
-                        print(f"[TOMATO] Error: {e}")
-                        cached = cached_data
-                    self.root.after(0, lambda: self._update_ai_setup_ui(
-                        process_tomato_data(cached, cached_data, tth), equip_body, cons_body, ammo_body, crew_body, fm_body,
-                        equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-                    ))
-            threading.Thread(target=fetch_and_update, daemon=True).start()
-        else:
-            build_data = process_tomato_data({}, cached_data, tth)
-            self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, 
+        # Override equipment with real data from equipment_loadouts.json
+        if self._equipment_loadouts:
+            equip_key = self._find_equip_key(tag, data)
+            if equip_key and equip_key in self._equipment_loadouts:
+                loadouts = self._equipment_loadouts[equip_key]
+                if loadouts and isinstance(loadouts, list) and len(loadouts) > 0:
+                    top = max(loadouts, key=lambda x: x.get('usage_percent', 0))
+                    eq = top.get('equipment', [])
+                    if len(eq) >= 1:
+                        build_data['equipment_1'] = [EQUIP_MAP.get(e, e.lower().replace(' ', '').replace('-', '')) for e in eq[:3]]
+                    if len(eq) >= 4:
+                        build_data['equipment_2'] = [EQUIP_MAP.get(e, e.lower().replace(' ', '').replace('-', '')) for e in eq[3:6]]
+
+        # Override crew skills with real data from crew_builds.json
+        if crew_rows:
+            build_data['crew'] = [(m.get('role', 'commander'), s) for m, s in crew_rows]
+
+        self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
+    def _find_equip_key(self, tag, data):
+        """Знаходить ключ у equipment_loadouts для заданого танка."""
+        if not self._equipment_loadouts:
+            return None
+        if tag in self._equipment_loadouts:
+            return tag
+        name = (data.get('name', '') if isinstance(data, dict) else '').strip()
+        parts = tag.split('_', 1)
+        nation_code = parts[0] if parts else ''
+        short_name = parts[1] if len(parts) > 1 else tag
+        nation_map = {'R': 'ussr', 'USA': 'usa', 'F': 'france', 'G': 'germany',
+                      'GB': 'uk', 'C': 'china', 'J': 'japan', 'CZ': 'czech',
+                      'S': 'sweden', 'PL': 'poland', 'I': 'italy'}
+        nation_str = nation_map.get(nation_code, '')
+        exact = []
+        name_match = []
+        fuzzy = []
+        for ek in self._equipment_loadouts:
+            suffix = ek.split(':')[-1]
+            if suffix == short_name:
+                exact.append(ek)
+            if nation_str and ek.startswith(nation_str + ':') and short_name in ek:
+                fuzzy.append(ek)
+            if name:
+                name_key = name.lower().replace(' ', '_').replace('-', '_')
+                if name_key and name_key in ek.lower():
+                    name_match.append(ek)
+        if exact: return exact[0]
+        if name_match: return name_match[0]
+        if fuzzy: return fuzzy[0]
+        return None
 
     def _map_ai_fm_text_to_icon(self, text):
         t = text.lower()
@@ -2742,3 +2681,227 @@ class StatsAI:
 
     def show_ai_result(self, text):
         pass  # ШІ результати видалено — тепер відображаємо ТТХ
+    
+    def schedule_browser(self):
+        """Більше не використовується — AI запускається з splash в main.py"""
+        pass
+
+    def needs_ai_refresh(self):
+        """Returns True if AI needs to run (no cache or expired)."""
+        if not ENABLE_POPULAR_TANK_CACHE:
+            return True
+        return not self._cache_fresh
+
+    def _handle_ai_failure(self):
+        """Called on main thread when AI fetch failed. Falls back to cached data."""
+        if self.popular_tanks:
+            return
+        if self._cache_data and self._cache_data.get('tanks'):
+            cached_tanks = [t['tag'] for t in self._cache_data['tanks'] if t.get('tag') in self.tank_db]
+            if cached_tanks:
+                self.popular_tanks = cached_tanks
+                fc = self._cache_data.get('fail_count', 0) + 1
+                self._cache_data['fail_count'] = fc
+                try:
+                    with open(_CACHE_PATH, 'r', encoding='utf-8') as f:
+                        cur = json.load(f)
+                    cur['fail_count'] = fc
+                    with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(cur, f, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
+                self.refresh_ai_view()
+                print(f"[AVISO] Завантажено з кешу (спроба {fc})")
+                if fc > 0 and fc % 3 == 0:
+                    from service_messages import log_event
+                    log_event(
+                        "popular_tanks",
+                        f"Не вдалося оновити популярні танки після {fc} спроб поспіль.",
+                        level="warning"
+                    )
+
+    def stop_browser(self):
+        """Зупиняє процес браузера при виході з програми."""
+        proc = getattr(self, '_ai_browser_process', None)
+        if proc and proc.poll() is None:
+            print("[AI Browser] stopping browser process")
+            proc.terminate()
+            try:
+                proc.wait(timeout=3)
+            except Exception:
+                proc.kill()
+
+    def launch_ai_browser(self, prompt=None, progress_cb=None, done_cb=None):
+        """Запускає AI браузер (ai_webview_gui.py) для отримання популярних танків"""
+        print("[AI Browser] launch_ai_browser called")
+        if not hasattr(self, '_ai_fetch_in_progress'):
+            self._ai_fetch_in_progress = False
+        if self._ai_fetch_in_progress:
+            print("[AI Browser] fetch in progress, returning")
+            return
+        self._ai_fetch_in_progress = True
+        print("[AI Browser] progress_cb=", progress_cb is not None, "done_cb=", done_cb is not None)
+        self.update_status_bar(self.locale_manager.t_ui('data_updating'), "#ffaa00")
+
+        ai_prompt = "2026-05-22. In World of Tanks, compile a list of the 40 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
+
+        def run_browser_process():
+            try:
+                script = os.path.join(os.path.dirname(__file__), "ai_webview_gui.py")
+                cmd = [
+                    sys.executable, script,
+                    "--prompt", ai_prompt,
+                ]
+                print(f"[AI Browser] running: {' '.join(cmd)}")
+                if progress_cb:
+                    progress_cb(10, self.locale_manager.t_ui('data_updating'))
+                self._ai_browser_process = subprocess.Popen(
+                    cmd,
+                    cwd=os.path.dirname(__file__),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                )
+                proc = self._ai_browser_process
+                if progress_cb:
+                    progress_cb(25, self.locale_manager.t_ui('fetching_info'))
+
+                # Read stdout line by line until RESPONSE_READY
+                tank_lines = []
+                for line in proc.stdout:
+                    line = line.strip()
+                    if 'RESPONSE_READY' in line:
+                        break
+                    if line and not line.startswith('[AI Browser]') and not line.startswith('ERROR:'):
+                        tank_lines.append(line)
+
+                if tank_lines:
+                    combined = '\n'.join(tank_lines)
+                    print(f"[AI DEBUG] tank_lines count: {len(tank_lines)}")
+                    print(f"[AI DEBUG] raw text (first 600): {repr(combined[:600])}")
+                    if progress_cb:
+                        progress_cb(70, self.locale_manager.t_ui('processing'))
+                    parse_event = threading.Event()
+                    print("[AI DEBUG] Scheduling process_ai_response via root.after(0, ...)")
+                    self.root.after(0, lambda t=combined, ev=parse_event: [
+                        print(f"[AI DEBUG] process_ai_response START"),
+                        self.process_ai_response(t),
+                        print(f"[AI DEBUG] process_ai_response DONE, popular_tanks={len(self.popular_tanks)}"),
+                        ev.set()
+                    ])
+                    print("[AI DEBUG] Waiting for parse_event...")
+                    parse_event.wait(timeout=30)
+                    print(f"[AI DEBUG] parse_event done, popular_tanks={len(self.popular_tanks)}")
+                    if progress_cb:
+                        progress_cb(95, self.locale_manager.t_ui('ready'))
+                else:
+                    self.root.after(0, lambda: self.update_status_bar("❌ AI не повернув назв танків", "red"))
+
+                # Terminate browser
+                try:
+                    proc.terminate()
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass
+
+            except subprocess.TimeoutExpired:
+                print("[AI Browser] TIMEOUT (90s)")
+                self.root.after(0, lambda: self.update_status_bar("❌ Час очікування AI", "red"))
+                if self._ai_browser_process:
+                    self._ai_browser_process.kill()
+            except Exception as e:
+                print(f"[AI Browser] ERROR: {e}")
+                self.root.after(0, lambda: self.update_status_bar(f"❌ {str(e)[:50]}", "red"))
+            finally:
+                if self._ai_browser_process:
+                    try:
+                        self._ai_browser_process.kill()
+                    except Exception:
+                        pass
+                self._ai_browser_process = None
+                self.root.after(0, self._re_enable_ui)
+                self.root.after(0, self._handle_ai_failure)
+                if done_cb:
+                    done_cb()
+
+        threading.Thread(target=run_browser_process, daemon=True).start()
+
+    def _re_enable_ui(self):
+        self._ai_fetch_in_progress = False
+
+    def process_ai_response(self, response_text):
+        """Обробляє відповідь від AI і оновлює популярні танки"""
+        print(f"[AI DEBUG] process_ai_response ENTER, text len={len(response_text)}")
+        try:
+            tank_names = []
+            lines = response_text.split('\n')
+            print(f"[AI Response] Received {len(lines)} lines")
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                # Remove numbering: "1.", "2)", "3-", "* ", "- " etc.
+                clean = re.sub(r'^[\d\*\-•]+\s*[\.\)\-\s]*\s*', '', line).strip()
+                # Strip markdown
+                clean = clean.replace('**', '').replace('*', '').replace('__', '')
+                # Strip parenthesized content (e.g. "(Tier X)", "(Soviet MT)")
+                clean = re.sub(r'\s*\(.*?\)\s*$', '', clean).strip()
+                low = clean.lower()
+                if any(skip in low for skip in [
+                    'перейти', 'справка', 'оставить', 'войти', 'режим ии',
+                    'результаты поиска', 'все', 'картинки', 'видео', 'новости',
+                    'google', 'форум', 'account', 'поиск', 'настройки',
+                    'list the most popular', 'output only', 'sorted by',
+                    'here are', 'here is', 'as of', 'based on', 'these are',
+                    'the most', 'popular tanks', 'tiers 6', 'tier 6', 'tier 7',
+                    'tier 8', 'tier 9', 'tier 10', 'tier 11',
+                    'note:', 'please note', 'disclaimer',
+                    'i hope', 'let me', 'do you', 'would you', 'could you',
+                ]):
+                    continue
+                if len(clean) < 3 or len(clean) > 60:
+                    continue
+                if re.match(r'^[\w\s\'\-\.\/\,\:\(\)\&]+$', clean):
+                    tank_names.append(clean)
+
+            print(f"[AI Response] After filtering: {len(tank_names)} tank candidates")
+            if tank_names:
+                name_to_tag = self._build_name_to_tag_lookup()
+                raw_tanks = []
+                seen = set()
+                for n in tank_names:
+                    tag = self._find_tank_tag(n, name_to_tag)
+                    if tag is None:
+                        tag = n.lower().replace(' ', '_').replace("'", "").replace(".", "").replace("/", "_").replace(",", "")
+                    if tag not in seen:
+                        seen.add(tag)
+                        raw_tanks.append({"name": n, "tag": tag})
+                raw_tanks = raw_tanks[:30]
+                valid_tanks = [t for t in raw_tanks if t['tag'] in self.tank_db]
+                print(f"[AI Response] {len(raw_tanks)} raw, {len(valid_tanks)} valid (found in DB)")
+                tanks = valid_tanks[:20]
+                for t in tanks:
+                    t_tag = t.get('tag')
+                    t['tier'] = self.tank_db.get(t_tag, {}).get('tier', 0)
+                tanks.sort(key=lambda x: x.get('tier', 0), reverse=True)
+                for t in tanks:
+                    t.pop('tier', None)
+                cache_data = {"tanks": tanks, "updated": time.strftime("%Y-%m-%dT%H:%M:%S"), "fail_count": 0}
+                if ENABLE_POPULAR_TANK_CACHE:
+                    with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                self.popular_tanks = [t['tag'] for t in tanks]
+                print(f"[AI DEBUG] popular_tanks set: {len(self.popular_tanks)} tanks, first 5: {self.popular_tanks[:5]}")
+                self.refresh_ai_view()
+                self.update_status_bar(f"✅ Знайдено {len(tanks)} танків", "#00cc00")
+            else:
+                print("[AI DEBUG] No valid tanks found")
+                self.update_status_bar("❌ Не знайдено назв танків", "red")
+            self._re_enable_ui()
+            print("[AI DEBUG] process_ai_response COMPLETE")
+        except Exception as e:
+            print(f"[AI DEBUG] process_ai_response EXCEPTION: {e}")
+            import traceback
+            traceback.print_exc()
+            self.update_status_bar(f"❌ {str(e)}", "red")
+            self._re_enable_ui()

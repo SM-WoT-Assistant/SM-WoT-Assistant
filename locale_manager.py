@@ -1,6 +1,7 @@
 import os
 import json
 import config
+import translations
 
 class LocaleManager:
     def __init__(self, app):
@@ -10,10 +11,33 @@ class LocaleManager:
         self.locales_file = os.path.join(os.path.dirname(config.SETTINGS_FILE), "locales.json")
         self.languages = self.load_locales()
         
-        # Яка немає файлу або він порожній - копіюємо дефолт з config
+        # Якщо немає файлу або він порожній - копіюємо дефолт з translations
         if not self.languages:
-            self.languages = config.LANG_DATA
-            self.save_locales() # одразу створюємо файл для ручного редагування/додавання мов
+            self.languages = translations.TRANSLATIONS
+            self.save_locales()
+        else:
+            # Додаємо нові ключі з translations.py без перезапису існуючих
+            self._merge_missing()
+            
+    def _merge_missing(self):
+        """Add missing keys from translations.py to self.languages (preserves existing)."""
+        changed = False
+        for lang, lang_data in translations.TRANSLATIONS.items():
+            if lang not in self.languages:
+                self.languages[lang] = lang_data
+                changed = True
+                continue
+            for section, section_data in lang_data.items():
+                if section not in self.languages[lang]:
+                    self.languages[lang][section] = section_data
+                    changed = True
+                    continue
+                for key, value in section_data.items():
+                    if key not in self.languages[lang][section]:
+                        self.languages[lang][section][key] = value
+                        changed = True
+        if changed:
+            self.save_locales()
             
     def load_locales(self):
         if os.path.exists(self.locales_file):

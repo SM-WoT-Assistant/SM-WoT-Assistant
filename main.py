@@ -25,7 +25,7 @@
 # [v] map_updater.py — TACTIC: Старий завантажувач з інтернету (ПІДКЛЮЧЕНО).
 # [v] map_extractor.py — MAPS: Автономний екстрактор з клієнта гри (ПІДКЛЮЧЕНО).
 # [v] painter.py — Логіка малювання, кольорові POI, магнітне прилипання, темна тема (ПІДКЛЮЧЕНО).
-# [v] tomato_viewer.py — Інтеграція статистики Tomato.gg через WebView2 (ПІДКЛЮЧЕНО).
+# [x] tomato_viewer.py — ВИДАЛЕНО (2026-05-20)
 # [v] ai_assistant.py — СТАТ АІ: Персональний помічник Gemini для усереднення збірок (ПІДКЛЮЧЕНО).
 # [v] tactics_manager.py — Новий модуль для імпорту/експорту тактик (ГОТОВО).
 # [v] log_reader.py — Читання python.log та автоматичне перемикання (ГОТОВО).
@@ -68,11 +68,6 @@ import data_manager
 import ui_manager
 
 try:
-    import tomato_viewer
-except ImportError:
-    tomato_viewer = None
-
-try:
     import map_extractor
 except ImportError:
     map_extractor = None
@@ -102,15 +97,7 @@ class WotAssistantHQ:
         self.extractor_names = {}
         self.map_list = []
         self.tank_db = self.data_mgr.load_tank_db()
-        self.popular_tanks = [
-            "R155_Object_277", "R45_IS-7", "GB91_Super_Conqueror", "Cz17_Vz_55",
-            "Pl21_CS_63", "Pl15_60TP_Lewandowskiego", "G89_Leopard1",
-            "F108_Panhard_EBR_105", "GB100_Manticore", "Ch47_BZ_176",
-            "F116_Bat_Chatillon_Bourrasque", "Cz14_Skoda_T-56",
-            "It08_Progetto_M40_mod_65", "It13_Progetto_M35_mod_46",
-            "R97_Object_140", "R148_Object_430_U", "A16_M18_Hellcat",
-            "G119_Panzer58", "A80_T26_E4_SuperPershing", "S11_Strv_103B"
-        ]
+        self.popular_tanks = []
         self.ai_icons = {} # Кеш іконок для Treeview
         self.ai_filters = {"nation": None, "class": None, "tier": None}
         
@@ -194,8 +181,6 @@ class WotAssistantHQ:
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
             
-        self.tomato = tomato_viewer.TomatoManager() if tomato_viewer else None
-        self.tomato_hwnd = None
         # self.ai_stats = ai_assistant.AIAssistant(self.settings.get("ai_key", ""))  # ТИМЧАСОВО ВИМКНЕНО
 
         # Стандартний старт: splash завжди показує прогрес фонового оновлення.
@@ -386,14 +371,11 @@ class WotAssistantHQ:
             if self.active_view == "maps":
                 self.battle_status_top.pack(side="top", fill="x")
                 self.canvas.pack(side="top", fill="both", expand=True)
-            if hasattr(self, 'tomato') and self.tomato:
-                self.tomato.stop()
-                self.tomato_hwnd = None
-        else:
-            self.mode = "edit"
-            self.win_mgr.set_clickthrough(False)
-            self.top_bar.pack_forget()
-            self.top_bar.pack(side="top", fill="x")
+            else:
+                self.mode = "edit"
+                self.win_mgr.set_clickthrough(False)
+                self.top_bar.pack_forget()
+                self.top_bar.pack(side="top", fill="x")
             
             if self.active_view == "maps":
                 if self.btn_mode_maps_1.cget("bg") == "#ff4500" or self.btn_mode_maps_2.cget("bg") == "#ff4500":
@@ -405,10 +387,6 @@ class WotAssistantHQ:
             elif self.active_view == "stats":
                 self.status_label.pack(side="bottom", fill="x")
                 self.browser_frame.pack(side="top", fill="both", expand=True)
-                if hasattr(self, 'tomato') and self.tomato:
-                    self.status_label.config(text="[СТАТ] Завантаження Tomato.gg...", fg="yellow")
-                    self.tomato.launch()
-                    self.root.after(500, self.win_mgr.dock_tomato_window)
             elif self.active_view == "ai_stats":
                 self.ai_frame.pack(side="top", fill="both", expand=True)
                 self.status_label.pack(side="bottom", fill="x")
@@ -466,6 +444,8 @@ class WotAssistantHQ:
             self.root.lift()
             self.root.focus_force()
         else:
+            if hasattr(self, 'stats_ai_module'):
+                self.stats_ai_module.stop_browser()
             self.save_settings()
             self.root.withdraw()
 
@@ -691,9 +671,9 @@ class WotAssistantHQ:
         self.ui_mgr.show_view("ai_stats")
 
     def quit_app(self):
+        if hasattr(self, 'stats_ai_module'):
+            self.stats_ai_module.stop_browser()
         self.save_settings()
-        if hasattr(self, 'tomato') and self.tomato:
-            self.tomato.stop()
         keyboard.unhook_all() 
         self.root.destroy()
         sys.exit(0)
@@ -751,15 +731,110 @@ class WotAssistantHQ:
         self.update_startup_progress(percent, text)
 
     def _on_startup_ready(self):
+        """Startup data checks complete → launch AI → then close splash."""
         self._startup_ready_at = time.time()
-        self.finish_startup_splash()
+        # Debug: check language setting
+        lang_code = getattr(self.locale, 'lang', '?')
+        test_key = self.t('ui', 'fetching_info')
+        print(f"[INIT] lang={lang_code}, fetching_info='{test_key}'")
+        # Check if AI refresh is needed (cache may be fresh)
+        if hasattr(self, 'stats_ai_module') and not self.stats_ai_module.needs_ai_refresh():
+            print("[INIT] Кеш свіжий, AI не потрібен")
+            try:
+                sw = int(self.splash_canvas["width"])
+                sh = int(self.splash_canvas["height"])
+                self.splash_canvas.coords(self.pbar, 0, sh - 8, sw, sh)
+                self.splash_canvas.itemconfigure(self.splash_percent_text, text="100%")
+            except Exception:
+                pass
+            self._startup_display_percent = 100
+            self._startup_target_percent = 100
+            self.root.after(200, self.finish_startup_splash)
+            return
+        # Save current progress as AI base
+        self._startup_ai_base = max(30, getattr(self, '_startup_display_percent', 30))
+        self._startup_ai_base = min(self._startup_ai_base, 80)
+        self.update_startup_progress(self._startup_ai_base, self.t('ui', 'data_updating'))
+        self.root.after(100, self._start_ai_phase)
+
+    def _start_ai_phase(self):
+        if hasattr(self, 'stats_ai_module'):
+            self._startup_ai_base = max(30, getattr(self, '_startup_display_percent', 30))
+            self._startup_ai_base = min(self._startup_ai_base, 80)
+            self._startup_ai_start = time.time()
+            self.stats_ai_module.launch_ai_browser(
+                progress_cb=self._on_ai_progress,
+                done_cb=self._on_ai_ready,
+            )
+            self._ai_creep_id = self.root.after(1000, self._ai_progress_creep)
+            self._ai_timeout_id = self.root.after(120000, self._ai_safety_timeout)
+        else:
+            self.finish_startup_splash()
+
+    def _ai_progress_creep(self):
+        if not hasattr(self, '_startup_ai_start'):
+            return
+        elapsed = time.time() - self._startup_ai_start
+        base = getattr(self, '_startup_ai_base', 40)
+        # Phase 1: base → 93% over 20 seconds (typical AI response time)
+        if elapsed < 20:
+            pct = base + (93 - base) * elapsed / 20
+        else:
+            # Phase 2: 93% → 100% over next 30 seconds
+            pct = 93 + 7 * min(elapsed - 20, 30) / 30
+        pct = min(100, pct)
+        self._startup_target_percent = int(pct)
+        # Direct canvas update with float pct for sub-pixel smoothness
+        try:
+            self._startup_creep_active = True
+            sw = int(self.splash_canvas["width"])
+            sh = int(self.splash_canvas["height"])
+            x2 = int((sw * pct) / 100)
+            self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
+            self.splash_canvas.itemconfigure(
+                self.splash_percent_text, text=f"{int(pct)}%"
+            )
+        except Exception:
+            pass
+        if pct < 100:
+            self._ai_creep_id = self.root.after(100, self._ai_progress_creep)
+
+    def _on_ai_progress(self, percent, text):
+        # Only update text, progress is handled by creep
+        self.root.after(0, lambda t=text: self.update_startup_progress(
+            getattr(self, '_startup_target_percent', 40), t
+        ))
+
+    def _on_ai_ready(self):
+        # Show "100% Готово" for 500ms before closing
+        self.root.after(0, lambda: self.update_startup_progress(
+            100, self.t('ui', 'ready')
+        ))
+        self.root.after(500, self._cancel_ai_timers)
+        self.root.after(500, lambda: self.finish_startup_splash())
+
+    def _cancel_ai_timers(self):
+        self._startup_creep_active = False
+        if hasattr(self, '_ai_creep_id') and self._ai_creep_id:
+            try: self.root.after_cancel(self._ai_creep_id)
+            except: pass
+            self._ai_creep_id = None
+        if hasattr(self, '_ai_timeout_id') and self._ai_timeout_id:
+            try: self.root.after_cancel(self._ai_timeout_id)
+            except: pass
+            self._ai_timeout_id = None
+
+    def _ai_safety_timeout(self):
+        print("[AI Browser] SAFETY TIMEOUT — closing splash")
+        self.root.after(0, self._cancel_ai_timers)
+        self.root.after(0, self.finish_startup_splash)
 
     def update_startup_progress(self, percent, text=None):
         if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
             return
         try:
             percent = max(0, min(100, int(percent)))
-            self._startup_target_percent = max(getattr(self, "_startup_target_percent", 0), percent)
+            self._startup_target_percent = percent
             if text:
                 self._startup_status_text = text
                 self.splash_canvas.itemconfigure(self.splash_status_text, text=text)
@@ -774,17 +849,19 @@ class WotAssistantHQ:
         if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
             return
         try:
-            sw = int(self.splash_canvas["width"])
-            sh = int(self.splash_canvas["height"])
-            target = int(getattr(self, "_startup_target_percent", 0))
-            current = int(getattr(self, "_startup_display_percent", 0))
-            if current < target:
-                step = 2 if (target - current) > 8 else 1
-                current = min(target, current + step)
-                self._startup_display_percent = current
-                x2 = int((sw * current) / 100)
-                self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
-                self.splash_canvas.itemconfigure(self.splash_percent_text, text=f"{current}%")
+            # During creep, direct smooth update handles the bar
+            if not getattr(self, '_startup_creep_active', False):
+                sw = int(self.splash_canvas["width"])
+                sh = int(self.splash_canvas["height"])
+                target = int(getattr(self, "_startup_target_percent", 0))
+                current = int(getattr(self, "_startup_display_percent", 0))
+                if current < target:
+                    step = 2 if (target - current) > 8 else 1
+                    current = min(target, current + step)
+                    self._startup_display_percent = current
+                    x2 = int((sw * current) / 100)
+                    self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
+                    self.splash_canvas.itemconfigure(self.splash_percent_text, text=f"{current}%")
             self.root.after(45, self._animate_startup_progress)
         except Exception:
             pass
@@ -836,7 +913,7 @@ class WotAssistantHQ:
         self._startup_target_percent = 0
         self._startup_display_percent = 0
         self._startup_ready_at = 0.0
-        self._startup_status_text = "Перевірка оновлень..."
+        self._startup_status_text = self.t('ui', 'checking_updates')
         sw, sh = 450, 300
         self.splash.geometry(f"{sw}x{sh}+{int((self.root.winfo_screenwidth()/2)-(sw/2))}+{int((self.root.winfo_screenheight()/2)-(sh/2))}")
         self.splash.overrideredirect(True)
@@ -861,7 +938,7 @@ class WotAssistantHQ:
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
             sh - 46,
-            text="Перевірка оновлень...",
+            text=self.t('ui', 'checking_updates'),
             fill="#bbbbbb",
             font=("Arial", 9),
         )
@@ -873,7 +950,7 @@ class WotAssistantHQ:
             font=("Arial", 9, "bold"),
         )
         self.pbar = self.splash_canvas.create_rectangle(0, sh-8, 0, sh, fill="#ff4500", outline="")
-        self.update_startup_progress(3, "Підготовка до перевірки...")
+        self.update_startup_progress(3, self.t('ui', 'preparing_check'))
         self._animate_startup_progress()
         # Форсуємо первинне відмалювання splash до старту фонових задач.
         self.splash.deiconify()
