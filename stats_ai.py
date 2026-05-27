@@ -21,27 +21,41 @@ _AI_BUILD_CACHE_PATH = os.path.join(os.path.dirname(__file__), "ai_builds_cache.
 
 
 def _load_ai_build_cache():
-    """Load cached AI builds. Returns (builds_dict, updated_dict)."""
     if os.path.exists(_AI_BUILD_CACHE_PATH):
         try:
             with open(_AI_BUILD_CACHE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("builds", {}), data.get("updated", {})
+                return data.get("builds", {}), data.get("updated", {}), data.get("fail_count", 0)
         except Exception:
             pass
-    return {}, {}
+    return {}, {}, 0
 
 
-def _save_ai_build_cache(tag, build_data):
-    """Save a single tank's AI build to cache."""
-    builds, updated = _load_ai_build_cache()
+def _save_ai_build_cache(tag, build_data, fail_count=None):
+    builds, updated, cur_fc = _load_ai_build_cache()
     builds[tag] = build_data
     updated[tag] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    if fail_count is not None:
+        cur_fc = fail_count
     try:
         with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"builds": builds, "updated": updated}, f, ensure_ascii=False, indent=2)
+            json.dump({"builds": builds, "updated": updated, "fail_count": cur_fc}, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
+
+
+def _handle_ai_build_failure(tag):
+    builds, updated, fc = _load_ai_build_cache()
+    fc = fc + 1
+    try:
+        with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"builds": builds, "updated": updated, "fail_count": fc}, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+    if fc > 0 and fc % 3 == 0:
+        from service_messages import log_event
+        log_event("ai_build", f"Не вдалося оновити build для {tag} після {fc} спроб поспіль.", level="warning")
+    print(f"[AI Tank Build] Failure #{fc} for {tag}")
 
 
 def _load_popular_tank_cache():
@@ -69,7 +83,7 @@ def _is_cache_expired(updated_iso):
         if updated.tzinfo is None:
             now = datetime.now()
         delta = now - updated
-        return delta.days >= 7
+        return delta.days >= 30
     except Exception:
         return True
 
@@ -2774,7 +2788,7 @@ class StatsAI:
         Якщо є свіжий кеш — використовує його, AI не запускає.
         Якщо попередній запит ще виконується — завершує його."""
         if ENABLE_AI_BUILD_CACHE:
-            builds, updated = _load_ai_build_cache()
+            builds, updated, _ = _load_ai_build_cache()
             if tag in builds and tag in updated and not _is_cache_expired(updated[tag]):
                 print(f"[AI Tank Build] Завантажено build для {tag} з кешу")
                 if self._current_build_tag == tag:
@@ -2833,9 +2847,13 @@ class StatsAI:
                             self.root.after(0, lambda bd=build_data: self._apply_ai_build(bd))
                 else:
                     print(f"[AI Tank Build] insufficient response for {tag} ({len(lines)} lines)")
+                    _handle_ai_build_failure(tag)
 
             except Exception as e:
                 print(f"[AI Tank Build] ERROR for {tag}: {e}")
+                try:
+                    _handle_ai_build_failure(tag)
+                except: pass
             finally:
                 if proc and proc.poll() is None:
                     try:
@@ -2870,7 +2888,7 @@ class StatsAI:
         if ENABLE_AI_BUILD_CACHE:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
-                _save_ai_build_cache(tag, build_data)
+                _save_ai_build_cache(tag, build_data, fail_count=0)
         self.update_status_bar("✅ AI build завантажено", "#00cc00")
 
     def _handle_ai_failure(self):
