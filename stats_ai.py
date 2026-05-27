@@ -73,8 +73,7 @@ def _load_popular_tank_cache():
     return [], None, 0
 
 
-def _is_cache_expired(updated_iso):
-    """Returns True if cache is older than 24 hours or missing."""
+def _is_cache_expired(updated_iso, max_days=7):
     if not updated_iso:
         return True
     try:
@@ -83,7 +82,7 @@ def _is_cache_expired(updated_iso):
         if updated.tzinfo is None:
             now = datetime.now()
         delta = now - updated
-        return delta.days >= 30
+        return delta.days >= max_days
     except Exception:
         return True
 
@@ -2789,7 +2788,7 @@ class StatsAI:
         Якщо попередній запит ще виконується — завершує його."""
         if ENABLE_AI_BUILD_CACHE:
             builds, updated, _ = _load_ai_build_cache()
-            if tag in builds and tag in updated and not _is_cache_expired(updated[tag]):
+            if tag in builds and tag in updated and not _is_cache_expired(updated[tag], max_days=30):
                 print(f"[AI Tank Build] Завантажено build для {tag} з кешу")
                 if self._current_build_tag == tag:
                     self.root.after(0, lambda bd=builds[tag]: self._apply_ai_build(bd))
