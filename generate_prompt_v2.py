@@ -364,8 +364,8 @@ def get_consumables_list(nation="ussr"):
     Цей список використовується для Main (звичайного) набору.
     """
     base = [
-        "Small Repair Kit", "Large Repair Kit",
-        "Small First Aid Kit", "Large First Aid Kit",
+        "Small Repair Kit",
+        "Small First Aid Kit",
         "Manual Fire Extinguisher", "Automatic Fire Extinguisher",
         "Strong Coffee", "Chocolate", "Cola"
     ]
@@ -493,6 +493,7 @@ def generate_prompt(tank_id, tank_name=None):
     nation_ration = get_nation_ration(nation)
     
     consumables_advanced_list = [c for c in consumables_list if c not in ["Manual Fire Extinguisher", "Automatic Fire Extinguisher"]]
+    consumables_advanced_list = ["Large Repair Kit", "Large First Aid Kit"] + consumables_advanced_list
     if nation_ration and nation_ration not in consumables_advanced_list:
         consumables_advanced_list.append(nation_ration)
     
