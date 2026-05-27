@@ -1,4 +1,3 @@
-# Mapping data for tank builds rendering
 
 EQUIP_MAP = {
     "Gun Rammer": "rammer",
@@ -24,10 +23,8 @@ EQUIP_MAP = {
     "Innovative Loading System": "improvedSights",
     "Additional Grousers": "grousers",
     "Extra Health Reserve": "extraHealthReserve",
-    # Internal IDs from equipment_loadouts.json that need icon mapping
     "additInvisibilityDevice": "additionalInvisibilityDevice",
     "rotationMechanism": "improvedRotationMechanism",
-    # Bond/experimental equipment names from generate_prompt_v2
     "Enhanced Gun Laying Drive": "enhancedAimDrives",
     "Improved Rotation Mechanism": "improvedRotationMechanism",
     "Low Noise Exhaust System": "additionalInvisibilityDevice",

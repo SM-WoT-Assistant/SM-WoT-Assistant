@@ -60,9 +60,6 @@ generate_prompt_v2.py - Prompt Generator for World of Tanks Competitive Builds
 import json
 from datetime import datetime
 
-# ==============================================================================
-# ЗАВАНТАЖЕННЯ ДАНИХ З КЛІЄНТА ГРИ
-# ==============================================================================
 
 with open('tank_slots_full.json', 'r', encoding='utf-8') as f:
     tank_slots = json.load(f)
@@ -76,16 +73,12 @@ with open('game_entities_english.json', 'r', encoding='utf-8') as f:
 with open('crew_builds.json', 'r', encoding='utf-8') as f:
     crew_builds = json.load(f)
 
-# ==============================================================================
-# ДАНІ ПРО ПЕРКИ З _role_skill_pools (клієнт гри)
-# ==============================================================================
 
 ROLE_SKILL_POOLS = crew_builds.get('_role_skill_pools', {})
 PERK_POLICY = crew_builds.get('_perk_policy', {})
 DEFAULT_PRIMARY_PERK_COUNT = PERK_POLICY.get('default_primary_perk_count', 6)
 PRIMARY_PERK_COUNT_BY_TIER = PERK_POLICY.get('primary_perk_count_by_tier', {})
 
-# Мапінг ID перків на англійські назви (з game_entities_english.json)
 PERK_NAME_MAP = {
     'commander_sixthSense': 'Sixth Sense',
     'commander_practical': 'Eagle Eye',
@@ -135,9 +128,6 @@ PERK_NAME_MAP = {
     'fireFighting': 'Firefighting'
 }
 
-# ==============================================================================
-# ОБЛАДНАННЯ ПО TIER (з клієнта гри: стандартне + експериментальне)
-# ==============================================================================
 
 EQUIPMENT_BY_TIER = {
     1: [
@@ -187,7 +177,6 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Experimental (Modernized)
         "modernizedTurbochargerRotationMechanism",
         "modernizedExtraHealthReserveAntifragmentationLining",
         "modernizedImprovedSightsEnhancedAimDrives",
@@ -201,7 +190,6 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Experimental (Modernized)
         "modernizedTurbochargerRotationMechanism",
         "modernizedExtraHealthReserveAntifragmentationLining",
         "modernizedImprovedSightsEnhancedAimDrives",
@@ -215,7 +203,6 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Experimental (Modernized)
         "modernizedTurbochargerRotationMechanism",
         "modernizedExtraHealthReserveAntifragmentationLining",
         "modernizedImprovedSightsEnhancedAimDrives",
@@ -229,7 +216,6 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Experimental (Modernized)
         "modernizedTurbochargerRotationMechanism",
         "modernizedExtraHealthReserveAntifragmentationLining",
         "modernizedImprovedSightsEnhancedAimDrives",
@@ -237,10 +223,6 @@ EQUIPMENT_BY_TIER = {
     ]
 }
 
-# ==============================================================================
-# ВИКЛЮЧЕННЯ ОБЛАДНАННЯ ЗА КЛАСОМ ТАНКА
-# SPG не може використовувати Vertical Stabilizer та Grousers (з клієнта гри)
-# ==============================================================================
 
 EQUIPMENT_EXCLUDE_BY_CLASS = {
     "SPG": ["aimingStabilizer_tier1", "aimingStabilizer_tier2", "aimingStabilizer_tier3",
@@ -252,15 +234,9 @@ EQUIPMENT_EXCLUDE_BY_CLASS = {
            "modernizedAimDrivesAimingStabilizer"]  # TD не можуть використовувати Vertical Stabilizer
 }
 
-# ==============================================================================
-# НАЗВИ ОБЛАДНАННЯ З КЛІЄНТА ГРИ (файл artefacts_en.mo) - БЕЗ Class І ЦИФР
-# ==============================================================================
 
-# Тут використовуємо FALLBACK_EQUIPMENT_NAMES як основний словник
-# ==============================================================================
 
 FALLBACK_EQUIPMENT_NAMES = {
-    # Стандартне обладнання (Tier 1-3)
     "tankRammer_tier1": "Gun Rammer",
     "tankRammer_tier2": "Gun Rammer",
     "tankRammer_tier3": "Gun Rammer",
@@ -308,30 +284,23 @@ FALLBACK_EQUIPMENT_NAMES = {
     "binocularTelescope_tier1": "Binocular Telescope",
     "binocularTelescope_tier2": "Binocular Telescope",
     "binocularTelescope_tier3": "Binocular Telescope",
-    # Experimental (Modernized)
     "modernizedTurbochargerRotationMechanism": "Experimental Turbocharger",
     "modernizedExtraHealthReserveAntifragmentationLining": "Experimental Hardening",
     "modernizedImprovedSightsEnhancedAimDrives": "Experimental Optics",
     "modernizedAimDrivesAimingStabilizer": "Experimental Gun Laying",
 }
 
-# ==============================================================================
-# ФУНКЦІЇ ДЛЯ ГЕНЕРАЦІЇ ПРОМТУ
-# ==============================================================================
 
 def get_equipment_for_tank(tank_id, tier, tank_class):
     """
     Повертає список обладнання для танка З КЛІЄНТА ГРИ.
     Використовує стандартне обладнання за tier танка.
     """
-    # Отримуємо стандартне обладнання за tier танка
     equipment_list = EQUIPMENT_BY_TIER.get(tier, EQUIPMENT_BY_TIER[5])
     
-    # Фільтруємо за класом танка (SPG виключає Stabilizer, Grousers)
     excluded = EQUIPMENT_EXCLUDE_BY_CLASS.get(tank_class, [])
     filtered = [eq for eq in equipment_list if eq not in excluded]
     
-    # Конвертуємо ID в назви з клієнта
     result_names = []
     result_standard = []
     for eq_id in filtered:
@@ -366,7 +335,6 @@ def get_ammo_types(tier=10, tank_class="MT"):
         "HIGH_EXPLOSIVE_SPG_STUN",
         "HIGH_EXPLOSIVE_ZERO_SPLASH",
     ]
-    # Фільтр за класом
     if tank_class == "SPG":
         base = ["HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_PREMIUM"]
         return base[:3]
@@ -374,13 +342,6 @@ def get_ammo_types(tier=10, tank_class="MT"):
     return base[:3]
 
 
-# ==============================================================================
-# НАЦІОНАЛЬНІ РАЦІОНИ (з клієнта гри - game_entities_english.json)
-# ==============================================================================
-# ВАЖЛИВО: Ці дані взяті з клієнта гри, не з лабораторних припущень!
-# Кожен раціон підвищує ефективність екіпажу на +10% і діє автоматично весь бій.
-# Доступні лише для техніки відповідної нації.
-# ==============================================================================
 
 NATION_RATIONS = {
     "ussr": "Extra Rations",        # Тільки для СССР (раніше: Додатковий пайок)
@@ -432,7 +393,6 @@ def get_crew_data_for_tank(tank_id, tier):
     role_skill_pools = crew_builds.get('_role_skill_pools', {})
     perk_policy = crew_builds.get('_perk_policy', {})
     
-    # Кількість перків за tier з _perk_policy (Tier 10 = 6 перків)
     primary_perk_count = perk_policy.get('primary_perk_count_by_tier', {}).get(str(tier), 6)
     
     result = {
@@ -521,7 +481,6 @@ def generate_prompt(tank_id, tank_name=None):
     nation = nation.split('_')[0] if '_' in nation else nation
     
     equip_slot_count = tank_data.get('equipment_slots', 3)
-    # Мінімум 3 слоти для всіх рівнів (після глобального оновлення обладнання)
     equip_slot_count = max(equip_slot_count, 3)
     all_equipment_names, standard_equipment_names = get_equipment_for_tank(tank_id, tier, tank_class)
     has_post_prog = tank_data.get('has_post_progression', False)
@@ -539,9 +498,7 @@ def generate_prompt(tank_id, tank_name=None):
     
     crew_data = get_crew_data_for_tank(tank_id, tier)
     
-    # Після глобального реворку всі рівні мають 6 основних перків
     primary_perk_count = 6
-    # Специфічне для танка значення secondary_perk_count з custom_role_slot_options
     custom_slots = crew_data.get('custom_role_slot_options')
     secondary_perk_bonus_map = PERK_POLICY.get('secondary_perk_bonus_by_custom_role_slots', {})
     if custom_slots and custom_slots in secondary_perk_bonus_map:
@@ -556,14 +513,11 @@ def generate_prompt(tank_id, tank_name=None):
         role = member['role']
         also = member.get('also', [])
         
-        # Маппінг ролей: loader_radio → loader (беруть перки з loader pool)
         pool_role = role
         if role == 'loader_radio':
             pool_role = 'loader'
         
-        # Для ролей з also (додаткова роль) — показуємо окремо
         if also:
-            # Основна роль
             primary_perks = ROLE_SKILL_POOLS.get(pool_role, [])
             primary_names = sorted(set([PERK_NAME_MAP.get(p, p) for p in primary_perks]))
             if primary_names:
@@ -571,7 +525,6 @@ def generate_prompt(tank_id, tank_name=None):
                 perks_list = ", ".join([f"Perk {i+1}" for i in range(primary_perk_count)])
                 crew_roles_output += f"   * {role}: [{perks_list}] (choose {primary_perk_count})\n"
             
-            # Додаткові ролі — показуємо тільки один раз (якщо ще не показані)
             for extra_role in also:
                 if extra_role not in seen_secondary:
                     seen_secondary.add(extra_role)
@@ -580,7 +533,6 @@ def generate_prompt(tank_id, tank_name=None):
                     crew_perks_section += f"{extra_role} (secondary, choose {secondary_perk_count}): {', '.join(extra_names)}\n"
                     extra_list = ", ".join([f"Perk {i+1}" for i in range(secondary_perk_count)])
                     crew_roles_output += f"   * {extra_role}: [{extra_list}] (choose {secondary_perk_count})\n"
-        # Звичайні ролі без додаткових
         else:
             perks = sorted(set(member['perks']))
             crew_perks_section += f"{role} (choose {primary_perk_count}): {', '.join(perks)}\n"
@@ -594,7 +546,6 @@ def generate_prompt(tank_id, tank_name=None):
     
     slots_line = " | ".join([f"Slot {i+1}: [Item {i+1}]" for i in range(equip_slot_count)]) if equip_slot_count > 0 else ""
     
-    # Tier 1-5 не мають польової модернізації. Tier 11 — всі модифікації вивчені.
     if tier >= 11 or tier < 6:
         field_mods_text = ""
         output_fm_text = ""
@@ -662,24 +613,10 @@ Build Generated:
     return prompt
 
 
-# ==============================================================================
-# ЗАПУСК ПРОГРАМИ
-# ==============================================================================
-# Використання:
-#     python generate_prompt_v2.py "Tank Name"
-#
-# Приклади:
-#     python generate_prompt_v2.py "Super Conqueror"
-#     python generate_prompt_v2.py "IS-7"
-#     python generate_prompt_v2.py "M4 Sherman"
-#
-# Вихідний файл: prompt_{TankName}_v5.txt
-# ==============================================================================
 
 if __name__ == "__main__":
     import sys
 
-    # Отримання назви танка з аргументу командного рядка
     if len(sys.argv) > 1:
         tank_name_arg = sys.argv[1]
     else:
@@ -688,8 +625,6 @@ if __name__ == "__main__":
     tank_id = None
     tank_name = None
 
-    # Пошук танка за назвою (підтримка кирилиці та різних форматів)
-    # Нормалізуємо: видаляємо дефіси, пробіли, конвертуємо кирилицю (йс/ис -> is)
     search_term = tank_name_arg.lower().replace('-', '').replace(' ', '')
     
     for tid, tinfo in tank_db.items():
@@ -697,26 +632,21 @@ if __name__ == "__main__":
         name_normalized = name.lower().replace('-', '').replace(' ', '').replace('йс', 'is').replace('ис', 'is')
         id_normalized = tid.lower().replace('_', '').replace('-', '')
         
-        # Порівнюємо нормалізовану назву та ID танка
         if search_term in name_normalized or search_term in id_normalized:
             tank_id = tid
             tank_name = name
             break
 
-    # Якщо танк не знайдено - виводимо помилку
     if not tank_id:
         print(f"Tank not found: {tank_name_arg}")
         sys.exit(1)
 
-    # Генерація промту
     prompt = generate_prompt(tank_id, tank_name)
 
-    # Збереження промту у файл
     output_file = f"prompt_{tank_name.replace(' ', '_')}_v5.txt"
     with open(output_file, "w", encoding="utf-8") as f:
         f.write(prompt)
     
-    # Вивід інформації про танк
     tank_info = tank_db.get(tank_id, {})
     tank_slots_info = tank_slots.get(tank_id, {})
     

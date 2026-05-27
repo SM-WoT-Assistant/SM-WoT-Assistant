@@ -77,14 +77,12 @@ class StatsAI:
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
         self.ai_frame = ai_frame
         self.tank_db = tank_db
-        # Завантажуємо кеш популярних танків, якщо він є і кешування увімкнено
         self._cache_data = None
         self._cache_fresh = False
         if ENABLE_POPULAR_TANK_CACHE:
             cached_tanks, updated, fail_count = _load_popular_tank_cache()
             if cached_tanks:
                 self._cache_data = {"tanks": [{"tag": t} for t in cached_tanks], "updated": updated, "fail_count": fail_count}
-                # Завжди показуємо кеш (навіть прострочений), оновлення в фоні
                 self.popular_tanks = cached_tanks
                 self._cache_fresh = not _is_cache_expired(updated)
                 if self._cache_fresh:
@@ -131,11 +129,8 @@ class StatsAI:
         self._detail_tth_fixed_width = 250
         self._detail_info_fixed_width = 440
         self._detail_top_row_fixed_width = 440
-        # Upward shift (px) for the tank sprite inside the detail image card.
         self._detail_image_lift_px = 10
-        # TEST MODE: keep global layout debug disabled for users.
         self._layout_debug = False
-        # TEST MODE: show borders only for subsection blocks (equipment/consumables/crew/field mod).
         self._sections_debug = False
         self.tank_tth = {}
         self.reload_tth_data()
@@ -149,17 +144,13 @@ class StatsAI:
         )
         self.TTH_ICON_DIR = os.path.join(os.path.dirname(__file__), 'extracted_icons', 'tth')
         
-        # Cache for available icons in each category
         self._available_icons = {}
         self._load_available_icons()
 
-        # Placeholder text should not affect filtering logic.
         self.search_placeholder = f"Пошук серед {len(self.tank_db)} танків..."
         
         self.build_ai_ui()
-        # Immediately refresh UI (empty) then start AI fetch
         self.refresh_ai_view()
-        # Глобальний MouseWheel для скролінгу canvas, навіть коли миша над дочірніми Labels
         self.root.bind_all("<MouseWheel>", self._global_mousewheel, add="+")
 
     def _load_crew_builds(self):
@@ -191,11 +182,9 @@ class StatsAI:
         role_skill_pools = (builds.get('_role_skill_pools') or {}) if builds else {}
         tanks = (builds.get('tanks') or {}) if builds else {}
 
-        # Crew members: new format with secondary roles.
         tank_entry = tanks.get(tag) or {}
         crew_members = tank_entry.get('crew_members')
         if not isinstance(crew_members, list) or not crew_members:
-            # Legacy fallback: crew = [role1, role2, ...]
             crew_roles = tank_entry.get('crew')
             if crew_roles:
                 crew_members = [{'role': r, 'also': []} for r in crew_roles]
@@ -209,7 +198,6 @@ class StatsAI:
                 for r in (default_roles.get(tank_class) or ['commander', 'gunner', 'driver', 'loader'])
             ]
 
-        # Global perk policy (version-stable): tier-driven primary perks + bonus for secondary roles.
         policy = (builds.get('_perk_policy') or {}) if builds else {}
         tier_map = policy.get('primary_perk_count_by_tier') or {}
         default_primary = policy.get('default_primary_perk_count', 3)
@@ -259,7 +247,6 @@ class StatsAI:
             member_target = primary_perk_count + (secondary_perk_bonus * len(also_roles))
             member_target = max(1, min(member_target, max_perks))
 
-            # Build primary list first, then append secondary-role skills.
             skills = []
 
             def _append_unique(seq):
@@ -267,13 +254,11 @@ class StatsAI:
                     if name and name not in skills:
                         skills.append(name)
 
-            # Primary role block.
             _append_unique(role_skill_pools.get(role) or [])
             _append_unique(default_skills.get(role) or [])
             _append_unique(fallback_common)
             primary_block = skills[:primary_perk_count]
 
-            # Secondary role bonus block.
             extra_target = max(0, member_target - len(primary_block))
             if extra_target > 0:
                 for sec_role in also_roles:
@@ -370,7 +355,6 @@ class StatsAI:
 
     def _perform_search(self):
         self._show_grid_if_needed()
-        # Запускаємо оновлення асинхронно, щоб не блокувати ввід
         self.root.after(10, self.refresh_ai_view)
 
     def update_search_placeholder(self, new_placeholder):
@@ -378,7 +362,6 @@ class StatsAI:
         current_text = (self.ai_search_var.get() or "").strip()
         self.search_placeholder = new_placeholder
 
-        # Якщо в полі лишився старий плейсхолдер, не трактуємо його як реальний пошук.
         looks_like_placeholder = current_text.startswith("Пошук серед ") and current_text.endswith("танків...")
         if current_text == "" or current_text.casefold() == old_placeholder.casefold() or looks_like_placeholder:
             self.ai_search_var.set(new_placeholder)
@@ -396,25 +379,19 @@ class StatsAI:
                 darkcolor=[('active', '#3a3a3a'), ('pressed', '#4a4a4a')],
                 arrowcolor=[('active', '#ffffff'), ('pressed', '#ffffff')]
             )
-        # ПАНЕЛЬ ФІЛЬТРІВ (Масштабовані 2 строки)
         fb = tk.Frame(self.ai_frame, bg="#1a1a1a", pady=2)
         fb.pack(side="top", fill="x")
         
-        # Строка 1: Пошук на всю ширину
         row1 = tk.Frame(fb, bg="#1a1a1a", height=46)
         row1.pack(side="top", fill="x", pady=2)
         row1.pack_propagate(False)
         
-        # Не використовуємо trace_add, щоб уникнути затримки вводу
-        # self.ai_search_var.trace_add("write", self._on_search_changed)
         
         placeholder = self.search_placeholder
         
-        # Кнопка Додому
         self.btn_home = tk.Button(row1, text="⌂", bg="#2a2a2a", fg="gray", activebackground="#333", activeforeground="white", font=("Arial", 28), bd=0, relief="flat", cursor="hand2", command=self.return_to_ai_home)
         self.btn_home.pack(side="left", fill="y", padx=(5, 0))
 
-        # Світліший фон для строки пошуку для контрасту
         se_frame = tk.Frame(row1, bg="#2a2a2a") 
         se_frame.pack(side="left", fill="both", expand=True, padx=5)
         
@@ -438,14 +415,11 @@ class StatsAI:
                 se.config(fg="gray")
 
         def on_key_press(e):
-            # Обробляємо тільки друковані символи
             if not e.char:
                 return
-            # Миттєво ховаємо плейсхолдер при першому введенні (якщо ще не видалено)
             if se.get() == placeholder:
                 se.delete(0, 'end')
                 se.config(fg="white")
-            # Запускаємо пошук з затримкою 500мс (debounce)
             if self._search_timer is not None:
                 self.root.after_cancel(self._search_timer)
             self._search_timer = self.root.after(500, self._perform_search)
@@ -454,10 +428,8 @@ class StatsAI:
         se.bind("<FocusOut>", on_search_focus_out)
         se.bind("<KeyPress>", on_key_press)
 
-        # Відступ між строкою 1 і 2
         tk.Frame(fb, height=2, bg="#111").pack(side="top", fill="x")
 
-        # Строка 2: Рівні + Класи
         row3 = tk.Frame(fb, bg="#1a1a1a", height=46)
         row3.pack(side="top", fill="x", pady=2, padx=4)
         row3.pack_propagate(False)
@@ -490,10 +462,8 @@ class StatsAI:
             class_f.columnconfigure(i, weight=1, uniform="eq2")
             self.class_filters[c] = {"btn": btn, "active": False}
 
-        # Відступ між строкою 2 і 3
         tk.Frame(fb, height=2, bg="#111").pack(side="top", fill="x")
 
-        # Строка 3: Прапори на всю ширину
         row2 = tk.Frame(fb, bg="#1a1a1a", height=46)
         row2.pack(side="top", fill="x", pady=2)
         row2.pack_propagate(False)
@@ -525,16 +495,13 @@ class StatsAI:
             nf.rowconfigure(0, weight=1)
             self.nation_filters[n] = {"btn": btn, "active": False}
         
-        # Контейнер для прогрес-бару (завжди запакований)
         self.progress_container = tk.Frame(fb, height=4, bg="#0a0a0a")
         self.progress_container.pack(side="top", fill="x")
         self.progress_container.pack_propagate(False)
         
-        # Canvas для прогрес-бару (спочатку не запакований)
         self.filter_progress_canvas = tk.Canvas(self.progress_container, height=4, bg="#0a0a0a", highlightthickness=0)
         self._progress_rect = self.filter_progress_canvas.create_rectangle(0, 0, 0, 4, fill="#ff4500", outline="")
         
-        # ОСНОВНА ЗОНА: СІТКА
         self.ai_grid_container = tk.Frame(self.ai_frame, bg="#000")
         self.ai_grid_container.pack(side="top", fill="both", expand=True)
 
@@ -570,10 +537,8 @@ class StatsAI:
         self.ai_grid_frame.bind("<Configure>", lambda e: self.ai_canvas.configure(
             scrollregion=(0, 0, e.width, e.height)))
         
-        # Вікно результату — скролюємо весь вміст
         self.ai_res_f = tk.Frame(self.ai_frame, bg="#111111")
         
-        # Скролюючий canvas для деталей танка
         self.detail_canvas = tk.Canvas(self.ai_res_f, bg="#111111", highlightthickness=0)
         self.detail_scroll = ttk.Scrollbar(self.ai_res_f, orient="vertical",
                                            command=self.detail_canvas.yview,
@@ -591,16 +556,12 @@ class StatsAI:
         self.detail_canvas.bind("<Button-4>", lambda e: (self.detail_canvas.yview_scroll(-1, "units"), "break")[1])
         self.detail_canvas.bind("<Button-5>", lambda e: (self.detail_canvas.yview_scroll(1, "units"), "break")[1])
         
-        # Назва: пряме пакування в detail_inner
         self.ai_title_frame = tk.Frame(self.detail_inner, bg="#111111")
         self.ai_title_frame.pack(side="top", anchor="center", pady=(2, 2))
 
-        # Зображення танка: використовується в блоці ТТХ (ліворуч),
-        # окремо під заголовком більше не показується.
         self.ai_image_frame = tk.Frame(self.detail_inner, bg="#111111")
         self.ai_tank_icon_lf = tk.Label(self.ai_image_frame, bg="#111111")
 
-        # Контент-панель деталей: компактна центральна колонка, 500 px.
         self.ai_content_panel = tk.Frame(self.detail_inner, bg="#111111")
         self.ai_content_panel.pack(side="top", fill="x", padx=10, pady=(0, 5))
         self.ai_content_panel.grid_columnconfigure(0, weight=1)
@@ -614,17 +575,14 @@ class StatsAI:
             self.ai_content_panel.configure(highlightthickness=1, highlightbackground="#ffb347")
 
         self.ai_tth_frame = tk.Frame(self.ai_content_panel, bg="#111111")
-        # Row 1: Headers (ОБЛАДНАННЯ, СНАРЯДИ, ВИТРАТНІ)
         self.ai_top_headers_row = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_equipment_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
         self.ai_ammo_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
         self.ai_consumables_header = tk.Frame(self.ai_top_headers_row, bg="#111111")
-        # Row 2: Loadout 1
         self.ai_top_loadout_row = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_equipment_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
         self.ai_ammo_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
         self.ai_consumables_frame = tk.Frame(self.ai_top_loadout_row, bg="#111111")
-        # Row 3: Loadout 2
         self.ai_top_loadout_row_2 = tk.Frame(self.ai_content_panel, bg="#111111")
         self.ai_equipment_frame_2 = tk.Frame(self.ai_top_loadout_row_2, bg="#111111")
         self.ai_ammo_frame_2 = tk.Frame(self.ai_top_loadout_row_2, bg="#111111")
@@ -667,11 +625,9 @@ class StatsAI:
         if width is None:
             return
 
-        # Keep detail center column fixed regardless of current window width.
         compact_w = self._detail_compact_max_width
         self.ai_content_panel.grid_columnconfigure(1, minsize=compact_w)
         
-        # Configure row constraints to allow proper sizing
         self.ai_content_panel.grid_rowconfigure(0, weight=0)  # TTH
         self.ai_content_panel.grid_rowconfigure(1, weight=0)  # Headers row
         self.ai_content_panel.grid_rowconfigure(2, weight=0)  # Loadout 1
@@ -691,7 +647,6 @@ class StatsAI:
         ]
 
 
-        # Тепер розташовуємо інші секції, починаючи з рядка 0
         for idx, sec in enumerate(sections, start=0):
             if idx == 0:
                 sec.grid(row=0, column=1, sticky="nsew", padx=0, pady=(2, 2))
@@ -708,7 +663,6 @@ class StatsAI:
         self.ai_crew_frame.grid_propagate(False)
         self.ai_field_mod_frame.grid_propagate(False)
         
-        # Headers row layout
         self.ai_equipment_header.grid_forget()
         self.ai_ammo_header.grid_forget()
         self.ai_consumables_header.grid_forget()
@@ -720,7 +674,6 @@ class StatsAI:
         self.ai_ammo_header.grid(row=0, column=2, sticky="ew", padx=(1, 1))
         self.ai_consumables_header.grid(row=0, column=3, sticky="ew", padx=(2, 0))
 
-        # Top row: equipment | ammo | consumables
         self.ai_equipment_frame.grid_forget()
         self.ai_ammo_frame.grid_forget()
         self.ai_consumables_frame.grid_forget()
@@ -731,7 +684,6 @@ class StatsAI:
         self.ai_ammo_frame.grid(row=0, column=1, sticky="ew", padx=(1, 1))
         self.ai_consumables_frame.grid(row=0, column=2, sticky="ew", padx=(2, 0))
 
-        # Row 2
         self.ai_top_loadout_row_2.configure(width=fixed_w)
         self.ai_equipment_frame_2.grid_forget()
         self.ai_ammo_frame_2.grid_forget()
@@ -781,7 +733,6 @@ class StatsAI:
             pair_w = max((s.winfo_reqwidth() for s in slots), default=1)
         except tk.TclError:
             return
-        # +pair_gap закладаємо як міжпарний інтервал.
         cols = max(1, width // max(1, pair_w + pair_gap))
 
         for s in slots:
@@ -819,12 +770,10 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
-        # Show progress bar
         if not self._filter_active:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Collect items during animation; callback finishes UI update
         self._animate_realtime(
             1.5,
             lambda: self._collect_filtered_items(),
@@ -840,12 +789,10 @@ class StatsAI:
         if not was_active:
             self.class_filters[c]["active"] = True
             self.class_filters[c]["btn"].config(bg="#444444", fg="#ffffff")
-        # Show progress bar instead of loading screen
         if not self._filter_active:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Animate for at least 0.8s; collect items during animation
         self._animate_realtime(
             0.8,
             lambda: self._collect_filtered_items(),
@@ -861,12 +808,10 @@ class StatsAI:
         if not was_active:
             self.nation_filters[n]["active"] = True
             self.nation_filters[n]["btn"].config(bg="#444444")
-        # Show progress bar instead of loading screen
         if not self._filter_active:
             self._filter_active = True
             self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
-        # Animate for at least 0.8s; collect items during animation
         self._animate_realtime(
             0.8,
             lambda: self._collect_filtered_items(),
@@ -877,7 +822,6 @@ class StatsAI:
         self.loading_frame = tk.Frame(self.ai_grid_container, bg="black")
         self.loading_canvas = tk.Canvas(self.loading_frame, bg="black", highlightthickness=0)
         self.loading_canvas.pack(fill="both", expand=True)
-        # Center content
         self.loading_canvas.update_idletasks()
         w = self.loading_canvas.winfo_width() or 400
         h = self.loading_canvas.winfo_height() or 300
@@ -938,11 +882,9 @@ class StatsAI:
             
             if not tank_path: return None
             tank_img = Image.open(tank_path).convert("RGBA")
-            # Scale original image uniformly - normalize to standard size first
             card_w, card_h = size
             card = Image.new("RGBA", (card_w, card_h), (17, 17, 17, 255))
             
-            # Normalize all tank images to standard 380x304 canvas
             std_w, std_h = 380, 304
             temp = ImageOps.contain(tank_img, (std_w, std_h), Image.LANCZOS)
             canvas = Image.new("RGBA", (std_w, std_h), (0, 0, 0, 0))
@@ -951,17 +893,14 @@ class StatsAI:
             canvas.paste(temp, (x, y), temp)
             tank_img = canvas
             
-            # Scale to fit within work area (preserve aspect ratio)
             work_w = int(card_w * 1.55)
             work_h = int(card_h * 1.55)
             tank_img = ImageOps.contain(tank_img, (work_w, work_h), Image.LANCZOS)
             
-            # Center vertically in card, then adjust with lift (negative = shift down)
             y_offset = (card_h - tank_img.height) // 2 - self._detail_image_lift_px
             card.paste(tank_img, ((card_w - tank_img.width)//2, y_offset), tank_img)
 
             if self._layout_debug:
-                # Outer bounds + vertical guides for top margin and actual image start/end.
                 dbg = ImageDraw.Draw(card)
                 dbg.rectangle((0, 0, card_w - 1, card_h - 1), outline=(255, 96, 96, 255), width=2)
                 dbg.line((0, y_top_margin, card_w - 1, y_top_margin), fill=(255, 210, 70, 255), width=1)
@@ -1038,7 +977,6 @@ class StatsAI:
         """Оновлює грід за допомогою чанків, щоб не блокувати UI."""
         if not hasattr(self, 'ai_grid_frame'): return
 
-        # Збираємо список танків для відображення
         search_q = self._parse_search_query()
         active_t, active_c, active_n = self._active_filter_values()
         max_cols = self._last_cols if self._last_cols > 0 else 5
@@ -1049,7 +987,6 @@ class StatsAI:
             for tag in self.popular_tanks:
                 if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
 
-            # Якщо список популярних танків порожній – показуємо інформаційне повідомлення
             if not self.popular_tanks:
                 for widget in self.ai_grid_frame.winfo_children():
                     widget.destroy()
@@ -1058,7 +995,6 @@ class StatsAI:
                 placeholder.pack(expand=True)
                 return
 
-            # Сортуємо за рівнем: найвищі зверху
             def _tier_sort(item):
                 d = item[1] if isinstance(item[1], dict) else {}
                 return int(d.get("tier", 0) or 0)
@@ -1098,11 +1034,9 @@ class StatsAI:
                     return 0
             items_to_show.sort(key=_tier_sort, reverse=True)
 
-        # Обмежуємо кількість результатів для швидкодії
         if len(items_to_show) > 60:
             items_to_show = items_to_show[:60]
 
-        # Передаємо список танків для відображення
         self._finish_filter_with_items(items_to_show)
         
     def _collect_filtered_items(self):
@@ -1175,11 +1109,9 @@ class StatsAI:
         """Build new grid in background, then swap instantly to avoid black flash."""
         max_cols = self._last_cols if self._last_cols > 0 else 5
         
-        # Build new grid in a temporary frame (not yet shown)
         new_grid = tk.Frame(self.ai_canvas, bg="#000", padx=0.5, pady=0.5)
         
         if not items_to_show:
-            # Show translated "NO TANKS FOUND" message
             msg_text = self.t("no_tanks_found", "NO TANKS FOUND")
             msg_label = tk.Label(
                 new_grid,
@@ -1258,30 +1190,25 @@ class StatsAI:
                 col += 1
                 if col >= max_cols: col = 0; row += 1
             
-        # Configure columns for the new grid
         for c in range(max_cols):
             new_grid.columnconfigure(c, weight=1)
         for c in range(max_cols, max_cols + 15):
             new_grid.columnconfigure(c, weight=0)
         
-        # Bind scrollregion update
         new_grid.bind("<Configure>", lambda e: self.ai_canvas.configure(
             scrollregion=(0, 0, e.width, e.height)))
         
-        # SWAP: Update canvas window to point to new frame, then destroy old
         self.ai_canvas.itemconfig(self.ai_canvas_window, window=new_grid)
         old_grid = self.ai_grid_frame
         self.ai_grid_frame = new_grid
         old_grid.destroy()
         
-        # Update scrollregion (без блокуючого update_idletasks)
         self.root.after(50, lambda: (
             self.ai_grid_frame.update_idletasks(),
             self.ai_canvas.configure(
                 scrollregion=(0, 0, self.ai_grid_frame.winfo_width(), self.ai_grid_frame.winfo_height()))
         )[-1])
         
-        # Now hide progress bar
         try:
             canvas_width = self.filter_progress_canvas.winfo_width()
             if canvas_width > 1:
@@ -1318,11 +1245,9 @@ class StatsAI:
             except Exception:
                 pass
             
-            # Continue animation if work still running OR time not elapsed
             if not work_done[0] or elapsed < duration:
                 self.root.after(50, update)
             else:
-                # Both work and minimum animation time complete
                 try:
                     canvas_width = self.filter_progress_canvas.winfo_width()
                     if canvas_width > 1:
@@ -1341,7 +1266,6 @@ class StatsAI:
         self._filter_hide_job = None
         if hasattr(self, 'filter_progress_canvas') and self.filter_progress_canvas.winfo_exists():
             self.filter_progress_canvas.pack_forget()
-        # Reset rectangle to 0 width
         try:
             self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
         except Exception:
@@ -1351,11 +1275,9 @@ class StatsAI:
         self.active_tank = None
         if hasattr(self, 'ai_res_f'): self.ai_res_f.pack_forget()
         if hasattr(self, 'ai_grid_container'): self.ai_grid_container.pack(side="top", fill="both", expand=True)
-        # Cancel any pending search timer
         if self._search_timer is not None:
             self.root.after_cancel(self._search_timer)
             self._search_timer = None
-        # Скидаємо всі фільтри та пошук
         self.ai_search_var.set(self.search_placeholder)
         for f in self.tier_filters.values(): f["active"] = False; f["btn"].config(bg="#333333", fg="#aaaaaa")
         for f in self.class_filters.values(): f["active"] = False; f["btn"].config(bg="#333333", fg="#aaaaaa")
@@ -1370,7 +1292,6 @@ class StatsAI:
 
         candidates = []
         if category == 'field_mods':
-            # Prefer larger icons: check 120x120, 100x100, 80x80, then 24x24 as last resort.
             base_field = os.path.join(self.LOADOUT_ICON_DIR, 'field_mods', 'pairModifications')
             for sub in ['120x120', '100x100', '80x80', '24x24']:
                 candidates.append(os.path.join(base_field, sub, f"{name}.png"))
@@ -1390,13 +1311,10 @@ class StatsAI:
             if disabled:
                 from PIL import ImageEnhance
                 img = ImageEnhance.Brightness(img).enhance(0.3)
-            # Keep native icon look: crop transparent margins and fit into square without stretching.
             bbox = img.getbbox()
             if bbox:
                 img = img.crop(bbox)
             canvas = Image.new("RGBA", size, (0, 0, 0, 0))
-            # crew_roles icons are very small (14-30px) — always scale freely with LANCZOS for quality.
-            # For other categories, limit upscale to 4x to avoid blurring tiny pixel-art icons.
             if category == 'crew_roles':
                 scale_w = size[0] / max(1, img.width)
                 scale_h = size[1] / max(1, img.height)
@@ -1407,8 +1325,6 @@ class StatsAI:
             scale = min(scale_w, scale_h)
             new_w = max(1, int(round(img.width * scale)))
             new_h = max(1, int(round(img.height * scale)))
-            # crew_roles: always LANCZOS for smooth upscaling of small originals.
-            # Others: LANCZOS for sources >= 48px, NEAREST for tiny pixel-art.
             if category == 'crew_roles':
                 resample = Image.LANCZOS
             else:
@@ -1488,7 +1404,6 @@ class StatsAI:
         if isinstance(tth, dict) and tth:
             return tth
 
-        # Явні alias-и для спец-варіантів/локальних розбіжностей тегів.
         tth_aliases = {
             "A14_T30": "A14_T30_FL",
             "R122_T44_100": "R122_T44_100B",
@@ -1523,14 +1438,12 @@ class StatsAI:
                         changed = True
             return base
 
-        # 1) Прямий/нормалізований пошук
         for key, value in self.tank_tth.items():
             key_l = str(key).lower()
             key_n = key_l.replace('-', '_')
             if (key_l == tag_l or key_n == tag_n) and isinstance(value, dict) and value:
                 return value
 
-        # 2) Спроба з обрізаними суфіксами режимів
         base_tag = _strip_mode_suffixes(tag_n)
         if base_tag != tag_n:
             for key, value in self.tank_tth.items():
@@ -1538,7 +1451,6 @@ class StatsAI:
                 if key_n == base_tag and isinstance(value, dict) and value:
                     return value
 
-        # 3) Спроба з корекцією story-перепрефікса: G1037_x -> G37_x
         m_story = re.match(r'^([a-z]+)(\d{4})_(.+)$', base_tag)
         if m_story:
             pref, num4, rest = m_story.groups()
@@ -1560,7 +1472,6 @@ class StatsAI:
             if key_suffix == suffix and isinstance(value, dict) and value:
                 return value
 
-        # 4) Fallback по назві: беремо інший тег з тією ж назвою танка
         current = self.tank_db.get(tag)
         if isinstance(current, dict):
             cur_name = str(current.get("name", "")).strip().casefold()
@@ -1632,15 +1543,12 @@ class StatsAI:
 
     def _ammo_icon_name(self, shell_type):
         """Повертає ім'я файлу іконки снаряда"""
-        # Знайдемо найближчий файл
         ammo_dir = os.path.join(self.LOADOUT_ICON_DIR, 'ammo')
         if not os.path.exists(ammo_dir):
             return None
-        # Прямий збіг
         direct = os.path.join(ammo_dir, f'{shell_type}.png')
         if os.path.exists(direct):
             return shell_type
-        # Пошук найближчого
         files = os.listdir(ammo_dir)
         for f in files:
             if shell_type in f.replace('.png', ''):
@@ -1790,7 +1698,6 @@ class StatsAI:
         """Формує пари FIELD MODS для конкретного танка з клієнтських даних."""
         if tag in self._field_mod_pairs_cache:
             cached = self._field_mod_pairs_cache[tag]
-            # Якщо в кеші вже достатньо пар для поточного рівня — використовуємо.
             if isinstance(cached, list) and len(cached) >= self._field_mod_pair_limit_for_tier(tag):
                 return cached
 
@@ -1799,7 +1706,6 @@ class StatsAI:
             self._field_mod_pairs_cache[tag] = []
             return []
 
-        # 1) Пріоритет: прямий витяг з декодованих клієнтських post_progression даних.
         for lookup_tag in self._field_mod_lookup_tags(tag):
             tank_entry = self._field_mod_pairs_by_tank.get(lookup_tag)
             if not isinstance(tank_entry, dict):
@@ -1818,7 +1724,6 @@ class StatsAI:
                 self._field_mod_pairs_cache[tag] = pairs
                 return pairs
 
-        # 2) Fallback: локальна евристика з *_modifications.xml (коли мапа не згенерована).
         tokens = self._extract_field_mod_tokens(tag)
         icons = []
         for tk_name in tokens:
@@ -1837,12 +1742,9 @@ class StatsAI:
                 self._field_mod_pairs_cache[tag] = pairs
                 return pairs
 
-        # 3) Fallback по ролі класу: знаходимо пари за class -> role з наявної бази.
-        #    Клас танка (HT/MT/LT/TD/SPG) -> найближча роль з pairs_by_tank.
         tank_info = self.tank_db.get(tag, {}) if isinstance(self.tank_db, dict) else {}
         tank_class = str((tank_info or {}).get('class', '')).upper()
 
-        # Пріоритетний маппінг клас -> роль
         class_role_priority = {
             'HT':  ['role_HT_universal', 'role_HT_break', 'role_HT_assault'],
             'MT':  ['role_MT_universal', 'role_MT_sniper', 'role_MT_assault'],
@@ -1850,7 +1752,6 @@ class StatsAI:
             'TD':  ['role_ATSPG_universal', 'role_ATSPG_sniper', 'role_ATSPG_assault'],
             'SPG': ['role_ATSPG_universal', 'role_ATSPG_assault', 'role_ATSPG_sniper'],
         }
-        # Будуємо словник роль -> пари з наявних 53 записів
         role_pairs_map = {}
         for _, entry in self._field_mod_pairs_by_tank.items():
             if not isinstance(entry, dict):
@@ -1874,7 +1775,6 @@ class StatsAI:
                 self._field_mod_pairs_cache[tag] = pairs
                 return pairs
 
-        # 4) Абсолютний fallback: використовуємо _default_field_mod_pairs
         pairs = self._default_field_mod_pairs()[:pair_limit]
         self._field_mod_pairs_cache[tag] = pairs
         return pairs
@@ -1883,16 +1783,13 @@ class StatsAI:
     def on_ai_tank_select(self, tag):
         self.active_tank = tag
         
-        # === INSTANT SWITCH: show detail view immediately with loading ===
         data = self.tank_db.get(tag, {})
         if not isinstance(data, dict):
             data = {}
         
-        # Hide grid, show result frame immediately
         self.ai_grid_container.pack_forget()
         self.ai_res_f.pack(side="top", fill="both", expand=True)
         
-        # Clear all detail frames
         for frame in [self.ai_title_frame, self.ai_tth_frame, 
                       self.ai_equipment_frame, self.ai_consumables_frame, self.ai_ammo_frame,
                       self.ai_equipment_frame_2, self.ai_consumables_frame_2, self.ai_ammo_frame_2,
@@ -1900,7 +1797,6 @@ class StatsAI:
             for w in frame.winfo_children():
                 w.destroy()
         
-        # Build title header immediately (we already have tank_db data)
         is_prem = data.get("is_premium", False)
         acc = "#e09b1b" if is_prem else "#bbbbbb"
         hf = tk.Frame(self.ai_title_frame, bg="#111111")
@@ -1922,14 +1818,12 @@ class StatsAI:
         tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
         tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
         
-        # Show loading indicator in the equipment area
         loading_frame = tk.Frame(self.ai_equipment_frame, bg="#111111")
         loading_frame.pack(fill="both", expand=True, pady=(30, 10))
         
         tk.Label(loading_frame, text="🔍  ПОШУК ІНФОРМАЦІЇ...", 
                  fg="#ff8800", bg="#111111", font=("Arial", 14, "bold")).pack(pady=(20, 10))
         
-        # Animated progress bar
         prog_canvas = tk.Canvas(loading_frame, height=6, bg="#1a1a1a", bd=0, highlightthickness=0)
         prog_canvas.pack(fill="x", padx=40, pady=(0, 20))
         prog_rect = prog_canvas.create_rectangle(0, 0, 0, 6, fill="#ff6600", outline="")
@@ -1937,7 +1831,6 @@ class StatsAI:
         self.detail_canvas.yview_moveto(0)
         self.root.update_idletasks()
         
-        # Animate the loading bar
         self._loading_anim_active = True
         start_time = time.time()
         
@@ -1948,7 +1841,6 @@ class StatsAI:
                 if not prog_canvas.winfo_exists():
                     return
                 elapsed = time.time() - start_time
-                # Slow progress that never reaches 100% (asymptotic)
                 progress = min(0.9, 1.0 - 1.0 / (1.0 + elapsed * 0.3))
                 w = prog_canvas.winfo_width()
                 if w > 1:
@@ -1959,10 +1851,8 @@ class StatsAI:
         
         animate_loading()
         
-        # Collect data in background thread, then build UI
         def background_collect():
             tank_info = self._collect_tank_data(tag)
-            # Switch back to main thread to build UI
             if self.ai_equipment_frame.winfo_exists():
                 self.ai_equipment_frame.after(0, lambda: self._finish_tank_detail_with_loading(tank_info))
         
@@ -1983,19 +1873,15 @@ class StatsAI:
         if not isinstance(data, dict):
             data = {}
         
-        # Get composite icon (image loading can be done in background)
         img = self.get_composite_icon(tag, data.get("nation", ""), size=(196, 126))
         
-        # Get TTH data
         tth = self._find_tth_for_tag(tag)
         if not tth:
             self.reload_tth_data()
             tth = self._find_tth_for_tag(tag)
         
-        # Get crew rows
         crew_rows = self._get_crew_rows_for_tank(tag)
         
-        # Get field mod pairs
         fm_pairs = self._get_field_mod_pairs_for_tank(tag)
         
         return {
@@ -2019,7 +1905,6 @@ class StatsAI:
         crew_rows = tank_info['crew_rows']
         fm_pairs = tank_info['fm_pairs']
         
-        # Clear old content
         for widget in self.ai_title_frame.winfo_children(): widget.destroy()
         for widget in self.ai_tth_frame.winfo_children(): widget.destroy()
         for widget in self.ai_equipment_frame.winfo_children(): widget.destroy()
@@ -2038,7 +1923,6 @@ class StatsAI:
         is_prem = data.get("is_premium", False)
         acc = "#e09b1b" if is_prem else "#bbbbbb"
         
-        # Build title
         hf = tk.Frame(self.ai_title_frame, bg="#111111")
         hf.pack(side="top", anchor="center", pady=(0, 8))
         roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
@@ -2058,7 +1942,6 @@ class StatsAI:
         tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
         tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
         
-        # Build TTH table
         tth_rows = []
         if tth.get('hp'):
             tth_rows.append(("relativeArmor.png", "Міцність (HP):", str(tth['hp'])))
@@ -2131,26 +2014,21 @@ class StatsAI:
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
         
-        # Build equipment section
         equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-        # СНАРЯДИ
         ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
         crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         
         fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
         
 
-        # Row 2 frames
         equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
         equip_body_2.pack(side="top", fill="x", pady=3)
         cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
         cons_body_2.pack(side="top", fill="x", pady=3)
-        # СНАРЯДИ
         ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
         ammo_body_2.pack(side="top", fill="x", pady=3)
         
-        # Пусті loading_labels
         loading_labels = []
             
         tank_name = self._get_clean_tank_name(tag, data)
@@ -2162,7 +2040,6 @@ class StatsAI:
                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
             ))
         
-        # Завантаження обладнання з Tomato.gg з кешуванням
         tomato_slug = None  # Tomato integration removed
         
         def map_equip(name):
@@ -2217,8 +2094,6 @@ class StatsAI:
             field_mods = []
             ammo = []
             
-            # Simple mapping: Tomato equipment names -> icon file names
-            # No client validation needed - Tomato already provides valid equipment
             if tomato_data:
                 eq1 = tomato_data.get("equipment_1", [])
                 eq2 = tomato_data.get("equipment_2", [])
@@ -2226,13 +2101,11 @@ class StatsAI:
                 equipment_1 = [map_equip(e) for e in eq1[:3]]
                 equipment_2 = [map_equip(e) for e in eq2[:3]]
                 
-                # Get consumables for both loadouts from Tomato
                 cons_1 = tomato_data.get("consumables_1", [])
                 cons_2 = tomato_data.get("consumables_2", [])
                 consumables_1 = [map_cons(c) for c in cons_1[:3]] if cons_1 else []
                 consumables_2 = [map_cons(c) for c in cons_2[:3]] if cons_2 else []
                 
-                # Fallback to old single consumables field if new fields not available
                 if not consumables_1:
                     cons = tomato_data.get("consumables", [])
                     consumables_1 = [map_cons(c) for c in cons[:3]]
@@ -2243,14 +2116,10 @@ class StatsAI:
                 for role, skills in crew_perks.items():
                     if isinstance(skills, list):
                         if role == "loader_radio":
-                            # loader_radio = 5th crew member with 6 loader skills + 4 radio skills
-                            # Store as "loader_radio" key (5th row in UI)
                             if "loader_radio" not in crew_skills_map:
                                 crew_skills_map["loader_radio"] = []
                             crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
                         elif role == "loader":
-                            # Regular loader = 4th crew member (6 skills)
-                            # Keep even if loader_radio exists (5 crew members total)
                             if "loader" not in crew_skills_map:
                                 crew_skills_map["loader"] = []
                             crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
@@ -2275,7 +2144,6 @@ class StatsAI:
                 consumables_1 = cached_data.get("consumables_1", [])
             if not consumables_2:
                 consumables_2 = cached_data.get("consumables_2", [])
-            # Fallback: if only old format available, use for both
             if not consumables_1 and not consumables_2:
                 old_cons = cached_data.get("consumables", [])
                 if old_cons:
@@ -2286,24 +2154,20 @@ class StatsAI:
             if not field_mods:
                 field_mods = cached_data.get("field_mods", [])
             
-            # no hardcoded fallbacks — AI will populate after prompt
             if not crew_skills:
                 crew_skills = []
             if not field_mods:
                 field_mods = []
             
-            # Отримуємо типи снарядів з tank_tth (без кількості)
             if tank_tth and tank_tth.get('shells'):
                 shells = tank_tth['shells']
                 for shell in shells:
                     shell_type = shell.get('type', '')
                     if shell_type:
-                        # Маппимо тип снаряду в ім'я іконки
                         mapped = _map_shell_type(shell_type)
                         if mapped:
                             ammo.append(mapped)
             if not ammo:
-                # Fallback: стандартний набір за tier/class
                 cls = data.get('class', 'MT') if isinstance(data, dict) else 'MT'
                 ammo = _default_ammo_for_tank(data.get('tier', 8) if isinstance(data, dict) else 8, cls)
             
@@ -2319,18 +2183,14 @@ class StatsAI:
 
         build_data = process_tomato_data(None, None, tank_tth=tth)
 
-        # NOTE: equipment_loadouts.json override removed for AI mechanism testing
-        # crew_builds.json override removed for AI mechanism testing
 
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
-        # Save context for AI build update
         self._current_build_data = build_data
         self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
                                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
-        # Trigger AI build for this tank
         tank_name = data.get('name', tag)
         self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
         tag_copy = tag
@@ -2347,7 +2207,6 @@ class StatsAI:
         parts = tag.split('_', 1)
         nation_code = parts[0] if parts else ''
         short_name = parts[1] if len(parts) > 1 else tag
-        # Strip trailing digits from nation prefix (e.g. "Ch01" -> "Ch")
         nation_code_alpha = re.sub(r'\d+$', '', nation_code)
         nation_map = {'A': 'usa', 'Ch': 'china', 'Cz': 'czech',
                       'Env': 'germany', 'F': 'france', 'G': 'germany',
@@ -2374,7 +2233,6 @@ class StatsAI:
 
     def _map_ai_fm_text_to_icon(self, text):
         t = text.lower()
-        # Robust keyword mapping for all 25 field mod IDs
         if "terrain" in t or "grouser" in t: return "additionalGrousers"
         if "lightweight" in t or "friction" in t: return "betterFriction"
         if "durability" in t or "chassis durability" in t: return "improvedChassisDurability"
@@ -2403,7 +2261,6 @@ class StatsAI:
         return "glow"
 
     def _update_ai_setup_ui(self, build_data, equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs):
-        # Simple safety check - exit if UI was destroyed
         try:
             if not equip_body.winfo_exists():
                 return
@@ -2415,7 +2272,6 @@ class StatsAI:
                 if lbl.winfo_exists(): lbl.destroy()
             except: pass
             
-        # Очищаємо всі frames
         for body in [equip_body, cons_body, ammo_body, crew_body, fm_body, equip_body_2, cons_body_2, ammo_body_2]:
             if body is None:
                 continue
@@ -2473,7 +2329,6 @@ class StatsAI:
             self._layout_tile_row(parent, slots, gap=0)
             return slots
 
-        # Force correct ration based on nation for ALL consumable loadouts
         ration_map = {
             "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
             "france": "hotCoffee", "china": "ration_china", "poland": "ration_poland",
@@ -2488,24 +2343,20 @@ class StatsAI:
                     if c in ration_map.values():
                         cons[i] = correct_ration
             
-        # Цифра 1 перед обладнанням - створюємо локально, не зберігаємо в self
         loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_1.pack(side="left", padx=(0, 2))
         loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
         loadout_num_label_1.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
-        # Оборудование в отдельном фрейме с grid
         equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
         equip_grid_frame_1.pack(side="left", fill="none", expand=False)
         render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts")
         
-        # Цифра 2 перед обладнанням - створюємо локально, не зберігаємо в self
         loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_2.pack(side="left", padx=(0, 2))
         loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
         loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
-        # Оборудование в отдельном фрейме с grid
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
         equip_grid_frame_2.pack(side="left", fill="none", expand=False)
         render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
@@ -2514,26 +2365,19 @@ class StatsAI:
         render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
         render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
         
-        # Build ai_crew: normalize role names (loader_1 -> loader, loader_2 -> loader, etc.)
-        # Each normalized role maps to a LIST of skill-lists (one per crew member of that role)
         ai_crew = {}
         ai_crew_also = {}  # Secondary role skills
         
-        # Check how many crew members we have in UI
         crew_member_count = len(crew_rows)
         
         for role, skills in build_data.get("crew", []):
             r_lower = role.lower()
             
-            # Handle loader_radio (5th crew member with 10 skills)
             if role == "loader_radio":
-                # 5th crew member - loader + radio operator with 10 skills (6 loader + 4 radio)
-                # Зберігаємо як loader (6) + radioman (4) окремо
                 if "loader" not in ai_crew:
                     ai_crew["loader"] = []
                 ai_crew["loader"].append(skills[:6])
                 
-                # Додаткові навички (радіо) зберігаємо окремо
                 if "loader" not in ai_crew_also:
                     ai_crew_also["loader"] = []
                 ai_crew_also["loader"].append(skills[6:10])
@@ -2550,7 +2394,6 @@ class StatsAI:
                     ai_crew[r_lower] = []
                 ai_crew[r_lower].append(skills[:6] if len(skills) > 6 else skills)
             else:
-                # Normalize: strip numeric suffix
                 import re as _re
                 r_lower = _re.sub(r'_\d+$', '', r_lower)
                 if "radio" in r_lower or "radioman" in r_lower: r_lower = "radioman"
@@ -2570,7 +2413,6 @@ class StatsAI:
             
             role_str = member.get("role", "commander")
             primary_r_icon = role_str.lower()
-            # Handle loader_radio FIRST - special case, map to loader
             if "loader_radio" in primary_r_icon:
                 primary_r_icon = "loader"
             elif "radio" in primary_r_icon or "radioman" in primary_r_icon:
@@ -2584,10 +2426,8 @@ class StatsAI:
             elif "commander" in primary_r_icon:
                 primary_r_icon = "commander"
             
-            # Check if this member has secondary role from crew_builds.json
             also_roles = member.get("also") or []
             
-            # Primary role
             role_box = tk.Frame(row, bg="#111111", bd=0, relief="flat", width=40, height=40)
             role_box.pack(side="left", padx=(0, 3))
             role_box.pack_propagate(False)
@@ -2598,8 +2438,6 @@ class StatsAI:
                 role_lbl.image = role_photo
             role_lbl.pack(expand=True)
             
-            # Secondary roles - use calculated from AI data, not from tank_db
-            # also_roles is already calculated above from ai_crew_also
             for sec_role in also_roles:
                 sec_icon = sec_role.lower()
                 if "loader" in sec_icon: sec_icon = "loader"
@@ -2618,7 +2456,6 @@ class StatsAI:
                     sec_lbl.image = sec_photo
                 sec_lbl.pack(expand=True)
                 
-            # Skills for this member (separate primary and secondary roles)
             primary_skills = []
             secondary_skills = []
             original_role = member.get("role", "").lower()
@@ -2644,7 +2481,6 @@ class StatsAI:
                     if r in ai_crew_also and ai_crew_also[r]:
                         secondary_skills.extend(ai_crew_also[r].pop(0))
             
-            # Deduplicate within each group (secondary shows all its perks even if duplicated with primary)
             seen_p = set()
             clean_primary = []
             for sk in primary_skills:
@@ -2658,7 +2494,6 @@ class StatsAI:
                     seen_s.add(sk)
                     clean_secondary.append(sk)
             
-            # Render all skills on ONE row: primary → spacer → secondary
             for sk in clean_primary:
                 sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                 sk_box.pack(side="left", padx=(0, 3))
@@ -2670,7 +2505,6 @@ class StatsAI:
                     sk_lbl.image = sk_photo
                 sk_lbl.pack(expand=True)
             
-            # Spacer with double indent before secondary skills
             if clean_secondary:
                 spacer = tk.Frame(row, bg="#111111", width=16)
                 spacer.pack(side="left")
@@ -2688,11 +2522,8 @@ class StatsAI:
 
         self._layout_tile_grid(crew_body, crew_slots, min_cell=9999, gap=0, stretch=False)
 
-        # Field mods section
-        # Each pair = (mod_id_left, mod_id_right) — only ONE is selected (recommended by AI)
         fm_raw = build_data.get("field_mods", [])
         
-        # Handle different formats: list of strings, list of dicts, or dict with mods
         fm_data = []
         if isinstance(fm_raw, list):
             for item in fm_raw:
@@ -2724,7 +2555,6 @@ class StatsAI:
             mod_left, mod_right = pair[0], pair[1]
             is_left  = mod_left  in ai_fm_icons
             is_right = mod_right in ai_fm_icons
-            # If AI didn't match either, highlight left by convention
             if not is_left and not is_right:
                 is_left = True
             
@@ -2752,7 +2582,6 @@ class StatsAI:
                     lbl.config(width=3, height=2, bg="#1e3020" if is_selected else "#0f161a")
                 lbl.pack(expand=True)
             
-            # Divider between pair items: a small "/" label
             div = tk.Label(pair_frame, text="/", fg="#555555", bg="#111111", font=("Arial", 9))
             div.place(relx=0.5, rely=0.5, anchor="center")
 
@@ -2766,13 +2595,10 @@ class StatsAI:
         tank_name = data.get('name', 'Unknown')
         self.update_status_bar(f"✓ Завантажено: {tank_name}", "#00cc00")
         
-        # Scroll to top and finalize
         self.detail_canvas.yview_moveto(0)
         
-        # Hide progress bar
         self._hide_filter_progress()
 
-        # Process all UI updates in one cycle to avoid flicker
         self.root.update_idletasks()
 
     def show_ai_result(self, text):
@@ -2947,7 +2773,6 @@ class StatsAI:
         """Запускає AI браузер для отримання build для конкретного танка.
         Якщо є свіжий кеш — використовує його, AI не запускає.
         Якщо попередній запит ще виконується — завершує його."""
-        # Check cache first
         if ENABLE_AI_BUILD_CACHE:
             builds, updated = _load_ai_build_cache()
             if tag in builds and tag in updated and not _is_cache_expired(updated[tag]):
@@ -3042,7 +2867,6 @@ class StatsAI:
             bd['field_mods'] = build_data['field_mods']
         bodies = self._current_bodies
         self._update_ai_setup_ui(bd, *bodies)
-        # Save to cache
         if ENABLE_AI_BUILD_CACHE:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
@@ -3127,7 +2951,6 @@ class StatsAI:
                 if progress_cb:
                     progress_cb(25, self.locale_manager.t_ui('fetching_info'))
 
-                # Read stdout line by line until RESPONSE_READY
                 tank_lines = []
                 for line in proc.stdout:
                     line = line.strip()
@@ -3158,7 +2981,6 @@ class StatsAI:
                 else:
                     self.root.after(0, lambda: self.update_status_bar("❌ AI не повернув назв танків", "red"))
 
-                # Terminate browser
                 try:
                     proc.terminate()
                     proc.wait(timeout=5)
@@ -3201,11 +3023,8 @@ class StatsAI:
                 line = line.strip()
                 if not line:
                     continue
-                # Remove numbering: "1.", "2)", "3-", "* ", "- " etc.
                 clean = re.sub(r'^[\d\*\-•]+\s*[\.\)\-\s]*\s*', '', line).strip()
-                # Strip markdown
                 clean = clean.replace('**', '').replace('*', '').replace('__', '')
-                # Strip parenthesized content (e.g. "(Tier X)", "(Soviet MT)")
                 clean = re.sub(r'\s*\(.*?\)\s*$', '', clean).strip()
                 low = clean.lower()
                 if any(skip in low for skip in [

@@ -28,7 +28,6 @@ class AIBrowserWindow(QWidget):
         self.setGeometry(100, 100, 1000, 700)
         self.setStyleSheet("background-color: white;")
 
-        # Hide taskbar icon via Windows API after window is created
         QTimer.singleShot(200, self._hide_taskbar_icon)
 
         profile = QWebEngineProfile.defaultProfile()

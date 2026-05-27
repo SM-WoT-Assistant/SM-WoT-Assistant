@@ -1,43 +1,7 @@
-            # -*- coding: utf-8 -*-
-# main.py 4_43
-# ==========================================
-# ЧЕК-ЛИСТ ФУНКЦІОНАЛУ (НЕ ВИДАЛЯТИ І НЕ ЗМІНЮВАТИ БЕЗ ДОЗВОЛУ):
-# [v] 1. UI: Три незалежні панелі (SETUP, TACTIC, MAPS), які повністю перемикаються. Нейтральний старт.
-# [v] 2. UI: Блок фільтрів (РЕЖИМ БОЮ з Натиском + ТЕХНІКА), пакування без накладання. Строка стану над фільтрами.
-# [v] 3. UI: Інструменти (painter.py). Магнітне прилипання. Захист від битих збережень.
-# [v] 4. UI: Налаштування (Кнопка ⚙ з коректним згортанням, перейменування мапи, авто-фільтри, AI-key). Темні діалоги.
-# [v] 5. ВІКНО: Гарячі клавіші (F10, E, Ctrl+Стрілки, Ctrl+ЛКМ). БЛОКУВАННЯ (Hotkey Lock) під час відкритих вікон.
-# [v] 6. ВІКНО: Масштабування суворо з фіксацією правого нижнього кута (apply_anchor_resize).
-# [v] 7. ВІКНО: Бойовий режим: click-through (ctypes) + приховування UI + незалежна пам'ять координат/розміру.
-# [v] 8. ДАНІ: Збереження всіх налаштувань у settings.json (окремо edit_ та norm_).
-# [v] 9. ДАНІ: Читання/запис custom_names.json та підміна назв у випадаючому списку.
-# [v] 10. МАПА: Запуск із заставки. ПОВЕРНУТО НЕЙТРАЛЬНИЙ СТАРТ.
-# [v] 11. МАПА: Дебаунс (затримка 100мс) при зміні розміру для уникнення мерехтіння.
-# [v] 12. ВІКНО: Watcher та жорстка фіксація (easy_drag=False) для WebView2.
-# [v] 13. МАПА: Кнопки ТАКТИКА / МАПИ, авто-перевірка version.xml та автономний парсинг.
-# [v] 14. МАПА: Читання map_data.json, фільтрація за режимом та відмальовування порожніх білих кілець із тінями.
-# [v] 15. UI: Універсальний вибір шляху до гри (wot_path + log_path) та автовизначення.
 
-# ==========================================
-# ЧЕК-ЛИСТ МОДУЛІВ ТА АРХІТЕКТУРИ:
-# [v] config.py — Конфігурація, шляхи, локалізація, словники.
-# [v] main.py — Головний GUI, масштабування, гарячі клавіші.
-# [v] map_updater.py — TACTIC: Старий завантажувач з інтернету (ПІДКЛЮЧЕНО).
-# [v] map_extractor.py — MAPS: Автономний екстрактор з клієнта гри (ПІДКЛЮЧЕНО).
-# [v] painter.py — Логіка малювання, кольорові POI, магнітне прилипання, темна тема (ПІДКЛЮЧЕНО).
-# [x] tomato_viewer.py — ВИДАЛЕНО (2026-05-20)
-# [v] ai_assistant.py — СТАТ АІ: Персональний помічник Gemini для усереднення збірок (ПІДКЛЮЧЕНО).
-# [v] tactics_manager.py — Новий модуль для імпорту/експорту тактик (ГОТОВО).
-# [v] log_reader.py — Читання python.log та автоматичне перемикання (ГОТОВО).
-# [v] help_system.py — Модуль ДОПОМОГИ (ГОТОВО).
-# [ ] translator.py — Модуль перекладу на інші мови (UA/EN/PL) (У ПЛАНАХ).
-# [x] tank_db.py — Модуль ТАНКИ: Локальна база ТТХ з клієнта (У ПЛАНАХ).
-# [ ] Модуль оновлення данних які програма бере з клієнта гри при зміні версії клієнта гри
-# ==========================================
 
 import os, sys, json, ctypes, re
 
-# Ensure UTF-8 output on Windows
 if os.name == 'nt':
     try:
         sys.stdout.reconfigure(encoding='utf-8')
@@ -57,7 +21,6 @@ import config
 import tactics_manager
 import log_reader
 import help_system
-# import ai_assistant  # ТИМЧАСОВО ВИМКНЕНО
 import painter as pnt
 import stats_ai
 import window_manager
@@ -101,7 +64,6 @@ class WotAssistantHQ:
         self.ai_icons = {} # Кеш іконок для Treeview
         self.ai_filters = {"nation": None, "class": None, "tier": None}
         
-        # Зворотна таблиця compactDescr -> інформація про танк (для авто-фільтрів)
         self.compact_descr_map = {
             v["compact_descr"]: {"key": k, "class": v["class"], "name": v["name"]}
             for k, v in self.tank_db.items()
@@ -138,9 +100,7 @@ class WotAssistantHQ:
         self.thread_queue = []
         self.process_queue()
         
-        # Ініціалізація відстеження логів
         log_path = self.settings.get("log_path", "")
-        # Нормалізуємо розділювачі шляху для поточної ОС
         if log_path:
             log_path = os.path.normpath(log_path)
             self.settings["log_path"] = log_path
@@ -181,10 +141,7 @@ class WotAssistantHQ:
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
             
-        # self.ai_stats = ai_assistant.AIAssistant(self.settings.get("ai_key", ""))  # ТИМЧАСОВО ВИМКНЕНО
 
-        # Стандартний старт: splash завжди показує прогрес фонового оновлення.
-        # Для аварійного вимкнення лишаємо технічний прапорець у settings.
         if bool(self.settings.get("disable_startup_splash", False)):
             self._start_startup_checks()
         else:
@@ -193,7 +150,6 @@ class WotAssistantHQ:
 
 
     def _start_startup_checks(self):
-        # Дозволяємо декодування мап на старті для автоматичного оновлення
         allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
         self.map_mgr.check_game_version(
             progress_cb=self._on_startup_progress,
@@ -201,7 +157,6 @@ class WotAssistantHQ:
             allow_map_decode=allow_decode,
         )
 
-    # auto_detect_wot_path moved to map_manager
 
     def t(self, cat, key):
         if cat == "ui": return self.locale.t_ui(key)
@@ -210,7 +165,6 @@ class WotAssistantHQ:
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
-        # До побудови UI повертаємо старий безпечний fallback.
         if not hasattr(self, "top_bar"):
             return 130
 
@@ -232,7 +186,6 @@ class WotAssistantHQ:
     def safe_execute(self, func):
         self.thread_queue.append(func)
 
-    # load_json and save_json moved to DataManager
 
     def save_settings(self):
         cx, cy = self.root.winfo_x(), self.root.winfo_y()
@@ -250,11 +203,9 @@ class WotAssistantHQ:
         self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
-        # Оновлюємо шлях у лог-рідері при зміні налаштувань
         if hasattr(self, 'log_watcher'):
             self.log_watcher.update_path(self.settings.get("log_path", ""))
 
-    # load_tank_db moved to DataManager
 
     def reload_tank_data(self):
         self.tank_db = self.data_mgr.load_tank_db()
@@ -272,12 +223,10 @@ class WotAssistantHQ:
 
 
 
-    # check_game_version moved to map_manager
 
     def translate_map_name(self, eng):
         return self.locale.t_map(eng)
 
-    # sort_map_list and get_eng_map_name moved to map_manager
 
     def ask_wot_path(self):
         self.dialog_open = True
@@ -290,7 +239,6 @@ class WotAssistantHQ:
             self.settings["log_path"] = log_path
             self.save_settings()
             
-            # Перевірка наявності лога
             if os.path.exists(log_path):
                 self.status_label.config(text=f"[ШТАБ] Путь та логи збережено: {path}", fg="lime")
                 print(f"[CONFIG] log_path встановлено: {log_path}")
@@ -323,7 +271,6 @@ class WotAssistantHQ:
                 self.ai_stats.configure(self.settings["ai_key"])
             self.status_label.config(text="[СТАТ АІ] Ключ оновлено успішно!", fg="lime")
 
-    # run_map_updater and load_map_list moved to map_manager
 
     def toggle_settings(self):
         if self._menu_is_active:
@@ -344,7 +291,6 @@ class WotAssistantHQ:
     def toggle_editor(self):
         if self.dialog_open: return 
 
-        # Бойовий режим дозволено лише у режимі МАПИ.
         if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
             msg = "[РЕЖИМ] Перехід у БОЙОВИЙ недоступний. Спочатку виберіть режим МАПИ."
             if hasattr(self, "status_label"):
@@ -364,9 +310,7 @@ class WotAssistantHQ:
 
         if self.mode == "edit":
             self.mode = "norm"
-            # У бойовому режимі click-through залежить від активності форматування (F8).
             self.win_mgr.set_clickthrough(not self.win_mgr.format_mode_enabled)
-            # НЕ показувати top_bar у боєвому режимі - тільки мапа
             self.top_bar.pack_forget()
             if self.active_view == "maps":
                 self.battle_status_top.pack(side="top", fill="x")
@@ -589,7 +533,6 @@ class WotAssistantHQ:
         target_map_mode = map_source_mode if map_source_mode in (1, 2) else 2
         self.switch_to_maps(target_map_mode)
         
-        # Конвертуємо режим
         mode_map = {
             "ctf": "Standard",
             "domination": "Encounter",
@@ -601,12 +544,10 @@ class WotAssistantHQ:
         print(f"[BATTLE] Синхронізація карти після повернення: {map_id} (МАПИ {target_map_mode})")
 
     def safe_battle_sync(self, map_id, ui_mode):
-        # Перевірка налаштування log_path
         if not self.settings.get("log_path", ""):
             self.status_label.config(text="[AUTO] ПОМИЛКА: Не встановлено log_path", fg="red")
             return
 
-        # Якщо зараз відкрито СТАТИ, автоматично перемикаємо на МАПИ II (вони актуальніші)
         self.switch_to_maps(2)
 
         if self.auto_mode_filter_var.get():
@@ -614,22 +555,18 @@ class WotAssistantHQ:
         else:
             print(f"[SYNC] Авто-вибір режиму бою вимкнено (auto_mode_filter={self.auto_mode_filter_var.get()})")
         
-        # Біжи до перекладу карти з логуванням
         target_name = self.translate_map_name(map_id)
         print(f"[SYNC] map_id='{map_id}', ui_mode='{ui_mode}', target_name='{target_name}'")
         
-        # Отримуємо список доступних карт
         tmaps = self.map_selector.cget("values")
         print(f"[SYNC] Available maps: {tmaps}")
         
-        # 1. Спробуємо точний збіг
         if target_name in tmaps:
             self.map_var.set(target_name)
             self.on_map_select()
             self.status_label.config(text=f"[AUTO] Виявлено: {target_name} ({map_id})", fg="lime")
             return
             
-        # 2. Пошук без врахування регістру
         for t in tmaps:
             if t.lower() == target_name.lower():
                 self.map_var.set(t)
@@ -637,7 +574,6 @@ class WotAssistantHQ:
                 self.status_label.config(text=f"[AUTO] Виявлено (регістр): {t} ({map_id})", fg="lime")
                 return
         
-        # 3. Частковий збіг (если перший фрагмент збігається)
         for t in tmaps:
             if target_name in t or t.lower() in target_name.lower():
                 self.map_var.set(t)
@@ -645,7 +581,6 @@ class WotAssistantHQ:
                 self.status_label.config(text=f"[AUTO] Виявлено (схоже): {t} ({map_id})", fg="yellow")
                 return
         
-        # 4. Якщо нічого не знайше - показуємо помилку з map_id
         self.status_label.config(text=f"[AUTO] ПОМИЛКА: Карта '{map_id}' ('{target_name}') не в списку", fg="red")
 
     def show_draw_menu(self):
@@ -654,10 +589,8 @@ class WotAssistantHQ:
         self.draw_menu.post(x, y)
 
     def setup_ui(self):
-        # Moved to UIManager
         pass
 
-    # build_filters moved to UIManager
 
 
 
@@ -689,8 +622,6 @@ class WotAssistantHQ:
             keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
             print(f"[HOTKEY] F8 недоступний: {e}")
             print("[HOTKEY] Fallback форматування: Ctrl+E")
-        # Ctrl керування вікном у бойовому режимі (подвійний натиск для drag)
-        # suppress=False дозволяє одинарному Ctrl залишатись прозорим для гри
         keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self.win_mgr.resize_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self.win_mgr.resize_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
@@ -733,11 +664,9 @@ class WotAssistantHQ:
     def _on_startup_ready(self):
         """Startup data checks complete → launch AI → then close splash."""
         self._startup_ready_at = time.time()
-        # Debug: check language setting
         lang_code = getattr(self.locale, 'lang', '?')
         test_key = self.t('ui', 'fetching_info')
         print(f"[INIT] lang={lang_code}, fetching_info='{test_key}'")
-        # Check if AI refresh is needed (cache may be fresh)
         if hasattr(self, 'stats_ai_module') and not self.stats_ai_module.needs_ai_refresh():
             print("[INIT] Кеш свіжий, AI не потрібен")
             try:
@@ -751,7 +680,6 @@ class WotAssistantHQ:
             self._startup_target_percent = 100
             self.root.after(200, self.finish_startup_splash)
             return
-        # Save current progress as AI base
         self._startup_ai_base = max(30, getattr(self, '_startup_display_percent', 30))
         self._startup_ai_base = min(self._startup_ai_base, 80)
         self.update_startup_progress(self._startup_ai_base, self.t('ui', 'data_updating'))
@@ -776,15 +704,12 @@ class WotAssistantHQ:
             return
         elapsed = time.time() - self._startup_ai_start
         base = getattr(self, '_startup_ai_base', 40)
-        # Phase 1: base → 93% over 20 seconds (typical AI response time)
         if elapsed < 20:
             pct = base + (93 - base) * elapsed / 20
         else:
-            # Phase 2: 93% → 100% over next 30 seconds
             pct = 93 + 7 * min(elapsed - 20, 30) / 30
         pct = min(100, pct)
         self._startup_target_percent = int(pct)
-        # Direct canvas update with float pct for sub-pixel smoothness
         try:
             self._startup_creep_active = True
             sw = int(self.splash_canvas["width"])
@@ -800,13 +725,11 @@ class WotAssistantHQ:
             self._ai_creep_id = self.root.after(100, self._ai_progress_creep)
 
     def _on_ai_progress(self, percent, text):
-        # Only update text, progress is handled by creep
         self.root.after(0, lambda t=text: self.update_startup_progress(
             getattr(self, '_startup_target_percent', 40), t
         ))
 
     def _on_ai_ready(self):
-        # Show "100% Готово" for 500ms before closing
         self.root.after(0, lambda: self.update_startup_progress(
             100, self.t('ui', 'ready')
         ))
@@ -849,7 +772,6 @@ class WotAssistantHQ:
         if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
             return
         try:
-            # During creep, direct smooth update handles the bar
             if not getattr(self, '_startup_creep_active', False):
                 sw = int(self.splash_canvas["width"])
                 sh = int(self.splash_canvas["height"])
@@ -868,20 +790,17 @@ class WotAssistantHQ:
 
     def finish_startup_splash(self):
         """Знищує splash та показує головне вікно."""
-        # Перевіряємо, чи splash відображався щонайменше 2 секунди
         shown_at = getattr(self, "_splash_shown_at", 0.0)
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
         min_visible_ms = 2000  # Принаймні 2 секунди
         if elapsed_ms < min_visible_ms:
             self.root.after(min_visible_ms - elapsed_ms, self.finish_startup_splash)
             return
-        # Тепер знищуємо splash
         try:
             if hasattr(self, "splash"):
                 if self.splash and self.splash.winfo_exists():
                     self.splash.destroy()
                     print("[INIT] Splash знищено")
-                # Видаляємо атрибут незалежно від результату
                 if hasattr(self, "splash"):
                     try:
                         del self.splash
@@ -890,13 +809,11 @@ class WotAssistantHQ:
         except Exception as e:
             print(f"[INIT] Помилка знищення splash: {e}")
         finally:
-            # Видаляємо атрибут незалежно від результату
             if hasattr(self, "splash"):
                 try:
                     del self.splash
                 except Exception:
                     pass
-        # Показуємо головне вікно
         try:
             self.root.deiconify()
             self.root.lift()
@@ -923,7 +840,6 @@ class WotAssistantHQ:
         self.splash_canvas.pack()
         if self.logo_splash:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
-        # Get version from git tag
         version = "1.03"
         try:
             import subprocess
@@ -952,13 +868,11 @@ class WotAssistantHQ:
         self.pbar = self.splash_canvas.create_rectangle(0, sh-8, 0, sh, fill="#ff4500", outline="")
         self.update_startup_progress(3, self.t('ui', 'preparing_check'))
         self._animate_startup_progress()
-        # Форсуємо первинне відмалювання splash до старту фонових задач.
         self.splash.deiconify()
         self.splash.lift()
         self.splash.update_idletasks()
 
     def _startup_show_failsafe(self):
-        # Якщо вікно досі приховане через проблеми splash/таймерів — примусово показуємо.
         try:
             if self.root.state() == "withdrawn":
                 sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
@@ -984,4 +898,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = WotAssistantHQ(root)
     root.mainloop()
-# main.py 4_43

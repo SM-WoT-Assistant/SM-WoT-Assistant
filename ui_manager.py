@@ -1,4 +1,3 @@
-# ui_manager.py
 import tkinter as tk
 from tkinter import ttk
 import stats_ai
@@ -13,7 +12,6 @@ class UIManager:
         self.app.top_bar.pack_propagate(False)
         self.app.top_bar.pack(side="top", fill="x")
         
-        # Spacer for 7px right indent in topbar
         tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="right")
 
         tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
@@ -41,7 +39,6 @@ class UIManager:
         self.app.battle_status_label = tk.Label(self.app.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
         self.app.battle_status_label.pack(side="left", padx=6)
 
-        # Spacer for 7px left indent in topbar
         tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="left")
 
         self.app.btn_mode_ai_stats = tk.Button(self.app.top_bar, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
@@ -87,7 +84,6 @@ class UIManager:
     def show_view(self, view_name, **kwargs):
         self.app.active_view = view_name
 
-        # Reset all buttons and hide all widgets first
         self.app.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
@@ -103,7 +99,6 @@ class UIManager:
         self.app.ai_frame.pack_forget()
         self.app.map_toolbar.pack_forget()
         
-        # Ensure top bar is always visible
         self.app.top_bar.pack_forget()
         self.app.top_bar.pack(side="top", fill="x")
 

@@ -170,7 +170,6 @@ def _collect_vehicle_sources():
                 if not fname.endswith(".xml") or fname in skip:
                     continue
                 tag = fname[:-4]
-                # Use direct assignment so later (more specific) folders overwrite earlier ones
                 sources[tag] = os.path.join(npath, fname)
 
     if os.path.isdir(TTH_WORK_DIR):
@@ -190,7 +189,6 @@ def main():
     with open(TANK_DB_PATH, "r", encoding="utf-8") as f:
         tank_db = json.load(f)
 
-    # Load tank_slots_full.json as fallback for missing XML crew data
     tank_slots = {}
     try:
         with open("tank_slots_full.json", "r", encoding="utf-8") as f:
@@ -213,7 +211,6 @@ def main():
             members = parsed.get('crew_members') or []
             custom_role_slot_options = parsed.get('custom_role_slot_options')
         else:
-            # Fallback: try tank_slots_full.json crew_roles
             slot_data = tank_slots.get(tag, {})
             slot_roles = slot_data.get('crew_roles') if isinstance(slot_data, dict) else None
             if slot_roles and isinstance(slot_roles, list):

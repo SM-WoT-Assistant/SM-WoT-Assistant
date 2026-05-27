@@ -1,4 +1,3 @@
-# config_4_13.py
 import os, sys
 
 if getattr(sys, 'frozen', False):
@@ -43,4 +42,3 @@ TECH_MAPS_STAGING = {
     "Live Oaks": "Live Oaks", "Glacier": "Glacier"
 }
 
-# config_4_13.py
