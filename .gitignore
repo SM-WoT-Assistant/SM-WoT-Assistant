@@ -13,6 +13,7 @@ venv/
 extracted_maps/
 extracted_data/
 extracted_icons/
+extracted_gui/
 *.rar
 
 # Тимчасові файли і папки
@@ -30,9 +31,6 @@ ai_cache.json
 
 # Backup-файли (генеруються при помилках)
 *.broken_fallback_backup.json
-
-# Runtime артефакти вбудованого браузера (cache/history/logs)
-browser_profile/
 
 # Runtime артефакти вбудованого браузера (cache/history/logs)
 browser_profile/

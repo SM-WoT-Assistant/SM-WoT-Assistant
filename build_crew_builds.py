@@ -42,32 +42,42 @@ DEFAULT_SKILLS = {
 ROLE_SKILL_POOLS = {
     "commander": [
         "commander_sixthSense", "commander_practical", "commander_eagleEye",
-        "commander_enemyShotPredictor", "repair", "camouflage", "brotherhood"
+        "commander_enemyShotPredictor", "commander_emergency", "commander_tutor",
+        "commander_coordination", "commander_holdLine", "commander_staySharp",
+        "repair", "camouflage", "brotherhood", "fireFighting"
     ],
     "gunner": [
         "gunner_sniper", "gunner_focus", "gunner_rancorous",
-        "gunner_smoothTurret", "repair", "camouflage", "brotherhood"
+        "gunner_smoothTurret", "gunner_armorer", "gunner_loneWolf",
+        "gunner_quickAiming", "gunner_pointBlast",
+        "repair", "camouflage", "brotherhood", "fireFighting"
     ],
     "driver": [
         "driver_smoothDriving", "driver_badRoadsKing", "driver_virtuoso",
-        "driver_rammingMaster", "repair", "camouflage", "brotherhood"
+        "driver_rammingMaster", "driver_reliablePlacement", "driver_motorExpert",
+        "driver_suspensionRepair", "driver_bulletproof",
+        "repair", "camouflage", "brotherhood", "fireFighting"
     ],
     "loader": [
         "loader_pedant", "loader_desperado", "loader_intuition",
+        "loader_perfectCharge", "loader_melee", "loader_ammunitionImprove",
+        "loader_secondChance", "loader_magMastery",
         "repair", "camouflage", "brotherhood", "fireFighting"
     ],
     "radioman": [
         "radioman_finder", "improvedRadioCommunication", "smokeSignal",
-        "camouflage", "repair", "brotherhood", "fireFighting"
+        "radioman_signalInterception", "radioman_interference", "radioman_expert",
+        "radioman_sideBySide", "radioman_threatSearch", "radioman_battleTempered",
+        "repair", "camouflage", "brotherhood", "fireFighting"
     ],
 }
 
 PERK_POLICY = {
     "default_primary_perk_count": 6,
     "primary_perk_count_by_tier": {
-        "1": 1, "2": 1, "3": 1, "4": 1,
-        "5": 2, "6": 2,
-        "7": 4,
+        "1": 6, "2": 6, "3": 6, "4": 6,
+        "5": 6, "6": 6,
+        "7": 6,
         "8": 6,
         "9": 6,
         "10": 6,
@@ -76,7 +86,7 @@ PERK_POLICY = {
     "secondary_perk_bonus_per_role": 3,
     "secondary_perk_bonus_by_custom_role_slots": {
         "2 4": 3,
-        "3 5": 1
+        "3 5": 3
     },
     "max_perks_per_member": 15,
 }
@@ -126,7 +136,7 @@ def _parse_vehicle_crew_info(xml_path):
 
         if role_count[role] > 1:
             if role == "loader":
-                has_radioman = "radioman" in roles
+                has_radioman = "radioman" in roles or any("radioman" in m.get("also", []) for m in out)
                 if not has_radioman:
                     out.append({"role": "loader_radio", "also": ["radioman"]})
                 else:
@@ -160,7 +170,8 @@ def _collect_vehicle_sources():
                 if not fname.endswith(".xml") or fname in skip:
                     continue
                 tag = fname[:-4]
-                sources.setdefault(tag, os.path.join(npath, fname))
+                # Use direct assignment so later (more specific) folders overwrite earlier ones
+                sources[tag] = os.path.join(npath, fname)
 
     if os.path.isdir(TTH_WORK_DIR):
         for root, _dirs, files in os.walk(TTH_WORK_DIR):
@@ -179,6 +190,14 @@ def main():
     with open(TANK_DB_PATH, "r", encoding="utf-8") as f:
         tank_db = json.load(f)
 
+    # Load tank_slots_full.json as fallback for missing XML crew data
+    tank_slots = {}
+    try:
+        with open("tank_slots_full.json", "r", encoding="utf-8") as f:
+            tank_slots = json.load(f)
+    except Exception:
+        pass
+
     xml_crew = {}
     sources = _collect_vehicle_sources()
     for tag, path in sources.items():
@@ -190,13 +209,32 @@ def main():
     for tag, data in tank_db.items():
         tank_class = str((data or {}).get("class") or "MT").upper()
         parsed = xml_crew.get(tag)
-        if not parsed:
-            defaults = DEFAULT_ROLES_BY_CLASS.get(tank_class, DEFAULT_ROLES_BY_CLASS["MT"])
-            members = [{"role": role, "also": []} for role in defaults]
-            custom_role_slot_options = None
-        else:
+        if parsed:
             members = parsed.get('crew_members') or []
             custom_role_slot_options = parsed.get('custom_role_slot_options')
+        else:
+            # Fallback: try tank_slots_full.json crew_roles
+            slot_data = tank_slots.get(tag, {})
+            slot_roles = slot_data.get('crew_roles') if isinstance(slot_data, dict) else None
+            if slot_roles and isinstance(slot_roles, list):
+                members = []
+                has_radioman = any(r == 'radioman' for r in slot_roles)
+                loader_count = sum(1 for r in slot_roles if r == 'loader')
+                for role in slot_roles:
+                    also = []
+                    if role == 'loader' and loader_count >= 2 and not has_radioman:
+                        idx = [i for i, m in enumerate(members) if m['role'] == 'loader']
+                        if len(idx) >= 1:
+                            members.append({"role": "loader", "also": []})
+                            continue
+                    elif role == 'commander' and not has_radioman:
+                        also = ['radioman']
+                    members.append({"role": role, "also": also})
+                custom_role_slot_options = None
+            else:
+                defaults = DEFAULT_ROLES_BY_CLASS.get(tank_class, DEFAULT_ROLES_BY_CLASS["MT"])
+                members = [{"role": role, "also": []} for role in defaults]
+                custom_role_slot_options = None
 
         tanks[tag] = {
             "crew_members": members,

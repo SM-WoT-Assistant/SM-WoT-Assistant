@@ -91,18 +91,42 @@ PERK_NAME_MAP = {
     'commander_practical': 'Eagle Eye',
     'commander_eagleEye': 'Eagle Eye',
     'commander_enemyShotPredictor': 'Enemy Shot Predictor',
-    'gunner_sniper': 'Snap Shot',
-    'gunner_focus': 'Designated Target',
+    'commander_emergency': 'Emergency',
+    'commander_tutor': 'Mentor',
+    'commander_coordination': 'Coordination',
+    'commander_holdLine': 'Hold the Line',
+    'commander_staySharp': 'Stay Sharp',
+    'gunner_sniper': 'Designated Target',
+    'gunner_focus': 'Steady Aim',
     'gunner_rancorous': 'Rancorous',
-    'gunner_smoothTurret': 'Smooth Turret',
+    'gunner_smoothTurret': 'Snap Shot',
+    'gunner_armorer': 'Armorer',
+    'gunner_loneWolf': 'Lone Wolf',
+    'gunner_quickAiming': 'Quick Aiming',
+    'gunner_pointBlast': 'Point Blank',
     'driver_smoothDriving': 'Smooth Driving',
     'driver_badRoadsKing': 'Off-Road Driving',
     'driver_virtuoso': 'Virtuoso',
     'driver_rammingMaster': 'Ramming Master',
+    'driver_reliablePlacement': 'Reliable Placement',
+    'driver_motorExpert': 'Engineer',
+    'driver_suspensionRepair': 'Field Support',
+    'driver_bulletproof': 'Bulletproof',
     'loader_pedant': 'Safe Stowage',
     'loader_desperado': 'Desperado',
     'loader_intuition': 'Intuition',
+    'loader_perfectCharge': 'Perfect Charge',
+    'loader_melee': 'Close Combat',
+    'loader_ammunitionImprove': 'Ammo Tuning',
+    'loader_secondChance': 'The Second Chance',
+    'loader_magMastery': 'Mag Mastery',
     'radioman_finder': 'Relayer',
+    'radioman_signalInterception': 'Signal Interception',
+    'radioman_interference': 'Jamming',
+    'radioman_expert': 'Communications Expert',
+    'radioman_sideBySide': 'Side by Side',
+    'radioman_threatSearch': 'Threat Search',
+    'radioman_battleTempered': 'Battle Tempered',
     'improvedRadioCommunication': 'Improved Radio Communication',
     'smokeSignal': 'Smoke Signal',
     'repair': 'Repairs',
@@ -163,12 +187,11 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Експериментальне (deluxe)
-        "deluxRammer", "deluxCoatedOptics", "deluxAimingStabilizer",
-        "deluxEnhancedAimDrives", "deluxImprovedConfiguration", "deluxImprovedVentilation",
-        "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
-        "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
-        "deluxeCamouflageNet"
+        # Experimental (Modernized)
+        "modernizedTurbochargerRotationMechanism",
+        "modernizedExtraHealthReserveAntifragmentationLining",
+        "modernizedImprovedSightsEnhancedAimDrives",
+        "modernizedAimDrivesAimingStabilizer"
     ],
     9: [
         "camouflageNet_tier1", "coatedOptics_tier1", "enhancedAimDrives_tier1",
@@ -178,12 +201,11 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Експериментальне (deluxe)
-        "deluxRammer", "deluxCoatedOptics", "deluxAimingStabilizer",
-        "deluxEnhancedAimDrives", "deluxImprovedConfiguration", "deluxImprovedVentilation",
-        "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
-        "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
-        "deluxeCamouflageNet"
+        # Experimental (Modernized)
+        "modernizedTurbochargerRotationMechanism",
+        "modernizedExtraHealthReserveAntifragmentationLining",
+        "modernizedImprovedSightsEnhancedAimDrives",
+        "modernizedAimDrivesAimingStabilizer"
     ],
     10: [
         "camouflageNet_tier1", "coatedOptics_tier1", "enhancedAimDrives_tier1",
@@ -193,12 +215,11 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        # Експериментальне (deluxe)
-        "deluxRammer", "deluxCoatedOptics", "deluxAimingStabilizer",
-        "deluxEnhancedAimDrives", "deluxImprovedConfiguration", "deluxImprovedVentilation",
-        "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
-        "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
-        "deluxeCamouflageNet"
+        # Experimental (Modernized)
+        "modernizedTurbochargerRotationMechanism",
+        "modernizedExtraHealthReserveAntifragmentationLining",
+        "modernizedImprovedSightsEnhancedAimDrives",
+        "modernizedAimDrivesAimingStabilizer"
     ],
     11: [  # Tier 11 — той самий набір що і Tier 10
         "camouflageNet_tier1", "coatedOptics_tier1", "enhancedAimDrives_tier1",
@@ -208,11 +229,11 @@ EQUIPMENT_BY_TIER = {
         "aimingStabilizer_tier1", "additionalInvisibilityDevice_tier1",
         "turbocharger_tier1", "extraHealthReserve_tier1",
         "antifragmentationLining_tier1",
-        "deluxRammer", "deluxCoatedOptics", "deluxAimingStabilizer",
-        "deluxEnhancedAimDrives", "deluxImprovedConfiguration", "deluxImprovedVentilation",
-        "deluxeTurbocharger", "deluxeExtraHealthReserve", "deluxeImprovedRotationMechanism",
-        "deluxeImprovedSights", "deluxeAdditionalInvisibilityDevice", "deluxeStereoscope",
-        "deluxeCamouflageNet"
+        # Experimental (Modernized)
+        "modernizedTurbochargerRotationMechanism",
+        "modernizedExtraHealthReserveAntifragmentationLining",
+        "modernizedImprovedSightsEnhancedAimDrives",
+        "modernizedAimDrivesAimingStabilizer"
     ]
 }
 
@@ -224,10 +245,11 @@ EQUIPMENT_BY_TIER = {
 EQUIPMENT_EXCLUDE_BY_CLASS = {
     "SPG": ["aimingStabilizer_tier1", "aimingStabilizer_tier2", "aimingStabilizer_tier3",
             "grousers_tier1", "grousers_tier2", "grousers_tier3", "additionalGrousers"],
-    "LT": [],  # Light tanks - немає виключень
-    "MT": [],  # Medium tanks - немає виключень
-    "HT": [],  # Heavy tanks - немає виключень
-    "TD": []   # Tank destroyers - немає виключень
+    "LT": [],  # Light tanks
+    "MT": [],  # Medium tanks
+    "HT": [],  # Heavy tanks
+    "TD": ["aimingStabilizer_tier1", "aimingStabilizer_tier2", "aimingStabilizer_tier3",
+           "modernizedAimDrivesAimingStabilizer"]  # TD не можуть використовувати Vertical Stabilizer
 }
 
 # ==============================================================================
@@ -286,24 +308,11 @@ FALLBACK_EQUIPMENT_NAMES = {
     "binocularTelescope_tier1": "Binocular Telescope",
     "binocularTelescope_tier2": "Binocular Telescope",
     "binocularTelescope_tier3": "Binocular Telescope",
-    # Експериментальне (Deluxe)
-    "deluxRammer": "Innovative Loading System",
-    "deluxCoatedOptics": "Experimental Optics",
-    "deluxAimingStabilizer": "Stabilizing Equipment System",
-    "deluxEnhancedAimDrives": "Wear-Resistant Gun Laying Drive",
-    "deluxImprovedConfiguration": "Improved Configuration",
-    "deluxImprovedVentilation": "Venting System",
-    "deluxeTurbocharger": "Improved Compressor",
-    "deluxeExtraHealthReserve": "Increased Shell Resistance",
-    "deluxeImprovedRotationMechanism": "Improved Final Drive",
-    "deluxeImprovedSights": "Innovative Targeting",
-    "deluxeAdditionalInvisibilityDevice": "Stealth Exhaust Unit",
-    "deluxeStereoscope": "Telescopic Observation System",
-    "deluxeCamouflageNet": "Tactical Concealment Net",
-    # Додаткові з клієнта
-    "additionalInvisibilityDevice": "Low Noise Exhaust System",
-    "camouflageNet": "Camouflage Net",
-    "invisibilityBonus": "Invisibility Bonus",
+    # Experimental (Modernized)
+    "modernizedTurbochargerRotationMechanism": "Experimental Turbocharger",
+    "modernizedExtraHealthReserveAntifragmentationLining": "Experimental Hardening",
+    "modernizedImprovedSightsEnhancedAimDrives": "Experimental Optics",
+    "modernizedAimDrivesAimingStabilizer": "Experimental Gun Laying",
 }
 
 # ==============================================================================
@@ -323,13 +332,16 @@ def get_equipment_for_tank(tank_id, tier, tank_class):
     filtered = [eq for eq in equipment_list if eq not in excluded]
     
     # Конвертуємо ID в назви з клієнта
-    result = []
+    result_names = []
+    result_standard = []
     for eq_id in filtered:
         name = FALLBACK_EQUIPMENT_NAMES.get(eq_id, eq_id)
-        if name not in result:
-            result.append(name)
+        if name not in result_names:
+            result_names.append(name)
+            if not any(x in eq_id for x in ['delux', 'trophy', 'modernized']):
+                result_standard.append(name)
     
-    return result
+    return result_names, result_standard
 
 
 def get_ammo_types(tier=10, tank_class="MT"):
@@ -356,19 +368,10 @@ def get_ammo_types(tier=10, tank_class="MT"):
     ]
     # Фільтр за класом
     if tank_class == "SPG":
-        # SPG зазвичай тільки HE
-        base = ["HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE_SPG_STUN"]
-        if tier >= 8 and tier <= 11:
-            base.append("HIGH_EXPLOSIVE_PREMIUM")
-        return base
-    # Для всіх інших класів
-    base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HOLLOW_CHARGE", "HIGH_EXPLOSIVE"]
-    if tier >= 8 and tier <= 11:
-        base.append("ARMOR_PIERCING_CR_PREMIUM")
-        base.append("ARMOR_PIERCING_PREMIUM")
-        base.append("HOLLOW_CHARGE_PREMIUM")
-        base.append("HIGH_EXPLOSIVE_PREMIUM")
-    return base
+        base = ["HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_PREMIUM"]
+        return base[:3]
+    base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HIGH_EXPLOSIVE"]
+    return base[:3]
 
 
 # ==============================================================================
@@ -419,14 +422,11 @@ def get_nation_ration(nation="ussr"):
 
 def get_crew_data_for_tank(tank_id, tier):
     """
-    Повертає дані про екіпаж танка з crew_builds.json.
+    Повертає дані про екіпаж танка з crew_builds.json (модульний рівень).
     - Члени екіпажу беруться з 'tanks' -> tank_id -> 'crew_members'
     - Перки беруться з _role_skill_pools (пули перків для кожної ролі)
     - Кількість перків за tier з _perk_policy -> primary_perk_count_by_tier
     """
-    with open('crew_builds.json', 'r', encoding='utf-8') as f:
-        crew_builds = json.load(f)
-    
     tank_crew = crew_builds.get('tanks', {}).get(tank_id, {})
     crew_members = tank_crew.get('crew_members', [])
     role_skill_pools = crew_builds.get('_role_skill_pools', {})
@@ -438,7 +438,8 @@ def get_crew_data_for_tank(tank_id, tier):
     result = {
         'crew_members': [],
         'perk_count': primary_perk_count,
-        'available_perks': {}
+        'available_perks': {},
+        'custom_role_slot_options': tank_crew.get('custom_role_slot_options'),
     }
     
     for member in crew_members:
@@ -520,7 +521,14 @@ def generate_prompt(tank_id, tank_name=None):
     nation = nation.split('_')[0] if '_' in nation else nation
     
     equip_slot_count = tank_data.get('equipment_slots', 3)
-    equipment_list = get_equipment_for_tank(tank_id, tier, tank_class)
+    # Мінімум 3 слоти для всіх рівнів (після глобального оновлення обладнання)
+    equip_slot_count = max(equip_slot_count, 3)
+    all_equipment_names, standard_equipment_names = get_equipment_for_tank(tank_id, tier, tank_class)
+    has_post_prog = tank_data.get('has_post_progression', False)
+    if has_post_prog:
+        equipment_list = all_equipment_names
+    else:
+        equipment_list = standard_equipment_names
     ammo_list = get_ammo_types(tier, tank_class)
     consumables_list = get_consumables_list(nation)
     nation_ration = get_nation_ration(nation)
@@ -528,104 +536,127 @@ def generate_prompt(tank_id, tank_name=None):
     consumables_advanced_list = [c for c in consumables_list if c not in ["Manual Fire Extinguisher", "Automatic Fire Extinguisher"]]
     if nation_ration and nation_ration not in consumables_advanced_list:
         consumables_advanced_list.append(nation_ration)
+    
     crew_data = get_crew_data_for_tank(tank_id, tier)
-    field_mods = get_field_mods()
     
-    primary_perk_count = crew_data['perk_count']
-    
-    # Знаходимо члени екіпажу з ролью loader_radio або loader з also=['radioman']
-    combined_roles = [m for m in crew_data['crew_members'] 
-                      if m['role'] == 'loader_radio' or 
-                      (m['role'] == 'loader' and 'radioman' in m.get('also', []))]
-    has_combined_loader_radio = len(combined_roles) > 0
+    # Після глобального реворку всі рівні мають 6 основних перків
+    primary_perk_count = 6
+    # Специфічне для танка значення secondary_perk_count з custom_role_slot_options
+    custom_slots = crew_data.get('custom_role_slot_options')
+    secondary_perk_bonus_map = PERK_POLICY.get('secondary_perk_bonus_by_custom_role_slots', {})
+    if custom_slots and custom_slots in secondary_perk_bonus_map:
+        secondary_perk_count = secondary_perk_bonus_map[custom_slots]
+    else:
+        secondary_perk_count = PERK_POLICY.get('secondary_perk_bonus_per_role', 3)
     
     crew_perks_section = ""
     crew_roles_output = ""
+    seen_secondary = set()
     for member in crew_data['crew_members']:
         role = member['role']
         also = member.get('also', [])
-        perks = member['perks']
         
-        # Перевіряємо чи це комбінована роль loader_radio
-        is_combined = (role == 'loader_radio') or (role == 'loader' and 'radioman' in also)
+        # Маппінг ролей: loader_radio → loader (беруть перки з loader pool)
+        pool_role = role
+        if role == 'loader_radio':
+            pool_role = 'loader'
         
-        # Якщо є комбінована роль - показуємо Loader-Radioman
-        if is_combined and has_combined_loader_radio:
-            loader_perks = ROLE_SKILL_POOLS.get('loader', [])
-            radioman_perks = ROLE_SKILL_POOLS.get('radioman', [])
+        # Для ролей з also (додаткова роль) — показуємо окремо
+        if also:
+            # Основна роль
+            primary_perks = ROLE_SKILL_POOLS.get(pool_role, [])
+            primary_names = sorted(set([PERK_NAME_MAP.get(p, p) for p in primary_perks]))
+            if primary_names:
+                crew_perks_section += f"{role} (primary, choose {primary_perk_count}): {', '.join(primary_names)}\n"
+                perks_list = ", ".join([f"Perk {i+1}" for i in range(primary_perk_count)])
+                crew_roles_output += f"   * {role}: [{perks_list}] (choose {primary_perk_count})\n"
             
-            loader_perk_names = [PERK_NAME_MAP.get(p, p) for p in loader_perks]
-            radioman_perk_names = [PERK_NAME_MAP.get(p, p) for p in radioman_perks]
-            
-            crew_perks_section += f"loader: {', '.join(loader_perk_names)}\n"
-            crew_perks_section += f"radioman: {', '.join(radioman_perk_names)}\n"
-            
-            loader_perks_list = ", ".join([f"Perk {i+1}" for i in range(6)])
-            radioman_perks_list = ", ".join([f"Perk {i+1}" for i in range(4)])
-            crew_roles_output += f"   * Loader-Radioman: [{loader_perks_list}] (choose 6)\n"
-            crew_roles_output += f"      └─ Radioman: [{radioman_perks_list}] (choose 4)\n"
-        # Якщо це звичайний loader і є комбінована роль десь - пропускаємо
-        elif role == "loader" and has_combined_loader_radio:
-            continue
-        # Звичайні ролі
+            # Додаткові ролі — показуємо тільки один раз (якщо ще не показані)
+            for extra_role in also:
+                if extra_role not in seen_secondary:
+                    seen_secondary.add(extra_role)
+                    extra_perks = ROLE_SKILL_POOLS.get(extra_role, [])
+                    extra_names = sorted(set([PERK_NAME_MAP.get(p, p) for p in extra_perks]))
+                    crew_perks_section += f"{extra_role} (secondary, choose {secondary_perk_count}): {', '.join(extra_names)}\n"
+                    extra_list = ", ".join([f"Perk {i+1}" for i in range(secondary_perk_count)])
+                    crew_roles_output += f"   * {extra_role}: [{extra_list}] (choose {secondary_perk_count})\n"
+        # Звичайні ролі без додаткових
         else:
-            crew_perks_section += f"{role}: {', '.join(perks)}\n"
-            display_role = role
+            perks = sorted(set(member['perks']))
+            crew_perks_section += f"{role} (choose {primary_perk_count}): {', '.join(perks)}\n"
             perks_list = ", ".join([f"Perk {i+1}" for i in range(primary_perk_count)])
-            crew_roles_output += f"   * {display_role}: [{perks_list}] (choose {primary_perk_count})\n"
+            crew_roles_output += f"   * {role}: [{perks_list}] (choose {primary_perk_count})\n"
     
     current_date = datetime.now().strftime("%Y-%m-%d")
     
-    slots_line = " | ".join([f"Slot {i+1}: [Item {i+1}]" for i in range(equip_slot_count)])
+    perk_word = "perk" if primary_perk_count == 1 else "perks"
+    secondary_perk_word = "perk" if secondary_perk_count == 1 else "perks"
+    
+    slots_line = " | ".join([f"Slot {i+1}: [Item {i+1}]" for i in range(equip_slot_count)]) if equip_slot_count > 0 else ""
+    
+    # Tier 1-5 не мають польової модернізації. Tier 11 — всі модифікації вивчені.
+    if tier >= 11 or tier < 6:
+        field_mods_text = ""
+        output_fm_text = ""
+    else:
+        field_mods_text = """5. FIELD MODIFICATIONS (Select one option per level from this list):
+Level II: "All-Terrain Suspension" OR "Lightweight Suspension" OR "No Modification"
+Level IV: "Parallax Adjustment" OR "Refined Powder" OR "Left-Side Periscope" OR "Right-Side Periscope" OR "No Modification"
+Level VI: "Right-Angle Optics" OR "Anti-Reflective Lenses" OR "Reinforced Spall Liner" OR "Anti-Fragmentation Lining" OR "No Modification"
+Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "Additional Forward Gears" OR "Additional Reverse Gears" OR "No Modification"
+"""
+        output_fm_text = "5. Field Modification: Level II: [Choice] | Level IV: [Choice] | Level VI: [Choice] | Level VIII: [Choice]"
+    
+    if equip_slot_count > 0:
+        equip_section = f"""1. EQUIPMENT (Select EXACTLY {equip_slot_count} items for EACH variant - Main and Advanced):
+- Loadout 1 (Main): Select {equip_slot_count} equipment items. Available items: {', '.join(standard_equipment_names)}.
+- Loadout 2 (Advanced): Select {equip_slot_count} equipment items (different from Main) - choose items that maximize all parameters combining both standard AND experimental equipment options. Available items: {', '.join(equipment_list)}.
+"""
+        equip_output = f"""1. Equipment:
+   * Loadout 1 (Main): {slots_line}
+   * Loadout 2 (Advanced): {slots_line}
+"""
+    else:
+        equip_section = ""
+        equip_output = ""
     
     prompt = f"""Current date: {current_date}.
+Tank: {tank_name}
 
 [INSTRUCTION CONTEXT & PURPOSE]
 This instruction acts as a configuration generator for the game World of Tanks. Its purpose is to process the requested tank name and output a highly precise, machine-readable competitive build. This output will be directly parsed by a downstream Python application.
 
 Generate the optimal competitive build data for the tank: {tank_name}.
 
+IMPORTANT: All output must be in English using ONLY the exact original item names as they appear in the World of Tanks game client. The tank name "{tank_name}" is the official English name from the game client.
+
 You must ONLY use the exact names and terms provided in the lists below. Begin your response exactly with the phrase "Build Generated:" followed immediately by a markdown code block containing the requested data. Do not include any other conversational text or explanations outside or inside the code block.
 
-1. EQUIPMENT (Select EXACTLY {equip_slot_count} items for EACH variant - Main and Advanced):
-- Loadout 1 (Main): Select {equip_slot_count} equipment items for optimal performance
-- Loadout 2 (Advanced): Select {equip_slot_count} equipment items (different from Main) - choose items that maximize all parameters combining both standard AND experimental equipment options
-Available items: {', '.join(equipment_list)}.
-
+{equip_section}
 2. AMMO TYPES (Select for EACH variant - Main and Advanced):
-- Loadout 1 (Main): Select ammo types and counts
-- Loadout 2 (Advanced): Select ammo types and counts (different from Main)
-Available types: {', '.join(ammo_list)}.
+- Loadout 1 (Main): Select ammo types and counts. Available types: {', '.join(ammo_list)}.
+- Loadout 2 (Advanced): Select ammo types and counts (different from Main). Available types: {', '.join(ammo_list)}.
 
 3. CONSUMABLES (Select for EACH variant - Main and Advanced):
-- Loadout 1 (Main): Select 3 consumable items (any from list)
-- Loadout 2 (Advanced): Select 3 consumable items (different from Main) - Slot 1-2: NO fire extinguishers | Slot 3: MUST be nation ration
-Available items (Main): {', '.join(consumables_list)}.
-Available items (Advanced): {', '.join(consumables_advanced_list)}.
+- Loadout 1 (Main): Select 3 consumable items. Available items: {', '.join(consumables_list)}.
+- Loadout 2 (Advanced): Select 3 consumable items (different from Main) - Slot 1-2: NO fire extinguishers | Slot 3: MUST be nation ration. Available items: {', '.join(consumables_advanced_list)}.
 
-4. CREW PERKS (Select {crew_data['perk_count']} perks for each role from these lists):
+4. CREW PERKS (Select {primary_perk_count} {perk_word} for each primary role, {secondary_perk_count} {secondary_perk_word} for each secondary/extra role).
+IMPORTANT: For roles marked as "(secondary)", you must select EXACTLY {secondary_perk_count} {secondary_perk_word} from their available list.
 {crew_perks_section}
-5. FIELD MODIFICATIONS (Select one option per level from this list):
-Level II: "All-Terrain Suspension" OR "Lightweight Suspension" OR "No Modification"
-Level IV: "Parallax Adjustment" OR "Refined Powder" OR "Left-Side Periscope" OR "Right-Side Periscope" OR "No Modification"
-Level VI: "Right-Angle Optics" OR "Anti-Reflective Lenses" OR "Reinforced Spall Liner" OR "Anti-Fragmentation Lining" OR "No Modification"
-Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "Additional Forward Gears" OR "Additional Reverse Gears" OR "No Modification"
-
+{field_mods_text}
 OUTPUT FORMAT:
 Build Generated:
 ```text
-1. Equipment:
-   * Loadout 1 (Main): {slots_line}
-* Loadout 2 (Advanced): {slots_line}
- 2. Ammo:
+{equip_output}2. Ammo:
    * Loadout 1 (Main): [Type 1]: [Count] shells | [Type 2]: [Count] shells | [Type 3]: [Count] shells
    * Loadout 2 (Advanced): [Type 1]: [Count] shells | [Type 2]: [Count] shells | [Type 3]: [Count] shells
  3. Consumables:
    * Loadout 1 (Main): Slot 1: [Item 1] | Slot 2: [Item 2] | Slot 3: [Item 3]
    * Loadout 2 (Advanced): Slot 1: [Item 1] | Slot 2: [Item 2] | Slot 3: [Item 3] (include nation ration)
-4. Crew Perks (same for both loadouts):
+ 4. Crew Perks (same for both loadouts):
 {crew_roles_output}
-5. Field Modification: Level II: [Choice] | Level IV: [Choice] | Level VI: [Choice] | Level VIII: [Choice]
+{output_fm_text}
 ```"""
     
     return prompt
@@ -694,7 +725,7 @@ if __name__ == "__main__":
     print(f"Class: {tank_info.get('class', 'N/A')}")
     print(f"Equipment slots: {tank_slots_info.get('equipment_slots', 0)}")
     
-    equipment = get_equipment_for_tank(tank_id, tank_info.get('tier', 10), tank_info.get('class', 'HT'))
+    equipment, _ = get_equipment_for_tank(tank_id, tank_info.get('tier', 10), tank_info.get('class', 'HT'))
     print(f"Available equipment: {len(equipment)} items")
     
     print(f"\nSaved to {output_file}")

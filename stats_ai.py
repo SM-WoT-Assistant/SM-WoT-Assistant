@@ -10,12 +10,38 @@ import io
 import threading
 import subprocess
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
 
-ENABLE_POPULAR_TANK_CACHE = False
+ENABLE_POPULAR_TANK_CACHE = True
+ENABLE_AI_BUILD_CACHE = False
 
 _CACHE_PATH = os.path.join(os.path.dirname(__file__), "popular_tanks_cache.json")
+_AI_BUILD_CACHE_PATH = os.path.join(os.path.dirname(__file__), "ai_builds_cache.json")
+
+
+def _load_ai_build_cache():
+    """Load cached AI builds. Returns (builds_dict, updated_dict)."""
+    if os.path.exists(_AI_BUILD_CACHE_PATH):
+        try:
+            with open(_AI_BUILD_CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("builds", {}), data.get("updated", {})
+        except Exception:
+            pass
+    return {}, {}
+
+
+def _save_ai_build_cache(tag, build_data):
+    """Save a single tank's AI build to cache."""
+    builds, updated = _load_ai_build_cache()
+    builds[tag] = build_data
+    updated[tag] = time.strftime("%Y-%m-%dT%H:%M:%S")
+    try:
+        with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"builds": builds, "updated": updated}, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
 
 
 def _load_popular_tank_cache():
@@ -34,7 +60,7 @@ def _load_popular_tank_cache():
 
 
 def _is_cache_expired(updated_iso):
-    """Returns True if cache is older than 30 days or missing."""
+    """Returns True if cache is older than 24 hours or missing."""
     if not updated_iso:
         return True
     try:
@@ -43,7 +69,7 @@ def _is_cache_expired(updated_iso):
         if updated.tzinfo is None:
             now = datetime.now()
         delta = now - updated
-        return delta.days >= 30
+        return delta.days >= 7
     except Exception:
         return True
 
@@ -58,16 +84,16 @@ class StatsAI:
             cached_tanks, updated, fail_count = _load_popular_tank_cache()
             if cached_tanks:
                 self._cache_data = {"tanks": [{"tag": t} for t in cached_tanks], "updated": updated, "fail_count": fail_count}
-            if not _is_cache_expired(updated) and cached_tanks:
+                # Завжди показуємо кеш (навіть прострочений), оновлення в фоні
                 self.popular_tanks = cached_tanks
-                self._cache_fresh = True
-                print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу")
+                self._cache_fresh = not _is_cache_expired(updated)
+                if self._cache_fresh:
+                    print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу (оновлено: {updated})")
+                else:
+                    print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу (потрібне оновлення: {updated})")
             else:
                 self.popular_tanks = []
-                if cached_tanks:
-                    print(f"[AI Browser] Кеш прострочений (оновлено: {updated}), запуск AI...")
-                else:
-                    print(f"[AI Browser] Кеш відсутній, запуск AI...")
+                print(f"[AI Browser] Кеш відсутній, запуск AI...")
         else:
             self.popular_tanks = []
         self.main_app = main_app  # Reference to WotAssistantHQ
@@ -656,6 +682,7 @@ class StatsAI:
         self.ai_content_panel.grid_rowconfigure(7, weight=0)  # Status bar
 
         sections = [
+            self.ai_tth_frame,
             self.ai_top_headers_row,
             self.ai_top_loadout_row,
             self.ai_top_loadout_row_2,
@@ -664,11 +691,11 @@ class StatsAI:
         ]
 
 
-        # Тепер розташовуємо інші секції, починаючи з рядка 1
-        for idx, sec in enumerate(sections, start=1):
-            if idx == 1:
-                sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
-            elif idx == 2:
+        # Тепер розташовуємо інші секції, починаючи з рядка 0
+        for idx, sec in enumerate(sections, start=0):
+            if idx == 0:
+                sec.grid(row=0, column=1, sticky="nsew", padx=0, pady=(2, 2))
+            elif idx == 1 or idx == 2:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 0))
             else:
                 sec.grid(row=idx, column=1, sticky="nsew", padx=0, pady=(0, 8))
@@ -677,12 +704,6 @@ class StatsAI:
 
         fixed_w = min(self._detail_info_fixed_width, compact_w)
         self.ai_tth_frame.configure(width=fixed_w)
-        self.ai_top_headers_row.configure(width=fixed_w)
-        self.ai_top_loadout_row.configure(width=fixed_w)
-        self.ai_top_loadout_row_2.configure(width=fixed_w)
-        self.ai_crew_frame.configure(width=fixed_w)
-        self.ai_field_mod_frame.configure(width=fixed_w)
-        self.ai_tth_frame.grid_propagate(False)
         self.ai_top_headers_row.grid_propagate(False)
         self.ai_crew_frame.grid_propagate(False)
         self.ai_field_mod_frame.grid_propagate(False)
@@ -752,21 +773,32 @@ class StatsAI:
         """Переносить елементи-пари по рядках; всередині пари відступи задаються у самій парі."""
         if not slots:
             return
-        container.update_idletasks()
-        width = max(1, container.winfo_width())
-        pair_w = max((s.winfo_reqwidth() for s in slots), default=1)
+        try:
+            if not container.winfo_exists():
+                return
+            container.update_idletasks()
+            width = max(1, container.winfo_width())
+            pair_w = max((s.winfo_reqwidth() for s in slots), default=1)
+        except tk.TclError:
+            return
         # +pair_gap закладаємо як міжпарний інтервал.
         cols = max(1, width // max(1, pair_w + pair_gap))
 
         for s in slots:
-            s.grid_forget()
+            try:
+                s.grid_forget()
+            except tk.TclError:
+                pass
 
         for i, s in enumerate(slots):
-            r = i // cols
-            c = i % cols
-            padx = (0, pair_gap if c < cols - 1 else 0)
-            s.grid(row=r, column=c, padx=padx, pady=(0, row_gap), sticky="nw")
-            container.columnconfigure(c, weight=0)
+            try:
+                r = i // cols
+                c = i % cols
+                padx = (0, pair_gap if c < cols - 1 else 0)
+                s.grid(row=r, column=c, padx=padx, pady=(0, row_gap), sticky="nw")
+                container.columnconfigure(c, weight=0)
+            except tk.TclError:
+                pass
 
     def _make_tiles_section(self, parent, title, icon_key):
         if self._sections_debug:
@@ -860,16 +892,19 @@ class StatsAI:
             self.loading_frame.pack_forget()
 
     def get_small_flag(self, nation):
-        cache_key = f"small_flag_{nation}"
+        norm = self._normalize_nation(nation) if hasattr(self, '_normalize_nation') else str(nation).strip().lower()
+        cache_key = f"small_flag_{norm}"
         if cache_key in self.composite_cache: return self.composite_cache[cache_key]
-        flag_map = {"USA": "usa", "USSR": "ussr", "Germany": "germany", "France": "france", "UK": "uk", 
-                    "China": "china", "Japan": "japan", "Czech": "czech", "Poland": "poland", "Sweden": "sweden", "Italy": "italy"}
-        f_name = flag_map.get(nation, nation.lower())
-        flag_path = os.path.join("extracted_icons", "clean_nations", f"{f_name}.png")
+        flag_map = {"usa": "usa", "ussr": "ussr", "germany": "germany", "france": "france",
+                    "uk": "uk", "china": "china", "japan": "japan", "czech": "czech",
+                    "poland": "poland", "sweden": "sweden", "italy": "italy"}
+        f_name = flag_map.get(norm, norm)
+        base = os.path.dirname(__file__)
+        flag_path = os.path.join(base, "extracted_icons", "clean_nations", f"{f_name}.png")
         if not os.path.exists(flag_path):
             flag_path = None
             for p in [f"{f_name}_160x100.png", f"{f_name}_155x31.png", f"{f_name}_131x31.png"]:
-                test_p = os.path.join("extracted_icons", "nations", p)
+                test_p = os.path.join(base, "extracted_icons", "nations", p)
                 if os.path.exists(test_p):
                     flag_path = test_p
                     break
@@ -1685,7 +1720,7 @@ class StatsAI:
         if tier == 10:
             return 5
         if tier == 11:
-            return 5  # same limit for new top tier
+            return 0  # Tier 11 не мають польової модернізації
         return 0
 
     def _field_mod_lookup_tags(self, tag):
@@ -2071,7 +2106,6 @@ class StatsAI:
         
         tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0, width=self._detail_info_fixed_width)
         tth_wrapper.pack(side="top", anchor="center", padx=0)
-        tth_wrapper.pack_propagate(False)
         tth_wrapper.grid_columnconfigure(0, weight=0)
         tth_wrapper.grid_columnconfigure(1, weight=1, minsize=self._detail_tth_fixed_width)
         tth_wrapper.grid_columnconfigure(2, weight=1)
@@ -2085,7 +2119,6 @@ class StatsAI:
         
         tth_table = tk.Frame(tth_wrapper, bg="#1a1a1a", width=self._detail_tth_fixed_width)
         tth_table.grid(row=0, column=1, sticky="nsew", padx=(0, 8), pady=6)
-        tth_table.pack_propagate(False)
         for i, (icon_name, label_text, value_text) in enumerate(tth_rows):
             row_bg = "#1a1a1a" if i % 2 == 0 else "#1f1f1f"
             row_f = tk.Frame(tth_table, bg=row_bg)
@@ -2168,19 +2201,17 @@ class StatsAI:
                 return None
 
             def _default_ammo_for_tank(tier, tank_class):
-                """Return default shell types based on tier and class."""
+                """Return default shell types (max 3) based on tier and class."""
                 if tank_class == "SPG":
-                    base = ["HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_SPG"]
-                    if tier >= 8:
-                        base.append("HIGH_EXPLOSIVE_PREMIUM")
-                    return base
-                base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HOLLOW_CHARGE", "HIGH_EXPLOSIVE"]
-                if tier >= 8:
-                    base.extend(["ARMOR_PIERCING_CR_PREMIUM", "HOLLOW_CHARGE_PREMIUM", "HIGH_EXPLOSIVE_PREMIUM"])
-                return base
+                    base = ["HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_PREMIUM"]
+                    return base[:3]
+                base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HIGH_EXPLOSIVE"]
+                return base[:3]
 
             equipment_1 = []
             equipment_2 = []
+            consumables_1 = []
+            consumables_2 = []
             consumables = []
             crew_skills = []
             field_mods = []
@@ -2255,23 +2286,11 @@ class StatsAI:
             if not field_mods:
                 field_mods = cached_data.get("field_mods", [])
             
-            if not equipment_1:
-                equipment_1 = ["rammer", "improvedVentilation", "aimingStabilizer"]
-            if not equipment_2:
-                equipment_2 = ["turbocharger", "coatedOptics", "extraHealthReserve"]
-            if not consumables_1:
-                consumables_1 = ["largeRepairkit", "largeMedkit", "ration"]
-            if not consumables_2:
-                consumables_2 = ["largeRepairkit", "largeMedkit", "autoExtinguishers"]
+            # no hardcoded fallbacks — AI will populate after prompt
             if not crew_skills:
-                crew_skills = [
-                    ("commander", ["brotherhood", "repair", "camouflage", "fireFighting", "commander_eagleEye", "commander_emergency"]),
-                    ("gunner", ["brotherhood", "repair", "camouflage", "fireFighting", "gunner_smoothTurret", "gunner_rancorous"]),
-                    ("driver", ["brotherhood", "repair", "camouflage", "fireFighting", "driver_smoothDriving", "driver_badRoadsKing"]),
-                    ("loader", ["brotherhood", "repair", "camouflage", "fireFighting", "loader_pedant", "loader_intuition"]),
-                ]
+                crew_skills = []
             if not field_mods:
-                field_mods = ["improvedEnginePower", "improvedAimingHandling", "improvedChassisDurability"]
+                field_mods = []
             
             # Отримуємо типи снарядів з tank_tth (без кількості)
             if tank_tth and tank_tth.get('shells'):
@@ -2300,25 +2319,23 @@ class StatsAI:
 
         build_data = process_tomato_data(None, None, tank_tth=tth)
 
-        # Override equipment with real data from equipment_loadouts.json
-        if self._equipment_loadouts:
-            equip_key = self._find_equip_key(tag, data)
-            if equip_key and equip_key in self._equipment_loadouts:
-                loadouts = self._equipment_loadouts[equip_key]
-                if loadouts and isinstance(loadouts, list) and len(loadouts) > 0:
-                    top = max(loadouts, key=lambda x: x.get('usage_percent', 0))
-                    eq = top.get('equipment', [])
-                    if len(eq) >= 1:
-                        build_data['equipment_1'] = [EQUIP_MAP.get(e, e.lower().replace(' ', '').replace('-', '')) for e in eq[:3]]
-                    if len(eq) >= 4:
-                        build_data['equipment_2'] = [EQUIP_MAP.get(e, e.lower().replace(' ', '').replace('-', '')) for e in eq[3:6]]
-
-        # Override crew skills with real data from crew_builds.json
-        if crew_rows:
-            build_data['crew'] = [(m.get('role', 'commander'), s) for m, s in crew_rows]
+        # NOTE: equipment_loadouts.json override removed for AI mechanism testing
+        # crew_builds.json override removed for AI mechanism testing
 
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
+        # Save context for AI build update
+        self._current_build_data = build_data
+        self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
+                                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
+        # Trigger AI build for this tank
+        tank_name = data.get('name', tag)
+        self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
+        tag_copy = tag
+        name_copy = tank_name
+        self.root.after(100, lambda t=tag_copy, n=name_copy: self._launch_ai_tank_build(t, n))
 
     def _find_equip_key(self, tag, data):
         """Знаходить ключ у equipment_loadouts для заданого танка."""
@@ -2330,10 +2347,13 @@ class StatsAI:
         parts = tag.split('_', 1)
         nation_code = parts[0] if parts else ''
         short_name = parts[1] if len(parts) > 1 else tag
-        nation_map = {'R': 'ussr', 'USA': 'usa', 'F': 'france', 'G': 'germany',
-                      'GB': 'uk', 'C': 'china', 'J': 'japan', 'CZ': 'czech',
-                      'S': 'sweden', 'PL': 'poland', 'I': 'italy'}
-        nation_str = nation_map.get(nation_code, '')
+        # Strip trailing digits from nation prefix (e.g. "Ch01" -> "Ch")
+        nation_code_alpha = re.sub(r'\d+$', '', nation_code)
+        nation_map = {'A': 'usa', 'Ch': 'china', 'Cz': 'czech',
+                      'Env': 'germany', 'F': 'france', 'G': 'germany',
+                      'GB': 'uk', 'It': 'italy', 'J': 'japan',
+                      'Pl': 'poland', 'R': 'ussr', 'S': 'sweden'}
+        nation_str = nation_map.get(nation_code_alpha, '')
         exact = []
         name_match = []
         fuzzy = []
@@ -2409,6 +2429,8 @@ class StatsAI:
         def render_items(parent, items, category, size=(48, 48)):
             slots = []
             for name in items:
+                if not name:
+                    continue
                 photo = self.get_loadout_icon(category, name, size)
                 slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
                 icon_box = tk.Frame(slot, bg="#1d2a1a" if category == "artefacts" else "#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
@@ -2451,7 +2473,7 @@ class StatsAI:
             self._layout_tile_row(parent, slots, gap=0)
             return slots
 
-        # Force correct ration based on nation
+        # Force correct ration based on nation for ALL consumable loadouts
         ration_map = {
             "ussr": "ration", "usa": "cocacola", "germany": "chocolate", "uk": "ration_uk",
             "france": "hotCoffee", "china": "ration_china", "poland": "ration_poland",
@@ -2460,11 +2482,11 @@ class StatsAI:
         nation = data.get("nation", "")
         correct_ration = ration_map.get(nation.lower())
         if correct_ration:
-            cons = build_data.get("consumables", [])
-            for i, c in enumerate(cons):
-                if c in ration_map.values():
-                    cons[i] = correct_ration
-            build_data["consumables"] = cons
+            for key in ["consumables_1", "consumables_2"]:
+                cons = build_data.get(key, [])
+                for i, c in enumerate(cons):
+                    if c in ration_map.values():
+                        cons[i] = correct_ration
             
         # Цифра 1 перед обладнанням - створюємо локально, не зберігаємо в self
         loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
@@ -2506,15 +2528,15 @@ class StatsAI:
             # Handle loader_radio (5th crew member with 10 skills)
             if role == "loader_radio":
                 # 5th crew member - loader + radio operator with 10 skills (6 loader + 4 radio)
-                # Зберігаємо як раніше - всі 10 навичок в одному ключі
-                if "loader_radio" not in ai_crew:
-                    ai_crew["loader_radio"] = []
-                ai_crew["loader_radio"].append(skills[:10])
+                # Зберігаємо як loader (6) + radioman (4) окремо
+                if "loader" not in ai_crew:
+                    ai_crew["loader"] = []
+                ai_crew["loader"].append(skills[:6])
                 
                 # Додаткові навички (радіо) зберігаємо окремо
-                if "loader_radio" not in ai_crew_also:
-                    ai_crew_also["loader_radio"] = []
-                ai_crew_also["loader_radio"].append([])
+                if "loader" not in ai_crew_also:
+                    ai_crew_also["loader"] = []
+                ai_crew_also["loader"].append(skills[6:10])
             elif role == "loader_2" and len(skills) > 6:
                 if "loader" not in ai_crew_also:
                     ai_crew_also["loader"] = []
@@ -2596,67 +2618,63 @@ class StatsAI:
                     sec_lbl.image = sec_photo
                 sec_lbl.pack(expand=True)
                 
-            # Skills for this member (combining primary and secondary roles)
-            skills = []
-            # Get the original role from crew member for special handling
+            # Skills for this member (separate primary and secondary roles)
+            primary_skills = []
+            secondary_skills = []
             original_role = member.get("role", "").lower()
             
-            for r in [primary_r_icon] + [sr.lower() for sr in also_roles]:
-                # Map roles
+            roles_to_check = [primary_r_icon] + [sr.lower() for sr in also_roles]
+            for idx, r in enumerate(roles_to_check):
+                is_primary = (idx == 0)
                 if "loader_radio" in original_role:
-                    r = "loader_radio"  # Use loader_radio key for skills
-                elif "radio" in r or "radioman" in r: r = "radioman"
-                elif "loader" in r: r = "loader"
-                elif "gunner" in r: r = "gunner"
-                elif "driver" in r: r = "driver"
-                elif "commander" in r: r = "commander"
-                
-                if r in ai_crew and ai_crew[r]:
-                    skills.extend(ai_crew[r].pop(0))
-                # Add secondary role skills from ai_crew_also
-                if r == "loader" and r in ai_crew_also and ai_crew_also[r]:
-                    skills.extend(ai_crew_also[r].pop(0))
-                elif r == "loader_radio" and r in ai_crew_also and ai_crew_also[r]:
-                    skills.extend(ai_crew_also[r].pop(0))
+                    if ai_crew.get("loader") and ai_crew["loader"]:
+                        primary_skills = ai_crew["loader"].pop(0)
+                    if ai_crew_also.get("loader") and ai_crew_also["loader"]:
+                        secondary_skills = ai_crew_also["loader"].pop(0)
+                else:
+                    if "radio" in r or "radioman" in r: r = "radioman"
+                    elif "loader" in r: r = "loader"
+                    elif "gunner" in r: r = "gunner"
+                    elif "driver" in r: r = "driver"
+                    elif "commander" in r: r = "commander"
+                    
+                    target = primary_skills if is_primary else secondary_skills
+                    if r in ai_crew and ai_crew[r]:
+                        target.extend(ai_crew[r].pop(0))
+                    if r in ai_crew_also and ai_crew_also[r]:
+                        secondary_skills.extend(ai_crew_also[r].pop(0))
             
-            # Deduplicate skills keeping order
-            seen_sk = set()
-            clean_skills = []
-            for sk in skills:
-                if sk not in seen_sk:
-                    seen_sk.add(sk)
-                    clean_skills.append(sk)
+            # Deduplicate within each group (secondary shows all its perks even if duplicated with primary)
+            seen_p = set()
+            clean_primary = []
+            for sk in primary_skills:
+                if sk not in seen_p:
+                    seen_p.add(sk)
+                    clean_primary.append(sk)
+            seen_s = set()
+            clean_secondary = []
+            for sk in secondary_skills:
+                if sk not in seen_s:
+                    seen_s.add(sk)
+                    clean_secondary.append(sk)
             
-            # Рендеримо навички - якщо більше 6, розділяємо на два рядки
-            if len(clean_skills) > 6:
-                # Перший рядок - перші 6 навичок
-                for sk in clean_skills[:6]:
-                    sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
-                    sk_box.pack(side="left", padx=(0, 3))
-                    sk_box.pack_propagate(False)
-                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
-                    sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
-                    if sk_photo:
-                        sk_lbl.config(image=sk_photo)
-                        sk_lbl.image = sk_photo
-                    sk_lbl.pack(expand=True)
-                
-                # Другий рядок - наступні навички
-                second_row = tk.Frame(slot, bg="#111111")
-                second_row.pack(side="top", pady=(2, 0))
-                for sk in clean_skills[6:]:
-                    sk_box = tk.Frame(second_row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
-                    sk_box.pack(side="left", padx=(0, 3))
-                    sk_box.pack_propagate(False)
-                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
-                    sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
-                    if sk_photo:
-                        sk_lbl.config(image=sk_photo)
-                        sk_lbl.image = sk_photo
-                    sk_lbl.pack(expand=True)
-            else:
-                # Звичайний випадок - всі навички в одному рядку
-                for sk in clean_skills:
+            # Render all skills on ONE row: primary → spacer → secondary
+            for sk in clean_primary:
+                sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
+                sk_box.pack(side="left", padx=(0, 3))
+                sk_box.pack_propagate(False)
+                sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
+                if sk_photo:
+                    sk_lbl.config(image=sk_photo)
+                    sk_lbl.image = sk_photo
+                sk_lbl.pack(expand=True)
+            
+            # Spacer with double indent before secondary skills
+            if clean_secondary:
+                spacer = tk.Frame(row, bg="#111111", width=16)
+                spacer.pack(side="left")
+                for sk in clean_secondary:
                     sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                     sk_box.pack(side="left", padx=(0, 3))
                     sk_box.pack_propagate(False)
@@ -2765,32 +2783,293 @@ class StatsAI:
         pass
 
     def needs_ai_refresh(self):
-        """Returns True if AI needs to run (no cache or expired)."""
+        """Returns True if AI needs to run — only when cache is expired or missing."""
         if not ENABLE_POPULAR_TANK_CACHE:
             return True
         return not self._cache_fresh
 
-    def _handle_ai_failure(self):
-        """Called on main thread when AI fetch failed. Falls back to cached data."""
-        if self.popular_tanks:
+    def _parse_ai_tank_build(self, text):
+        """Parse AI response for a tank build. Returns updated build_data dict.
+        Strips prompt echo — finds the last "Build Generated:" and parses from there."""
+        import re as _re
+        idx = text.rfind('Build Generated:')
+        if idx >= 0:
+            text = text[idx:]
+        build_data = {}
+        lines = text.split('\n')
+        current_section = None
+        loadout1_eq = []
+        loadout2_eq = []
+        loadout1_cons = []
+        loadout2_cons = []
+        ammo1 = []
+        ammo2 = []
+        crew = []
+        field_mods = []
+
+        def _clean_item(name):
+            n = name.strip().strip('*').strip()
+            nl = n.lower()
+            for eq_key, eq_val in EQUIP_MAP.items():
+                if nl == eq_key.lower():
+                    return eq_val
+            for cs_key, cs_val in CONS_MAP.items():
+                if nl == cs_key.lower():
+                    return cs_val
+            best_val = None
+            best_len = 0
+            for eq_key, eq_val in EQUIP_MAP.items():
+                ekl = eq_key.lower()
+                if ekl in nl or nl in ekl:
+                    if len(eq_key) > best_len:
+                        best_val = eq_val
+                        best_len = len(eq_key)
+            if best_val:
+                return best_val
+            for cs_key, cs_val in CONS_MAP.items():
+                csl = cs_key.lower()
+                if csl in nl or nl in csl:
+                    if len(cs_key) > best_len:
+                        best_val = cs_val
+                        best_len = len(cs_key)
+            if best_val:
+                return best_val
+            return n.lower().replace(' ', '').replace('-', '')
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            ll = line.lower()
+            if 'slot' not in ll:
+                if ('equipment' in ll and ('loadout' in ll or ':' in ll)):
+                    current_section = 'equipment'
+                    continue
+                elif 'ammo' in ll and ('loadout' in ll or ':' in ll):
+                    current_section = 'ammo'
+                    continue
+                elif 'consumables' in ll and ('loadout' in ll or ':' in ll):
+                    current_section = 'consumables'
+                    continue
+                elif ('crew' in ll and 'perks' in ll) or ('perks' in ll and ('commander' in ll or ':' in ll)):
+                    current_section = 'crew'
+                    continue
+                elif ('field' in ll and ('mod' in ll or 'modification' in ll)) or 'level' in ll:
+                    current_section = 'field_mods'
+
+            if current_section == 'equipment':
+                if 'loadout 1' in ll or 'main' in ll:
+                    slots = _re.findall(r'Slot\s+\d+:\s*([^|]+)', line)
+                    if slots:
+                        loadout1_eq = [_clean_item(s) for s in slots[:3]]
+                elif 'loadout 2' in ll or 'advanced' in ll:
+                    slots = _re.findall(r'Slot\s+\d+:\s*([^|]+)', line)
+                    if slots:
+                        loadout2_eq = [_clean_item(s) for s in slots[:3]]
+            elif current_section == 'ammo':
+                if 'loadout 1' in ll or 'main' in ll:
+                    types = _re.findall(r'([A-Z_]+)\s*:', line)
+                    if types:
+                        ammo1 = types[:3]
+                elif 'loadout 2' in ll or 'advanced' in ll:
+                    types = _re.findall(r'([A-Z_]+)\s*:', line)
+                    if types:
+                        ammo2 = types[:3]
+            elif current_section == 'consumables':
+                if 'loadout 1' in ll or 'main' in ll:
+                    slots = _re.findall(r'Slot\s+\d+:\s*([^|]+)', line)
+                    if slots:
+                        loadout1_cons = [_clean_item(s) for s in slots[:3]]
+                elif 'loadout 2' in ll or 'advanced' in ll:
+                    slots = _re.findall(r'Slot\s+\d+:\s*([^|]+)', line)
+                    if slots:
+                        loadout2_cons = [_clean_item(s) for s in slots[:3]]
+            elif current_section == 'crew':
+                match = _re.match(r'\s*(?:\*|[─└├│\->]+\s*)?\s*([\w\-]+(?:\s*-\s*\w+)?)(?:\s*\([^)]*\))?\s*:\s*(.+)', line)
+                if match:
+                    role = match.group(1).strip().lower().replace(' ', '_').replace('-', '_')
+                    if role == 'loader_radioman': role = 'loader_radio'
+                    skills_text = match.group(2)
+                    skills_text = _re.sub(r'^\s*\((?:primary|secondary)[^)]*\)\s*:\s*', '', skills_text)
+                    skills_text = _re.sub(r'\s*\(choose\s+\d+\)\s*$', '', skills_text)
+                    skills_text = skills_text.strip('[]')
+                    skills_list = [s.strip() for s in skills_text.split(',') if s.strip()]
+                    mapped = []
+                    for s in skills_list:
+                        found = False
+                        sl = s.lower()
+                        for sk_key, sk_val in CREW_SKILL_MAP.items():
+                            if sl == sk_key.lower():
+                                mapped.append(sk_val)
+                                found = True
+                                break
+                        if found:
+                            continue
+                        best_val = None
+                        best_len = 0
+                        for sk_key, sk_val in CREW_SKILL_MAP.items():
+                            skl = sk_key.lower()
+                            if skl in sl or sl in skl:
+                                if len(sk_key) > best_len:
+                                    best_val = sk_val
+                                    best_len = len(sk_key)
+                        if best_val:
+                            mapped.append(best_val)
+                        else:
+                            mapped.append(s.lower().replace(' ', '').replace('-', ''))
+                    crew.append((role, mapped[:6]))
+            elif current_section == 'field_mods':
+                if 'level' in ll:
+                    parts = line.split('|')
+                    for part in parts:
+                        if ':' in part:
+                            choice = part.split(':')[1].strip()
+                            field_mods.append(choice.lower().replace(' ', ''))
+
+        build_data['equipment_1'] = loadout1_eq
+        build_data['equipment_2'] = loadout2_eq
+        build_data['consumables_1'] = loadout1_cons
+        build_data['consumables_2'] = loadout2_cons
+        build_data['ammo'] = ammo1 or ammo2
+        build_data['crew'] = crew if crew else None
+        build_data['field_mods'] = field_mods
+        return build_data
+
+    def _generate_tank_build_prompt(self, tag, tank_name):
+        """Generate a concise prompt for the AI to create a competitive build."""
+        import importlib
+        import generate_prompt_v2
+        importlib.reload(generate_prompt_v2)
+        from generate_prompt_v2 import generate_prompt
+        return generate_prompt(tag, tank_name)
+
+    def _launch_ai_tank_build(self, tag, tank_name):
+        """Запускає AI браузер для отримання build для конкретного танка.
+        Якщо є свіжий кеш — використовує його, AI не запускає.
+        Якщо попередній запит ще виконується — завершує його."""
+        # Check cache first
+        if ENABLE_AI_BUILD_CACHE:
+            builds, updated = _load_ai_build_cache()
+            if tag in builds and tag in updated and not _is_cache_expired(updated[tag]):
+                print(f"[AI Tank Build] Завантажено build для {tag} з кешу")
+                if self._current_build_tag == tag:
+                    self.root.after(0, lambda bd=builds[tag]: self._apply_ai_build(bd))
+                self.update_status_bar(f"✅ Build для {tank_name} з кешу", "#00cc00")
+                return
+
+        if hasattr(self, '_ai_build_proc') and self._ai_build_proc and self._ai_build_proc.poll() is None:
+            try:
+                self._ai_build_proc.terminate()
+                self._ai_build_proc.wait(timeout=3)
+            except Exception:
+                try: self._ai_build_proc.kill()
+                except: pass
+            self._ai_build_proc = None
+            print(f"[AI Tank Build] terminated previous request")
+
+        self._current_build_tag = tag
+        prompt = self._generate_tank_build_prompt(tag, tank_name)
+        prompt_bytes = prompt.encode('utf-8', errors='replace')
+        tag_bytes = str(tag).encode('utf-8', errors='replace')
+        sys.stdout.buffer.write(b"[AI Tank Build] PROMPT FOR " + tag_bytes + b":\n")
+        sys.stdout.buffer.write(prompt_bytes)
+        sys.stdout.buffer.write(b"\n[AI Tank Build] END PROMPT\n")
+        sys.stdout.buffer.flush()
+
+        def run_build_process():
+            proc = None
+            try:
+                script = os.path.join(os.path.dirname(__file__), "ai_webview_gui.py")
+                cmd = [sys.executable, script, "--prompt", prompt]
+                print(f"[AI Tank Build] running for {tag}")
+                proc = subprocess.Popen(
+                    cmd,
+                    cwd=os.path.dirname(__file__),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    encoding='utf-8', errors='replace',
+                )
+                self._ai_build_proc = proc
+                lines = []
+                for line in proc.stdout:
+                    line = line.strip()
+                    if 'RESPONSE_READY' in line:
+                        break
+                    if line and not line.startswith('[AI Browser]'):
+                        lines.append(line)
+
+                if lines and len(lines) >= 3:
+                    combined = '\n'.join(lines)
+                    print(f"[AI Tank Build] response for {tag} ({len(lines)} lines):")
+                    print(combined)
+                    if self._current_build_tag == tag:
+                        build_data = self._parse_ai_tank_build(combined)
+                        if build_data and hasattr(self, 'ai_equipment_frame') and self.ai_equipment_frame.winfo_exists():
+                            self.root.after(0, lambda bd=build_data: self._apply_ai_build(bd))
+                else:
+                    print(f"[AI Tank Build] insufficient response for {tag} ({len(lines)} lines)")
+
+            except Exception as e:
+                print(f"[AI Tank Build] ERROR for {tag}: {e}")
+            finally:
+                if proc and proc.poll() is None:
+                    try:
+                        proc.terminate()
+                        proc.wait(timeout=5)
+                    except Exception:
+                        try: proc.kill()
+                        except: pass
+                if self._ai_build_proc is proc:
+                    self._ai_build_proc = None
+
+        threading.Thread(target=run_build_process, daemon=True).start()
+
+    def _apply_ai_build(self, build_data):
+        """Apply AI build data to the current tank detail UI."""
+        if not hasattr(self, 'ai_equipment_frame') or not self.ai_equipment_frame.winfo_exists():
             return
-        if self._cache_data and self._cache_data.get('tanks'):
+        if not hasattr(self, '_current_bodies'):
+            return
+        bd = self._current_build_data
+        if bd is None:
+            return
+        for k in ['equipment_1', 'equipment_2', 'consumables_1', 'consumables_2', 'ammo']:
+            if k in build_data and build_data[k]:
+                bd[k] = build_data[k]
+        if build_data.get('crew'):
+            bd['crew'] = build_data['crew']
+        if build_data.get('field_mods'):
+            bd['field_mods'] = build_data['field_mods']
+        bodies = self._current_bodies
+        self._update_ai_setup_ui(bd, *bodies)
+        # Save to cache
+        if ENABLE_AI_BUILD_CACHE:
+            tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
+            if tag:
+                _save_ai_build_cache(tag, build_data)
+        self.update_status_bar("✅ AI build завантажено", "#00cc00")
+
+    def _handle_ai_failure(self):
+        """Called on main thread when AI fetch failed. Increments fail_count and logs on 3rd failure."""
+        fc = 0
+        if self._cache_data:
+            fc = self._cache_data.get('fail_count', 0) + 1
+            self._cache_data['fail_count'] = fc
+            try:
+                with open(_CACHE_PATH, 'r', encoding='utf-8') as f:
+                    cur = json.load(f)
+                cur['fail_count'] = fc
+                with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
+                    json.dump(cur, f, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+        if not self.popular_tanks and self._cache_data and self._cache_data.get('tanks'):
             cached_tanks = [t['tag'] for t in self._cache_data['tanks'] if t.get('tag') in self.tank_db]
             if cached_tanks:
                 self.popular_tanks = cached_tanks
-                fc = self._cache_data.get('fail_count', 0) + 1
-                self._cache_data['fail_count'] = fc
-                try:
-                    with open(_CACHE_PATH, 'r', encoding='utf-8') as f:
-                        cur = json.load(f)
-                    cur['fail_count'] = fc
-                    with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
-                        json.dump(cur, f, ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
                 self.refresh_ai_view()
                 print(f"[AVISO] Завантажено з кешу (спроба {fc})")
-                if fc > 0 and fc % 3 == 0:
+        if fc > 0 and fc % 3 == 0:
                     from service_messages import log_event
                     log_event(
                         "popular_tanks",
@@ -2821,7 +3100,11 @@ class StatsAI:
         print("[AI Browser] progress_cb=", progress_cb is not None, "done_cb=", done_cb is not None)
         self.update_status_bar(self.locale_manager.t_ui('data_updating'), "#ffaa00")
 
-        ai_prompt = "2026-05-22. In World of Tanks, compile a list of the 40 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
+        if prompt:
+            ai_prompt = prompt
+        else:
+            today_str = date.today().strftime("%Y-%m-%d")
+            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 40 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
         def run_browser_process():
             try:
@@ -2838,7 +3121,7 @@ class StatsAI:
                     cwd=os.path.dirname(__file__),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
-                    text=True,
+                    encoding='utf-8', errors='replace',
                 )
                 proc = self._ai_browser_process
                 if progress_cb:
