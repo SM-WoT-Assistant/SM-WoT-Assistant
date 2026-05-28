@@ -2042,15 +2042,17 @@ class StatsAI:
                 for sk in crew_skills:
                     if sk: self.get_loadout_icon("artefacts", sk, (24, 24))
                 
-                # Now destroy loading and create body frames in one batch
-                for frame in [self.ai_equipment_frame, self.ai_consumables_frame,
-                              self.ai_ammo_frame, self.ai_equipment_frame_2,
-                              self.ai_consumables_frame_2, self.ai_ammo_frame_2,
-                              self.ai_crew_frame, self.ai_field_mod_frame]:
-                    for w in frame.winfo_children():
-                        try: w.destroy()
-                        except: pass
+                # Capture loading frames before creating new content
+                loading_frames = {}
+                for name in ['ai_equipment_frame', 'ai_consumables_frame',
+                             'ai_ammo_frame', 'ai_equipment_frame_2',
+                             'ai_consumables_frame_2', 'ai_ammo_frame_2',
+                             'ai_crew_frame', 'ai_field_mod_frame']:
+                    frame = getattr(self, name)
+                    children = frame.winfo_children()
+                    loading_frames[name] = children[0] if children else None
                 
+                # Create body frames alongside loading (loading stays visible)
                 equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
                 cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
                 ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
@@ -2067,10 +2069,20 @@ class StatsAI:
                 self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
                                         equip_body_2, cons_body_2, ammo_body_2, data, crew_rows, fm_pairs)
                 
+                # Render all content (loading still visible above new content)
                 self._update_ai_setup_ui(
                     build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                     equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs
                 )
+                
+                # Force layout calculation for all new widgets
+                self.root.update_idletasks()
+                
+                # NOW destroy loading frames - content underneath is already fully rendered
+                for lf in loading_frames.values():
+                    if lf and lf.winfo_exists():
+                        try: lf.destroy()
+                        except: pass
             
             if is_cached:
                 self.ai_equipment_frame.after(1000, prewarm_and_render)
