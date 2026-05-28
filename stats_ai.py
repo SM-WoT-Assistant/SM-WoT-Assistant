@@ -2118,16 +2118,14 @@ class StatsAI:
             n = a[0] if isinstance(a, tuple) else a
             if n: self.get_loadout_icon('ammo', n, (48, 48))
 
-        # Show detail container (behind the still-visible grid)
-        self.ai_res_f.pack(side="top", fill="both", expand=True)
-
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
         self.root.update_idletasks()
 
-        # Now swap: hide grid, show fully rendered detail
+        # Swap: hide grid first, then pack rendered detail at the top (no jump)
         self.ai_grid_container.pack_forget()
+        self.ai_res_f.pack(side="top", fill="both", expand=True)
         self.root.update_idletasks()
 
         self._current_build_data = build_data
