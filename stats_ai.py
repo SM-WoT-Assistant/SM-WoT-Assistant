@@ -1995,23 +1995,21 @@ class StatsAI:
         ammo_body_2.pack(side="top", fill="x", pady=3)
         
         loading_labels = []
-            
-        tank_name = self._get_clean_tank_name(tag, data)
-        self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
-        def on_build_ready(build_data, is_cached):
-            if not self.ai_equipment_frame.winfo_exists(): return
-            self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
-                build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-            ))
         
-                
+        # Load AI build cache data for first render
+        _ai_cache_build = {}
+        if ENABLE_AI_BUILD_CACHE:
+            try:
+                _builds, _, _ = _load_ai_build_cache()
+                if tag in _builds:
+                    _ai_cache_build = _builds[tag]
+            except Exception:
+                pass
+        
         def map_equip(name):
             return EQUIP_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
-        
         def map_cons(name):
             return CONS_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
-        
         def map_skill(name):
             return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
         
@@ -2107,7 +2105,7 @@ class StatsAI:
                 "field_mods": field_mods
             }
 
-        build_data = _build_data({}, tank_tth=tth)
+        build_data = _build_data(_ai_cache_build, tank_tth=tth)
 
         # Prewarm loadout icons from cached build data
         for k, cat, sz in [('equipment_1','artefacts',(48,48)),('equipment_2','artefacts',(48,48)),
@@ -2716,11 +2714,15 @@ class StatsAI:
         if ENABLE_AI_BUILD_CACHE:
             builds, updated, _ = _load_ai_build_cache()
             if tag in builds:
-                self.update_status_bar(f"📦 Build для {tank_name} з кешу", "#00cc00")
-                self.root.after(0, lambda bd=builds[tag]: self._apply_ai_build(bd))
                 if tag in updated and not _is_cache_expired(updated[tag], max_days=30):
-                    print(f"[AI Tank Build] Свіжий кеш для {tag}")
+                    self.update_status_bar(f"📦 Build для {tank_name} з кешу", "#00cc00")
+                    print(f"[AI Tank Build] Свіжий кеш для {tag} — скіп, вже відрендерено")
                     return
+                # Stale cache: show stale data while AI updates
+                self.update_status_bar(f"📦 Build для {tank_name} з кешу (застарілий)", "#00cc00")
+                self.root.after(0, lambda bd=builds[tag]: self._update_ai_setup_ui(
+                    bd, *self._current_bodies
+                ) if hasattr(self, '_current_bodies') else None)
                 print(f"[AI Tank Build] Кеш для {tag} прострочений, запускаю AI оновлення")
             else:
                 print(f"[AI Tank Build] Немає кешу для {tag}, запускаю AI")
