@@ -2064,12 +2064,20 @@ class StatsAI:
                 ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
                 ammo_body_2.pack(side="top", fill="x", pady=3)
                 
+                self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
+                                        equip_body_2, cons_body_2, ammo_body_2, data, crew_rows, fm_pairs)
+                
                 self._update_ai_setup_ui(
                     build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                     equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs
                 )
             
-            self.ai_equipment_frame.after(1000, prewarm_and_render)
+            if is_cached:
+                self.ai_equipment_frame.after(1000, prewarm_and_render)
+            else:
+                self.ai_equipment_frame.after(0, prewarm_and_render)
+        
+        self._on_build_ready = on_build_ready
         
         tomato_slug = None  # Tomato integration removed
         
@@ -2213,15 +2221,11 @@ class StatsAI:
             }
 
         build_data = process_tomato_data(None, None, tank_tth=tth)
-
-
-        self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                                   equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
-
         self._current_build_data = build_data
-        self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
-                                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
-
+        
+        # Trigger cached build rendering (on_build_ready prewarms icons, then creates body frames and renders)
+        on_build_ready(build_data, True)
+        
         tank_name = data.get('name', tag)
         self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
         tag_copy = tag
@@ -2891,8 +2895,6 @@ class StatsAI:
         """Apply AI build data to the current tank detail UI."""
         if not hasattr(self, 'ai_equipment_frame') or not self.ai_equipment_frame.winfo_exists():
             return
-        if not hasattr(self, '_current_bodies'):
-            return
         bd = self._current_build_data
         if bd is None:
             return
@@ -2903,8 +2905,8 @@ class StatsAI:
             bd['crew'] = build_data['crew']
         if build_data.get('field_mods'):
             bd['field_mods'] = build_data['field_mods']
-        bodies = self._current_bodies
-        self._update_ai_setup_ui(bd, *bodies)
+        if hasattr(self, '_on_build_ready'):
+            self._on_build_ready(bd, False)
         if ENABLE_AI_BUILD_CACHE:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
