@@ -540,7 +540,7 @@ def generate_prompt(tank_id, tank_name=None):
             perks_list = ", ".join([f"Perk {i+1}" for i in range(primary_perk_count)])
             crew_roles_output += f"   * {role}: [{perks_list}] (choose {primary_perk_count})\n"
     
-    current_date = datetime.now().strftime("%Y-%m-%d")
+    current_year = datetime.now().strftime("%Y")
     
     perk_word = "perk" if primary_perk_count == 1 else "perks"
     secondary_perk_word = "perk" if secondary_perk_count == 1 else "perks"
@@ -572,7 +572,7 @@ Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "Additiona
         equip_section = ""
         equip_output = ""
     
-    prompt = f"""Current date: {current_date}.
+    prompt = f"""{current_year} year.
 Tank: {tank_name}
 
 [INSTRUCTION CONTEXT & PURPOSE]

@@ -38469,5 +38469,68 @@
     "has_post_progression": false,
     "field_mods": [],
     "nation": "ussr"
+  },
+  "R122_T44_100": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "deluxeAdditionalInvisibilityDevice",
+      "additionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "camouflageNet",
+      "invisibilityBonus",
+      "deluxeCamouflageNet"
+    ],
+    "has_post_progression": true,
+    "post_progression_tree": "role_MT_universal",
+    "field_mods": [],
+    "nation": "ussr"
+  },
+  "A14_T30": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "radioman",
+      "loader",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "deluxeAdditionalInvisibilityDevice",
+      "additionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "camouflageNet",
+      "invisibilityBonus",
+      "deluxeCamouflageNet"
+    ],
+    "has_post_progression": false,
+    "field_mods": [],
+    "nation": "usa"
   }
 }

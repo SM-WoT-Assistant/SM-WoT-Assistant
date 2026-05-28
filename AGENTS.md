@@ -29,6 +29,11 @@
 2. `crew_builds.json` override — вимкнено для тестування AI механізму (stats_ai.py:2286)
 3. `ai_builds_cache.json` — вимкнено для тестування (stats_ai.py:19, ENABLE_AI_BUILD_CACHE=False)
 
+## Зміна в генерації промпту (28.05.2026)
+1. `generate_prompt_v2.py:575` — "Current date: 2026-05-28." замінено на "2026 year"
+   - Причина: рядок "Current date: ..." блокував AI відповідь для окремих танків (Google AI Mode ігнорував запит з повною датою для певних назв)
+   - Рік динамічний: `datetime.now().strftime("%Y")`
+
 ## Механіки гри (з клієнта)
 1. Слоти обладнання: Tier 1→0, Tier 2→1, Tier 3→1, Tier 4-5→2, Tier 6-11→3 (tank_slots_full.json: equipment_slots)
 2. Кількість перків: Tier 1-4→1, Tier 5-6→2, Tier 7→4, Tier 8-11→6 (crew_builds.json: _perk_policy.primary_perk_count_by_tier)
