@@ -125,8 +125,7 @@ class StatsAI:
         self._field_mod_pairs_by_tank = self._load_field_mod_pairs_by_tank()
         self._crew_builds = self._load_crew_builds()
         self._equipment_loadouts = self._load_equipment_loadouts()
-        self._tomato_lock = threading.Lock()  # Lock для синхронізації запитів до Tomato
-
+        
         self.root = self.main_app.root
         self._search_timer = None
         self._filter_active = False
@@ -2053,8 +2052,7 @@ class StatsAI:
                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
             ))
         
-        tomato_slug = None  # Tomato integration removed
-        
+                
         def map_equip(name):
             return EQUIP_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
         
@@ -2064,7 +2062,7 @@ class StatsAI:
         def map_skill(name):
             return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
         
-        def process_tomato_data(tomato_data, cached_data, tank_tth=None):
+        def _build_data(cached_data, tank_tth=None):
             if cached_data is None:
                 cached_data = {}
             
@@ -2107,47 +2105,9 @@ class StatsAI:
             field_mods = []
             ammo = []
             
-            if tomato_data:
-                eq1 = tomato_data.get("equipment_1", [])
-                eq2 = tomato_data.get("equipment_2", [])
-                
-                equipment_1 = [map_equip(e) for e in eq1[:3]]
-                equipment_2 = [map_equip(e) for e in eq2[:3]]
-                
-                cons_1 = tomato_data.get("consumables_1", [])
-                cons_2 = tomato_data.get("consumables_2", [])
-                consumables_1 = [map_cons(c) for c in cons_1[:3]] if cons_1 else []
-                consumables_2 = [map_cons(c) for c in cons_2[:3]] if cons_2 else []
-                
-                if not consumables_1:
-                    cons = tomato_data.get("consumables", [])
-                    consumables_1 = [map_cons(c) for c in cons[:3]]
-                
-                crew_perks = tomato_data.get("crew_perks", {})
-                crew_skills_map = {}
-                has_loader_radio = "loader_radio" in crew_perks
-                for role, skills in crew_perks.items():
-                    if isinstance(skills, list):
-                        if role == "loader_radio":
-                            if "loader_radio" not in crew_skills_map:
-                                crew_skills_map["loader_radio"] = []
-                            crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
-                        elif role == "loader":
-                            if "loader" not in crew_skills_map:
-                                crew_skills_map["loader"] = []
-                            crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
-                        else:
-                            skill_ids = [map_skill(s) for s in skills[:6]]
-                            if role not in crew_skills_map:
-                                crew_skills_map[role] = []
-                            crew_skills_map[role].extend(skill_ids)
-                
-                for role, skills in crew_skills_map.items():
-                    crew_skills.append((role, skills[:12]))
-                
-                fm = tomato_data.get("field_mods", {})
-                if isinstance(fm, dict):
-                    mods = fm.get("mods", [])
+            if False:
+                # tomato_data path removed - using cached_data only
+                pass
             
             if not equipment_1:
                 equipment_1 = cached_data.get("equipment_1", [])
@@ -2194,7 +2154,7 @@ class StatsAI:
                 "field_mods": field_mods
             }
 
-        build_data = process_tomato_data(None, None, tank_tth=tth)
+        build_data = _build_data({}, tank_tth=tth)
 
 
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,

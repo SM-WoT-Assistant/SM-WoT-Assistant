@@ -74,7 +74,6 @@ class UIManager:
 
         self.app.canvas = tk.Canvas(self.app.root, bg="black", highlightthickness=0)
         self.app.browser_frame = tk.Frame(self.app.root, bg="#000")
-        self.app.browser_frame.bind("<Configure>", self.app.win_mgr.resize_tomato_window)
         
         self.app.ai_frame = tk.Frame(self.app.root, bg="#111")
         self.app.stats_ai_module = stats_ai.StatsAI(self.app.ai_frame, self.app.tank_db, self.app.popular_tanks, self.app)
@@ -88,10 +87,6 @@ class UIManager:
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
         
-        if hasattr(self.app, 'tomato') and self.app.tomato:
-            self.app.tomato.stop()
-            self.app.tomato_hwnd = None
-            
         self.app.browser_frame.pack_forget()
         self.app.canvas.pack_forget() 
         self.app.filter_panel.pack_forget()
@@ -128,21 +123,6 @@ class UIManager:
                 bg="#000", fg="#cccccc", font=("Segoe UI", 14)
             )
             loading_label.pack(expand=True)
-            self.app.browser_frame.update()
-
-            if hasattr(self.app, 'tomato') and self.app.tomato:
-                self.app.tomato_hwnd = None
-                self.app.tomato.launch()
-                self.app.root.after(200, self.app.win_mgr.dock_tomato_window)
-
-                def cleanup_loading_when_docked():
-                    if self.app.tomato_hwnd:
-                        try: loading_label.destroy()
-                        except Exception: pass
-                    else: self.app.root.after(200, cleanup_loading_when_docked)
-                self.app.root.after(200, cleanup_loading_when_docked)
-            else:
-                self.app.status_label.config(text="[ПОМИЛКА] Модуль tomato_viewer.py не знайдено!", fg="red")
 
         elif view_name == "ai_stats":
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
