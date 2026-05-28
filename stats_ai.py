@@ -14,7 +14,7 @@ from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
 
 ENABLE_POPULAR_TANK_CACHE = True
-ENABLE_AI_BUILD_CACHE = False
+ENABLE_AI_BUILD_CACHE = True
 
 _CACHE_PATH = os.path.join(os.path.dirname(__file__), "popular_tanks_cache.json")
 _AI_BUILD_CACHE_PATH = os.path.join(os.path.dirname(__file__), "ai_builds_cache.json")
@@ -2788,12 +2788,15 @@ class StatsAI:
         Якщо попередній запит ще виконується — завершує його."""
         if ENABLE_AI_BUILD_CACHE:
             builds, updated, _ = _load_ai_build_cache()
-            if tag in builds and tag in updated and not _is_cache_expired(updated[tag], max_days=30):
-                print(f"[AI Tank Build] Завантажено build для {tag} з кешу")
-                if self._current_build_tag == tag:
-                    self.root.after(0, lambda bd=builds[tag]: self._apply_ai_build(bd))
-                self.update_status_bar(f"✅ Build для {tank_name} з кешу", "#00cc00")
-                return
+            if tag in builds:
+                self.update_status_bar(f"📦 Build для {tank_name} з кешу", "#00cc00")
+                self.root.after(0, lambda bd=builds[tag]: self._apply_ai_build(bd))
+                if tag in updated and not _is_cache_expired(updated[tag], max_days=30):
+                    print(f"[AI Tank Build] Свіжий кеш для {tag}")
+                    return
+                print(f"[AI Tank Build] Кеш для {tag} прострочений, запускаю AI оновлення")
+            else:
+                print(f"[AI Tank Build] Немає кешу для {tag}, запускаю AI")
 
         if hasattr(self, '_ai_build_proc') and self._ai_build_proc and self._ai_build_proc.poll() is None:
             try:
