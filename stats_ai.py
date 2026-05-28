@@ -1478,22 +1478,25 @@ class StatsAI:
             except Exception:
                 pass
 
-        # Reverse: check if any TTH key with 4-digit prefix matches our tag
+        suffix = tag_n.split("_", 1)[1] if "_" in tag_n else tag_n
         for key, value in self.tank_tth.items():
-            key_n = str(key).lower().replace('-', '_')
-            base_key = _strip_mode_suffixes(key_n)
-            if base_key != key_n:
-                m = re.match(r'^([a-z]+)(\d{4})_(.+)$', base_key)
-                if m:
-                    try:
-                        pref, num4, rest = m.groups()
-                        num_val = int(num4)
-                        if num_val >= 1000:
-                            candidate = f"{pref}{num_val - 1000}_{rest}"
-                            if candidate == base_tag and isinstance(value, dict) and value:
-                                return value
-                    except Exception:
-                        pass
+            key_l = str(key).lower().replace('-', '_')
+            key_suffix = key_l.split("_", 1)[1] if "_" in key_l else key_l
+            if key_suffix == suffix and isinstance(value, dict) and value:
+                return value
+
+        current = self.tank_db.get(tag)
+        if isinstance(current, dict):
+            cur_name = str(current.get("name", "")).strip().casefold()
+            if cur_name:
+                for other_tag, other_data in self.tank_db.items():
+                    if other_tag == tag or not isinstance(other_data, dict):
+                        continue
+                    if str(other_data.get("name", "")).strip().casefold() != cur_name:
+                        continue
+                    v = _get_tth_by_key(other_tag)
+                    if v:
+                        return v
 
         return {}
 
@@ -1915,9 +1918,20 @@ class StatsAI:
         crew_rows = tank_info['crew_rows']
         fm_pairs = tank_info['fm_pairs']
         
-        # Destroy title and TTH frames only (keep loading alive in other frames)
         for widget in self.ai_title_frame.winfo_children(): widget.destroy()
         for widget in self.ai_tth_frame.winfo_children(): widget.destroy()
+        for widget in self.ai_equipment_frame.winfo_children(): widget.destroy()
+        for widget in self.ai_consumables_frame.winfo_children(): widget.destroy()
+        for widget in self.ai_ammo_frame.winfo_children(): widget.destroy()
+        for widget in self.ai_equipment_frame_2.winfo_children(): widget.destroy()
+        for widget in self.ai_consumables_frame_2.winfo_children(): widget.destroy()
+        for widget in self.ai_ammo_frame_2.winfo_children(): widget.destroy()
+        for widget in self.ai_crew_frame.winfo_children(): widget.destroy()
+        for widget in self.ai_field_mod_frame.winfo_children(): widget.destroy()
+        if hasattr(self, '_loadout_num_label') and self._loadout_num_label.winfo_exists():
+            self._loadout_num_label.destroy()
+        if hasattr(self, '_loadout_num_label_2') and self._loadout_num_label_2.winfo_exists():
+            self._loadout_num_label_2.destroy()
         
         is_prem = data.get("is_premium", False)
         acc = "#e09b1b" if is_prem else "#bbbbbb"
@@ -2013,83 +2027,31 @@ class StatsAI:
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
         
-        # Don't create body frames here - keep loading animation visible
-        # They will be created inside on_build_ready after prewarming
+        equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
+        cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
+        ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
+        crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
         
+        fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
+        
+
+        equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
+        equip_body_2.pack(side="top", fill="x", pady=3)
+        cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
+        cons_body_2.pack(side="top", fill="x", pady=3)
+        ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
+        ammo_body_2.pack(side="top", fill="x", pady=3)
+        
+        loading_labels = []
+            
         tank_name = self._get_clean_tank_name(tag, data)
         self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
         def on_build_ready(build_data, is_cached):
             if not self.ai_equipment_frame.winfo_exists(): return
-            
-            def prewarm_and_render():
-                equip_1 = [map_equip(e) for e in build_data.get("equipment_1", [])[:3]]
-                equip_2 = [map_equip(e) for e in build_data.get("equipment_2", [])[:3]]
-                cons_1 = [map_cons(c) for c in build_data.get("consumables_1", [])[:3]]
-                cons_2 = [map_cons(c) for c in build_data.get("consumables_2", [])[:3]]
-                ammo = build_data.get("ammo", [])
-                
-                for item in equip_1 + equip_2:
-                    if item: self.get_loadout_icon("artefacts", item, (48, 48))
-                for item in cons_1 + cons_2:
-                    if item: self.get_loadout_icon("artefacts", item, (48, 48))
-                for a in ammo:
-                    n = a[0] if isinstance(a, tuple) else a
-                    if n: self.get_loadout_icon("ammo", n, (48, 48))
-                
-                crew_skills = []
-                for role, skills in build_data.get("crew", []):
-                    crew_skills.extend(skills)
-                for sk in crew_skills:
-                    if sk: self.get_loadout_icon("artefacts", sk, (24, 24))
-                
-                # Capture loading frames before creating new content
-                loading_frames = {}
-                for name in ['ai_equipment_frame', 'ai_consumables_frame',
-                             'ai_ammo_frame', 'ai_equipment_frame_2',
-                             'ai_consumables_frame_2', 'ai_ammo_frame_2',
-                             'ai_crew_frame', 'ai_field_mod_frame']:
-                    frame = getattr(self, name)
-                    children = frame.winfo_children()
-                    loading_frames[name] = children[0] if children else None
-                
-                # Create body frames alongside loading (loading stays visible)
-                equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
-                cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-                ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
-                crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
-                fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
-                
-                equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
-                equip_body_2.pack(side="top", fill="x", pady=3)
-                cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
-                cons_body_2.pack(side="top", fill="x", pady=3)
-                ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
-                ammo_body_2.pack(side="top", fill="x", pady=3)
-                
-                self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
-                                        equip_body_2, cons_body_2, ammo_body_2, data, crew_rows, fm_pairs)
-                
-                # Render all content (loading still visible above new content)
-                self._update_ai_setup_ui(
-                    build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                    equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs
-                )
-                
-                # Force layout calculation for all new widgets
-                self.root.update_idletasks()
-                
-                # NOW destroy loading frames - content underneath is already fully rendered
-                for lf in loading_frames.values():
-                    if lf and lf.winfo_exists():
-                        try: lf.destroy()
-                        except: pass
-            
-            if is_cached:
-                self.ai_equipment_frame.after(1000, prewarm_and_render)
-            else:
-                self.ai_equipment_frame.after(0, prewarm_and_render)
-        
-        self._on_build_ready = on_build_ready
+            self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
+                build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
+                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
+            ))
         
         tomato_slug = None  # Tomato integration removed
         
@@ -2233,11 +2195,15 @@ class StatsAI:
             }
 
         build_data = process_tomato_data(None, None, tank_tth=tth)
+
+
+        self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
+                                   equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
         self._current_build_data = build_data
-        
-        # Trigger cached build rendering (on_build_ready prewarms icons, then creates body frames and renders)
-        on_build_ready(build_data, True)
-        
+        self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
+                                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
         tank_name = data.get('name', tag)
         self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
         tag_copy = tag
@@ -2907,6 +2873,8 @@ class StatsAI:
         """Apply AI build data to the current tank detail UI."""
         if not hasattr(self, 'ai_equipment_frame') or not self.ai_equipment_frame.winfo_exists():
             return
+        if not hasattr(self, '_current_bodies'):
+            return
         bd = self._current_build_data
         if bd is None:
             return
@@ -2917,8 +2885,8 @@ class StatsAI:
             bd['crew'] = build_data['crew']
         if build_data.get('field_mods'):
             bd['field_mods'] = build_data['field_mods']
-        if hasattr(self, '_on_build_ready'):
-            self._on_build_ready(bd, False)
+        bodies = self._current_bodies
+        self._update_ai_setup_ui(bd, *bodies)
         if ENABLE_AI_BUILD_CACHE:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
