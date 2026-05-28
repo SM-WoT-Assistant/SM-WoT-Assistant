@@ -1477,6 +1477,23 @@ class StatsAI:
             except Exception:
                 pass
 
+        # Reverse: TTH keys with StoryMode 4-digit prefix -> target tag
+        for key, value in self.tank_tth.items():
+            key_n = str(key).lower().replace('-', '_')
+            base_key = _strip_mode_suffixes(key_n)
+            if base_key != key_n:
+                m = re.match(r'^([a-z]+)(\d{4})_(.+)$', base_key)
+                if m:
+                    try:
+                        pref, num4, rest = m.groups()
+                        num_val = int(num4)
+                        if num_val >= 1000:
+                            candidate = f"{pref}{num_val - 1000}_{rest}"
+                            if candidate == base_tag and isinstance(value, dict) and value:
+                                return value
+                    except Exception:
+                        pass
+
         suffix = tag_n.split("_", 1)[1] if "_" in tag_n else tag_n
         for key, value in self.tank_tth.items():
             key_l = str(key).lower().replace('-', '_')
@@ -1795,73 +1812,7 @@ class StatsAI:
     def on_ai_tank_select(self, tag):
         self.active_tank = tag
         
-        data = self.tank_db.get(tag, {})
-        if not isinstance(data, dict):
-            data = {}
-        
-        self.ai_grid_container.pack_forget()
-        self.ai_res_f.pack(side="top", fill="both", expand=True)
-        
-        for frame in [self.ai_title_frame, self.ai_tth_frame, 
-                      self.ai_equipment_frame, self.ai_consumables_frame, self.ai_ammo_frame,
-                      self.ai_equipment_frame_2, self.ai_consumables_frame_2, self.ai_ammo_frame_2,
-                      self.ai_crew_frame, self.ai_field_mod_frame]:
-            for w in frame.winfo_children():
-                w.destroy()
-        
-        is_prem = data.get("is_premium", False)
-        acc = "#e09b1b" if is_prem else "#bbbbbb"
-        hf = tk.Frame(self.ai_title_frame, bg="#111111")
-        hf.pack(side="top", anchor="center", pady=(0, 8))
-        roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
-        try:
-            tier_val = int(data.get('tier', 0) or 0)
-        except Exception:
-            tier_val = 0
-        rt = roman_tiers[tier_val - 1] if 1 <= tier_val <= 11 else str(tier_val)
-        tk.Label(hf, text=rt, font=("Arial", 16, "bold"), fg=acc, bg="#111111").pack(side="left", padx=(0, 4))
-        s_flag = self.get_small_flag(data.get("nation", ""))
-        if s_flag:
-            fl = tk.Label(hf, image=s_flag, bg="#111111")
-            fl.image = s_flag
-            fl.pack(side="left", padx=(0, 4))
-        xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
-        sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
-        tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
-        tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
-        
-        loading_frame = tk.Frame(self.ai_equipment_frame, bg="#111111")
-        loading_frame.pack(fill="both", expand=True, pady=(30, 10))
-        
-        tk.Label(loading_frame, text="🔍  ПОШУК ІНФОРМАЦІЇ...", 
-                 fg="#ff8800", bg="#111111", font=("Arial", 14, "bold")).pack(pady=(20, 10))
-        
-        prog_canvas = tk.Canvas(loading_frame, height=6, bg="#1a1a1a", bd=0, highlightthickness=0)
-        prog_canvas.pack(fill="x", padx=40, pady=(0, 20))
-        prog_rect = prog_canvas.create_rectangle(0, 0, 0, 6, fill="#ff6600", outline="")
-        
         self.detail_canvas.yview_moveto(0)
-        self.root.update_idletasks()
-        
-        self._loading_anim_active = True
-        start_time = time.time()
-        
-        def animate_loading():
-            if not self._loading_anim_active:
-                return
-            try:
-                if not prog_canvas.winfo_exists():
-                    return
-                elapsed = time.time() - start_time
-                progress = min(0.9, 1.0 - 1.0 / (1.0 + elapsed * 0.3))
-                w = prog_canvas.winfo_width()
-                if w > 1:
-                    prog_canvas.coords(prog_rect, 0, 0, int(w * progress), 6)
-                self.root.after(50, animate_loading)
-            except Exception:
-                pass
-        
-        animate_loading()
         
         def background_collect():
             tank_info = self._collect_tank_data(tag)
@@ -1871,11 +1822,13 @@ class StatsAI:
         import threading
         threading.Thread(target=background_collect, daemon=True).start()
 
+
     def _finish_tank_detail_with_loading(self, tank_info):
-        """Build tank detail UI, replacing the loading indicator."""
-        self._loading_anim_active = False
+        """Hide grid and build tank detail UI in one callback (zero flicker)."""
         if not tank_info:
             return
+        self.ai_grid_container.pack_forget()
+        self.ai_res_f.pack(side="top", fill="both", expand=True)
         self._finish_tank_detail(tank_info)
 
 
@@ -2156,9 +2109,23 @@ class StatsAI:
 
         build_data = _build_data({}, tank_tth=tth)
 
+        # Prewarm loadout icons from cached build data
+        for k, cat, sz in [('equipment_1','artefacts',(48,48)),('equipment_2','artefacts',(48,48)),
+                            ('consumables_1','artefacts',(48,48)),('consumables_2','artefacts',(48,48))]:
+            for item in build_data.get(k, []):
+                if item: self.get_loadout_icon(cat, item, sz)
+        for sk_list in build_data.get('crew', []):
+            if isinstance(sk_list, tuple) and len(sk_list) == 2:
+                for sk in sk_list[1]:
+                    if sk: self.get_loadout_icon('artefacts', sk, (24, 24))
+        for a in build_data.get('ammo', []):
+            n = a[0] if isinstance(a, tuple) else a
+            if n: self.get_loadout_icon('ammo', n, (48, 48))
 
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
                                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+
+        self.root.update_idletasks()
 
         self._current_build_data = build_data
         self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
