@@ -2048,10 +2048,34 @@ class StatsAI:
         self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
         def on_build_ready(build_data, is_cached):
             if not self.ai_equipment_frame.winfo_exists(): return
-            self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
-                build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-            ))
+            
+            def prewarm_and_render():
+                equip_1 = [map_equip(e) for e in build_data.get("equipment_1", [])[:3]]
+                equip_2 = [map_equip(e) for e in build_data.get("equipment_2", [])[:3]]
+                cons_1 = [map_cons(c) for c in build_data.get("consumables_1", [])[:3]]
+                cons_2 = [map_cons(c) for c in build_data.get("consumables_2", [])[:3]]
+                ammo = build_data.get("ammo", [])
+                
+                for item in equip_1 + equip_2:
+                    if item: self.get_loadout_icon("artefacts", item, (48, 48))
+                for item in cons_1 + cons_2:
+                    if item: self.get_loadout_icon("artefacts", item, (48, 48))
+                for a in ammo:
+                    n = a[0] if isinstance(a, tuple) else a
+                    if n: self.get_loadout_icon("ammo", n, (48, 48))
+                
+                crew_skills = []
+                for role, skills in build_data.get("crew", []):
+                    crew_skills.extend(skills)
+                for sk in crew_skills:
+                    if sk: self.get_loadout_icon("artefacts", sk, (24, 24))
+                
+                self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
+                    build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
+                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
+                ))
+            
+            self.ai_equipment_frame.after(1000, prewarm_and_render)
         
         tomato_slug = None  # Tomato integration removed
         
