@@ -1478,25 +1478,22 @@ class StatsAI:
             except Exception:
                 pass
 
-        suffix = tag_n.split("_", 1)[1] if "_" in tag_n else tag_n
+        # Reverse: check if any TTH key with 4-digit prefix matches our tag
         for key, value in self.tank_tth.items():
-            key_l = str(key).lower().replace('-', '_')
-            key_suffix = key_l.split("_", 1)[1] if "_" in key_l else key_l
-            if key_suffix == suffix and isinstance(value, dict) and value:
-                return value
-
-        current = self.tank_db.get(tag)
-        if isinstance(current, dict):
-            cur_name = str(current.get("name", "")).strip().casefold()
-            if cur_name:
-                for other_tag, other_data in self.tank_db.items():
-                    if other_tag == tag or not isinstance(other_data, dict):
-                        continue
-                    if str(other_data.get("name", "")).strip().casefold() != cur_name:
-                        continue
-                    v = _get_tth_by_key(other_tag)
-                    if v:
-                        return v
+            key_n = str(key).lower().replace('-', '_')
+            base_key = _strip_mode_suffixes(key_n)
+            if base_key != key_n:
+                m = re.match(r'^([a-z]+)(\d{4})_(.+)$', base_key)
+                if m:
+                    try:
+                        pref, num4, rest = m.groups()
+                        num_val = int(num4)
+                        if num_val >= 1000:
+                            candidate = f"{pref}{num_val - 1000}_{rest}"
+                            if candidate == base_tag and isinstance(value, dict) and value:
+                                return value
+                    except Exception:
+                        pass
 
         return {}
 
@@ -1918,20 +1915,9 @@ class StatsAI:
         crew_rows = tank_info['crew_rows']
         fm_pairs = tank_info['fm_pairs']
         
+        # Destroy title and TTH frames only (keep loading alive in other frames)
         for widget in self.ai_title_frame.winfo_children(): widget.destroy()
         for widget in self.ai_tth_frame.winfo_children(): widget.destroy()
-        for widget in self.ai_equipment_frame.winfo_children(): widget.destroy()
-        for widget in self.ai_consumables_frame.winfo_children(): widget.destroy()
-        for widget in self.ai_ammo_frame.winfo_children(): widget.destroy()
-        for widget in self.ai_equipment_frame_2.winfo_children(): widget.destroy()
-        for widget in self.ai_consumables_frame_2.winfo_children(): widget.destroy()
-        for widget in self.ai_ammo_frame_2.winfo_children(): widget.destroy()
-        for widget in self.ai_crew_frame.winfo_children(): widget.destroy()
-        for widget in self.ai_field_mod_frame.winfo_children(): widget.destroy()
-        if hasattr(self, '_loadout_num_label') and self._loadout_num_label.winfo_exists():
-            self._loadout_num_label.destroy()
-        if hasattr(self, '_loadout_num_label_2') and self._loadout_num_label_2.winfo_exists():
-            self._loadout_num_label_2.destroy()
         
         is_prem = data.get("is_premium", False)
         acc = "#e09b1b" if is_prem else "#bbbbbb"
@@ -2027,23 +2013,9 @@ class StatsAI:
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
         
-        equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
-        cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-        ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
-        crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
+        # Don't create body frames here - keep loading animation visible
+        # They will be created inside on_build_ready after prewarming
         
-        fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
-        
-
-        equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
-        equip_body_2.pack(side="top", fill="x", pady=3)
-        cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
-        cons_body_2.pack(side="top", fill="x", pady=3)
-        ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
-        ammo_body_2.pack(side="top", fill="x", pady=3)
-        
-        loading_labels = []
-            
         tank_name = self._get_clean_tank_name(tag, data)
         self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
         def on_build_ready(build_data, is_cached):
@@ -2070,10 +2042,32 @@ class StatsAI:
                 for sk in crew_skills:
                     if sk: self.get_loadout_icon("artefacts", sk, (24, 24))
                 
-                self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
+                # Now destroy loading and create body frames in one batch
+                for frame in [self.ai_equipment_frame, self.ai_consumables_frame,
+                              self.ai_ammo_frame, self.ai_equipment_frame_2,
+                              self.ai_consumables_frame_2, self.ai_ammo_frame_2,
+                              self.ai_crew_frame, self.ai_field_mod_frame]:
+                    for w in frame.winfo_children():
+                        try: w.destroy()
+                        except: pass
+                
+                equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
+                cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
+                ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
+                crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
+                fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
+                
+                equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
+                equip_body_2.pack(side="top", fill="x", pady=3)
+                cons_body_2 = tk.Frame(self.ai_consumables_frame_2, bg="#111111")
+                cons_body_2.pack(side="top", fill="x", pady=3)
+                ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
+                ammo_body_2.pack(side="top", fill="x", pady=3)
+                
+                self._update_ai_setup_ui(
                     build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                    equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-                ))
+                    equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs
+                )
             
             self.ai_equipment_frame.after(1000, prewarm_and_render)
         
