@@ -1478,6 +1478,23 @@ class StatsAI:
             except Exception:
                 pass
 
+        # Reverse: check TTH keys with 4-digit prefix for StoryMode variants
+        for key, value in self.tank_tth.items():
+            key_n = str(key).lower().replace('-', '_')
+            base_key = _strip_mode_suffixes(key_n)
+            if base_key != key_n:
+                m = re.match(r'^([a-z]+)(\d{4})_(.+)$', base_key)
+                if m:
+                    try:
+                        pref, num4, rest = m.groups()
+                        num_val = int(num4)
+                        if num_val >= 1000:
+                            candidate = f"{pref}{num_val - 1000}_{rest}"
+                            if candidate == base_tag and isinstance(value, dict) and value:
+                                return value
+                    except Exception:
+                        pass
+
         suffix = tag_n.split("_", 1)[1] if "_" in tag_n else tag_n
         for key, value in self.tank_tth.items():
             key_l = str(key).lower().replace('-', '_')
@@ -1800,69 +1817,7 @@ class StatsAI:
         if not isinstance(data, dict):
             data = {}
         
-        self.ai_grid_container.pack_forget()
-        self.ai_res_f.pack(side="top", fill="both", expand=True)
-        
-        for frame in [self.ai_title_frame, self.ai_tth_frame, 
-                      self.ai_equipment_frame, self.ai_consumables_frame, self.ai_ammo_frame,
-                      self.ai_equipment_frame_2, self.ai_consumables_frame_2, self.ai_ammo_frame_2,
-                      self.ai_crew_frame, self.ai_field_mod_frame]:
-            for w in frame.winfo_children():
-                w.destroy()
-        
-        is_prem = data.get("is_premium", False)
-        acc = "#e09b1b" if is_prem else "#bbbbbb"
-        hf = tk.Frame(self.ai_title_frame, bg="#111111")
-        hf.pack(side="top", anchor="center", pady=(0, 8))
-        roman_tiers = ["I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
-        try:
-            tier_val = int(data.get('tier', 0) or 0)
-        except Exception:
-            tier_val = 0
-        rt = roman_tiers[tier_val - 1] if 1 <= tier_val <= 11 else str(tier_val)
-        tk.Label(hf, text=rt, font=("Arial", 16, "bold"), fg=acc, bg="#111111").pack(side="left", padx=(0, 4))
-        s_flag = self.get_small_flag(data.get("nation", ""))
-        if s_flag:
-            fl = tk.Label(hf, image=s_flag, bg="#111111")
-            fl.image = s_flag
-            fl.pack(side="left", padx=(0, 4))
-        xvm_classes = {"LT": chr(0x3A), "MT": chr(0x3B), "HT": chr(0x3F), "TD": chr(0x2E), "SPG": chr(0x2D)}
-        sym = xvm_classes.get(str(data.get('class', '')).upper(), "?")
-        tk.Label(hf, text=sym, font=("XVMSymbol", 18), fg=acc, bg="#111111").pack(side="left", padx=(0, 6))
-        tk.Label(hf, text=data.get('name', tag), font=("Arial", 14, "bold"), fg=acc, bg="#111111").pack(side="left")
-        
-        loading_frame = tk.Frame(self.ai_equipment_frame, bg="#111111")
-        loading_frame.pack(fill="both", expand=True, pady=(30, 10))
-        
-        tk.Label(loading_frame, text="🔍  ПОШУК ІНФОРМАЦІЇ...", 
-                 fg="#ff8800", bg="#111111", font=("Arial", 14, "bold")).pack(pady=(20, 10))
-        
-        prog_canvas = tk.Canvas(loading_frame, height=6, bg="#1a1a1a", bd=0, highlightthickness=0)
-        prog_canvas.pack(fill="x", padx=40, pady=(0, 20))
-        prog_rect = prog_canvas.create_rectangle(0, 0, 0, 6, fill="#ff6600", outline="")
-        
         self.detail_canvas.yview_moveto(0)
-        self.root.update_idletasks()
-        
-        self._loading_anim_active = True
-        start_time = time.time()
-        
-        def animate_loading():
-            if not self._loading_anim_active:
-                return
-            try:
-                if not prog_canvas.winfo_exists():
-                    return
-                elapsed = time.time() - start_time
-                progress = min(0.9, 1.0 - 1.0 / (1.0 + elapsed * 0.3))
-                w = prog_canvas.winfo_width()
-                if w > 1:
-                    prog_canvas.coords(prog_rect, 0, 0, int(w * progress), 6)
-                self.root.after(50, animate_loading)
-            except Exception:
-                pass
-        
-        animate_loading()
         
         def background_collect():
             tank_info = self._collect_tank_data(tag)
@@ -1873,10 +1828,12 @@ class StatsAI:
         threading.Thread(target=background_collect, daemon=True).start()
 
     def _finish_tank_detail_with_loading(self, tank_info):
-        """Build tank detail UI, replacing the loading indicator."""
-        self._loading_anim_active = False
+        """Hide grid and build tank detail UI in one batch (zero flicker)."""
         if not tank_info:
             return
+        # Hide grid, show detail container
+        self.ai_grid_container.pack_forget()
+        self.ai_res_f.pack(side="top", fill="both", expand=True)
         self._finish_tank_detail(tank_info)
 
 
@@ -2042,167 +1999,28 @@ class StatsAI:
         ammo_body_2 = tk.Frame(self.ai_ammo_frame_2, bg="#111111")
         ammo_body_2.pack(side="top", fill="x", pady=3)
         
-        loading_labels = []
-            
-        tank_name = self._get_clean_tank_name(tag, data)
-        self.update_status_bar(f"Запит: {tank_name} (Tier {data.get('tier', '?')})", "#ff8800")
-        def on_build_ready(build_data, is_cached):
-            if not self.ai_equipment_frame.winfo_exists(): return
-            self.ai_equipment_frame.after(0, lambda: self._update_ai_setup_ui(
-                build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs
-            ))
+        prewarm_bd = process_tomato_data(None, None, tank_tth=tth)
+        for k, cat, sz in [('equipment_1','artefacts',(48,48)),('equipment_2','artefacts',(48,48)),
+                            ('consumables_1','artefacts',(48,48)),('consumables_2','artefacts',(48,48))]:
+            for item in prewarm_bd.get(k, []):
+                if item: self.get_loadout_icon(cat, item, sz)
+        for sk_list in prewarm_bd.get('crew', []):
+            if isinstance(sk_list, tuple) and len(sk_list) == 2:
+                for sk in sk_list[1]:
+                    if sk: self.get_loadout_icon('artefacts', sk, (24, 24))
+        for a in prewarm_bd.get('ammo', []):
+            n = a[0] if isinstance(a, tuple) else a
+            if n: self.get_loadout_icon('ammo', n, (48, 48))
         
-        tomato_slug = None  # Tomato integration removed
-        
-        def map_equip(name):
-            return EQUIP_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
-        
-        def map_cons(name):
-            return CONS_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
-        
-        def map_skill(name):
-            return CREW_SKILL_MAP.get(name, name.lower().replace(" ", "").replace("-", ""))
-        
-        def process_tomato_data(tomato_data, cached_data, tank_tth=None):
-            if cached_data is None:
-                cached_data = {}
-            
-            def _map_shell_type(raw_type):
-                """Map game-internal shell type to canonical icon filename."""
-                canon = {
-                    "ARMOR_PIERCING": "ARMOR_PIERCING",
-                    "AP": "ARMOR_PIERCING",
-                    "ARMOR_PIERCING_CR": "ARMOR_PIERCING_CR",
-                    "APCR": "ARMOR_PIERCING_CR",
-                    "ARMOR_PIERCING_HE": "ARMOR_PIERCING_HE",
-                    "APHE": "ARMOR_PIERCING_HE",
-                    "HOLLOW_CHARGE": "HOLLOW_CHARGE",
-                    "HEAT": "HOLLOW_CHARGE",
-                    "HIGH_EXPLOSIVE": "HIGH_EXPLOSIVE",
-                    "HE": "HIGH_EXPLOSIVE",
-                    "HIGH_EXPLOSIVE_MODERN": "HIGH_EXPLOSIVE_MODERN",
-                    "HIGH_EXPLOSIVE_SPG": "HIGH_EXPLOSIVE_SPG",
-                }
-                raw = raw_type.upper().replace('_', '').replace('-', '').replace(' ', '')
-                for k, v in canon.items():
-                    if k.replace('_', '') in raw or raw in k.replace('_', ''):
-                        return v
-                return None
-
-            def _default_ammo_for_tank(tier, tank_class):
-                """Return default shell types (max 3) based on tier and class."""
-                if tank_class == "SPG":
-                    base = ["HIGH_EXPLOSIVE_SPG", "HIGH_EXPLOSIVE", "HIGH_EXPLOSIVE_PREMIUM"]
-                    return base[:3]
-                base = ["ARMOR_PIERCING", "ARMOR_PIERCING_CR", "HIGH_EXPLOSIVE"]
-                return base[:3]
-
-            equipment_1 = []
-            equipment_2 = []
-            consumables_1 = []
-            consumables_2 = []
-            consumables = []
-            crew_skills = []
-            field_mods = []
-            ammo = []
-            
-            if tomato_data:
-                eq1 = tomato_data.get("equipment_1", [])
-                eq2 = tomato_data.get("equipment_2", [])
-                
-                equipment_1 = [map_equip(e) for e in eq1[:3]]
-                equipment_2 = [map_equip(e) for e in eq2[:3]]
-                
-                cons_1 = tomato_data.get("consumables_1", [])
-                cons_2 = tomato_data.get("consumables_2", [])
-                consumables_1 = [map_cons(c) for c in cons_1[:3]] if cons_1 else []
-                consumables_2 = [map_cons(c) for c in cons_2[:3]] if cons_2 else []
-                
-                if not consumables_1:
-                    cons = tomato_data.get("consumables", [])
-                    consumables_1 = [map_cons(c) for c in cons[:3]]
-                
-                crew_perks = tomato_data.get("crew_perks", {})
-                crew_skills_map = {}
-                has_loader_radio = "loader_radio" in crew_perks
-                for role, skills in crew_perks.items():
-                    if isinstance(skills, list):
-                        if role == "loader_radio":
-                            if "loader_radio" not in crew_skills_map:
-                                crew_skills_map["loader_radio"] = []
-                            crew_skills_map["loader_radio"].extend([map_skill(s) for s in skills[:10]])
-                        elif role == "loader":
-                            if "loader" not in crew_skills_map:
-                                crew_skills_map["loader"] = []
-                            crew_skills_map["loader"].extend([map_skill(s) for s in skills[:6]])
-                        else:
-                            skill_ids = [map_skill(s) for s in skills[:6]]
-                            if role not in crew_skills_map:
-                                crew_skills_map[role] = []
-                            crew_skills_map[role].extend(skill_ids)
-                
-                for role, skills in crew_skills_map.items():
-                    crew_skills.append((role, skills[:12]))
-                
-                fm = tomato_data.get("field_mods", {})
-                if isinstance(fm, dict):
-                    mods = fm.get("mods", [])
-            
-            if not equipment_1:
-                equipment_1 = cached_data.get("equipment_1", [])
-            if not equipment_2:
-                equipment_2 = cached_data.get("equipment_2", [])
-            if not consumables_1:
-                consumables_1 = cached_data.get("consumables_1", [])
-            if not consumables_2:
-                consumables_2 = cached_data.get("consumables_2", [])
-            if not consumables_1 and not consumables_2:
-                old_cons = cached_data.get("consumables", [])
-                if old_cons:
-                    consumables_1 = old_cons[:3]
-                    consumables_2 = old_cons[:3]
-            if not crew_skills:
-                crew_skills = cached_data.get("crew", [])
-            if not field_mods:
-                field_mods = cached_data.get("field_mods", [])
-            
-            if not crew_skills:
-                crew_skills = []
-            if not field_mods:
-                field_mods = []
-            
-            if tank_tth and tank_tth.get('shells'):
-                shells = tank_tth['shells']
-                for shell in shells:
-                    shell_type = shell.get('type', '')
-                    if shell_type:
-                        mapped = _map_shell_type(shell_type)
-                        if mapped:
-                            ammo.append(mapped)
-            if not ammo:
-                cls = data.get('class', 'MT') if isinstance(data, dict) else 'MT'
-                ammo = _default_ammo_for_tank(data.get('tier', 8) if isinstance(data, dict) else 8, cls)
-            
-            return {
-                "equipment_1": equipment_1,
-                "equipment_2": equipment_2,
-                "consumables_1": consumables_1,
-                "consumables_2": consumables_2,
-                "ammo": ammo,  # Тепер типи снарядів з tank_tth, а не жорстко закодовані числа
-                "crew": crew_skills,
-                "field_mods": field_mods
-            }
-
-        build_data = process_tomato_data(None, None, tank_tth=tth)
-
-
+        build_data = prewarm_bd
         self._update_ai_setup_ui(build_data, equip_body, cons_body, ammo_body, crew_body, fm_body,
-                                   equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+                                   equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs)
 
         self._current_build_data = build_data
         self._current_bodies = (equip_body, cons_body, ammo_body, crew_body, fm_body,
-                                equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
+                                equip_body_2, cons_body_2, ammo_body_2, [], data, crew_rows, fm_pairs)
+
+        self.root.update_idletasks()
 
         tank_name = data.get('name', tag)
         self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
