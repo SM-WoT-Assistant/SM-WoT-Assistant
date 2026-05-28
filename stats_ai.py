@@ -129,6 +129,7 @@ class StatsAI:
         self.root = self.main_app.root
         self._search_timer = None
         self._filter_active = False
+        self._filter_version = 0
         self._filter_progress_canvas = None
         self._filter_progress_rect = None
         self._filter_hide_job = None
@@ -782,9 +783,11 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
-        if not self._filter_active:
-            self._filter_active = True
-            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self._filter_active = False
+        self.root.update_idletasks()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = True
+        self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
         self._animate_realtime(
             1.5,
@@ -801,9 +804,11 @@ class StatsAI:
         if not was_active:
             self.class_filters[c]["active"] = True
             self.class_filters[c]["btn"].config(bg="#444444", fg="#ffffff")
-        if not self._filter_active:
-            self._filter_active = True
-            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self._filter_active = False
+        self.root.update_idletasks()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = True
+        self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
         self._animate_realtime(
             0.8,
@@ -820,9 +825,11 @@ class StatsAI:
         if not was_active:
             self.nation_filters[n]["active"] = True
             self.nation_filters[n]["btn"].config(bg="#444444")
-        if not self._filter_active:
-            self._filter_active = True
-            self.filter_progress_canvas.pack(fill="both", expand=True)
+        self._filter_active = False
+        self.root.update_idletasks()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = True
+        self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
         self._animate_realtime(
             0.8,
@@ -1229,6 +1236,7 @@ class StatsAI:
             pass
     def _animate_realtime(self, duration, work_func, callback):
         """Animate progress bar. work_func runs during animation; callback after both complete."""
+        filter_version = self._filter_version
         if not self._filter_active:
             return
         start_time = time.time()
@@ -1244,7 +1252,7 @@ class StatsAI:
         work_thread.start()
         
         def update():
-            if not self._filter_active:
+            if not self._filter_active or self._filter_version != filter_version:
                 return
             elapsed = time.time() - start_time
             progress = min(elapsed / duration, 1.0)
