@@ -27,17 +27,8 @@ generate_prompt_v2.py - Prompt Generator for World of Tanks Competitive Builds
        - Назви з клієнта: Small/Large Repair Kit, Small/Large First Aid Kit,
          Manual/Automatic Fire Extinguisher, Strong Coffee, Chocolate, Cola
        
-    3. НАЦІОНАЛЬНІ РАЦІОНИ (з клієнта):
-       - USSR: Extra Rations
-       - USA: Cola
-       - Germany: Chocolate
-       - UK: Pudding and Tea
-       - Japan: Onigiri
-       - China: Improved Combat Rations
-       - Czech: Buchty
-       - Italy: Spaghetti with Meat Sauce
-       - Poland: Bread with Smalec
-       - Sweden: Coffee with Cinnamon Buns
+     3. НАЦІОНАЛЬНІ РАЦІОНИ (з game_entities_english.json + CONS_MAP):
+        - Будуються динамічно з клієнтських даних при запуску
        
     4. ЕКІПАЖ:
        - Перки беруться з _role_skill_pools клієнта
@@ -343,33 +334,72 @@ def get_ammo_types(tier=10, tank_class="MT"):
 
 
 
-NATION_RATIONS = {
-    "ussr": "Extra Rations",        # Тільки для СССР (раніше: Додатковий пайок)
-    "usa": "Cola",                  # Тільки для США (раніше: помилково Chocolate)
-    "germany": "Chocolate",         # Тільки для Німеччини
-    "uk": "Pudding and Tea",        # Тільки для Великобританії (раніше: Pudding із чаєм)
-    "japan": "Onigiri",            # Тільки для Японії
-    "china": "Improved Combat Rations",  # Тільки для Китаю (раніше: Поліпшений раціон)
-    "czech": "Buchty",              # Тільки для Чехословаччини
-    "italy": "Spaghetti with Meat Sauce",  # Тільки для Італії
-    "poland": "Bread with Smalec",  # Тільки для Польщі (раніше: Хліб зі смальцем)
-    "sweden": "Coffee with Cinnamon Buns",  # Тільки для Швеції (раніше: Кава з печивом)
-}
+def _cons_rev_map():
+    from stats_data import CONS_MAP
+    rev = {}
+    for dn, ik in CONS_MAP.items():
+        if ik not in rev or ('(' not in dn and '(' in rev[ik]):
+            rev[ik] = dn
+    return rev
+
+
+def _build_nation_rations():
+    entities = game_entities.get("consumables", {})
+    rev = _cons_rev_map()
+    special = {"ration": "ussr", "chocolate": "germany", "cocacola": "usa", "hotCoffee": "france"}
+    result = {}
+    for key, entry in entities.items():
+        if key.startswith("ration_"):
+            nation = key.split("_", 1)[1]
+            result[nation] = rev.get(key, entry.get('name', key))
+        elif key in special:
+            result[special[key]] = rev.get(key, entry.get('name', key))
+    return result
+
+
+def _ration_internal_keys():
+    entities = game_entities.get("consumables", {})
+    rations = {"ration", "chocolate", "cocacola", "hotCoffee"}
+    for key in entities:
+        if key.startswith("ration_"):
+            rations.add(key)
+    return rations
+
+
+def _nation_specific_ration_keys():
+    entities = game_entities.get("consumables", {})
+    return {key for key in entities if key.startswith("ration_")}
+
+
+def _get_consumables_from_game_data():
+    """Return {internal_key: display_name} for all standard consumables."""
+    rev = _cons_rev_map()
+    entities = game_entities.get("consumables", {})
+    skip_patterns = ['fl_', 'comp7_', 'trophy', '_tier', 'passive_engineering',
+                     'delux', 'improvedConfiguration', 'afterburning',
+                     'regenerationKit', 'builtin']
+    result = {}
+    for key, entry in entities.items():
+        if any(p in key.lower() for p in skip_patterns):
+            continue
+        name = rev.get(key, entry.get('name', key))
+        if name:
+            result[key] = name
+    return result
+
+
+NATION_RATIONS = _build_nation_rations()
 
 
 def get_consumables_list(nation="ussr"):
     """
     Повертає список витратних матеріалів для Main loadout (з клієнта гри).
-    Включає ВСІ доступні предмети: ремкомплекти, аптечки, пожежогасіння, посилення.
+    Включає всі стандартні предмети крім національних раціонів інших націй.
     Цей список використовується для Main (звичайного) набору.
     """
-    base = [
-        "Small Repair Kit",
-        "Small First Aid Kit",
-        "Manual Fire Extinguisher", "Automatic Fire Extinguisher",
-        "Strong Coffee", "Chocolate", "Cola"
-    ]
-    return base
+    data = _get_consumables_from_game_data()
+    ration_keys = _nation_specific_ration_keys()
+    return [name for key, name in data.items() if key not in ration_keys]
 
 
 def get_nation_ration(nation="ussr"):
@@ -493,9 +523,14 @@ def generate_prompt(tank_id, tank_name=None):
     nation_ration = get_nation_ration(nation)
     
     consumables_advanced_list = [c for c in consumables_list if c not in ["Manual Fire Extinguisher", "Automatic Fire Extinguisher"]]
-    consumables_advanced_list = ["Large Repair Kit", "Large First Aid Kit"] + consumables_advanced_list
     if nation_ration and nation_ration not in consumables_advanced_list:
         consumables_advanced_list.append(nation_ration)
+    
+    other_rations = {r for n, r in NATION_RATIONS.items() if n != nation.lower()}
+    consumables_advanced_list = [c for c in consumables_advanced_list if c not in other_rations]
+    
+    seen = set()
+    consumables_advanced_list = [x for x in consumables_advanced_list if not (x in seen or seen.add(x))]
     
     crew_data = get_crew_data_for_tank(tank_id, tier)
     
@@ -572,7 +607,7 @@ Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "Additiona
         equip_section = ""
         equip_output = ""
     
-    prompt = f"""{current_year} year.
+    prompt = f"""{current_year} year
 Tank: {tank_name}
 
 [INSTRUCTION CONTEXT & PURPOSE]
@@ -591,7 +626,7 @@ You must ONLY use the exact names and terms provided in the lists below. Begin y
 
 3. CONSUMABLES (Select for EACH variant - Main and Advanced):
 - Loadout 1 (Main): Select 3 consumable items. Available items: {', '.join(consumables_list)}.
-- Loadout 2 (Advanced): Select 3 consumable items (different from Main) - Slot 1-2: NO fire extinguishers | Slot 3: MUST be nation ration. Available items: {', '.join(consumables_advanced_list)}.
+- Loadout 2 (Advanced): Select 3 consumable items (different from Main) - Slot 1-2: NO fire extinguishers | Slot 3: MUST be "{nation_ration}" (the nation ration for this tank). Available items: {', '.join(consumables_advanced_list)}.
 
 4. CREW PERKS (Select {primary_perk_count} {perk_word} for each primary role, {secondary_perk_count} {secondary_perk_word} for each secondary/extra role).
 IMPORTANT: For roles marked as "(secondary)", you must select EXACTLY {secondary_perk_count} {secondary_perk_word} from their available list.
@@ -605,7 +640,7 @@ Build Generated:
    * Loadout 2 (Advanced): [Type 1]: [Count] shells | [Type 2]: [Count] shells | [Type 3]: [Count] shells
  3. Consumables:
    * Loadout 1 (Main): Slot 1: [Item 1] | Slot 2: [Item 2] | Slot 3: [Item 3]
-   * Loadout 2 (Advanced): Slot 1: [Item 1] | Slot 2: [Item 2] | Slot 3: [Item 3] (include nation ration)
+   * Loadout 2 (Advanced): Slot 1: [Item 1] | Slot 2: [Item 2] | Slot 3: {nation_ration} (include nation ration)
  4. Crew Perks (same for both loadouts):
 {crew_roles_output}
 {output_fm_text}

@@ -31,12 +31,9 @@ def load_tank_db():
            "tutorial","observer","r05_kv","r70_t_50_2","sherman_crab","g00_",
            "_cfe","auto_s","auto_test","_shxxi","_bomber","pillbox","env_artillery",
            "a08_t23","a26_t18","a15_t57","_newonboarding","_storymode"]
-    icons_dir = "extracted_icons"
     clean = {}
     for k, v in db.items():
         if any(b in k.lower() for b in bad) or any(b in v.get("name","").lower() for b in bad):
-            continue
-        if not os.path.exists(os.path.join(icons_dir, v.get("icon",""))):
             continue
         tier = v.get("tier", 0)
         if tier < 1 or tier > 11:

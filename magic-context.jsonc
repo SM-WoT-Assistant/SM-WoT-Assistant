@@ -2,9 +2,22 @@
   "$schema": "https://raw.githubusercontent.com/cortexkit/magic-context/master/assets/magic-context.schema.json",
   "enabled": true,
   "historian": {
-    "model": "opencode-go/glm-4-flash"
+    "model": "opencode-go/glm-4-flash",
+    "fallback_models": ["opencode-go/glm-5"]
   },
   "dreamer": {
-    "enabled": true
+    "enabled": true,
+    "user_memories": {
+      "enabled": true
+    }
+  },
+  "experimental": {
+    "git_commit_indexing": {
+      "enabled": true
+    },
+    "auto_search": {
+      "enabled": true
+    },
+    "temporal_awareness": true
   }
 }

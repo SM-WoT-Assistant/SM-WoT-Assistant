@@ -28,6 +28,15 @@ startup.log
 
 # AI-кеш (великий, генерується автоматично)
 ai_cache.json
+ai_builds_cache.json
+
+# Службові повідомлення (невидимі для користувача)
+service_messages.json
+
+# Прогрес заповнення кешу
+_fill_progress.json
+fill_log.txt
+prompt_*.txt
 
 # Backup-файли (генеруються при помилках)
 *.broken_fallback_backup.json

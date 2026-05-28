@@ -2347,7 +2347,7 @@ class StatsAI:
             "france": "hotCoffee", "china": "ration_china", "poland": "ration_poland",
             "czech": "ration_czech", "japan": "ration_japan", "italy": "ration_italy", "sweden": "ration_sweden"
         }
-        nation = data.get("nation", "")
+        nation = data.get("nation", "").split('_')[0]
         correct_ration = ration_map.get(nation.lower())
         if correct_ration:
             for key in ["consumables_1", "consumables_2"]:
