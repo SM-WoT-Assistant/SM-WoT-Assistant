@@ -28,7 +28,6 @@ startup.log
 
 # AI-кеш (великий, генерується автоматично)
 ai_cache.json
-ai_builds_cache.json
 
 # Службові повідомлення (невидимі для користувача)
 service_messages.json
