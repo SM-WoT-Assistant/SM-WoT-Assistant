@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<13_erlenberg>
+  <name>	#arenas:13_erlenberg/name	</name>
+  <description>	#arenas:13_erlenberg/description	</description>
+  <geometry>	spaces/13_erlenberg	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/13_erlenberg/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	winter	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <defaultGroundEffect>	None	</defaultGroundEffect>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_erlenberg_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_erlenberg_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_erlenberg_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_erlenberg_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_erlenberg_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_erlenberg_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_13_erlenberg_wind_winter	</wwambientSound>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	100.746 -411.833	</position1>
+        </team1>
+        <team2>
+          <position1>	-98.5109 404.362	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <assault>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-274.425 -260.791	</position>
+        </team1>
+        <team2>
+          <position>	299.056 362.671	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	-99.231 -3.16865	</position1>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault>
+    <comp7>
+      <boundingBox>
+        <bottomLeft>	-500.0 -450.0	</bottomLeft>
+        <upperRight>	400.0 450.0	</upperRight>
+      </boundingBox>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-262.486 -35.3081	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	245.045 -36.7933	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-79.509 -18.2428	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	208.045 202.609	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	35.3627 -378.44	</position>
+        </team1>
+        <team2>
+          <position>	-218.087 328.71	</position>
+        </team2>
+      </teamSpawnPoints>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/13_erlenberg/mmap_comp7.dds	</minimap>
+      <controlPoint>	83.8198 10.4942	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <mapActivities>		</mapActivities>
+</13_erlenberg>

@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="utf-8"?>
+<10_hills>
+  <name>	#arenas:10_hills/name	</name>
+  <description>	#arenas:10_hills/description	</description>
+  <geometry>	spaces/10_hills	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-400.0 -400.0	</bottomLeft>
+    <upperRight>	400.0 400.0	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/10_hills/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <defaultGroundEffect>	None	</defaultGroundEffect>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_mines_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_mines_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_mines_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_mines_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_mines_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_mines_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_10_hills_wind_summer	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	env_Mountain.bnk	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <artilleryPreparationChance>	0.0	</artilleryPreparationChance>
+      <teamBasePositions>
+        <team1>
+          <position1>	175.784 -305.848	</position1>
+        </team1>
+        <team2>
+          <position1>	-236.649 329.638	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-14 -330	</position>
+        </team1>
+        <team2>
+          <position>	-177 305	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	258.449 132.453	</controlPoint>
+    </domination>
+    <assault2>
+      <roundLength>	420	</roundLength>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	86.705 -311.497	</position>
+        </team1>
+        <team2>
+          <position>	-172.927 264.269	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	195.065 -18.8735	</position1>
+          <position2>	-222.886 -81.2801	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+    <maps_training>
+      <teamBasePositions>
+        <team1>
+          <position1>	175.784 -305.848	</position1>
+        </team1>
+        <team2>
+          <position1>	-236.649 329.638	</position1>
+        </team2>
+      </teamBasePositions>
+    </maps_training>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/10_hills/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-226.244 -5.56287	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	184.469 67.7895	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	79.6135 23.8222	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-320.714 -26.1933	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-19.0396 -292.899	</position>
+        </team1>
+        <team2>
+          <position>	-62.6879 258.237	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-72.8768 12.4964	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <roadMap>		</roadMap>
+</10_hills>

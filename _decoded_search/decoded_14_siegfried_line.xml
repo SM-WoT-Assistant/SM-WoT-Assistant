@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<14_siegfried_line>
+  <name>	#arenas:14_siegfried_line/name	</name>
+  <description>	#arenas:14_siegfried_line/description	</description>
+  <geometry>	spaces/14_siegfried_line	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/14_siegfried_line/mmap.dds	</minimap>
+  <minimapLayers>
+    <layer>
+      <layerId>	layer1	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/14_siegfried_line/mmap_city_bombing_01_zone.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer2	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/14_siegfried_line/mmap_city_bombing_01_destroyed.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer3	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/14_siegfried_line/mmap_plane_crash_01_zone.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer4	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/14_siegfried_line/mmap_plane_crash_01_destroyed.dds	</path>
+    </layer>
+  </minimapLayers>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_siegfried_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_siegfried_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_siegfried_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_siegfried_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_siegfried_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_siegfried_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_14_siegfried_line_wind_autumn	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	env_Forest.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.pck	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	255.8 -439.83	</position1>
+        </team1>
+        <team2>
+          <position1>	284.239 434.602	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <boundingBox>
+        <bottomLeft>	-200 -350	</bottomLeft>
+        <upperRight>	500 350	</upperRight>
+      </boundingBox>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/14_siegfried_line/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-31.0451 4.84261	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	271.516 198.314	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	277.063 -114.492	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	383.322 48.4537	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	174.037 -255.266	</position>
+        </team1>
+        <team2>
+          <position>	124.171 239.57	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	227.565 21.1085	</controlPoint>
+    </comp7>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-81 -415	</position>
+          <position>	179 -422	</position>
+        </team1>
+        <team2>
+          <position>	-127 414	</position>
+          <position>	100 397	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	334.887 42.8609	</controlPoint>
+    </domination>
+    <assault>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <teamSpawnPoints>
+        <team1>
+          <position>	473.199 79.6173	</position>
+        </team1>
+        <team2>
+          <position>	-253.922 14.072	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	176.319 8.63968	</position1>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault>
+    <assault2>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	158.534 248.794	</position>
+        </team1>
+        <team2>
+          <position>	240.942 -397.861	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	-69.2187 4.50972	</position1>
+          <position2>	307.173 43.12	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+  </gameplayTypes>
+</14_siegfried_line>

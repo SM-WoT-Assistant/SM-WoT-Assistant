@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<127_japort>
+  <name>	#arenas:127_japort/name	</name>
+  <description>	#arenas:127_japort/description	</description>
+  <geometry>	spaces/127_japort	</geometry>
+  <estimatedLoad>	0.55	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-500.0 -500.0	</bottomLeft>
+    <upperRight>	500.0 500.0	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/127_japort/mmap.dds	</minimap>
+  <minimapLayers>
+    <layer>
+      <layerId>	layer1	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/127_japort/mmap_bunker_crash01_destroyed.dds	</path>
+    </layer>
+  </minimapLayers>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_japort_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_japort_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_japort_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_japort_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_japort_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_japort_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_spring_01	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	destructible_objects.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.pck	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-367.279 156.182	</position1>
+        </team1>
+        <team2>
+          <position1>	337.413 152.014	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/127_japort/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	28.2788 82.8473	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	37.1653 -282.248	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	38.335 -445.019	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-284.023 -319.193	</position>
+        </team1>
+        <team2>
+          <position>	320.945 -250.264	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	46.2847 -98.335	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <roadMap>		</roadMap>
+  <mapActivities>		</mapActivities>
+  <wwambientSound>		</wwambientSound>
+</127_japort>

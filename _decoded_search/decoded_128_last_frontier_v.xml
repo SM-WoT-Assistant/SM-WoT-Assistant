@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<128_last_frontier_v>
+  <name>	#arenas:128_last_frontier_v/name	</name>
+  <description>	#arenas:128_last_frontier_v/description	</description>
+  <geometry>	spaces/128_last_frontier_v	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-400 -600	</bottomLeft>
+    <upperRight>	600 400	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/128_last_frontier_v/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_last_frontier_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_last_frontier_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_last_frontier_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_last_frontier_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_last_frontier_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_last_frontier_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	333.302 177.749	</position1>
+        </team1>
+        <team2>
+          <position1>	-198.58 -275.587	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/128_last_frontier_v/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	109.22 -120.008	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-63.5116 61.895	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	313.026 -67.1977	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	4.02436 -299.875	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-154.905 172.854	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	364.838 233.35	</position>
+        </team1>
+        <team2>
+          <position>	-298.432 -320.163	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	60.1439 -44.8997	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <mapActivities>		</mapActivities>
+</128_last_frontier_v>

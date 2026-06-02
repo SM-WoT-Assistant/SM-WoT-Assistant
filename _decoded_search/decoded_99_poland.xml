@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<99_poland>
+  <name>	#arenas:99_poland/name	</name>
+  <description>	#arenas:99_poland/description	</description>
+  <geometry>	spaces/99_poland	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/99_poland/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_poland_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_poland_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_poland_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_poland_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_poland_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_poland_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <artilleryPreparationChance>	0.6	</artilleryPreparationChance>
+      <teamBasePositions>
+        <team1>
+          <position1>	-391.19 -32.9408	</position1>
+        </team1>
+        <team2>
+          <position1>	403.926 -44.0923	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-392.413 44.051	</position>
+        </team1>
+        <team2>
+          <position>	392.566 24.851	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	13.0351 203.235	</controlPoint>
+    </domination>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/99_poland/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	9.72016 79.3362	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	233.902 366.219	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-220.952 363.418	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	7.65124 479.061	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-390.597 221.078	</position>
+        </team1>
+        <team2>
+          <position>	412.796 235.061	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	12.0436 183.852	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <useAdvancedPhysics>	true	</useAdvancedPhysics>
+  <roadMap>		</roadMap>
+  <mapActivities>		</mapActivities>
+</99_poland>

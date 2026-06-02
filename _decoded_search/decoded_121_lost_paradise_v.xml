@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<121_lost_paradise_v>
+  <name>	#arenas:121_lost_paradise_v/name	</name>
+  <description>	#arenas:121_lost_paradise_v/description	</description>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <geometry>	spaces/121_lost_paradise_v	</geometry>
+  <boundingBox>
+    <bottomLeft>	-600 -600	</bottomLeft>
+    <upperRight>	700 700	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/121_lost_paradise_v/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_lost_paradise_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_lost_paradise_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_lost_paradise_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_lost_paradise_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_lost_paradise_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_lost_paradise_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_desert_01	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>	env_Mountain.bnk	</bank>
+    </loadBanks>
+  </soundRemapping>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-309.24 -296.056	</position1>
+        </team1>
+        <team2>
+          <position1>	370.678 431.027	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/121_lost_paradise_v/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-42.0291 98.0548	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	286.852 -198.339	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-53.43 -42.8212	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	103.85 132.231	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-312.69 -205.941	</position>
+        </team1>
+        <team2>
+          <position>	338.893 330.382	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	183.347 -95.8223	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</121_lost_paradise_v>

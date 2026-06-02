@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<45_north_america>
+  <name>	#arenas:45_north_america/name	</name>
+  <description>	#arenas:45_north_america/description	</description>
+  <geometry>	spaces/45_north_america	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/45_north_america/mmap.dds	</minimap>
+  <minimapLayers>
+    <layer>
+      <layerId>	layer1	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/45_north_america/mmap_train_crashing_01_zone.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer2	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/45_north_america/mmap_train_crashing_01_destroyed.dds	</path>
+    </layer>
+  </minimapLayers>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_highway_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_highway_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_highway_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_highway_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_highway_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_highway_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_45_wind	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	destructible_objects.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.pck	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	195.851 352.782	</position1>
+        </team1>
+        <team2>
+          <position1>	-343.188 -327.37	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+  </gameplayTypes>
+</45_north_america>

@@ -1,0 +1,875 @@
+<?xml version="1.0" encoding="utf-8"?>
+<208_bf_epic_normandy>
+  <name>	#arenas:208_bf_epic_normandy/name	</name>
+  <description>	#arenas:208_bf_epic_normandy/description	</description>
+  <geometry>	spaces/208_bf_epic_normandy	</geometry>
+  <runDelay>	30	</runDelay>
+  <explicitRequestOnly>	true	</explicitRequestOnly>
+  <boundingBox>
+    <bottomLeft>	-1500 -1500	</bottomLeft>
+    <upperRight>	1500 1500	</upperRight>
+  </boundingBox>
+  <roundLength>	720	</roundLength>
+  <minimap>	spaces/208_bf_epic_normandy/mmap.dds	</minimap>
+  <overviewmap>	spaces/208_bf_epic_normandy/ovmap.dds	</overviewmap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	30	</maxPlayersInTeam>
+  <wwambientSound>	ambient_wind_summer_01	</wwambientSound>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_epic_normandy_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_epic_normandy_dron_battle	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_epic_normandy_dron_battle	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_epic_normandy_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_epic_normandy_result_win	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_epic_normandy_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwmusicDroneSetup>
+    <timeRemained>
+      <value>	120	</value>
+    </timeRemained>
+    <capturedPoints>
+      <value>	20	</value>
+    </capturedPoints>
+    <musicStopPredelay>
+      <value>	10	</value>
+    </musicStopPredelay>
+    <epicRespawnView>
+      <value>	1	</value>
+    </epicRespawnView>
+    <epicMainObjectivesTotalHealth>
+      <value>	50	</value>
+    </epicMainObjectivesTotalHealth>
+    <epicMainObjectivesNumDestroyed>
+      <value>	2	</value>
+    </epicMainObjectivesNumDestroyed>
+    <epicZoneTransition>
+      <value>	1	</value>
+    </epicZoneTransition>
+  </wwmusicDroneSetup>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	epic_battle.bnk	</name>
+      </bank>
+      <bank>
+        <name>	epic_battle_voiceover.bnk	</name>
+      </bank>
+      <bank>
+        <name>	env_Mountain.bnk	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <estimatedLoad>	0.75	</estimatedLoad>
+  <gameplayTypes>
+    <epic>
+      <epicSectorGrid>
+        <owningTeam>	2	</owningTeam>
+        <mainDirection>	+Z	</mainDirection>
+        <bordersZ>
+          <border>	-1500.5	</border>
+          <border>	-500	</border>
+          <border>	500	</border>
+          <border>	1500.5	</border>
+        </bordersZ>
+        <bordersX>
+          <border>	-1500.5	</border>
+          <border>	-500	</border>
+          <border>	500	</border>
+          <border>	1500.5	</border>
+        </bordersX>
+      </epicSectorGrid>
+      <winnerIfTimeout>	2	</winnerIfTimeout>
+      <playerGroupLimit>	13	</playerGroupLimit>
+      <numPlayerGroups>	3	</numPlayerGroups>
+      <numDestructiblesToDestroyForWin>	3	</numDestructiblesToDestroyForWin>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 -1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <frontLinesGeometry>
+        <front>
+          <playerGroup>	1	</playerGroup>
+          <direction>	0 1	</direction>
+          <boundingBox>
+            <bottomLeft>	-1500.5 -1500.5	</bottomLeft>
+            <upperRight>	-500 1500.5	</upperRight>
+          </boundingBox>
+        </front>
+        <front>
+          <playerGroup>	2	</playerGroup>
+          <direction>	0 1	</direction>
+          <boundingBox>
+            <bottomLeft>	-500 -1500.5	</bottomLeft>
+            <upperRight>	500 1500.5	</upperRight>
+          </boundingBox>
+        </front>
+        <front>
+          <playerGroup>	3	</playerGroup>
+          <direction>	0 1	</direction>
+          <boundingBox>
+            <bottomLeft>	500 -1500.5	</bottomLeft>
+            <upperRight>	1500.5 1500.5	</upperRight>
+          </boundingBox>
+        </front>
+      </frontLinesGeometry>
+      <visualScript>
+        <server>
+          <plan>	flsectorbase	</plan>
+        </server>
+      </visualScript>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	64.2892 11.9877 549.413	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	5.93112 27.1752 -554.926	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	131.058 14.0754 449.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	270.959 13.2408 541.569	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	237.592 20.5062 -550.591	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	248.836 14.3022 -450.574	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	462.889 13.7099 449.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	554.478 14.0437 549.43	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	744.765 23.5211 -550.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	703.033 28.1238 -450.624	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	852.181 18.3014 444.577	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	828.208 17.9264 549.387	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	982.019 23.9636 -550.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	962.804 27.8767 -449.292	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	1097.59 14.288 549.413	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	1118.03 20.9955 449.344	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	1198.69 15.6629 -539.824	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	1160.4 15.9729 -450.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	1335.77 15.5737 449.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	1383.5 18.4995 549.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	1341.3 24.9734 -550.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	1335.78 25.4935 -450.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-1321.32 22.667 -550.565	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-1293.6 17.502 -450.621	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-1108.89 15.4459 448.302	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-1093.78 13.5715 548.341	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-1016.93 16.6701 -550.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-1021.33 10.665 -450.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-871.999 13.2667 449.327	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-866.881 13.2737 549.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-835.327 13.7037 -450.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-734.379 13.9424 449.469	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-775.877 24.1437 -550.586	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-671.989 12.0514 549.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-579.955 18.8351 -450.544	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-354.865 11.6237 449.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-372.714 17.3999 -561.515	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-273.717 11.9219 552.288	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-202.489 16.9537 -561.515	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-285.782 19.6544 -450.416	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	1	</team>
+        <position>	-194.741 11.7446 449.414	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-123.751 11.9237 549.413	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-121.277 15.0537 -450.416	</position>
+      </sectorWayPoint>
+      <sectorWayPoint>
+        <team>	2	</team>
+        <position>	-26.5019 16.6326 -455.133	</position>
+      </sectorWayPoint>
+    </epic>
+  </gameplayTypes>
+  <roadMap>		</roadMap>
+  <mapActivities>
+    <scenario>
+      <startTime>	10 12	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	0	</interval>
+      <arenaPeriod>	2	</arenaPeriod>
+      <name>	pregame_attack_east	</name>
+      <trajectories>
+        <warplane>
+          <preset>	IL2_attack_failed_east_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_east_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_east_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_east_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_east_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_east_06	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_east_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	7.5 7.5	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_east_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	7 7	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_crash_east_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	18.9000 18.90000	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_crash_east_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	18 18	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_smoke_east_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	0	</possibility>
+          <startTime>	23.0000 25.0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	10 12	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	0	</interval>
+      <arenaPeriod>	2	</arenaPeriod>
+      <name>	pregame_attack_west	</name>
+      <trajectories>
+        <warplane>
+          <preset>	IL2_attack_failed_west_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_west_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_west_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_west_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_west_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_west_06	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_west_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	8 8	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_west_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	7 7	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_crash_west_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	23.5 23.5	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_crash_west_02	</preset>
+          <position>	100 -25 -900	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	26.000000 26.00000	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	4 5	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	0	</interval>
+      <arenaPeriod>	2	</arenaPeriod>
+      <name>	pregame_attack_center	</name>
+      <trajectories>
+        <warplane>
+          <preset>	IL2_attack_failed_center_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_center_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_center_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_center_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_center_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_failed_center_06	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_center_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	7 7	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_attack_air_defense_center_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	6.5 6.5	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_crash_center_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	20.6 20.6	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_smoke_center_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	0	</possibility>
+          <startTime>	20.6 21.25	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	IL2_smoke_center_02	</preset>
+          <position>	0 15 -700	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	25.1 25.1	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	0 0	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	360	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_CZ1_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ1_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	10 40	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	300	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_CZ2_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_CZ2_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	0 0	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	360	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_EZ1_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ1_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	10 40	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	300	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_EZ2_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_EZ2_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	0 0	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	360	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_WZ1_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ1_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <startTime>	10 40	</startTime>
+      <possibility>	1	</possibility>
+      <interval>	300	</interval>
+      <arenaPeriod>	0	</arenaPeriod>
+      <name>	zone_destr_WZ2_planes	</name>
+      <trajectories>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_00	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_01	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_02	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_03	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_04	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+        <warplane>
+          <preset>	zone_destr_WZ2_planes_05	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+  </mapActivities>
+</208_bf_epic_normandy>

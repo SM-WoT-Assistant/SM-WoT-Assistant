@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8"?>
+<23_westfeld>
+  <name>	#arenas:23_westfeld/name	</name>
+  <description>	#arenas:23_westfeld/description	</description>
+  <geometry>	spaces/23_westfeld	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/23_westfeld/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_westfield_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_westfield_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_westfield_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_westfield_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_westfield_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_westfield_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_23_westfield_wind_spring	</wwambientSound>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-300.1 -339.6	</position1>
+        </team1>
+        <team2>
+          <position1>	339.4 299.767	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-399.898 57.212	</position>
+        </team1>
+        <team2>
+          <position>	-33.142 407.046	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	57.8328 -26.8809	</controlPoint>
+    </domination>
+    <comp7>
+      <teamSpawnPoints>
+        <team1>
+          <position>	8.62154 405.435	</position>
+        </team1>
+        <team2>
+          <position>	-398.561 -21.989	</position>
+        </team2>
+      </teamSpawnPoints>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/23_westfeld/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	66.309 -43.206	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	124.584 91.254	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-117.147 -132.162	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-136.295 126.955	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-412.713 376.436	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <controlPoint>	-290.224 275.864	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</23_westfeld>

@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="utf-8"?>
+<217_er_alaska>
+  <name>	#arenas:217_er_alaska/name	</name>
+  <description>	#arenas:217_er_alaska/description	</description>
+  <geometry>	spaces/217_er_alaska	</geometry>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	600 600	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/217_er_alaska/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	winter	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_klondike_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_klondike_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_klondike_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_klondike_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_klondike_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_klondike_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_217_er_alaska_wind_winter	</wwambientSound>
+  <wwDefaultReverb>
+    <auxBus>	AUX_env_Mountain	</auxBus>
+    <controlValue>	1.0	</controlValue>
+  </wwDefaultReverb>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	env_Forest.bnk	</name>
+      </bank>
+      <bank>
+        <name>	env_Mountain.bnk	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <estimatedLoad>	0.91	</estimatedLoad>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	377.87 266.671	</position1>
+        </team1>
+        <team2>
+          <position1>	-150.805 -324.074	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <boundingBox>
+        <bottomLeft>	-300 -700	</bottomLeft>
+        <upperRight>	700 300	</upperRight>
+      </boundingBox>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/217_er_alaska/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-79.3391 181.566	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	381.713 -284.384	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	188.923 207.907	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-86.2335 -110.494	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <controlPoint>	154.949 -51.8653	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <roadMap>		</roadMap>
+  <mapActivities>		</mapActivities>
+</217_er_alaska>

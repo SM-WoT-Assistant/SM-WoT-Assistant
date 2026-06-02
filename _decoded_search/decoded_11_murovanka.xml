@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<11_murovanka>
+  <name>	#arenas:11_murovanka/name	</name>
+  <description>	#arenas:11_murovanka/description	</description>
+  <geometry>	spaces/11_murovanka	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/11_murovanka/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <defaultGroundEffect>	None	</defaultGroundEffect>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_murovanka_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_murovanka_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_murovanka_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_murovanka_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_murovanka_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_murovanka_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-55.0002 417.3	</position1>
+        </team1>
+        <team2>
+          <position1>	-55.0003 -407.2	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-144.346 428.046	</position>
+        </team1>
+        <team2>
+          <position>	-183.126 -387.177	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-373.27 9.96181	</controlPoint>
+    </domination>
+    <assault2>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-101.549 -428.606	</position>
+        </team1>
+        <team2>
+          <position>	-27.412 293.698	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	-379.173 5.87197	</position1>
+          <position2>	131.785 -307.999	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/11_murovanka/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	0.364715 208.673	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-48.2096 1.4885	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-25.793 -186.689	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	169.309 22.2419	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-467.119 5.4889	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-168.182 385.068	</position>
+        </team1>
+        <team2>
+          <position>	-209.967 -368.118	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-326.377 6.08584	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <mapActivities>		</mapActivities>
+</11_murovanka>

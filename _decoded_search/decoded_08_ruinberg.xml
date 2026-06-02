@@ -1,0 +1,145 @@
+<?xml version="1.0" encoding="utf-8"?>
+<08_ruinberg>
+  <name>	#arenas:08_ruinberg/name	</name>
+  <description>	#arenas:08_ruinberg/description	</description>
+  <geometry>	spaces/08_ruinberg	</geometry>
+  <estimatedLoad>	0.55	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-425 -400	</bottomLeft>
+    <upperRight>	425 450	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/08_ruinberg/mmap.dds	</minimap>
+  <minimapLayers>
+    <layer>
+      <layerId>	layer1	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/08_ruinberg/mmap_bigCityBombing_danger_zone.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer2	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/08_ruinberg/mmap_bigCityBombing_destroyed.dds	</path>
+    </layer>
+  </minimapLayers>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <defaultGroundEffect>	None	</defaultGroundEffect>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_ruinberg_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_ruinberg_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_ruinberg_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_ruinberg_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_ruinberg_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_ruinberg_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	destructible_objects.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.pck	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-66.4 306.1	</position1>
+        </team1>
+        <team2>
+          <position1>	-83.0028 -290.901	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-49 337	</position>
+        </team1>
+        <team2>
+          <position>	-9 -282	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-346.377 -60.447	</controlPoint>
+    </domination>
+    <assault2>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	320.434 334.328	</position>
+        </team1>
+        <team2>
+          <position>	-336.217 -48.082	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	-66.4902 305.921	</position1>
+          <position2>	218.214 -89.1485	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+    <maps_training>
+      <teamBasePositions>
+        <team1>
+          <position1>	-66.4 306.1	</position1>
+        </team1>
+        <team2>
+          <position1>	-83.0028 -290.901	</position1>
+        </team2>
+      </teamBasePositions>
+    </maps_training>
+    <comp7>
+      <boundingBox>
+        <bottomLeft>	-600 -400	</bottomLeft>
+        <upperRight>	250 450	</upperRight>
+      </boundingBox>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/08_ruinberg/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	47.2396 23.9588	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-385.629 -38.5394	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-82.7553 333.962	</position>
+        </team1>
+        <team2>
+          <position>	0.512566 -325.229	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-166 -13.447	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</08_ruinberg>

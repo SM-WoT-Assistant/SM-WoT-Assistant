@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<63_tundra>
+  <name>	#arenas:63_tundra/name	</name>
+  <description>	#arenas:63_tundra/description	</description>
+  <geometry>	spaces/63_tundra	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-400.0 -400.0	</bottomLeft>
+    <upperRight>	400.0 400.0	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/63_tundra/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_tundra_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_tundra_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_tundra_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_tundra_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_tundra_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_tundra_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	env_Mountain.bnk	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	85.4165 -167.155	</position1>
+        </team1>
+        <team2>
+          <position1>	-72.2026 141.256	</position1>
+        </team2>
+      </teamBasePositions>
+      <teamSpawnPoints>
+        <team1>
+          <position>	13.326 -306.419	</position>
+        </team1>
+        <team2>
+          <position>	-3.164 282.311	</position>
+        </team2>
+      </teamSpawnPoints>
+    </ctf>
+    <assault2>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-325.562 96.459	</position>
+        </team1>
+        <team2>
+          <position>	316.803 0.031	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	-41.3472 224.069	</position1>
+          <position2>	-215.285 -235.364	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/63_tundra/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	40.0515 -213.576	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-297.858 -73.4698	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-93.8793 153.724	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-107.692 315.115	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	199.601 -10.1188	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-266.979 -241.261	</position>
+        </team1>
+        <team2>
+          <position>	261.609 -135.882	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-38.8827 -14.8942	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</63_tundra>

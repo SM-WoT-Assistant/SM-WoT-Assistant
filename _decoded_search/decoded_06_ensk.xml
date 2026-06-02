@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="utf-8"?>
+<06_ensk>
+  <name>	#arenas:06_ensk/name	</name>
+  <description>	#arenas:06_ensk/description	</description>
+  <geometry>	spaces/06_ensk	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-300 -300	</bottomLeft>
+    <upperRight>	300 300	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/06_ensk/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <defaultGroundEffect>	None	</defaultGroundEffect>
+  <umbraEnabled>	1	</umbraEnabled>
+  <batchingEnabled>	0	</batchingEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_ensk_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_ensk_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_ensk_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_ensk_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_ensk_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_ensk_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_autumn_01	</wwambientSound>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	20.2999 249.7	</position1>
+        </team1>
+        <team2>
+          <position1>	19.0999 -248.7	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	17 255	</position>
+        </team1>
+        <team2>
+          <position>	111 -263	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-82.7687 0.675796	</controlPoint>
+    </domination>
+    <maps_training>
+      <teamBasePositions>
+        <team1>
+          <position1>	20.2999 249.7	</position1>
+        </team1>
+        <team2>
+          <position1>	19.0999 -248.7	</position1>
+        </team2>
+      </teamBasePositions>
+    </maps_training>
+    <comp7>
+      <teamSpawnPoints>
+        <team1>
+          <position>	38.168 270.421	</position>
+        </team1>
+        <team2>
+          <position>	77.943 -265.811	</position>
+        </team2>
+      </teamSpawnPoints>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/06_ensk/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-186.743 -37.199	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	137.205 12.7927	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-270.385 -34.89	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	236.22 18.8278	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <controlPoint>	5.873 10.181	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <mapActivities>
+    <scenario>
+      <startTime>	15 15	</startTime>
+      <possibility>	100	</possibility>
+      <interval>	0	</interval>
+      <arenaPeriod>	3	</arenaPeriod>
+      <name>	ensk_airplane	</name>
+      <trajectories>
+        <warplane>
+          <preset>	ensk_airplane_fly	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+  </mapActivities>
+</06_ensk>

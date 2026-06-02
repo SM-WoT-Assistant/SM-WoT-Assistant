@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<31_airfield>
+  <name>	#arenas:31_airfield/name	</name>
+  <description>	#arenas:31_airfield/description	</description>
+  <geometry>	spaces/31_airfield	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-500 -600	</bottomLeft>
+    <upperRight>	500 400	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/31_airfield/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	desert	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_airfield_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_airfield_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_airfield_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_airfield_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_airfield_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_airfield_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	ambient_wind_desert_01	</wwambientSound>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	env_Mountain.bnk	</name>
+      </bank>
+    </loadBanks>
+  </soundRemapping>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	438.517 27.8268	</position1>
+        </team1>
+        <team2>
+          <position1>	-383.74 7.16718	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <boundingBox>
+        <bottomLeft>	-350 -500	</bottomLeft>
+        <upperRight>	400 250	</upperRight>
+      </boundingBox>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/31_airfield/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	-3.21866 -349.351	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-1.12287 186.481	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-169.324 -168.859	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	191.545 -178.056	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	309.115 26.0854	</position>
+        </team1>
+        <team2>
+          <position>	-314.455 32.6401	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-2.11198 -75.4353	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+  <mapActivities>
+    <scenario>
+      <name>	warplane1_sc	</name>
+      <startTime>	100 200	</startTime>
+      <possibility>	70	</possibility>
+      <interval>	600	</interval>
+      <trajectories>
+        <warplane>
+          <preset>	airfield_curve	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+    <scenario>
+      <name>	warplane2	</name>
+      <startTime>	300 400	</startTime>
+      <possibility>	70	</possibility>
+      <interval>	600	</interval>
+      <trajectories>
+        <warplane>
+          <preset>	airfield_curve1	</preset>
+          <position>	0 0 0	</position>
+          <yaw>	0	</yaw>
+          <possibility>	1	</possibility>
+          <startTime>	0 0	</startTime>
+        </warplane>
+      </trajectories>
+    </scenario>
+  </mapActivities>
+</31_airfield>

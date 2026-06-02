@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<44_north_america>
+  <name>	#arenas:44_north_america/name	</name>
+  <description>	#arenas:44_north_america/description	</description>
+  <geometry>	spaces/44_north_america	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <boundingBox>
+    <bottomLeft>	-500.0 -500.0	</bottomLeft>
+    <upperRight>	500.0 500.0	</upperRight>
+  </boundingBox>
+  <roundLength>	900	</roundLength>
+  <minimap>	spaces/44_north_america/mmap.dds	</minimap>
+  <vehicleCamouflageKind>	summer	</vehicleCamouflageKind>
+  <maxPlayersInTeam>	15	</maxPlayersInTeam>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_liveoaks_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_liveoaks_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_liveoaks_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_liveoaks_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_liveoaks_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_liveoaks_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <wwambientSound>	amb_map_44_north_america_base_ambient	</wwambientSound>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	-356.987 -329.784	</position1>
+        </team1>
+        <team2>
+          <position1>	300.916 362.276	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <comp7>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/44_north_america/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	93.141 238.99	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-257.51 324.075	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-311.891 472.912	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-300.385 46.3481	</position>
+          <type>	2	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-459.659 17.7539	</position>
+        </team1>
+        <team2>
+          <position>	158.584 391.458	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-146.856 157.201	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</44_north_america>

@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<95_lost_city_ctf>
+  <name>	#arenas:95_lost_city_ctf/name	</name>
+  <description>	#arenas:95_lost_city_ctf/description	</description>
+  <geometry>	spaces/95_lost_city_ctf	</geometry>
+  <estimatedLoad>	0.3	</estimatedLoad>
+  <roundLength>	900	</roundLength>
+  <boundingBox>
+    <bottomLeft>	-500 -500	</bottomLeft>
+    <upperRight>	500 500	</upperRight>
+  </boundingBox>
+  <minimap>	spaces/95_lost_city_ctf/mmap.dds	</minimap>
+  <minimapLayers>
+    <layer>
+      <layerId>	layer1	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/95_lost_city_ctf/mmap_city_bombing_01_zone.dds	</path>
+    </layer>
+    <layer>
+      <layerId>	layer2	</layerId>
+      <layerType>	base	</layerType>
+      <path>	spaces/95_lost_city_ctf/mmap_city_bombing_01_destroyed.dds	</path>
+    </layer>
+  </minimapLayers>
+  <vehicleCamouflageKind>	desert	</vehicleCamouflageKind>
+  <umbraEnabled>	1	</umbraEnabled>
+  <wwmusicSetup>
+    <wwmusicLoading>	music_lost_city_loading_screen	</wwmusicLoading>
+    <wwmusicIntensive>	music_lost_city_dron_intensive	</wwmusicIntensive>
+    <wwmusicRelaxed>	music_lost_city_dron_relaxed	</wwmusicRelaxed>
+    <wwmusicStop>	music_dron_stop	</wwmusicStop>
+    <wwmusicEndbattleStop>	music_dron_endbattle_stop	</wwmusicEndbattleStop>
+    <wwmusicResultWin>	music_lost_city_result_win	</wwmusicResultWin>
+    <wwmusicResultDrawn>	music_lost_city_result_drawn	</wwmusicResultDrawn>
+    <wwmusicResultDefeat>	music_lost_city_result_defeat	</wwmusicResultDefeat>
+  </wwmusicSetup>
+  <soundRemapping>
+    <loadBanks>
+      <bank>
+        <name>	destructible_objects.bnk	</name>
+      </bank>
+      <bank>
+        <name>	destructible_objects.pck	</name>
+      </bank>
+    </loadBanks>
+    <events>
+      <event>
+        <name>	ev_battle_royale_2020_amb_fueltank	</name>
+        <mod>	amb_map_95_metal_stress	</mod>
+      </event>
+    </events>
+  </soundRemapping>
+  <wwambientSound>	amb_map_95_wind	</wwambientSound>
+  <water>
+    <texScale>	0	</texScale>
+    <freqX>	0	</freqX>
+    <freqZ>	0	</freqZ>
+  </water>
+  <gameplayTypes>
+    <ctf>
+      <teamBasePositions>
+        <team1>
+          <position1>	0 -350	</position1>
+        </team1>
+        <team2>
+          <position1>	-0.561653 350.284	</position1>
+        </team2>
+      </teamBasePositions>
+    </ctf>
+    <domination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	350 -450	</position>
+        </team1>
+        <team2>
+          <position>	350 450	</position>
+        </team2>
+      </teamSpawnPoints>
+      <controlPoint>	-0.000137 1.5e-05	</controlPoint>
+    </domination>
+    <assault>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <teamSpawnPoints>
+        <team1>
+          <position>	380 0	</position>
+        </team1>
+        <team2>
+          <position>	-410 0	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	112.008 0.086	</position1>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault>
+    <assault2>
+      <winnerIfTimeout>	1	</winnerIfTimeout>
+      <winnerIfExtermination>	1	</winnerIfExtermination>
+      <teamSpawnPoints>
+        <team1>
+          <position>	-315.682 121.161	</position>
+        </team1>
+        <team2>
+          <position>	315.682 -121.161	</position>
+        </team2>
+      </teamSpawnPoints>
+      <teamBasePositions>
+        <team1>
+          <position1>	53.4634 292.177	</position1>
+          <position2>	-4.6e-05 0	</position2>
+        </team1>
+        <team2>		</team2>
+      </teamBasePositions>
+    </assault2>
+    <comp7>
+      <teamSpawnPoints>
+        <team1>
+          <position>	48.545 317.769	</position>
+        </team1>
+        <team2>
+          <position>	51.368 -315.613	</position>
+        </team2>
+      </teamSpawnPoints>
+      <visualScript>
+        <server>
+          <plan>	PointsOfInterest/pointsOfInterest	</plan>
+        </server>
+      </visualScript>
+      <recon>
+        <flyDirections>
+          <flyDirection>
+            <team>	1	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+          <flyDirection>
+            <team>	2	</team>
+            <direction>	0 0 1	</direction>
+          </flyDirection>
+        </flyDirections>
+      </recon>
+      <minimap>	spaces/95_lost_city_ctf/mmap_comp7.dds	</minimap>
+      <pointsOfInterestUDO>
+        <point>
+          <position>	382.687 232.241	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	372.801 -232.384	</position>
+          <type>	2	</type>
+        </point>
+        <point>
+          <position>	-440.919 -1.021	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	-116.9 0.279	</position>
+          <type>	1	</type>
+        </point>
+        <point>
+          <position>	190.311 -1.27674	</position>
+          <type>	1	</type>
+        </point>
+      </pointsOfInterestUDO>
+      <controlPoint>	0 0	</controlPoint>
+    </comp7>
+  </gameplayTypes>
+</95_lost_city_ctf>
