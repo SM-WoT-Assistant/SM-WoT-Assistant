@@ -101,8 +101,10 @@ class WindowManager:
         
         px = self.app.settings.get("edit_x", (sw - self.app.w) // 2)
         py = self.app.settings.get("edit_y", (sh - self.app.h) // 2)
-        px = max(0, min(int(px), max(0, sw - self.app.w)))
-        py = max(0, min(int(py), max(0, sh - self.app.h)))
+        cx = self.app.settings.get("edit_cx", px + self.app.w // 2)
+        cy = self.app.settings.get("edit_cy", py + self.app.h // 2)
+        px = max(0, min(int(cx - self.app.w // 2), max(0, sw - self.app.w)))
+        py = max(0, min(int(cy - self.app.h // 2), max(0, sh - self.app.h)))
         
         root.geometry(f"{self.app.w}x{self.app.h}+{px}+{py}")
         root.overrideredirect(True)
@@ -319,32 +321,34 @@ class WindowManager:
     def resize_up(self, e): 
         if not self._is_ctrl_armed():
             return "break"
-        self.apply_anchor_resize(20)
+        self.apply_anchor_resize(1 if self.app.mode == "norm" else 20)
         return "break"
     
     def resize_up_hotkey(self):
         """Обгортка для глобального hotkey (без event)"""
         if self.app.dialog_open or not self._is_ctrl_armed(): return
-        self.apply_anchor_resize(20)
+        self.apply_anchor_resize(1 if self.app.mode == "norm" else 20)
 
     def resize_down(self, e):
         if not self._is_ctrl_armed():
             return "break"
+        step = 1 if self.app.mode == "norm" else 20
         if self.app.mode == "edit":
-            min_width = self.app.filters_container.winfo_reqwidth() - 20
+            min_width = self.app.filters_container.winfo_reqwidth() - step
             if min_width < 500: min_width = 500
         else: min_width = 150
-        if self.app.w - 20 >= min_width: self.apply_anchor_resize(-20)
+        if self.app.w - step >= min_width: self.apply_anchor_resize(-step)
         return "break"
     
     def resize_down_hotkey(self):
         """Обгортка для глобального hotkey (без event)"""
         if self.app.dialog_open or not self._is_ctrl_armed(): return
+        step = 1 if self.app.mode == "norm" else 20
         if self.app.mode == "edit":
-            min_width = self.app.filters_container.winfo_reqwidth() - 20
+            min_width = self.app.filters_container.winfo_reqwidth() - step
             if min_width < 500: min_width = 500
         else: min_width = 150
-        if self.app.w - 20 >= min_width: self.apply_anchor_resize(-20)
+        if self.app.w - step >= min_width: self.apply_anchor_resize(-step)
 
     def apply_anchor_resize(self, delta):
         cur_x, cur_y = self.app.root.winfo_x(), self.app.root.winfo_y()

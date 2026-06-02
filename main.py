@@ -92,9 +92,9 @@ class WotAssistantHQ:
 
         self.selected_battle_mode = tk.StringVar(value="Standard")
         self.selected_classes = {
-            "ЛТ": tk.BooleanVar(value=False), "СТ": tk.BooleanVar(value=False),
-            "ТТ": tk.BooleanVar(value=False), "ПТ": tk.BooleanVar(value=False),
-            "САУ": tk.BooleanVar(value=False)
+            "ЛТ": tk.BooleanVar(value=True), "СТ": tk.BooleanVar(value=True),
+            "ТТ": tk.BooleanVar(value=True), "ПТ": tk.BooleanVar(value=True),
+            "САУ": tk.BooleanVar(value=True)
         }
 
         self.thread_queue = []
@@ -136,11 +136,11 @@ class WotAssistantHQ:
         self.load_logo()
         
         self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
+        self._init_painter_overlay()
         
         self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
-            
 
         if bool(self.settings.get("disable_startup_splash", False)):
             self._start_startup_checks()
@@ -148,6 +148,30 @@ class WotAssistantHQ:
             self.show_small_loading_splash()
             self.root.after(120, self._start_startup_checks)
 
+    def _init_painter_overlay(self):
+        self._po_win = tk.Toplevel(self.root)
+        self._po_win.withdraw()
+        self._po_win.overrideredirect(True)
+        self._po_win.attributes("-topmost", True)
+        self._po_win.attributes("-transparentcolor", "#010101")
+        self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
+        self._po_canvas.pack(fill="both", expand=True)
+        self.painter.bind_events_to(self.canvas)
+        self.painter.bind_events_to(self._po_canvas)
+        self.painter.canvas = self._po_canvas
+        self.canvas.bind("<Configure>", self._sync_po_pos, "+")
+        self.root.bind("<Configure>", self._sync_po_pos, "+")
+
+    def _sync_po_pos(self, event=None):
+        if not hasattr(self, '_po_win') or self._po_win.state() == "withdrawn":
+            return
+        cx = self.canvas.winfo_rootx()
+        cy = self.canvas.winfo_rooty()
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw > 10 and ch > 10:
+            self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
+            self._po_win.lift()
 
     def _start_startup_checks(self):
         allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
@@ -193,8 +217,16 @@ class WotAssistantHQ:
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
-        self.settings[f"{prefix}x"] = cx
-        self.settings[f"{prefix}y"] = cy
+        if self.mode == "edit":
+            aw = self.root.winfo_width()
+            ah = self.root.winfo_height()
+            self.settings[f"{prefix}cx"] = cx + aw // 2
+            self.settings[f"{prefix}cy"] = cy + ah // 2
+            self.settings[f"{prefix}x"] = cx
+            self.settings[f"{prefix}y"] = cy
+        else:
+            self.settings[f"{prefix}x"] = cx
+            self.settings[f"{prefix}y"] = cy
         self.settings[f"{prefix}alpha"] = self.alpha
         self.settings[f"{prefix}contrast"] = self.contrast
         self.settings["auto_sync"] = self.auto_sync_var.get()
@@ -299,6 +331,8 @@ class WotAssistantHQ:
             return
 
         self.save_settings() 
+        if hasattr(self, '_rsz_timer'):
+            self.root.after_cancel(self._rsz_timer)
         self.battle_status_top.pack_forget()
         self.top_bar.pack_forget()
         self.map_toolbar.pack_forget()
@@ -311,41 +345,99 @@ class WotAssistantHQ:
         if self.mode == "edit":
             self.mode = "norm"
             self.win_mgr.set_clickthrough(not self.win_mgr.format_mode_enabled)
-            self.top_bar.pack_forget()
             if self.active_view == "maps":
                 self.battle_status_top.pack(side="top", fill="x")
                 self.canvas.pack(side="top", fill="both", expand=True)
-            else:
+            elif self.active_view in ("stats", "ai_stats"):
                 self.mode = "edit"
                 self.win_mgr.set_clickthrough(False)
-                self.top_bar.pack_forget()
                 self.top_bar.pack(side="top", fill="x")
-            
-            if self.active_view == "maps":
-                if self.btn_mode_maps_1.cget("bg") == "#ff4500" or self.btn_mode_maps_2.cget("bg") == "#ff4500":
-                    toolbar_frame = tk.Frame(self.root, bg="#1a1a1a") # Container to help packing
-                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10) 
-                    self.filter_panel.pack(side="bottom", fill="x") 
+        else:
+            self.mode = "edit"
+            self.win_mgr.set_clickthrough(False)
+            self.top_bar.pack(side="top", fill="x")
+
+        if self.active_view == "maps":
+            self.status_label.pack_forget()
+            if self.mode == "edit":
+                if self.map_mode == 2:
+                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+                    self.filter_panel.pack(side="bottom", fill="x")
                 self.status_label.pack(side="bottom", fill="x")
-                self.canvas.pack(side="top", fill="both", expand=True) 
-            elif self.active_view == "stats":
-                self.status_label.pack(side="bottom", fill="x")
-                self.browser_frame.pack(side="top", fill="both", expand=True)
-            elif self.active_view == "ai_stats":
-                self.ai_frame.pack(side="top", fill="both", expand=True)
-                self.status_label.pack(side="bottom", fill="x")
+            self.canvas.pack(side="top", fill="both", expand=True)
+            if hasattr(self, '_po_win'):
+                self._po_win.deiconify()
+                self._sync_po_pos()
+        elif self.active_view == "stats":
+            if hasattr(self, '_po_win'):
+                self._po_win.withdraw()
+            self.status_label.pack(side="bottom", fill="x")
+            self.browser_frame.pack(side="top", fill="both", expand=True)
+        elif self.active_view == "ai_stats":
+            if hasattr(self, '_po_win'):
+                self._po_win.withdraw()
+            self.ai_frame.pack(side="top", fill="both", expand=True)
+            self.status_label.pack(side="bottom", fill="x")
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.w = self.settings.get(f"{prefix}w", 800 if self.mode=="edit" else 400)
-        self.h = self.w + (self.get_edit_extra_height() if self.mode=="edit" else 0)
+        if self.mode == "edit":
+            self.h = self.w + self.get_edit_extra_height()
+        else:
+            self.h = self.w + 18
         self.alpha = self.settings.get(f"{prefix}alpha", 1.0)
         self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
-        px, py = self.settings.get(f"{prefix}x", 100), self.settings.get(f"{prefix}y", 100)
+        if self.mode == "edit":
+            mid_x = self.settings.get(f"{prefix}cx", self.settings.get(f"{prefix}x", 100) + self.w // 2)
+            mid_y = self.settings.get(f"{prefix}cy", self.settings.get(f"{prefix}y", 100) + self.h // 2)
+            px = mid_x - self.w // 2
+            py = mid_y - self.h // 2
+        else:
+            px = self.settings.get(f"{prefix}x", 100)
+            py = self.settings.get(f"{prefix}y", 100)
         
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
+        self.root.attributes("-alpha", 0.0)
+        if self.mode == "norm":
+            self.root.aspect(1, 1, 1, 1)
+        elif self.mode == "edit":
+            self.root.aspect(1, 1, 100, 1)
+        if not hasattr(self, '_canvas_cfg_bound'):
+            self.canvas.bind("<Configure>", self._on_canvas_resize, "+")
+            self._canvas_cfg_bound = True
+        self.map_renderer.show_main_splash()
         self.root.attributes("-alpha", self.alpha)
-        self.root.after(50, self.map_renderer.show_main_splash)
         self.refresh_mode_indicator()
+
+    def _on_canvas_resize(self, event=None):
+        if self.active_view != "maps":
+            return
+        if getattr(self, '_redrawing', False):
+            return
+        if self.mode == "norm":
+            self.root.attributes("-alpha", 0.0)
+        if hasattr(self, '_rsz_timer'):
+            self.root.after_cancel(self._rsz_timer)
+        self._rsz_timer = self.root.after(200, self._do_canvas_redraw)
+
+    def _do_canvas_redraw(self):
+        if getattr(self, '_redrawing', False):
+            return
+        self._redrawing = True
+        if hasattr(self, '_rsz_timer'):
+            self.root.after_cancel(self._rsz_timer)
+        try:
+            if self.mode == "norm":
+                w = self.root.winfo_width()
+                target_h = w + 18
+                if abs(self.root.winfo_height() - target_h) > 1:
+                    self.root.geometry(f"{w}x{int(target_h)}")
+                    self.root.update_idletasks()
+            self.root.update_idletasks()
+            self.map_renderer.show_main_splash()
+            self.root.attributes("-alpha", self.alpha)
+        finally:
+            self._redrawing = False
 
     def refresh_mode_indicator(self):
         mode_text = "РЕДАГУВАННЯ" if self.mode == "edit" else "БОЙОВИЙ"
@@ -356,6 +448,11 @@ class WotAssistantHQ:
             self.status_label.config(text=text, fg=fg)
         if hasattr(self, "battle_status_label"):
             self.battle_status_label.config(text=text, fg=fg)
+
+    def _lift_po_win(self):
+        if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
+            self._po_win.lift()
+            self._sync_po_pos()
 
     def toggle_formatting_mode(self):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
@@ -373,11 +470,13 @@ class WotAssistantHQ:
             self.win_mgr.set_clickthrough(False)
             self.root.lift()
             self.root.focus_force()
+            self._lift_po_win()
             print("[HOTKEY] F8: ФОРМАТУВАННЯ увімкнено")
         else:
             if self.mode == "norm":
                 self.win_mgr.set_clickthrough(True)
                 self.win_mgr.focus_game_window()
+            self._lift_po_win()
             print("[HOTKEY] F8: ФОРМАТУВАННЯ вимкнено")
         self.refresh_mode_indicator()
 
@@ -387,10 +486,15 @@ class WotAssistantHQ:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
+            if self.active_view == "maps" and hasattr(self, '_po_win'):
+                self._po_win.deiconify()
+                self._sync_po_pos()
         else:
             if hasattr(self, 'stats_ai_module'):
                 self.stats_ai_module.stop_browser()
             self.save_settings()
+            if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
+                self._po_win.withdraw()
             self.root.withdraw()
 
     def _ensure_edit_focus(self):
@@ -541,7 +645,6 @@ class WotAssistantHQ:
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.safe_battle_sync(map_id, ui_mode)
-        print(f"[BATTLE] Синхронізація карти після повернення: {map_id} (МАПИ {target_map_mode})")
 
     def safe_battle_sync(self, map_id, ui_mode):
         if not self.settings.get("log_path", ""):
@@ -556,15 +659,13 @@ class WotAssistantHQ:
             print(f"[SYNC] Авто-вибір режиму бою вимкнено (auto_mode_filter={self.auto_mode_filter_var.get()})")
         
         target_name = self.translate_map_name(map_id)
-        print(f"[SYNC] map_id='{map_id}', ui_mode='{ui_mode}', target_name='{target_name}'")
         
         tmaps = self.map_selector.cget("values")
-        print(f"[SYNC] Available maps: {tmaps}")
         
         if target_name in tmaps:
             self.map_var.set(target_name)
             self.on_map_select()
-            self.status_label.config(text=f"[AUTO] Виявлено: {target_name} ({map_id})", fg="lime")
+            self.status_label.config(text=f"[AUTO] Виявлено: {target_name}", fg="lime")
             return
             
         for t in tmaps:
@@ -898,3 +999,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = WotAssistantHQ(root)
     root.mainloop()
+у

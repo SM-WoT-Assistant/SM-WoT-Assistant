@@ -22,14 +22,10 @@ class UIManager:
         self.app.settings_menu = tk.Menu(self.app.settings_btn, tearoff=0, bg="#333", fg="white")
         self.app.settings_menu.add_command(label="Вказати папку гри (WoT)", command=self.app.ask_wot_path)
         self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_command(label="Оновити мапи (Примусово)", command=self.app.map_mgr.run_map_updater)
-        self.app.settings_menu.add_separator()
         self.app.settings_menu.add_checkbutton(label="Авто-фільтри (за логом)", variable=self.app.auto_sync_var, command=self.app.save_settings)
         self.app.settings_menu.add_checkbutton(label="Авто-вибір режиму бою", variable=self.app.auto_mode_filter_var, command=self.app.save_settings)
         self.app.settings_menu.add_checkbutton(label="Авто-вибір виду техніки", variable=self.app.auto_vehicle_filter_var, command=self.app.save_settings)
         self.app.settings_menu.add_checkbutton(label="Авто-бойовий режим", variable=self.app.auto_battle_var, command=self.app.save_settings)
-        self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_command(label="Встановити AI Key (Gemini)", command=self.app.ask_ai_key)
         self.app.settings_menu.add_separator()
         self.app.settings_menu.add_command(label="Допомога (F1)", command=self.app.help_manager.toggle_overlay)
         self.app.settings_menu.bind("<Unmap>", self.app._on_settings_unmap)
@@ -100,20 +96,26 @@ class UIManager:
         if view_name == "maps":
             mode = kwargs.get('mode', 1)
             self.app.map_mode = mode
+            if hasattr(self.app, '_po_win'):
+                self.app._po_win.deiconify()
+                self.app._sync_po_pos()
             if mode == 1:
                 self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
+                self.app.battle_status_top.pack(side="top", fill="x")
             else:
                 self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
-            
-            self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10) 
-            self.app.filter_panel.pack(side="bottom", fill="x") 
-            self.app.status_label.pack(side="bottom", fill="x")
-            self.app.canvas.pack(side="top", fill="both", expand=True) 
+                self.app.filter_panel.pack(side="bottom", fill="x")
+                self.app.status_label.pack(side="bottom", fill="x")
+                self.app.status_label.config(height=2, bg="#1a1a1a")
+                self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+            self.app.canvas.pack(side="top", fill="both", expand=True)
             
             self.app.map_mgr.load_map_list()
 
         elif view_name == "stats":
-            self.app.status_label.config(text="[СТАТ] Запуск браузера...", fg="yellow")
+            if hasattr(self.app, '_po_win'):
+                self.app._po_win.withdraw()
+            self.app.status_label.config(text="[СТАТ] Запуск браузера...", fg="yellow", height=1, bg="#222")
             self.app.status_label.pack(side="bottom", fill="x")
             self.app.browser_frame.pack(side="top", fill="both", expand=True)
             
@@ -125,9 +127,11 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
+            if hasattr(self.app, '_po_win'):
+                self.app._po_win.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
-            self.app.status_label.config(text="[СТАТ АІ] Оберіть танк для отримання збірки", fg="cyan")
+            self.app.status_label.config(text="[СТАТ АІ] Оберіть танк для отримання збірки", fg="cyan", height=1, bg="#222")
             self.app.status_label.pack(side="bottom", fill="x")
             if hasattr(self.app, 'stats_ai_module'): self.app.stats_ai_module.refresh_ai_view()
 

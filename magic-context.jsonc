@@ -1,23 +1,55 @@
 {
   "$schema": "https://raw.githubusercontent.com/cortexkit/magic-context/master/assets/magic-context.schema.json",
   "enabled": true,
+  "memory": {
+    "enabled": true,
+    "injection_budget_tokens": 20000,
+    "auto_promote": true,
+    "retrieval_count_promotion_threshold": 1
+  },
   "historian": {
     "model": "opencode-go/glm-4-flash",
-    "fallback_models": ["opencode-go/glm-5"]
+    "fallback_models": ["opencode-go/glm-5"],
+    "two_pass": true
   },
   "dreamer": {
     "enabled": true,
     "user_memories": {
-      "enabled": true
-    }
+      "enabled": true,
+      "promotion_threshold": 2
+    },
+    "pin_key_files": {
+      "enabled": true,
+      "token_budget": 30000,
+      "min_reads": 2
+    },
+    "tasks": ["consolidate", "verify", "archive-stale", "improve", "maintain-docs"],
+    "max_runtime_minutes": 120
+  },
+  "sidekick": {
+    "model": "opencode-go/glm-4-flash",
+    "fallback_models": ["opencode-go/glm-5"],
+    "timeout_ms": 60000
+  },
+  "embedding": {
+    "provider": "local"
   },
   "experimental": {
     "git_commit_indexing": {
-      "enabled": true
+      "enabled": true,
+      "since_days": 365,
+      "max_commits": 10000
     },
     "auto_search": {
-      "enabled": true
+      "enabled": true,
+      "min_prompt_chars": 5,
+      "score_threshold": 0.3
     },
     "temporal_awareness": true
-  }
+  },
+  "nudge_interval_tokens": 1000,
+  "auto_drop_tool_age": 50,
+  "iteration_nudge_threshold": 10,
+  "execute_threshold_percentage": 80,
+  "protected_tags": 50
 }
