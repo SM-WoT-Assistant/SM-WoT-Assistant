@@ -22,6 +22,7 @@ import tactics_manager
 import log_reader
 import help_system
 import painter as pnt
+import painting_palette
 import stats_ai
 import window_manager
 import map_renderer
@@ -137,6 +138,8 @@ class WotAssistantHQ:
         
         self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
         self._init_painter_overlay()
+        self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
+        self.drawing_palette.withdraw()
         
         self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
         for var in self.selected_classes.values():
@@ -163,6 +166,9 @@ class WotAssistantHQ:
         self.root.bind("<Configure>", self._sync_po_pos, "+")
 
     def _sync_po_pos(self, event=None):
+        palette = getattr(self, 'drawing_palette', None)
+        if palette and palette.state() != 'withdrawn':
+            palette.lift()
         if not hasattr(self, '_po_win') or self._po_win.state() == "withdrawn":
             return
         cx = self.canvas.winfo_rootx()
@@ -371,11 +377,19 @@ class WotAssistantHQ:
         elif self.active_view == "stats":
             if hasattr(self, '_po_win'):
                 self._po_win.withdraw()
+            if hasattr(self, 'drawing_palette'):
+                self.drawing_palette.exit_edit_mode()
+                if self.drawing_palette.state() != 'withdrawn':
+                    self.drawing_palette.withdraw()
             self.status_label.pack(side="bottom", fill="x")
             self.browser_frame.pack(side="top", fill="both", expand=True)
         elif self.active_view == "ai_stats":
             if hasattr(self, '_po_win'):
                 self._po_win.withdraw()
+            if hasattr(self, 'drawing_palette'):
+                self.drawing_palette.exit_edit_mode()
+                if self.drawing_palette.state() != 'withdrawn':
+                    self.drawing_palette.withdraw()
             self.ai_frame.pack(side="top", fill="both", expand=True)
             self.status_label.pack(side="bottom", fill="x")
 
@@ -536,18 +550,51 @@ class WotAssistantHQ:
         self.root.focus_set()
         selected_ua = self.map_var.get()
         self.current_map_eng = self.map_mgr.get_eng_map_name(selected_ua)
+        if hasattr(self, 'painter'):
+            self.painter._creation_history.clear()
+            self.painter._editing_idx = -1
+        if hasattr(self, 'drawing_palette'):
+            self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
 
-    def set_painter_tool(self, tool):
-        if hasattr(self, 'painter'):
-            self.painter.set_tool(tool)
-                
-        if tool == "marker":
-            self.draw_btn.config(text="МАРКЕР", bg="#ffaa00", fg="black")
-        elif tool == "text":
-            self.draw_btn.config(text="ТЕКСТ / ЗНАК", bg="#ffaa00", fg="black")
+    def _handle_ctrl_up(self):
+        import time
+        now = time.time()
+        if hasattr(self, '_last_ctrl_up_time') and now - self._last_ctrl_up_time < 0.15:
+            return
+        self._last_ctrl_up_time = now
+        if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
+            self.painter.resize_selected(1)
         else:
-            self.draw_btn.config(text="МАЛЮВАТИ", bg="#444", fg="gray")
+            self.win_mgr.resize_up_hotkey()
+
+    def _handle_ctrl_down(self):
+        import time
+        now = time.time()
+        if hasattr(self, '_last_ctrl_down_time') and now - self._last_ctrl_down_time < 0.15:
+            return
+        self._last_ctrl_down_time = now
+        if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
+            self.painter.resize_selected(-1)
+        else:
+            self.win_mgr.resize_down_hotkey()
+
+    def set_painter_tool(self, tool):
+        if hasattr(self, 'drawing_palette'):
+            self.drawing_palette.exit_edit_mode()
+
+    def toggle_palette(self):
+        if self.active_view != "maps" or self.map_mode != 2:
+            msg = "[РЕЖИМ] Малювання доступне тільки в MAPS режимi."
+            if hasattr(self, "status_label"):
+                self.status_label.config(text=msg, fg="#ffb347")
+            return
+        if self.drawing_palette.state() != 'withdrawn':
+            self.drawing_palette._close()
+            self.draw_btn.config(bg="#444", fg="gray")
+        else:
+            self.drawing_palette.show()
+            self.draw_btn.config(bg="#ffaa00", fg="black")
 
     def export_current_tactic(self):
         if not self.current_map_eng: return
@@ -684,11 +731,6 @@ class WotAssistantHQ:
         
         self.status_label.config(text=f"[AUTO] ПОМИЛКА: Карта '{map_id}' ('{target_name}') не в списку", fg="red")
 
-    def show_draw_menu(self):
-        x = self.draw_btn.winfo_rootx()
-        y = self.draw_btn.winfo_rooty() + self.draw_btn.winfo_height()
-        self.draw_menu.post(x, y)
-
     def setup_ui(self):
         pass
 
@@ -723,12 +765,15 @@ class WotAssistantHQ:
             keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
             print(f"[HOTKEY] F8 недоступний: {e}")
             print("[HOTKEY] Fallback форматування: Ctrl+E")
-        keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self.win_mgr.resize_up_hotkey), suppress=False)
-        keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self.win_mgr.resize_down_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self._handle_ctrl_up), suppress=False)
+        keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self._handle_ctrl_down), suppress=False)
         keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
+        keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=False)
+        self.root.bind_all("<Control-Up>", lambda e: self.safe_execute(self._handle_ctrl_up))
+        self.root.bind_all("<Control-Down>", lambda e: self.safe_execute(self._handle_ctrl_down))
         self.win_mgr.bind_controls(self.top_bar, self.canvas)
 
     def load_logo(self):
@@ -999,4 +1044,3 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = WotAssistantHQ(root)
     root.mainloop()
-у

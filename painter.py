@@ -1,7 +1,6 @@
 # painter.py (відновлено з ARC/painter_1_06.py)
 import os, json, math
 import tkinter as tk
-from tkinter import colorchooser
 import config
 import ctypes
 
@@ -10,195 +9,10 @@ if os.path.exists(font_path):
     FR_PRIVATE = 0x10
     ctypes.windll.gdi32.AddFontResourceExW(font_path, FR_PRIVATE, 0)
 
-
-class PainterDialog(tk.Toplevel):
-    def __init__(self, parent, current_mode, current_classes, default_color, tool_type, painter, edit_data=None, cancel_callback=None):
-        super().__init__(parent)
-        self.tool_type = tool_type
-        self.edit_data = edit_data
-        self.painter = painter
-        self.cancel_callback = cancel_callback
-        is_editing = edit_data is not None
-        self.title("Редагування мітки" if is_editing else "Параметри мітки")
-
-        self.resizable(False, False)
-        self.minsize(350, 100)
-
-        self.attributes("-topmost", True)
-        self.configure(bg="#222")
-        self.grab_set()
-
-        self.result = None
-        self.color = (edit_data or {}).get("color", default_color)
-
-        self.mode_labels = {
-            "Standard": "Стандарт", "Encounter": "Зустріч",
-            "Assault": "Штурм", "Onslaught": "НАТИСК"
-        }
-
-        existing_modes = (edit_data or {}).get("modes", [])
-        self.modes = {"Standard": tk.BooleanVar(value="Standard" in existing_modes if edit_data is not None else current_mode == "Standard"),
-                      "Encounter": tk.BooleanVar(value="Encounter" in existing_modes if edit_data is not None else current_mode == "Encounter"),
-                      "Assault": tk.BooleanVar(value="Assault" in existing_modes if edit_data is not None else current_mode == "Assault"),
-                      "Onslaught": tk.BooleanVar(value="Onslaught" in existing_modes if edit_data is not None else current_mode == "Onslaught")}
-
-        existing_classes = (edit_data or {}).get("classes", [])
-        self.classes = {"ЛТ": tk.BooleanVar(value="ЛТ" in existing_classes if edit_data is not None else current_classes.get("ЛТ", False)),
-                        "СТ": tk.BooleanVar(value="СТ" in existing_classes if edit_data is not None else current_classes.get("СТ", False)),
-                        "ТТ": tk.BooleanVar(value="ТТ" in existing_classes if edit_data is not None else current_classes.get("ТТ", False)),
-                        "ПТ": tk.BooleanVar(value="ПТ" in existing_classes if edit_data is not None else current_classes.get("ПТ", False)),
-                        "САУ": tk.BooleanVar(value="САУ" in existing_classes if edit_data is not None else current_classes.get("САУ", False))}
-
-        existing_text = (edit_data or {}).get("text", "")
-        self.text_var = tk.StringVar(value=existing_text)
-        self.text_var.trace("w", self.validate_text)
-        self.text_var.trace("w", self._on_change)
-        self.poi_vars = {}
-
-        self.build_ui()
-        self._sync_obj()
-
-    def _sync_obj(self):
-        if not self.edit_data:
-            return
-        obj = self.edit_data
-        obj["modes"] = [k for k, v in self.modes.items() if v.get()]
-        obj["classes"] = [k for k, v in self.classes.items() if v.get()]
-        obj["text"] = self.text_var.get()
-        if obj["type"] == "text":
-            obj["poi"] = [code for code, var in self.poi_vars.items() if var.get()]
-        obj["color"] = self.color
-        if obj["type"] == "marker":
-            coords = obj.get("coords", [])
-            if obj.get("classes") and not obj.get("class_icon_coords") and len(coords) >= 2:
-                cw = self.painter.canvas.winfo_width()
-                ch = self.painter.canvas.winfo_height()
-                sc = min(cw, ch) / 800.0 if cw >= 10 and ch >= 10 else 1.0
-                obj["class_icon_coords"] = [coords[0], min(max(coords[1] + (int(22 * sc) / max(ch, 1)), 0.0), 1.0)]
-            if obj.get("text") and not obj.get("text_coords") and len(coords) >= 4:
-                cw = self.painter.canvas.winfo_width()
-                ch = self.painter.canvas.winfo_height()
-                sc = min(cw, ch) / 800.0 if cw >= 10 and ch >= 10 else 1.0
-                obj["text_coords"] = [(coords[0]+coords[2])/2, (coords[1]+coords[3])/2 - int(10 * sc)/max(ch, 1)]
-        self.painter.redraw()
-
-    def _on_change(self, *args):
-        self._sync_obj()
-        
-    def build_ui(self):
-        style_bg = "#222"
-        style_fg = "white"
-        cb_style = {"bg": style_bg, "fg": style_fg, "selectcolor": "#333", "activebackground": style_bg, "activeforeground": style_fg}
-        
-        tk.Label(self, text="Режим бою (можна кілька):", font=("Arial", 9, "bold"), bg=style_bg, fg="#aaa").pack(anchor="w", padx=10, pady=(10,0))
-        mf = tk.Frame(self, bg=style_bg)
-        mf.pack(fill="x", padx=10)
-        for k, v in self.modes.items():
-            cb = tk.Checkbutton(mf, text=self.mode_labels[k], variable=v, command=self._on_change, **cb_style)
-            cb.pack(side="left")
-            
-        tk.Label(self, text="Техніка (якщо пусто = Загальне):", font=("Arial", 9, "bold"), bg=style_bg, fg="#aaa").pack(anchor="w", padx=10, pady=(10,0))
-        cf = tk.Frame(self, bg=style_bg)
-        cf.pack(fill="x", padx=10)
-        for k, v in self.classes.items():
-            cb = tk.Checkbutton(cf, text=k, variable=v, command=self._on_change, **cb_style)
-            cb.pack(side="left")
-            
-        tk.Label(self, text="Текст (опціонально):", font=("Arial", 9, "bold"), bg=style_bg, fg="#aaa").pack(anchor="w", padx=10, pady=(10,0))
-        tf = tk.Frame(self, bg=style_bg)
-        tf.pack(fill="x", padx=10)
-        self.entry = tk.Entry(tf, textvariable=self.text_var, width=30, bg="#111", fg="white", insertbackground="white", bd=1, relief="solid")
-        self.entry.pack(side="left", pady=5)
-        self.count_lbl = tk.Label(tf, text="0/30", bg=style_bg, fg="gray")
-        self.count_lbl.pack(side="left", padx=5)
-        
-        if self.tool_type == "text":
-            tk.Label(self, text="Знак (можна кілька):", font=("Arial", 9, "bold"), bg=style_bg, fg="#aaa").pack(anchor="w", padx=10, pady=(10,0))
-            pf = tk.Frame(self, bg=style_bg)
-            pf.pack(fill="x", padx=10)
-            
-            xvm_codes = [0x2B, 0x2D, 0x2E, 0x3A, 0x3B, 0x3F, 0x42, 0x45, 0x50, 0x52, 0x5C, 0x6F, 0x2C]
-            existing_poi = (self.edit_data or {}).get("poi", [])
-            if isinstance(existing_poi, str):
-                if existing_poi.startswith("xvm_"):
-                    existing_poi = [int(existing_poi.split("_")[1], 16)]
-                else:
-                    existing_poi = []
-            for i, code in enumerate(xvm_codes):
-                self.poi_vars[code] = tk.BooleanVar(value=code in existing_poi)
-                cb = tk.Checkbutton(pf, text=chr(code), variable=self.poi_vars[code], font=("XVMSymbol", 16), command=self._on_change, **cb_style)
-                cb.grid(row=i//5, column=i%5, sticky="w", padx=2, pady=2)
-            tree_var = tk.BooleanVar(value="tree" in existing_poi)
-            self.poi_vars["tree"] = tree_var
-            tf = tk.Frame(pf, bg=style_bg)
-            tf.grid(row=(len(xvm_codes)+4)//5, column=0, columnspan=5, sticky="w", padx=2, pady=4)
-            tree_img = self.painter._render_tree(24, "#00ff00") if hasattr(self.painter, '_render_tree') else None
-            if tree_img:
-                tree_cb = tk.Checkbutton(tf, image=tree_img, variable=tree_var, command=self._on_change, bg=style_bg, activebackground=style_bg, bd=0)
-                tree_cb.image = tree_img
-                tree_cb.pack(side="left")
-            else:
-                tree_cb = tk.Checkbutton(tf, text="T", variable=tree_var, command=self._on_change, **cb_style)
-                tree_cb.pack(side="left")
-            tk.Label(tf, text=self.painter.app.t('ui', 'broken_tree'), bg=style_bg, fg="#aaa", font=("Arial", 9)).pack(side="left", padx=5)
-            
-        tk.Label(self, text="Колір:", font=("Arial", 9, "bold"), bg=style_bg, fg="#aaa").pack(anchor="w", padx=10, pady=(10,0))
-        clf = tk.Frame(self, bg=style_bg)
-        clf.pack(fill="x", padx=10)
-        colors = [("#ff0000", "Червоний"), ("#00ff00", "Зелений"), ("#00bbff", "Синій"), 
-                  ("#ffff00", "Жовтий"), ("#ffaa00", "Помаранчевий")]
-        for hex_code, name in colors:
-            btn = tk.Button(clf, bg=hex_code, width=2, bd=0, command=lambda c=hex_code: self.set_color(c))
-            btn.pack(side="left", padx=2, pady=5)
-        tk.Button(clf, text="Інший...", bg="#444", fg="white", bd=0, command=self.pick_color).pack(side="left", padx=5)
-        self.color_preview = tk.Label(clf, text=" ■ ", bg=style_bg, fg=self.color, font=("Arial", 16))
-        self.color_preview.pack(side="left", padx=5)
-        
-        bf = tk.Frame(self, bg=style_bg)
-        bf.pack(fill="x", padx=10, pady=20)
-        tk.Button(bf, text="ЗБЕРЕГТИ", bg="#006400", fg="white", bd=0, font=("Arial", 10, "bold"), pady=5, command=self.save).pack(side="left", expand=True, fill="x", padx=5)
-        tk.Button(bf, text="СКАСУВАТИ", bg="#8b0000", fg="white", bd=0, font=("Arial", 10, "bold"), pady=5, command=self.cancel).pack(side="right", expand=True, fill="x", padx=5)
-        
-    def validate_text(self, *args):
-        t = self.text_var.get()
-        if len(t) > 30:
-            self.text_var.set(t[:30])
-            self.entry.config(bg="#550000")
-        else:
-            self.entry.config(bg="#111")
-        self.count_lbl.config(text=f"{len(self.text_var.get())}/30")
-        
-    def set_color(self, c):
-        self.color = c
-        self.color_preview.config(fg=self.color)
-        self._sync_obj()
-        
-    def pick_color(self):
-        c = colorchooser.askcolor(color=self.color, parent=self)[1]
-        if c: self.set_color(c)
-
-    def cancel(self):
-        if self.cancel_callback:
-            self.cancel_callback()
-        self.destroy()
-        
-    def save(self):
-        self._sync_obj()
-        selected_modes = [k for k, v in self.modes.items() if v.get()]
-        selected_classes = [k for k, v in self.classes.items() if v.get()]
-        
-        poi_res = []
-        if self.tool_type == "text":
-            poi_res = [code for code, var in self.poi_vars.items() if var.get()]
-            
-        self.result = {
-            "modes": selected_modes,
-            "classes": selected_classes,
-            "text": self.text_var.get(),
-            "poi": poi_res,
-            "color": self.color
-        }
-        self.destroy()
+fa_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontawesome-webfont.ttf")
+if os.path.exists(fa_path):
+    FR_PRIVATE = 0x10
+    ctypes.windll.gdi32.AddFontResourceExW(fa_path, FR_PRIVATE, 0)
 
 class MapPainter:
     def __init__(self, canvas, app, data_mgr):
@@ -216,7 +30,9 @@ class MapPainter:
         self.move_drag = None
         self.move_drag_active = False
         
-        self._load_tree_icon()
+        self._creation_history = []
+        self._editing_idx = -1
+
         self.class_icon_codes = {
             "ЛТ": 0x3A,
             "СТ": 0x3B,
@@ -238,43 +54,6 @@ class MapPainter:
         ]:
             target_canvas.bind(ev, cb, add="+")
     
-    def _load_tree_icon(self):
-        try:
-            tree_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon", "Broken_tree.svg")
-            if not os.path.exists(tree_path):
-                return
-            with open(tree_path, 'rb') as f:
-                self._tree_svg_data = f.read()
-        except Exception as e:
-            print(f"[PAINTER] Не вдалося завантажити іконку дерева: {e}")
-
-    def _render_tree(self, size, color):
-        try:
-            if not hasattr(self, '_tree_svg_data'):
-                return None
-            from PyQt6.QtSvg import QSvgRenderer
-            from PyQt6.QtCore import QByteArray, QRectF
-            from PyQt6.QtGui import QImage, QPainter
-            from PIL import ImageQt, ImageTk
-            key = (size, color)
-            if not hasattr(self, '_tree_render_cache'):
-                self._tree_render_cache = {}
-            if key not in self._tree_render_cache:
-                svg_text = self._tree_svg_data.decode('utf-8')
-                svg_text = svg_text.replace('.st0{fill:#FFFFFF;}', '.st0{fill:%s;}' % color)
-                svg_text = svg_text.replace('.st0{fill:#ffffff;}', '.st0{fill:%s;}' % color)
-                qimg = QImage(size, size, QImage.Format.Format_ARGB32)
-                qimg.fill(0x00000000)
-                painter = QPainter(qimg)
-                renderer = QSvgRenderer(QByteArray(svg_text.encode('utf-8')))
-                renderer.render(painter, QRectF(0, 0, size, size))
-                painter.end()
-                self._tree_render_cache[key] = ImageTk.PhotoImage(ImageQt.fromqimage(qimg))
-            return self._tree_render_cache[key]
-        except Exception as e:
-            print(f"[PAINTER] render_tree error: {e}")
-            return None
-
     def set_tool(self, tool):
         self.active_tool = tool
         self.app.status_label.config(text=f"ІНСТРУМЕНТ: {tool.upper() if tool else 'ВИМКНЕНО'}")
@@ -288,11 +67,70 @@ class MapPainter:
     def _do_clear(self, confirmed):
         if confirmed and self.app.current_map_eng:
             self.drawings[self.app.current_map_eng] = []
+            self._creation_history.clear()
+            self._editing_idx = -1
+            palette = getattr(self.app, 'drawing_palette', None)
+            if palette:
+                palette.exit_edit_mode()
             self.data_mgr.save_drawings(self.drawings)
             self.redraw()
 
+    def ctrl_z_undo(self):
+        if not self._creation_history or not self.app.current_map_eng:
+            return
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            palette.exit_edit_mode()
+        idx = self._creation_history.pop()
+        map_id = self.app.current_map_eng
+        if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
+            del self.drawings[map_id][idx]
+            self.data_mgr.save_drawings(self.drawings)
+            self.redraw()
+
+    def resize_selected(self, direction):
+        """Resize the edited element. direction: 1 = bigger, -1 = smaller."""
+        if not self.app.current_map_eng or self._editing_idx < 0:
+            return
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+        if self._editing_idx >= len(objects):
+            return
+        obj = objects[self._editing_idx]
+        scale = obj.get("scale", 1.0)
+        step = 0.1
+        new_scale = scale + direction * step
+        new_scale = max(0.3, min(3.0, new_scale))
+        obj["scale"] = new_scale
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if obj.get("type") == "marker" and len(obj.get("coords", [])) >= 4:
+            coords = obj["coords"]
+            mx, my = (coords[0] + coords[2]) / 2, (coords[1] + coords[3]) / 2
+            dx = coords[2] - mx
+            dy = coords[3] - my
+            coords[2] = mx + dx * (new_scale / scale)
+            coords[3] = my + dy * (new_scale / scale)
+        self.data_mgr.save_drawings(self.drawings)
+        self.redraw()
+
     def on_press(self, event):
-        if not self.active_tool or not self.app.current_map_eng or self.app.mode != "edit": return
+        if not self.app.current_map_eng or self.app.mode != "edit": return
+
+        palette = getattr(self.app, 'drawing_palette', None)
+        palette_visible = palette and palette.state() != 'withdrawn'
+
+        if palette_visible and not self.active_tool:
+            idx, _ = self._find_object_index_at(event.x, event.y)
+            if idx >= 0:
+                self._edit_object_at(idx)
+                return
+            elif palette.is_in_edit_mode():
+                palette.exit_edit_mode()
+                return
+
+        if not self.active_tool:
+            return
         
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
@@ -588,9 +426,6 @@ class MapPainter:
         
         px1, py1 = self.start_x / cw, self.start_y / ch
         px2, py2 = event.x / cw, event.y / ch
-        
-        current_classes = {k: v.get() for k, v in self.app.selected_classes.items()}
-        current_mode = self.app.selected_battle_mode.get()
 
         new_obj = {
             "type": self.active_tool,
@@ -609,26 +444,28 @@ class MapPainter:
         if map_id not in self.drawings: self.drawings[map_id] = []
         self.drawings[map_id].append(new_obj)
 
-        def _cancel_remove():
-            if map_id in self.drawings and new_obj in self.drawings[map_id]:
-                self.drawings[map_id].remove(new_obj)
-            self.redraw()
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette:
+            self.canvas.delete("temp_draw")
+            self.temp_item = None
+            return
 
-        self.app.dialog_open = True
-        dlg = PainterDialog(self.app.root, current_mode, current_classes, self.default_color, self.active_tool, self, edit_data=new_obj, cancel_callback=_cancel_remove)
-        self.app.root.wait_window(dlg)
-        self.app.dialog_open = False
-        
+        needs_show = palette.state() == 'withdrawn'
+        palette.exit_edit_mode()
+        palette.apply_to_new_object(new_obj, cw, ch)
+        self.default_color = new_obj["color"]
+        self._creation_history.append(len(self.drawings[map_id]) - 1)
+        self.data_mgr.save_drawings(self.drawings)
+        self.redraw()
         self.canvas.delete("temp_draw")
         self.temp_item = None
-            
-        if dlg.result:
-            self.default_color = dlg.result["color"]
-            self.data_mgr.save_drawings(self.drawings)
-            self.redraw()
-        else:
-            _cancel_remove()
-        self.app.set_painter_tool(None)
+        if needs_show:
+            palette.show()
+            if hasattr(self.app, 'draw_btn'):
+                self.app.draw_btn.config(bg="#ffaa00", fg="black")
+        palette._deactivate_tool()
+        self.active_tool = None
+        self.app.root.after(10, palette._lift_self)
             
     def on_right_click(self, event):
         if self.app.mode != "edit" or not self.app.current_map_eng:
@@ -653,28 +490,32 @@ class MapPainter:
         if idx < 0 or idx >= len(objects):
             return
         obj = objects[idx]
-        obj_backup = {
-            "modes": list(obj.get("modes", [])),
-            "classes": list(obj.get("classes", [])),
-            "text": obj.get("text", ""),
-            "color": obj.get("color", self.default_color),
-            "poi": list(obj.get("poi", [])),
-        }
-        self.app.dialog_open = True
-        dlg = PainterDialog(self.app.root, None, None, obj.get("color", self.default_color), obj["type"], self, edit_data=obj)
-        self.app.root.wait_window(dlg)
-        self.app.dialog_open = False
-        if dlg.result:
-            self.data_mgr.save_drawings(self.drawings)
-            self.redraw()
-        else:
-            obj["modes"] = obj_backup["modes"]
-            obj["classes"] = obj_backup["classes"]
-            obj["text"] = obj_backup["text"]
-            obj["color"] = obj_backup["color"]
-            if obj["type"] == "text":
-                obj["poi"] = obj_backup["poi"]
-            self.redraw()
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette:
+            return
+        needs_show = palette.state() == 'withdrawn'
+        palette.exit_edit_mode()
+        self._editing_idx = idx
+        palette.load_object(obj)
+        if needs_show:
+            palette.show()
+            if hasattr(self.app, 'draw_btn'):
+                self.app.draw_btn.config(bg="#ffaa00", fg="black")
+        self.redraw()
+
+    def _delete_edited_object(self):
+        if self._editing_idx < 0 or not self.app.current_map_eng:
+            return
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+        if self._editing_idx < 0 or self._editing_idx >= len(objects):
+            return
+        idx = self._editing_idx
+        del objects[idx]
+        self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
+        self._editing_idx = -1
+        self.data_mgr.save_drawings(self.drawings)
+        self.redraw()
 
     def _confirm_delete(self, label):
         dlg = tk.Toplevel(self.app.root)
@@ -718,6 +559,14 @@ class MapPainter:
         ok = self._confirm_delete(label)
         if ok:
             del objects[idx]
+            self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
+            if self._editing_idx == idx:
+                self._editing_idx = -1
+                palette = getattr(self.app, 'drawing_palette', None)
+                if palette:
+                    palette.exit_edit_mode()
+            elif self._editing_idx > idx:
+                self._editing_idx -= 1
             self.data_mgr.save_drawings(self.drawings)
             self.redraw()
 
@@ -747,15 +596,18 @@ class MapPainter:
         if cw < 10 or ch < 10: return
 
         sc = min(cw, ch) / 800.0
-        r12 = max(3, int(12 * sc))
-        r4 = max(2, int(4 * sc))
-        lw = max(1, int(3 * sc))
-        mt_sz = max(6, int(9 * sc))
-        poi_base = max(12, int(48 * sc))
-        tt_sz = max(6, int(10 * sc))
         
         for obj in self.drawings[map_id]:
             if not self.is_visible(obj): continue
+
+            obj_sc = obj.get("scale", 1.0)
+            sc_eff = sc * obj_sc
+            r12 = max(3, int(12 * sc_eff))
+            r4 = max(2, int(4 * sc_eff))
+            lw = max(1, int(3 * sc_eff))
+            mt_sz = max(6, int(9 * sc_eff))
+            poi_base = max(12, int(48 * sc_eff))
+            tt_sz = max(6, int(10 * sc_eff))
             
             c = obj["color"]
             coords = obj["coords"]
@@ -811,7 +663,7 @@ class MapPainter:
                     for code in poi_data:
                         if code == "tree":
                             sz = int(poi_base * 1.0)
-                            items.append({"tree": True, "sz": sz, "color": c, "w": sz + int(4 * sc)})
+                            items.append({"tree": True, "sz": sz, "w": sz + int(4 * sc)})
                             total_w += sz + int(4 * sc)
                             continue
                         sz = int(base_sz * XVM_SCALE.get(code, 1.0))
@@ -828,9 +680,9 @@ class MapPainter:
                     for it in items:
                         cx = curr_x + it["w"] / 2
                         if it.get("tree"):
-                            tree_img = self._render_tree(it["sz"], it["color"]) if hasattr(self, '_render_tree') else None
-                            if tree_img:
-                                self.canvas.create_image(cx, y-poi_oy, image=tree_img, tags="painter_obj")
+                            self.canvas.create_text(cx, y-poi_oy, text=chr(0xF18C),
+                                                    font=("FontAwesome", it["sz"]), fill=c,
+                                                    tags="painter_obj")
                         else:
                             self.canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]), fill="black", tags=("painter_obj", "xvm_bg"))
                             self.canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]-max(2, int(4*sc))), fill=c, tags=("painter_obj", "xvm_fg"))
@@ -839,3 +691,23 @@ class MapPainter:
                 if obj.get("text"):
                     ty = y + int(15 * sc) if poi_data else y
                     self.canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
+
+        if self._editing_idx >= 0 and self._editing_idx < len(self.drawings[map_id]):
+            sobj = self.drawings[map_id][self._editing_idx]
+            if self.is_visible(sobj):
+                scoords = sobj["coords"]
+                spad = max(10, int(18 * sc))
+                if sobj["type"] == "marker" and len(scoords) >= 4:
+                    sx1, sy1 = scoords[0]*cw, scoords[1]*ch
+                    sx2, sy2 = scoords[2]*cw, scoords[3]*ch
+                    self.canvas.create_rectangle(
+                        min(sx1, sx2)-spad, min(sy1, sy2)-spad,
+                        max(sx1, sx2)+spad, max(sy1, sy2)+spad,
+                        outline="#ffff00", width=2, dash=(4, 2), tags="painter_obj"
+                    )
+                elif sobj["type"] == "text" and len(scoords) >= 2:
+                    sx, sy = scoords[0]*cw, scoords[1]*ch
+                    self.canvas.create_rectangle(
+                        sx-spad, sy-spad, sx+spad, sy+spad,
+                        outline="#ffff00", width=2, dash=(4, 2), tags="painter_obj"
+                    )

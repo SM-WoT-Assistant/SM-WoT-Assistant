@@ -12,12 +12,14 @@
 4. Кешування включаємо тільки за прямим наказом і документуємо у цей файл всі кеші які працюють у проекті.
 
 ## Painter (30.05.2026)
-1. **Редагування маркера/тексту:** правий клік → контекстне меню (painter.py:on_right_click) → Редагувати / Видалити.
-2. **Видалення:** контекстне меню → Видалити → підтвердження (кастомний діалог, painter.py:_confirm_delete).
+1. **Редагування маркера/тексту:** правий клік → контекстне меню (painter.py:on_right_click) → Редагувати / Видалити. Редагування через `DrawingPalette` (painting_palette.py) — live sync без модального діалогу.
+2. **Видалення:** контекстне меню → Видалити → підтвердження (кастомний діалог, painter.py:_confirm_delete). Або кнопка «Видалити» в DrawingPalette (painting_palette.py:_delete_selected → painter.py:_delete_edited_object).
 3. **Зміна напрямку вектора:** Ctrl+перетягування кінчика стрілки (target_kind "marker_tip") — рухається тільки кінець, початок фіксований.
 4. **Текст маркера** — не рухається при переміщенні маркера (абсолютна позиція).
 5. **Іконки класів:** ПТ=0x2E, САУ=0x2D (XVMSymbol font).
-6. **Іконка "Зламане дерево"** (02.06.2026): SVG-файл icon/Broken_tree.svg, CSS-клас `.st0{fill:#FFFFFF;}`. Колір змінюється через заміну CSS перед рендерингом (painter.py:_render_tree). Кешується за (size, color).
+6. **Іконка "Зламане дерево"** (06.06.2026): FontAwesome символ `chr(0xF18C)` (fontawesome-webfont.ttf). Рендериться через `canvas.create_text` з шрифтом FontAwesome, колір через fill=. SVG-рендеринг через PyQt6 видалено. Кешування не потрібне (шрифтовий символ).
+7. **DrawingPalette** (painting_palette.py) — плаваюча палітра замість старого `draw_menu` + `PainterDialog`. Авто-deactivate після створення об'єкта. Ctrl+Z undo через keyboard хук. Ctrl+↑/↓ resize в edit mode (debounce 150ms від double-fire keyboard+bind_all).
+8. **PainterDialog** (painter.py) — ВИДАЛЕНО (06.06.2026). Замінено на DrawingPalette.
 
 ## Активні кеші проекту (станом на 27.05.2026)
 1. `popular_tanks_cache.json` — дисковий кеш популярних танків з відповіді ШІ (stats_ai.py:18, 7 днів, fail_count)

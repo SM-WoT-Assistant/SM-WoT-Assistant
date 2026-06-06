@@ -52,17 +52,8 @@ class UIManager:
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
         self.app.map_selector.pack(side="left", padx=5, pady=2)
         
-        self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw'), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.show_draw_menu)
+        self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw'), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
         self.app.draw_btn.pack(side="left", padx=5, pady=2)
-        self.app.draw_menu = tk.Menu(self.app.draw_btn, tearoff=0, bg="#333", fg="white", activebackground="#ffaa00", activeforeground="black")
-        self.app.draw_menu.add_command(label=self.app.t('ui', 'marker'), command=lambda: self.app.set_painter_tool("marker"))
-        self.app.draw_menu.add_separator()
-        self.app.draw_menu.add_command(label=self.app.t('ui', 'text_sign'), command=lambda: self.app.set_painter_tool("text"))
-        self.app.draw_menu.add_separator()
-        self.app.draw_menu.add_command(label=self.app.t('ui', 'clear'), command=lambda: self.app.painter.clear_all())
-        self.app.draw_menu.add_separator()
-        self.app.draw_menu.add_command(label="Експорт тактики (.json)", command=self.app.export_current_tactic)
-        self.app.draw_menu.add_command(label="Імпорт тактики (.json)", command=self.app.import_external_tactic)
 
         self.app.status_label = tk.Label(self.app.root, text="[HANGAR]", bg="#222", fg="gray", font=("Arial", 8))
         self.app.filter_panel = tk.Frame(self.app.root, bg="#222", bd=1, relief="solid")
@@ -115,6 +106,8 @@ class UIManager:
         elif view_name == "stats":
             if hasattr(self.app, '_po_win'):
                 self.app._po_win.withdraw()
+            if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
+                self.app.drawing_palette.withdraw()
             self.app.status_label.config(text="[СТАТ] Запуск браузера...", fg="yellow", height=1, bg="#222")
             self.app.status_label.pack(side="bottom", fill="x")
             self.app.browser_frame.pack(side="top", fill="both", expand=True)
@@ -129,6 +122,8 @@ class UIManager:
         elif view_name == "ai_stats":
             if hasattr(self.app, '_po_win'):
                 self.app._po_win.withdraw()
+            if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
+                self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
             self.app.status_label.config(text="[СТАТ АІ] Оберіть танк для отримання збірки", fg="cyan", height=1, bg="#222")
