@@ -506,13 +506,11 @@ class WotAssistantHQ:
             self.root.lift()
             self.root.focus_force()
             self._lift_po_win()
-            print("[HOTKEY] F8: ФОРМАТУВАННЯ увімкнено")
         else:
             if self.mode == "norm":
                 self.win_mgr.set_clickthrough(True)
                 self.win_mgr.focus_game_window()
             self._lift_po_win()
-            print("[HOTKEY] F8: ФОРМАТУВАННЯ вимкнено")
         self.refresh_mode_indicator()
 
     def toggle_visibility(self):
@@ -558,14 +556,9 @@ class WotAssistantHQ:
         if going_to_edit:
             self.edit_focus_lock = True
             self.root.after(10, self._ensure_edit_focus)
-            print("[HOTKEY] F8: увімкнено РЕДАГУВАННЯ + ФОРМАТУВАННЯ")
         else:
             self.edit_focus_lock = False
-            focused = self.win_mgr.focus_game_window()
-            if focused:
-                print("[HOTKEY] F8: увімкнено БОЙОВИЙ режим, форматування вимкнено")
-            else:
-                print("[HOTKEY] F8: увімкнено БОЙОВИЙ режим (вікно гри не знайдено)")
+            self.win_mgr.focus_game_window()
 
     def on_map_select(self, event=None):
         self.root.focus_set()
@@ -782,11 +775,8 @@ class WotAssistantHQ:
         keyboard.add_hotkey('e', lambda: self.safe_execute(self.toggle_editor), suppress=False)
         try:
             keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
-            print("[HOTKEY] ФОРМАТУВАННЯ: F8")
         except Exception as e:
             keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
-            print(f"[HOTKEY] F8 недоступний: {e}")
-            print("[HOTKEY] Fallback форматування: Ctrl+E")
         keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self._handle_ctrl_up), suppress=False)
         keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self._handle_ctrl_down), suppress=False)
         keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
@@ -832,9 +822,6 @@ class WotAssistantHQ:
     def _on_startup_ready(self):
         """Startup data checks complete → launch AI → then close splash."""
         self._startup_ready_at = time.time()
-        lang_code = getattr(self.locale, 'lang', '?')
-        test_key = self.t('ui', 'fetching_info')
-        print(f"[INIT] lang={lang_code}, fetching_info='{test_key}'")
         if hasattr(self, 'stats_ai_module') and not self.stats_ai_module.needs_ai_refresh():
             print("[INIT] Кеш свіжий, AI не потрібен")
             try:
@@ -968,7 +955,6 @@ class WotAssistantHQ:
             if hasattr(self, "splash"):
                 if self.splash and self.splash.winfo_exists():
                     self.splash.destroy()
-                    print("[INIT] Splash знищено")
                 if hasattr(self, "splash"):
                     try:
                         del self.splash

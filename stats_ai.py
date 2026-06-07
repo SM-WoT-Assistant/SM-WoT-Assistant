@@ -2889,7 +2889,6 @@ class StatsAI:
             print("[AI Browser] fetch in progress, returning")
             return
         self._ai_fetch_in_progress = True
-        print("[AI Browser] progress_cb=", progress_cb is not None, "done_cb=", done_cb is not None)
         self.update_status_bar(self.locale_manager.t_ui('data_updating'), "#ffaa00")
 
         if prompt:
@@ -2932,28 +2931,19 @@ class StatsAI:
                     line = line.strip()
                     if 'RESPONSE_READY' in line:
                         break
-                    if line.startswith('ERROR:') or line.startswith('[AI Browser]'):
-                        print(f"[AI Browser] sub: {line}", flush=True)
                     if line and not line.startswith('[AI Browser]') and not line.startswith('ERROR:'):
                         tank_lines.append(line)
 
                 if tank_lines:
                     combined = '\n'.join(tank_lines)
-                    print(f"[AI DEBUG] tank_lines count: {len(tank_lines)}")
-                    print(f"[AI DEBUG] raw text (first 600): {repr(combined[:600])}")
                     if progress_cb:
                         progress_cb(70, self.locale_manager.t_ui('processing'))
                     parse_event = threading.Event()
-                    print("[AI DEBUG] Scheduling process_ai_response via root.after(0, ...)")
                     self.root.after(0, lambda t=combined, ev=parse_event: [
-                        print(f"[AI DEBUG] process_ai_response START"),
                         self.process_ai_response(t),
-                        print(f"[AI DEBUG] process_ai_response DONE, popular_tanks={len(self.popular_tanks)}"),
                         ev.set()
                     ])
-                    print("[AI DEBUG] Waiting for parse_event...")
                     parse_event.wait(timeout=30)
-                    print(f"[AI DEBUG] parse_event done, popular_tanks={len(self.popular_tanks)}")
                     if progress_cb:
                         progress_cb(95, self.locale_manager.t_ui('ready'))
                 else:
@@ -2988,7 +2978,6 @@ class StatsAI:
 
     def process_ai_response(self, response_text):
         """Обробляє відповідь від AI і оновлює популярні танки"""
-        print(f"[AI DEBUG] process_ai_response ENTER, text len={len(response_text)}")
         try:
             tank_names = []
             lines = response_text.split('\n')
@@ -3045,16 +3034,12 @@ class StatsAI:
                     with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
                         json.dump(cache_data, f, ensure_ascii=False, indent=2)
                 self.popular_tanks = [t['tag'] for t in tanks]
-                print(f"[AI DEBUG] popular_tanks set: {len(self.popular_tanks)} tanks, first 5: {self.popular_tanks[:5]}")
                 self.refresh_ai_view()
                 self.update_status_bar(f"✅ Знайдено {len(tanks)} танків", "#00cc00")
             else:
-                print("[AI DEBUG] No valid tanks found")
                 self.update_status_bar("❌ Не знайдено назв танків", "red")
             self._re_enable_ui()
-            print("[AI DEBUG] process_ai_response COMPLETE")
         except Exception as e:
-            print(f"[AI DEBUG] process_ai_response EXCEPTION: {e}")
             import traceback
             traceback.print_exc()
             self.update_status_bar(f"❌ {str(e)}", "red")

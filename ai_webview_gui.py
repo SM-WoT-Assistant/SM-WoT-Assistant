@@ -145,7 +145,6 @@ def main():
         today = date.today().strftime("%Y-%m-%d")
         prompt = f"{today}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
-    print(f"[AI Browser] prompt: {prompt[:80]}...", flush=True)
     app = QApplication(sys.argv)
     window = AIBrowserWindow(prompt)
     window.showMinimized()
