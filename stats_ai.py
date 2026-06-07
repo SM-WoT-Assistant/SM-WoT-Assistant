@@ -1004,7 +1004,11 @@ class StatsAI:
         items_to_show = []
         if is_default:
             for tag in self.popular_tanks:
-                if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
+                if tag in self.tank_db:
+                    data = self.tank_db[tag]
+                    tier = int(data.get("tier", 0) or 0)
+                    if 8 <= tier <= 11:
+                        items_to_show.append((tag, data))
 
             if not self.popular_tanks:
                 for widget in self.ai_grid_frame.winfo_children():
@@ -1025,10 +1029,13 @@ class StatsAI:
             if len(items_to_show) > target_count:
                 items_to_show = items_to_show[:target_count]
             elif len(items_to_show) < target_count:
-                for tag, data in self.tank_db.items():
+                fill_items = [(t, d) for t, d in self.tank_db.items()
+                              if t not in self.popular_tanks and isinstance(d, dict)
+                              and 8 <= int(d.get("tier", 0) or 0) <= 11]
+                fill_items.sort(key=_tier_sort, reverse=True)
+                for tag, data in fill_items:
                     if len(items_to_show) >= target_count: break
-                    if tag not in self.popular_tanks:
-                        items_to_show.append((tag, data))
+                    items_to_show.append((tag, data))
         else:
             for tag, data in self.tank_db.items():
                 if not isinstance(data, dict):
@@ -1069,18 +1076,33 @@ class StatsAI:
         
         if is_default:
             for tag in self.popular_tanks:
-                if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
+                if tag in self.tank_db:
+                    data = self.tank_db[tag]
+                    tier = int(data.get("tier", 0) or 0)
+                    if 8 <= tier <= 11:
+                        items_to_show.append((tag, data))
             
+            def _tier_sort(item):
+                d = item[1] if isinstance(item[1], dict) else {}
+                try:
+                    return int(d.get("tier", 0) or 0)
+                except Exception:
+                    return 0
+            items_to_show.sort(key=_tier_sort, reverse=True)
+
             target_rows = max(1, round(30 / max_cols))
             target_count = target_rows * max_cols
             
             if len(items_to_show) > target_count:
                 items_to_show = items_to_show[:target_count]
             elif len(items_to_show) < target_count:
-                for tag, data in self.tank_db.items():
+                fill_items = [(t, d) for t, d in self.tank_db.items()
+                              if t not in self.popular_tanks and isinstance(d, dict)
+                              and 8 <= int(d.get("tier", 0) or 0) <= 11]
+                fill_items.sort(key=_tier_sort, reverse=True)
+                for tag, data in fill_items:
                     if len(items_to_show) >= target_count: break
-                    if tag not in self.popular_tanks:
-                        items_to_show.append((tag, data))
+                    items_to_show.append((tag, data))
         else:
             for tag, data in self.tank_db.items():
                 if not isinstance(data, dict):
