@@ -56,7 +56,9 @@ class MapPainter:
     
     def set_tool(self, tool):
         self.active_tool = tool
-        self.app.status_label.config(text=f"ІНСТРУМЕНТ: {tool.upper() if tool else 'ВИМКНЕНО'}")
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette or not palette.is_in_edit_mode():
+            self.app.status_label.config(text=f"ІНСТРУМЕНТ: {tool.upper() if tool else 'ВИМКНЕНО'}")
         
     def clear_all(self):
         if not self.app.current_map_eng: return
@@ -218,65 +220,67 @@ class MapPainter:
                 continue
             coords = obj.get("coords", [])
 
-            found_special = False
+            special_kind = None
+            special_dist = float('inf')
 
             if obj.get("type") == "marker" and obj.get("text"):
                 tx, ty = self._get_marker_text_pos(obj, cw, ch)
                 if tx is not None:
-                    text_dist = math.hypot((tx / cw) - click_px, (ty / ch) - click_py)
-                    if text_dist < min_dist:
-                        min_dist = text_dist
-                        closest_idx = i
-                        closest_kind = "marker_text"
-                        found_special = True
+                    d = math.hypot((tx / cw) - click_px, (ty / ch) - click_py)
+                    if d < special_dist:
+                        special_dist = d
+                        special_kind = "marker_text"
 
             if obj.get("type") == "marker" and obj.get("classes"):
                 icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch)
                 if icon_x is not None:
-                    icon_dist = math.hypot((icon_x / cw) - click_px, (icon_y / ch) - click_py)
-                    if icon_dist < min_dist:
-                        min_dist = icon_dist
-                        closest_idx = i
-                        closest_kind = "class_icons"
-                        found_special = True
+                    d = math.hypot((icon_x / cw) - click_px, (icon_y / ch) - click_py)
+                    if d < special_dist:
+                        special_dist = d
+                        special_kind = "class_icons"
 
             if obj.get("type") == "marker" and len(coords) >= 4:
-                tip_dist = math.hypot(coords[2] - click_px, coords[3] - click_py)
-                if tip_dist < min_dist:
-                    min_dist = tip_dist
-                    closest_idx = i
-                    closest_kind = "marker_tip"
-                    found_special = True
+                d = math.hypot(coords[2] - click_px, coords[3] - click_py)
+                if d < special_dist:
+                    special_dist = d
+                    special_kind = "marker_tip"
 
-            if found_special:
-                continue
-
-            if obj.get("type") == "marker" and len(coords) >= 4:
-                dist = min(
+                general_dist = min(
                     math.hypot(coords[0] - click_px, coords[1] - click_py),
                     math.hypot(coords[2] - click_px, coords[3] - click_py),
                     self._distance_to_segment(click_px, click_py, coords[0], coords[1], coords[2], coords[3]),
                 )
+
+                if special_kind is not None and special_dist < threshold_norm:
+                    obj_best_kind = special_kind
+                    obj_best_dist = special_dist
+                else:
+                    obj_best_kind = "object"
+                    obj_best_dist = general_dist
+
             elif obj.get("type") == "text" and len(coords) >= 2:
                 tx_norm, ty_norm = coords[0], coords[1]
-                dist = math.hypot(tx_norm - click_px, ty_norm - click_py)
+                obj_best_dist = math.hypot(tx_norm - click_px, ty_norm - click_py)
+                obj_best_kind = "object"
                 poi = obj.get("poi", [])
                 txt = obj.get("text", "")
                 if poi:
                     d = math.hypot(tx_norm - click_px, ty_norm - 24/ch - click_py)
-                    if d < dist:
-                        dist = d
+                    if d < obj_best_dist:
+                        obj_best_dist = d
                 if txt:
                     ofs = 15/ch if poi else 0
                     d = math.hypot(tx_norm - click_px, ty_norm + ofs - click_py)
-                    if d < dist:
-                        dist = d
+                    if d < obj_best_dist:
+                        obj_best_dist = d
             else:
                 continue
-            if dist < min_dist:
-                min_dist = dist
+
+            if obj_best_dist < min_dist:
+                min_dist = obj_best_dist
                 closest_idx = i
-                closest_kind = "object"
+                closest_kind = obj_best_kind
+
         return closest_idx, closest_kind
 
     def on_move_press(self, event):
@@ -496,6 +500,8 @@ class MapPainter:
         needs_show = palette.state() == 'withdrawn'
         palette.exit_edit_mode()
         self._editing_idx = idx
+        label = "Маркер" if obj["type"] == "marker" else "Текст/Знак"
+        self.app.status_label.config(text=f"РЕДАГУВАННЯ: {label}", fg="#ffff00")
         palette.load_object(obj)
         if needs_show:
             palette.show()
@@ -514,6 +520,11 @@ class MapPainter:
         del objects[idx]
         self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
         self._editing_idx = -1
+        if hasattr(self.app, 'status_label'):
+            self.app.status_label.config(text="")
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            palette._edit_obj = None
         self.data_mgr.save_drawings(self.drawings)
         self.redraw()
 
@@ -585,7 +596,6 @@ class MapPainter:
         return True
 
     def redraw(self, cw=None, ch=None):
-        self.canvas.delete("painter_obj")
         if not self.app.current_map_eng: return
         map_id = self.app.current_map_eng
         if map_id not in self.drawings: return
@@ -595,6 +605,7 @@ class MapPainter:
             ch = self.canvas.winfo_height()
         if cw < 10 or ch < 10: return
 
+        self.canvas.delete("painter_obj")
         sc = min(cw, ch) / 800.0
         
         for obj in self.drawings[map_id]:
@@ -646,7 +657,7 @@ class MapPainter:
                     items = []
                     total_w = 0
                     XVM_SCALE = {
-                        0x2B: 1.4,
+                        0x2B: 0.7,
                         0x2D: 0.7,
                         0x2E: 0.7,
                         0x3A: 0.7,
@@ -657,12 +668,12 @@ class MapPainter:
                         0x50: 0.7,
                         0x52: 0.7,
                         0x5C: 0.7,
-                        0x6F: 1.4,
+                        0x6F: 0.7,
                         0x2C: 0.7,
                     }
                     for code in poi_data:
                         if code == "tree":
-                            sz = int(poi_base * 1.0)
+                            sz = int(poi_base * 0.5)
                             items.append({"tree": True, "sz": sz, "w": sz + int(4 * sc)})
                             total_w += sz + int(4 * sc)
                             continue
@@ -692,22 +703,4 @@ class MapPainter:
                     ty = y + int(15 * sc) if poi_data else y
                     self.canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
 
-        if self._editing_idx >= 0 and self._editing_idx < len(self.drawings[map_id]):
-            sobj = self.drawings[map_id][self._editing_idx]
-            if self.is_visible(sobj):
-                scoords = sobj["coords"]
-                spad = max(10, int(18 * sc))
-                if sobj["type"] == "marker" and len(scoords) >= 4:
-                    sx1, sy1 = scoords[0]*cw, scoords[1]*ch
-                    sx2, sy2 = scoords[2]*cw, scoords[3]*ch
-                    self.canvas.create_rectangle(
-                        min(sx1, sx2)-spad, min(sy1, sy2)-spad,
-                        max(sx1, sx2)+spad, max(sy1, sy2)+spad,
-                        outline="#ffff00", width=2, dash=(4, 2), tags="painter_obj"
-                    )
-                elif sobj["type"] == "text" and len(scoords) >= 2:
-                    sx, sy = scoords[0]*cw, scoords[1]*ch
-                    self.canvas.create_rectangle(
-                        sx-spad, sy-spad, sx+spad, sy+spad,
-                        outline="#ffff00", width=2, dash=(4, 2), tags="painter_obj"
-                    )
+

@@ -16,32 +16,7 @@
             ]
         }
     ],
-    "105_germany": [
-        {
-            "type": "text",
-            "modes": [],
-            "classes": [],
-            "text": "",
-            "poi": [],
-            "color": "#ffaa00",
-            "coords": [
-                0.425,
-                0.3155291790306627
-            ]
-        },
-        {
-            "type": "text",
-            "modes": [],
-            "classes": [],
-            "text": "",
-            "poi": [],
-            "color": "#ffaa00",
-            "coords": [
-                0.372,
-                0.3016815034619189
-            ]
-        }
-    ],
+    "105_germany": [],
     "05_prohorovka": [
         {
             "type": "marker",

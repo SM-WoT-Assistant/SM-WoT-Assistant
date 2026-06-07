@@ -13,7 +13,7 @@ import threading
 import time
 import subprocess
 import tkinter as tk
-from tkinter import ttk, filedialog, messagebox
+from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageOps, ImageEnhance
 import keyboard
 
@@ -289,15 +289,34 @@ class WotAssistantHQ:
                 self.map_mgr.run_map_updater()
 
     def ask_clear_confirm(self, map_title, on_done):
-        """Підтвердження очищення міток (викликається з painter.MapPainter.clear_all)."""
-        self.dialog_open = True
-        ok = messagebox.askyesno(
-            "Очистити малюнки",
-            f"Видалити всі мітки на карті «{map_title}»?",
-            parent=self.root,
-        )
-        self.dialog_open = False
-        on_done(ok)
+        dlg = tk.Toplevel(self.root)
+        dlg.title("\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u043c\u0430\u043b\u044e\u043d\u043a\u0438")
+        dlg.configure(bg="#2a2a2a")
+        dlg.resizable(False, False)
+        dlg.minsize(300, 120)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+
+        cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
+        cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 60
+        dlg.geometry(f"+{cx}+{cy}")
+
+        tk.Label(dlg, text=f"\u0412\u0438\u0434\u0430\u043b\u0438\u0442\u0438 \u0432\u0441\u0456 \u043c\u0456\u0442\u043a\u0438 \u043d\u0430 \u043a\u0430\u0440\u0442\u0456 \u00ab{map_title}\u00bb?",
+                 font=("Arial", 10), bg="#2a2a2a", fg="#cccccc").pack(pady=(20, 15))
+
+        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf.pack(pady=(0, 15))
+        result = {"ok": False}
+        def on_yes(): result["ok"] = True; dlg.destroy()
+        def on_no(): dlg.destroy()
+
+        tk.Button(bf, text="  \u0422\u0430\u043a  ", bg="#555", fg="white", bd=0,
+                  font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
+        tk.Button(bf, text="  \u041d\u0456  ", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=15, pady=4, command=on_no).pack(side="left", padx=10)
+
+        self.root.wait_window(dlg)
+        on_done(result["ok"])
 
     def ask_ai_key(self):
         from tkinter import simpledialog

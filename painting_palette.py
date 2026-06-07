@@ -73,6 +73,12 @@ class DrawingPalette(tk.Toplevel):
 
         all_tools = [
             ("marker", chr(0xF01B), FONT_AWE),
+            (0x3A, chr(0x3A), "XVMSymbol"),
+            (0x3B, chr(0x3B), "XVMSymbol"),
+            (0x3F, chr(0x3F), "XVMSymbol"),
+            (0x2E, chr(0x2E), "XVMSymbol"),
+            (0x2D, chr(0x2D), "XVMSymbol"),
+            ("tree", chr(0xF18C), FONT_AWE),
             (0x2B, chr(0x2B), "XVMSymbol"),
             (0x42, chr(0x42), "XVMSymbol"),
             (0x45, chr(0x45), "XVMSymbol"),
@@ -81,25 +87,21 @@ class DrawingPalette(tk.Toplevel):
             (0x5C, chr(0x5C), "XVMSymbol"),
             (0x6F, chr(0x6F), "XVMSymbol"),
             (0x2C, chr(0x2C), "XVMSymbol"),
-            ("tree", chr(0xF18C), FONT_AWE),
-            (0x3A, chr(0x3A), "XVMSymbol"),
-            (0x3B, chr(0x3B), "XVMSymbol"),
-            (0x3F, chr(0x3F), "XVMSymbol"),
-            (0x2E, chr(0x2E), "XVMSymbol"),
-            (0x2D, chr(0x2D), "XVMSymbol"),
         ]
 
-        mid = (len(all_tools) + 1) // 2
+        mid = 6
         rows = [all_tools[:mid], all_tools[mid:]]
 
         for row_items in rows:
             r = tk.Frame(tb, bg="#1a1a1a")
-            r.pack(side="top", fill="x")
+            r.pack(side="top", fill="x", pady=1)
             for code, text, font_name in row_items:
-                btn_width = 3 if font_name == FONT_AWE else 2
-                btn = tk.Button(r, text=text, font=(font_name, 16), bg="#333", fg="#aaa",
-                                bd=0, width=btn_width, command=lambda c=code: self._on_toolbar_click(c))
-                btn.pack(side="left", padx=1)
+                btn_frame = tk.Frame(r, bg="#1a1a1a", width=38, height=38)
+                btn_frame.pack(side="left", padx=1)
+                btn_frame.pack_propagate(False)
+                btn = tk.Button(btn_frame, text=text, font=(font_name, 16), bg="#333", fg="#aaa",
+                                bd=0, command=lambda c=code: self._on_toolbar_click(c))
+                btn.pack(expand=True, fill="both")
                 self._toolbar_buttons[code] = btn
 
         self._tb_marker = self._toolbar_buttons.get("marker")
@@ -180,6 +182,10 @@ class DrawingPalette(tk.Toplevel):
         tk.Button(bf, text="\u0406\u043c\u043f\u043e\u0440\u0442 (.json)", bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
 
+        self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
+                                     height=1, anchor="w")
+        self._status_lbl.pack(fill="x", padx=8, pady=(2, 2))
+
     def _on_toolbar_click(self, code):
         self._lift_self()
         if self._edit_obj:
@@ -195,6 +201,8 @@ class DrawingPalette(tk.Toplevel):
         self._active_tool_code = code
         self._update_toolbar_buttons()
         self.painter.set_tool("marker" if code == "marker" else "text")
+        self.current_color = "#ffaa00" if code == "marker" else "#00ff00"
+        self._color_preview.config(fg=self.current_color)
 
     def _deactivate_tool(self):
         self._active_tool_code = None
@@ -232,6 +240,8 @@ class DrawingPalette(tk.Toplevel):
             pass
 
     def _on_any_change(self, *args):
+        if getattr(self, '_loading_obj', False):
+            return
         self._lift_self()
         if self._edit_obj:
             self._write_to_object(self._edit_obj)
@@ -271,6 +281,7 @@ class DrawingPalette(tk.Toplevel):
         self.app.import_external_tactic()
 
     def _close(self):
+        self.exit_edit_mode()
         self.withdraw()
         self._saved_pos = self.geometry()
         self._save_position()
@@ -334,42 +345,52 @@ class DrawingPalette(tk.Toplevel):
     # --- Public API ---
 
     def load_object(self, obj):
-        self._edit_obj = obj
-        for k, v in self.mode_vars.items():
-            v.set(k in obj.get("modes", []))
-        for k, v in self.class_vars.items():
-            v.set(k in obj.get("classes", []))
-        self.text_var.set(obj.get("text", ""))
-        self.current_color = obj.get("color", "#ffaa00")
-        self._color_preview.config(fg=self.current_color)
+        self._loading_obj = True
+        try:
+            self._edit_obj = obj
+            for k, v in self.mode_vars.items():
+                v.set(k in obj.get("modes", []))
+            for k, v in self.class_vars.items():
+                v.set(k in obj.get("classes", []))
+            self.text_var.set(obj.get("text", ""))
+            self.current_color = obj.get("color", "#ffaa00")
+            self._color_preview.config(fg=self.current_color)
 
-        if obj["type"] == "text":
-            poi_data = obj.get("poi", [])
-            if isinstance(poi_data, str):
-                if poi_data.startswith("xvm_"):
-                    poi_data = [int(poi_data.split("_")[1], 16)]
+            if obj["type"] == "text":
+                poi_data = obj.get("poi", [])
+                if isinstance(poi_data, str):
+                    if poi_data.startswith("xvm_"):
+                        poi_data = [int(poi_data.split("_")[1], 16)]
+                    else:
+                        poi_data = []
+                if "tree" in poi_data:
+                    self._highlight_toolbar_button("tree")
+                elif poi_data:
+                    code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
+                    self._highlight_toolbar_button(code)
                 else:
-                    poi_data = []
-            if "tree" in poi_data:
-                self._highlight_toolbar_button("tree")
-            elif poi_data:
-                code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
-                self._highlight_toolbar_button(code)
+                    self._highlight_toolbar_button(0x2B)
             else:
-                self._highlight_toolbar_button(0x2B)
-        else:
-            self._highlight_toolbar_button("marker")
-        self.painter.set_tool(None)
-        self._del_frame.pack(fill="x")
+                self._highlight_toolbar_button("marker")
+            self.painter.set_tool(None)
+            self._del_frame.pack(fill="x")
+            label = "Маркер" if obj["type"] == "marker" else "Текст/Знак"
+            self._status_lbl.config(text=f"Редагування: {label}")
+        finally:
+            self._loading_obj = False
 
     def exit_edit_mode(self):
-        if self._edit_obj:
-            self._write_to_object(self._edit_obj)
-            self.painter.redraw()
-            self.painter.data_mgr.save_drawings(self.painter.drawings)
+        if self._edit_obj is None:
+            return
+        self._write_to_object(self._edit_obj)
+        self.painter.redraw()
+        self.painter.data_mgr.save_drawings(self.painter.drawings)
         self._edit_obj = None
         self.painter._editing_idx = -1
         self._del_frame.pack_forget()
+        if hasattr(self.app, 'status_label'):
+            self.app.status_label.config(text="")
+        self._status_lbl.config(text="")
 
     def _write_to_object(self, obj):
         obj["modes"] = [k for k, v in self.mode_vars.items() if v.get()]
