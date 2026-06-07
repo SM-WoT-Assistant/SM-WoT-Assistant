@@ -2955,7 +2955,7 @@ class StatsAI:
 
                 out = ""
                 try:
-                    out, _ = proc.communicate(timeout=45)
+                    out, _ = proc.communicate(timeout=20)
                 except subprocess.TimeoutExpired:
                     print("[AI Browser] TIMEOUT (45s) — killing subprocess", flush=True)
                     proc.kill()
