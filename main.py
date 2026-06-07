@@ -575,6 +575,7 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
+        self.painter.redraw()
 
     def _handle_ctrl_up(self):
         import time

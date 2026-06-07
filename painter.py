@@ -600,7 +600,6 @@ class MapPainter:
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
         map_id = self.app.current_map_eng
-        if map_id not in self.drawings: return
         
         if cw is None or ch is None:
             cw = self.canvas.winfo_width()
@@ -608,6 +607,7 @@ class MapPainter:
         if cw < 10 or ch < 10: return
 
         self.canvas.delete("painter_obj")
+        if map_id not in self.drawings: return
         sc = min(cw, ch) / 800.0
         
         for obj in self.drawings[map_id]:
