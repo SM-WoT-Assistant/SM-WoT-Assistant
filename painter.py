@@ -390,7 +390,9 @@ class MapPainter:
         return "break"
 
     def _draw_class_icons(self, x, y, class_list, color, sc=1.0):
-        ordered_classes = [cls for cls in ("ЛТ", "СТ", "ТТ", "ПТ", "САУ") if cls in class_list]
+        active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
+        ordered_classes = [cls for cls in ("ЛТ", "СТ", "ТТ", "ПТ", "САУ")
+                           if cls in class_list and cls in active_classes]
         if not ordered_classes:
             return
 
