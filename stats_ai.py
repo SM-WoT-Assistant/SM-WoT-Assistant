@@ -1019,7 +1019,7 @@ class StatsAI:
                 return int(d.get("tier", 0) or 0)
             items_to_show.sort(key=_tier_sort, reverse=True)
 
-            target_rows = max(1, round(20 / max_cols))
+            target_rows = max(1, round(30 / max_cols))
             target_count = target_rows * max_cols
 
             if len(items_to_show) > target_count:
@@ -1071,7 +1071,7 @@ class StatsAI:
             for tag in self.popular_tanks:
                 if tag in self.tank_db: items_to_show.append((tag, self.tank_db[tag]))
             
-            target_rows = max(1, round(20 / max_cols))
+            target_rows = max(1, round(30 / max_cols))
             target_count = target_rows * max_cols
             
             if len(items_to_show) > target_count:
@@ -2896,7 +2896,7 @@ class StatsAI:
             ai_prompt = prompt
         else:
             today_str = date.today().strftime("%Y-%m-%d")
-            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 40 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
+            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
         def run_browser_process():
             try:
