@@ -96,8 +96,9 @@ class DrawingPalette(tk.Toplevel):
             r = tk.Frame(tb, bg="#1a1a1a")
             r.pack(side="top", fill="x")
             for code, text, font_name in row_items:
+                btn_width = 3 if font_name == FONT_AWE else 2
                 btn = tk.Button(r, text=text, font=(font_name, 16), bg="#333", fg="#aaa",
-                                bd=0, width=2, command=lambda c=code: self._on_toolbar_click(c))
+                                bd=0, width=btn_width, command=lambda c=code: self._on_toolbar_click(c))
                 btn.pack(side="left", padx=1)
                 self._toolbar_buttons[code] = btn
 

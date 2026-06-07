@@ -2771,8 +2771,16 @@ class StatsAI:
                     encoding='utf-8', errors='replace',
                 )
                 self._ai_build_proc = proc
+                out = ""
+                try:
+                    out, _ = proc.communicate(timeout=120)
+                except subprocess.TimeoutExpired:
+                    print(f"[AI Tank Build] TIMEOUT (120s) for {tag} — killing subprocess", flush=True)
+                    proc.kill()
+                    out, _ = proc.communicate()
+
                 lines = []
-                for line in proc.stdout:
+                for line in out.split('\n'):
                     line = line.strip()
                     if 'RESPONSE_READY' in line:
                         break
@@ -2911,11 +2919,21 @@ class StatsAI:
                 if progress_cb:
                     progress_cb(25, self.locale_manager.t_ui('fetching_info'))
 
+                out = ""
+                try:
+                    out, _ = proc.communicate(timeout=45)
+                except subprocess.TimeoutExpired:
+                    print("[AI Browser] TIMEOUT (45s) — killing subprocess", flush=True)
+                    proc.kill()
+                    out, _ = proc.communicate()
+
                 tank_lines = []
-                for line in proc.stdout:
+                for line in out.split('\n'):
                     line = line.strip()
                     if 'RESPONSE_READY' in line:
                         break
+                    if line.startswith('ERROR:') or line.startswith('[AI Browser]'):
+                        print(f"[AI Browser] sub: {line}", flush=True)
                     if line and not line.startswith('[AI Browser]') and not line.startswith('ERROR:'):
                         tank_lines.append(line)
 
@@ -2947,18 +2965,14 @@ class StatsAI:
                 except Exception:
                     pass
 
-            except subprocess.TimeoutExpired:
-                print("[AI Browser] TIMEOUT (90s)")
-                self.root.after(0, lambda: self.update_status_bar("❌ Час очікування AI", "red"))
-                if self._ai_browser_process:
-                    self._ai_browser_process.kill()
             except Exception as e:
                 print(f"[AI Browser] ERROR: {e}")
                 self.root.after(0, lambda: self.update_status_bar(f"❌ {str(e)[:50]}", "red"))
             finally:
-                if self._ai_browser_process:
+                proc = getattr(self, '_ai_browser_process', None)
+                if proc:
                     try:
-                        self._ai_browser_process.kill()
+                        proc.kill()
                     except Exception:
                         pass
                 self._ai_browser_process = None

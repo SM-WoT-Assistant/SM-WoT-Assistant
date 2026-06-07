@@ -841,7 +841,7 @@ class WotAssistantHQ:
                 done_cb=self._on_ai_ready,
             )
             self._ai_creep_id = self.root.after(1000, self._ai_progress_creep)
-            self._ai_timeout_id = self.root.after(120000, self._ai_safety_timeout)
+            self._ai_timeout_id = self.root.after(60000, self._ai_safety_timeout)
         else:
             self.finish_startup_splash()
 
@@ -853,8 +853,8 @@ class WotAssistantHQ:
         if elapsed < 20:
             pct = base + (93 - base) * elapsed / 20
         else:
-            pct = 93 + 7 * min(elapsed - 20, 30) / 30
-        pct = min(100, pct)
+            pct = 93 + 6 * min(elapsed - 20, 30) / 30
+        pct = min(99, pct)
         self._startup_target_percent = int(pct)
         try:
             self._startup_creep_active = True

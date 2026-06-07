@@ -107,32 +107,19 @@ class AIBrowserWindow(QWidget):
             QTimer.singleShot(1000, self.close)
             return
 
-        if self._poll_count <= 60:
-            js = """
-            (function() {
-                var div = document.querySelector('div.jUiaTd');
-                if (div && div.textContent.trim().length > 0) return div.textContent.trim();
-                var body = document.body.innerText;
-                var idx = body.lastIndexOf('Build Generated:');
-                if (idx >= 0) {
-                    var text = body.substring(idx);
-                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
-                }
-                return '';
-            })();
-            """
-        else:
-            js = """
-            (function() {
-                var body = document.body.innerText;
-                var idx = body.lastIndexOf('Build Generated:');
-                if (idx >= 0) {
-                    var text = body.substring(idx);
-                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
-                }
-                return '';
-            })();
-            """
+        js = """
+        (function() {
+            var div = document.querySelector('div.jUiaTd');
+            if (div && div.textContent.trim().length > 0) return div.textContent.trim();
+            var body = document.body.innerText;
+            var idx = body.lastIndexOf('Build Generated:');
+            if (idx >= 0) {
+                var text = body.substring(idx);
+                if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
+            }
+            return '';
+        })();
+        """
         self.browser.page().runJavaScript(js, self.check_response)
 
     def check_response(self, text):
