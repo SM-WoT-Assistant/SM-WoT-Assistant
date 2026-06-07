@@ -2942,32 +2942,18 @@ class StatsAI:
                     except Exception:
                         pass
                     if file_out:
-                        print(f"[DIAG] file: {len(file_out)} chars, {len(file_out.splitlines())} lines", flush=True)
                         out = file_out
-
-                print(f"[DIAG] communicate: {len(out)} chars, {len(out.splitlines())} lines", flush=True)
-                print(f"[DIAG] first 500: {repr(out[:500])}", flush=True)
 
                 tank_lines = []
                 for line in out.split('\n'):
                     line = line.strip()
                     if 'RESPONSE_READY' in line:
-                        print("[DIAG] Found RESPONSE_READY, breaking", flush=True)
                         break
-                    if line.startswith('[AI Browser]'):
-                        print(f"[DIAG] SKIP [AI Browser]: {line[:80]}", flush=True)
-                        continue
-                    if line.startswith('ERROR:'):
-                        print(f"[DIAG] SKIP ERROR: {line[:80]}", flush=True)
-                        continue
-                    if line:
+                    if line and not line.startswith('[AI Browser]') and not line.startswith('ERROR:'):
                         tank_lines.append(line)
 
-                print(f"[DIAG] tank_lines after filter: {len(tank_lines)} lines", flush=True)
                 if tank_lines:
-                    print(f"[DIAG] first 5: {tank_lines[:5]}", flush=True)
                     combined = '\n'.join(tank_lines)
-                    print(f"[AI Response] raw ({len(tank_lines)} lines): {repr(combined[:300])}")
                     if progress_cb:
                         progress_cb(70, self.locale_manager.t_ui('processing'))
                     parse_event = threading.Event()
@@ -3033,22 +3019,20 @@ class StatsAI:
                     'tier 8', 'tier 9', 'tier 10', 'tier 11',
                     'note:', 'please note', 'disclaimer',
                     'i hope', 'let me', 'do you', 'would you', 'could you',
+                    'reddit', 'www.', '.com', '.org', 'sign in', 'sign up',
+                    'world of tanks', 'worldoftanks',
                 ]
                 blocked = False
                 for sw in skip_words:
                     if sw in low:
-                        print(f"[DIAG] FILTER blocked: '{clean[:60]}' -> '{sw}'", flush=True)
                         blocked = True
                         break
                 if blocked:
                     continue
                 if len(clean) < 3 or len(clean) > 60:
-                    print(f"[DIAG] FILTER length: '{clean[:60]}' (len={len(clean)})", flush=True)
                     continue
                 if re.match(r'^[\w\s\'\-\.\/\,\:\(\)\&]+$', clean):
                     tank_names.append(clean)
-                else:
-                    print(f"[DIAG] FILTER regex: '{clean[:60]}'", flush=True)
 
             print(f"[AI Response] After filtering: {len(tank_names)} tank candidates")
             if tank_names:
@@ -3062,7 +3046,7 @@ class StatsAI:
                     if tag not in seen:
                         seen.add(tag)
                         raw_tanks.append({"name": n, "tag": tag})
-                raw_tanks = raw_tanks[:30]
+                raw_tanks = raw_tanks[:50]
                 valid_tanks = [t for t in raw_tanks if t['tag'] in self.tank_db]
                 print(f"[AI Response] {len(raw_tanks)} raw, {len(valid_tanks)} valid (found in DB)")
                 tanks = valid_tanks[:30]
