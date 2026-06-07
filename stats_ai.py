@@ -98,7 +98,7 @@ class StatsAI:
             if cached_tanks:
                 self._cache_data = {"tanks": [{"tag": t} for t in cached_tanks], "updated": updated, "fail_count": fail_count}
                 self.popular_tanks = cached_tanks
-                self._cache_fresh = not _is_cache_expired(updated)
+                self._cache_fresh = not _is_cache_expired(updated, max_days=30)
                 if self._cache_fresh:
                     print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу (оновлено: {updated})")
                 else:

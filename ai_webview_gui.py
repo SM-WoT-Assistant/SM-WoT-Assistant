@@ -30,7 +30,7 @@ class AIBrowserWindow(QWidget):
         self.setStyleSheet("background-color: white;")
 
         # Hide taskbar icon via Windows API after window is created
-        # QTimer.singleShot(200, self._hide_taskbar_icon)
+        QTimer.singleShot(200, self._hide_taskbar_icon)
 
         profile = QWebEngineProfile.defaultProfile()
         profile.setHttpUserAgent(REAL_UA)
@@ -165,7 +165,7 @@ def main():
     print(f"[AI Browser] prompt: {prompt[:80]}...", flush=True)
     app = QApplication(sys.argv)
     window = AIBrowserWindow(prompt)
-    window.show()
+    window.showMinimized()
     app.exec()
 
 
