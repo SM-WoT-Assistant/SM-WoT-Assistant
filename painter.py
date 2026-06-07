@@ -465,11 +465,11 @@ class MapPainter:
         self.redraw()
         self.canvas.delete("temp_draw")
         self.temp_item = None
+        palette._deactivate_tool()
         if needs_show:
             palette.show()
             if hasattr(self.app, 'draw_btn'):
                 self.app.draw_btn.config(bg="#ffaa00", fg="black")
-        palette._deactivate_tool()
         self.active_tool = None
         self.app.root.after(10, palette._lift_self)
             

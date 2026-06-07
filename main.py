@@ -175,7 +175,7 @@ class WotAssistantHQ:
         cy = self.canvas.winfo_rooty()
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
-        if cw > 10 and ch > 10:
+        if cw > 100 and ch > 100:
             self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
             self._po_win.lift()
 
@@ -220,6 +220,7 @@ class WotAssistantHQ:
     def save_settings(self):
         cx, cy = self.root.winfo_x(), self.root.winfo_y()
         if cx < -5000: return
+        if self.root.winfo_width() < 100: return
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
@@ -393,6 +394,7 @@ class WotAssistantHQ:
             if hasattr(self, '_po_win'):
                 self._po_win.deiconify()
                 self._sync_po_pos()
+                self.painter.redraw()
         elif self.active_view == "stats":
             if hasattr(self, '_po_win'):
                 self._po_win.withdraw()
