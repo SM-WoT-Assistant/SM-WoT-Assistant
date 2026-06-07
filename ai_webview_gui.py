@@ -5,6 +5,7 @@ ai_webview_gui.py - WebView для отримання даних через Goog
 """
 import sys
 import os
+import tempfile
 from datetime import date
 
 from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout
@@ -138,10 +139,13 @@ class AIBrowserWindow(QWidget):
 
     def check_response(self, text):
         if text and len(text) > 10:
+            resp_file = os.path.join(tempfile.gettempdir(), "wot_ai_response.txt")
+            with open(resp_file, 'w', encoding='utf-8') as f:
+                f.write(text)
             print(f"[AI Browser] Response received ({len(text)} chars)", flush=True)
             print(text, flush=True)
             print("[AI Browser] RESPONSE_READY", flush=True)
-            QTimer.singleShot(500, self.close)
+            os._exit(0)
         else:
             QTimer.singleShot(500, self.poll_response)
 

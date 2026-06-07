@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import tempfile
 import random
 import time
 import tkinter as tk
@@ -2931,6 +2932,18 @@ class StatsAI:
                     print("[AI Browser] TIMEOUT (45s) — killing subprocess", flush=True)
                     proc.kill()
                     out, _ = proc.communicate()
+
+                resp_file = os.path.join(tempfile.gettempdir(), "wot_ai_response.txt")
+                if os.path.exists(resp_file):
+                    with open(resp_file, 'r', encoding='utf-8') as f:
+                        file_out = f.read()
+                    try:
+                        os.remove(resp_file)
+                    except Exception:
+                        pass
+                    if file_out:
+                        print(f"[DIAG] file: {len(file_out)} chars, {len(file_out.splitlines())} lines", flush=True)
+                        out = file_out
 
                 print(f"[DIAG] communicate: {len(out)} chars, {len(out.splitlines())} lines", flush=True)
                 print(f"[DIAG] first 500: {repr(out[:500])}", flush=True)
