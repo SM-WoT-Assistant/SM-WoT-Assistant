@@ -109,24 +109,31 @@ class AIBrowserWindow(QWidget):
             QTimer.singleShot(1000, self.close)
             return
 
-        js = """
-        (function() {
-            var div = document.querySelector('div.jUiaTd');
-            if (div && div.textContent.trim().length > 0) return div.textContent.trim();
-            var container = document.querySelector('div.AgWCw');
-            if (container) return container.textContent.trim();
-            var lines = document.body.innerText.split('\\n');
-            var result = [];
-            for (var i = 0; i < lines.length; i++) {
-                var line = lines[i].trim();
-                if (line.length > 3 && line.length < 60 && /^[\\w\\s\\-\\.,\\/\\(\\)\\']+$/.test(line)) {
-                    result.push(line);
+        if self._poll_count <= 60:
+            js = """
+            (function() {
+                var div = document.querySelector('div.jUiaTd');
+                if (div) return div.textContent.trim();
+                var container = document.querySelector('div.AgWCw');
+                if (container) return container.textContent.trim();
+                return '';
+            })();
+            """
+        else:
+            js = """
+            (function() {
+                var lines = document.body.innerText.split('\\n');
+                var result = [];
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line.length > 3 && line.length < 60 && /^[\\w\\s\\-\\.,\\/\\(\\)\\']+$/.test(line)) {
+                        result.push(line);
+                    }
                 }
-            }
-            if (result.length >= 5) return result.join('\\n');
-            return '';
-        })();
-        """
+                if (result.length >= 5) return result.join('\\n');
+                return '';
+            })();
+            """
         self.browser.page().runJavaScript(js, self.check_response)
 
     def check_response(self, text):
@@ -137,6 +144,7 @@ class AIBrowserWindow(QWidget):
             print(f"[AI Browser] Response received ({len(text)} chars)", flush=True)
             print(text, flush=True)
             print("[AI Browser] RESPONSE_READY", flush=True)
+            os._exit(0)
         else:
             QTimer.singleShot(500, self.poll_response)
 
@@ -152,7 +160,7 @@ def main():
 
     if not prompt:
         today = date.today().strftime("%Y-%m-%d")
-        prompt = f"{today}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. Output ONLY the tank names — one per line, no numbering, no bullet points, no introductions, no explanations, no other text whatsoever."
+        prompt = f"{today}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
     print(f"[AI Browser] prompt: {prompt[:80]}...", flush=True)
     app = QApplication(sys.argv)

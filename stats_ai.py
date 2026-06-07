@@ -975,50 +975,22 @@ class StatsAI:
 
     def _find_tank_tag(self, name, lookup):
         key = name.strip().lower()
-        key_norm = re.sub(r"['\"]", '', key)
-        key_norm = re.sub(r'[\-_,\.\/]', ' ', key_norm)
-        key_norm = re.sub(r'\s+', ' ', key_norm).strip()
-
         if key in lookup:
             return lookup[key]
-        if key_norm in lookup:
-            return lookup[key_norm]
-
-        key_words = set(key_norm.split())
-
-        best_tag = None
-        best_score = 0
-
         for lk, lt in lookup.items():
-            lk_norm = re.sub(r"['\"]", '', lk)
-            lk_norm = re.sub(r'[\-_]', ' ', lk_norm)
-            lk_norm = re.sub(r'\s+', ' ', lk_norm).strip()
-
-            if key_norm == lk_norm:
+            if key == lk or key in lk or lk in key:
                 return lt
-            if len(key_norm) > 10 and (key_norm in lk_norm or lk_norm in key_norm):
-                if lt not in (best_tag,):
-                    best_tag = lt
-                    best_score = 8
-
-            lk_words = set(lk_norm.split())
-            intersection = key_words & lk_words
-            union = key_words | lk_words
-            if union:
-                jaccard = len(intersection) / len(union)
-                if jaccard > best_score:
-                    best_score = jaccard
-                    best_tag = lt
-
-            overlap = len(intersection)
-            if overlap >= 2 and overlap > best_score:
+        words = set(key.split())
+        best = None
+        best_score = 0
+        for lk, lt in lookup.items():
+            lw = set(lk.split())
+            overlap = len(words & lw)
+            if overlap > best_score:
                 best_score = overlap
-                best_tag = lt
-
-        if best_score >= 0.5:
-            return best_tag
+                best = lt
         if best_score >= 2:
-            return best_tag
+            return best
         return None
 
     def refresh_ai_view(self):
@@ -2930,7 +2902,7 @@ class StatsAI:
             ai_prompt = prompt
         else:
             today_str = date.today().strftime("%Y-%m-%d")
-            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. Output ONLY the tank names — one per line, no numbering, no bullet points, no introductions, no explanations, no other text whatsoever."
+            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
         def run_browser_process():
             try:
@@ -2955,9 +2927,9 @@ class StatsAI:
 
                 out = ""
                 try:
-                    out, _ = proc.communicate(timeout=20)
+                    out, _ = proc.communicate(timeout=45)
                 except subprocess.TimeoutExpired:
-                    print("[AI Browser] TIMEOUT (20s) — killing subprocess", flush=True)
+                    print("[AI Browser] TIMEOUT (45s) — killing subprocess", flush=True)
                     proc.kill()
                     out, _ = proc.communicate()
 
@@ -3078,11 +3050,6 @@ class StatsAI:
                 valid_tanks = [t for t in raw_tanks if t['tag'] in self.tank_db]
                 print(f"[AI Response] {len(raw_tanks)} raw, {len(valid_tanks)} valid (found in DB)")
                 tanks = valid_tanks[:30]
-                if len(tanks) < 30:
-                    self._handle_ai_build_failure("popular_tanks")
-                    self.update_status_bar(f"❌ Знайдено лише {len(tanks)}/30 танків (кеш не оновлено)", "red")
-                    self._re_enable_ui()
-                    return
                 for t in tanks:
                     t_tag = t.get('tag')
                     t['tier'] = self.tank_db.get(t_tag, {}).get('tier', 0)
