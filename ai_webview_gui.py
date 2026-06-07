@@ -52,7 +52,7 @@ class AIBrowserWindow(QWidget):
             import ctypes
             hwnd = int(self.winId())
             if hwnd == 0:
-                QTimer.singleShot(200, self._hide_taskbar_icon)
+        # QTimer.singleShot(200, self._hide_taskbar_icon)
                 return
             user32 = ctypes.windll.user32
             GWL_EXSTYLE = -20
@@ -147,7 +147,7 @@ def main():
 
     app = QApplication(sys.argv)
     window = AIBrowserWindow(prompt)
-    window.showMinimized()
+    window.show()
     app.exec()
 
 

@@ -2958,6 +2958,7 @@ class StatsAI:
 
                 if tank_lines:
                     combined = '\n'.join(tank_lines)
+                    print(f"[AI Response] raw ({len(tank_lines)} lines): {repr(combined[:300])}")
                     if progress_cb:
                         progress_cb(70, self.locale_manager.t_ui('processing'))
                     parse_event = threading.Event()
