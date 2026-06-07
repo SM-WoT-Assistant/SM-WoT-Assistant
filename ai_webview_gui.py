@@ -28,6 +28,7 @@ class AIBrowserWindow(QWidget):
         self.setGeometry(100, 100, 1000, 700)
         self.setStyleSheet("background-color: white;")
 
+        # Hide taskbar icon via Windows API after window is created
         QTimer.singleShot(200, self._hide_taskbar_icon)
 
         profile = QWebEngineProfile.defaultProfile()
@@ -52,7 +53,7 @@ class AIBrowserWindow(QWidget):
             import ctypes
             hwnd = int(self.winId())
             if hwnd == 0:
-        # QTimer.singleShot(200, self._hide_taskbar_icon)
+                QTimer.singleShot(200, self._hide_taskbar_icon)
                 return
             user32 = ctypes.windll.user32
             GWL_EXSTYLE = -20
@@ -107,19 +108,32 @@ class AIBrowserWindow(QWidget):
             QTimer.singleShot(1000, self.close)
             return
 
-        js = """
-        (function() {
-            var div = document.querySelector('div.jUiaTd');
-            if (div && div.textContent.trim().length > 0) return div.textContent.trim();
-            var body = document.body.innerText;
-            var idx = body.lastIndexOf('Build Generated:');
-            if (idx >= 0) {
-                var text = body.substring(idx);
-                if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
-            }
-            return '';
-        })();
-        """
+        if self._poll_count <= 60:
+            js = """
+            (function() {
+                var div = document.querySelector('div.jUiaTd');
+                if (div && div.textContent.trim().length > 0) return div.textContent.trim();
+                var body = document.body.innerText;
+                var idx = body.lastIndexOf('Build Generated:');
+                if (idx >= 0) {
+                    var text = body.substring(idx);
+                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
+                }
+                return '';
+            })();
+            """
+        else:
+            js = """
+            (function() {
+                var body = document.body.innerText;
+                var idx = body.lastIndexOf('Build Generated:');
+                if (idx >= 0) {
+                    var text = body.substring(idx);
+                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
+                }
+                return '';
+            })();
+            """
         self.browser.page().runJavaScript(js, self.check_response)
 
     def check_response(self, text):
@@ -127,7 +141,6 @@ class AIBrowserWindow(QWidget):
             print(f"[AI Browser] Response received ({len(text)} chars)", flush=True)
             print(text, flush=True)
             print("[AI Browser] RESPONSE_READY", flush=True)
-            QTimer.singleShot(500, self.close)
         else:
             QTimer.singleShot(500, self.poll_response)
 
@@ -146,9 +159,10 @@ def main():
         today = date.today().strftime("%Y-%m-%d")
         prompt = f"{today}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
 
+    print(f"[AI Browser] prompt: {prompt[:80]}...", flush=True)
     app = QApplication(sys.argv)
     window = AIBrowserWindow(prompt)
-    window.show()
+    window.showMinimized()
     app.exec()
 
 

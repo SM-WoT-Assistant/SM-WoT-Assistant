@@ -1028,14 +1028,6 @@ class StatsAI:
 
             if len(items_to_show) > target_count:
                 items_to_show = items_to_show[:target_count]
-            elif len(items_to_show) < target_count:
-                fill_items = [(t, d) for t, d in self.tank_db.items()
-                              if t not in self.popular_tanks and isinstance(d, dict)
-                              and 8 <= int(d.get("tier", 0) or 0) <= 11]
-                fill_items.sort(key=_tier_sort, reverse=True)
-                for tag, data in fill_items:
-                    if len(items_to_show) >= target_count: break
-                    items_to_show.append((tag, data))
         else:
             for tag, data in self.tank_db.items():
                 if not isinstance(data, dict):
@@ -1095,14 +1087,6 @@ class StatsAI:
             
             if len(items_to_show) > target_count:
                 items_to_show = items_to_show[:target_count]
-            elif len(items_to_show) < target_count:
-                fill_items = [(t, d) for t, d in self.tank_db.items()
-                              if t not in self.popular_tanks and isinstance(d, dict)
-                              and 8 <= int(d.get("tier", 0) or 0) <= 11]
-                fill_items.sort(key=_tier_sort, reverse=True)
-                for tag, data in fill_items:
-                    if len(items_to_show) >= target_count: break
-                    items_to_show.append((tag, data))
         else:
             for tag, data in self.tank_db.items():
                 if not isinstance(data, dict):
