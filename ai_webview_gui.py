@@ -113,25 +113,24 @@ class AIBrowserWindow(QWidget):
             js = """
             (function() {
                 var div = document.querySelector('div.jUiaTd');
-                if (div && div.textContent.trim().length > 0) return div.textContent.trim();
-                var body = document.body.innerText;
-                var idx = body.lastIndexOf('Build Generated:');
-                if (idx >= 0) {
-                    var text = body.substring(idx);
-                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
-                }
+                if (div) return div.textContent.trim();
+                var container = document.querySelector('div.AgWCw');
+                if (container) return container.textContent.trim();
                 return '';
             })();
             """
         else:
             js = """
             (function() {
-                var body = document.body.innerText;
-                var idx = body.lastIndexOf('Build Generated:');
-                if (idx >= 0) {
-                    var text = body.substring(idx);
-                    if (text.length > 100 && text.indexOf('[Item') < 0 && text.indexOf('[Count]') < 0 && text.indexOf('(choose ') < 0) return text;
+                var lines = document.body.innerText.split('\\n');
+                var result = [];
+                for (var i = 0; i < lines.length; i++) {
+                    var line = lines[i].trim();
+                    if (line.length > 3 && line.length < 60 && /^[\\w\\s\\-\\.,\\/\\(\\)\\']+$/.test(line)) {
+                        result.push(line);
+                    }
                 }
+                if (result.length >= 5) return result.join('\\n');
                 return '';
             })();
             """
@@ -151,7 +150,6 @@ class AIBrowserWindow(QWidget):
 
 
 def main():
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
     prompt = ""
     i = 1
     while i < len(sys.argv):
