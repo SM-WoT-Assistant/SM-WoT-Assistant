@@ -141,6 +141,7 @@ class AIBrowserWindow(QWidget):
             print(f"[AI Browser] Response received ({len(text)} chars)", flush=True)
             print(text, flush=True)
             print("[AI Browser] RESPONSE_READY", flush=True)
+            QTimer.singleShot(500, self.close)
         else:
             QTimer.singleShot(500, self.poll_response)
 
