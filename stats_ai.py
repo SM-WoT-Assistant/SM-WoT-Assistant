@@ -3022,7 +3022,7 @@ class StatsAI:
                 raw_tanks = raw_tanks[:30]
                 valid_tanks = [t for t in raw_tanks if t['tag'] in self.tank_db]
                 print(f"[AI Response] {len(raw_tanks)} raw, {len(valid_tanks)} valid (found in DB)")
-                tanks = valid_tanks[:20]
+                tanks = valid_tanks[:30]
                 for t in tanks:
                     t_tag = t.get('tag')
                     t['tier'] = self.tank_db.get(t_tag, {}).get('tier', 0)
