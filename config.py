@@ -1,27 +1,38 @@
 import os, sys
 
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    BUNDLE_DIR = sys._MEIPASS
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
+    BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
+BASE_DIR = BUNDLE_DIR
+
+def _appdata_dir():
+    base = os.environ.get('APPDATA', BUNDLE_DIR)
+    return os.path.join(base, 'WoT Assistant')
+
+USER_DATA_DIR = _appdata_dir()
 
 def load_version():
     try:
-        with open(VERSION_FILE, "r", encoding="utf-8") as f:
+        with open(os.path.join(BUNDLE_DIR, "VERSION"), "r", encoding="utf-8") as f:
             return f.read().strip()
     except Exception:
         return "0.0.0"
 
-LOGO_FILE = os.path.join(BASE_DIR, "logo.png")
-MAPS_DIR = os.path.join(BASE_DIR, "maps")
-SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
-DRAWINGS_FILE = os.path.join(BASE_DIR, "map_drawings.json")
-MAP_LIST_FILE = os.path.join(BASE_DIR, "map_list.json") 
-MAP_LINKS_FILE = os.path.join(BASE_DIR, "map_links.json")
-TECH_IDS_FILE = os.path.join(BASE_DIR, "map_tech_ids.json")
-CUSTOM_NAMES_FILE = os.path.join(BASE_DIR, "custom_names.json")
+LOGO_FILE = os.path.join(BUNDLE_DIR, "logo.png")
+MAPS_DIR = os.path.join(BUNDLE_DIR, "maps")
+
+SETTINGS_FILE = os.path.join(USER_DATA_DIR, "settings.json")
+DRAWINGS_FILE = os.path.join(USER_DATA_DIR, "map_drawings.json")
+MAP_LIST_FILE = os.path.join(BUNDLE_DIR, "map_list.json")
+MAP_LINKS_FILE = os.path.join(BUNDLE_DIR, "map_links.json")
+TECH_IDS_FILE = os.path.join(BUNDLE_DIR, "map_tech_ids.json")
+CUSTOM_NAMES_FILE = os.path.join(USER_DATA_DIR, "custom_names.json")
+LOCALES_FILE = os.path.join(USER_DATA_DIR, "locales.json")
+
+DEFAULT_FILES = ["settings.json", "locales.json", "map_drawings.json", "service_messages.json"]
+
 BG_COLOR = "#000000"
 
 HEADERS = {
@@ -50,4 +61,3 @@ TECH_MAPS_STAGING = {
      "120_graf_zeppelin": "Nordskar", "120_graf_zeppelin_scc": "Nordskar",
     "Live Oaks": "Live Oaks", "Glacier": "Glacier"
 }
-

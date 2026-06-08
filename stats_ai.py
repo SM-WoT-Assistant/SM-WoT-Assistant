@@ -13,12 +13,14 @@ import subprocess
 import sys
 from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
+import config
 
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
 
-_CACHE_PATH = os.path.join(os.path.dirname(__file__), "popular_tanks_cache.json")
-_AI_BUILD_CACHE_PATH = os.path.join(os.path.dirname(__file__), "ai_builds_cache.json")
+_CACHE_PATH = os.path.join(config.USER_DATA_DIR, "popular_tanks_cache.json")
+_AI_BUILD_CACHE_PATH = os.path.join(config.USER_DATA_DIR, "ai_builds_cache.json")
+_DATA_DIR = config.BASE_DIR
 
 
 def _load_ai_build_cache():
@@ -149,14 +151,14 @@ class StatsAI:
         self.tank_tth = {}
         self.reload_tth_data()
         
-        self.LOADOUT_ICON_DIR = os.path.join(os.path.dirname(__file__), 'extracted_icons', 'loadout')
+        self.LOADOUT_ICON_DIR = os.path.join(_DATA_DIR, 'extracted_icons', 'loadout')
         self.FIELD_MODS_ORIGINAL_DIR = os.path.join(
             self.LOADOUT_ICON_DIR,
             'field_mods',
             'pairModifications',
             '80x80',
         )
-        self.TTH_ICON_DIR = os.path.join(os.path.dirname(__file__), 'extracted_icons', 'tth')
+        self.TTH_ICON_DIR = os.path.join(_DATA_DIR, 'extracted_icons', 'tth')
         
         self._available_icons = {}
         self._load_available_icons()
@@ -169,7 +171,7 @@ class StatsAI:
 
     def _load_crew_builds(self):
         """Завантажує crew_builds.json з рекомендованими будовами екіпажу."""
-        path = os.path.join(os.path.dirname(__file__), 'crew_builds.json')
+        path = os.path.join(_DATA_DIR, 'crew_builds.json')
         if not os.path.exists(path):
             return {}
         try:
@@ -180,7 +182,7 @@ class StatsAI:
 
     def _load_equipment_loadouts(self):
         """Завантажує equipment_loadouts.json з даними про обладнання."""
-        path = os.path.join(os.path.dirname(__file__), 'equipment_loadouts.json')
+        path = os.path.join(_DATA_DIR, 'equipment_loadouts.json')
         if not os.path.exists(path):
             return {}
         try:
@@ -286,7 +288,7 @@ class StatsAI:
         return rows
 
     def reload_tth_data(self):
-        tth_path = os.path.join(os.path.dirname(__file__), 'tank_tth.json')
+        tth_path = os.path.join(_DATA_DIR, 'tank_tth.json')
         if os.path.exists(tth_path):
             try:
                 with open(tth_path, 'r', encoding='utf-8') as f:
@@ -863,7 +865,7 @@ class StatsAI:
                     "uk": "uk", "china": "china", "japan": "japan", "czech": "czech",
                     "poland": "poland", "sweden": "sweden", "italy": "italy"}
         f_name = flag_map.get(norm, norm)
-        base = os.path.dirname(__file__)
+        base = _DATA_DIR
         flag_path = os.path.join(base, "extracted_icons", "clean_nations", f"{f_name}.png")
         if not os.path.exists(flag_path):
             flag_path = None
@@ -1602,7 +1604,7 @@ class StatsAI:
     def _extract_field_mod_tokens(self, tag):
         """Читає клієнтський *_modifications.xml і повертає KPI-токени в порядку появи."""
         cfg_path = os.path.join(
-            os.path.dirname(__file__),
+            _DATA_DIR,
             'extracted_data',
             'common',
             'post_progression',
@@ -1637,7 +1639,7 @@ class StatsAI:
     def _load_field_mod_pairs_by_tank(self):
         """Завантажує готову мапу пар FIELD MODS по танках, згенеровану з Orion-декодування."""
         path = os.path.join(
-            os.path.dirname(__file__),
+            _DATA_DIR,
             'extracted_data',
             'common',
             'post_progression',
@@ -2770,12 +2772,12 @@ class StatsAI:
                 if getattr(sys, 'frozen', False):
                     cmd = [sys.executable, "--ai-webview", "--prompt", prompt]
                 else:
-                    script = os.path.join(os.path.dirname(__file__), "main.py")
+                    script = os.path.join(_DATA_DIR, "main.py")
                     cmd = [sys.executable, script, "--ai-webview", "--prompt", prompt]
                 print(f"[AI Tank Build] running for {tag}")
                 proc = subprocess.Popen(
                     cmd,
-                    cwd=os.path.dirname(__file__),
+                    cwd=_DATA_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     encoding='utf-8', errors='replace',
@@ -2912,14 +2914,14 @@ class StatsAI:
                 if getattr(sys, 'frozen', False):
                     cmd = [sys.executable, "--ai-webview", "--prompt", ai_prompt]
                 else:
-                    script = os.path.join(os.path.dirname(__file__), "main.py")
+                    script = os.path.join(_DATA_DIR, "main.py")
                     cmd = [sys.executable, script, "--ai-webview", "--prompt", ai_prompt]
                 print(f"[AI Browser] running: {' '.join(cmd)}")
                 if progress_cb:
                     progress_cb(10, self.locale_manager.t_ui('data_updating'))
                 self._ai_browser_process = subprocess.Popen(
                     cmd,
-                    cwd=os.path.dirname(__file__),
+                    cwd=_DATA_DIR,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
                     encoding='utf-8', errors='replace',

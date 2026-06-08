@@ -1088,6 +1088,17 @@ if __name__ == "__main__":
     import multiprocessing
     multiprocessing.freeze_support()
     os.chdir(config.BASE_DIR)
+    os.makedirs(config.USER_DATA_DIR, exist_ok=True)
+    import shutil
+    for fn in config.DEFAULT_FILES:
+        dst = os.path.join(config.USER_DATA_DIR, fn)
+        if not os.path.exists(dst):
+            src = os.path.join(config.BUNDLE_DIR, fn)
+            if os.path.exists(src):
+                try:
+                    shutil.copy2(src, dst)
+                except Exception:
+                    pass
     if "--ai-webview" in sys.argv:
         from ai_webview_gui import main as webview_main
         webview_main()

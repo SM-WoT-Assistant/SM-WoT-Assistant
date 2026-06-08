@@ -8,7 +8,7 @@ class LocaleManager:
         self.app = app
         self.lang = app.settings.get("language", "ua")
         
-        self.locales_file = os.path.join(os.path.dirname(config.SETTINGS_FILE), "locales.json")
+        self.locales_file = config.LOCALES_FILE
         self.languages = self.load_locales()
         
         # Якщо немає файлу або він порожній - копіюємо дефолт з translations

@@ -9,8 +9,9 @@ import os
 import json
 import time
 import uuid
+import config
 
-_SERVICE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "service_messages.json")
+_SERVICE_FILE = os.path.join(config.USER_DATA_DIR, "service_messages.json")
 
 
 def _load():
