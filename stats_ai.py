@@ -2767,8 +2767,11 @@ class StatsAI:
         def run_build_process():
             proc = None
             try:
-                script = os.path.join(os.path.dirname(__file__), "ai_webview_gui.py")
-                cmd = [sys.executable, script, "--prompt", prompt]
+                if getattr(sys, 'frozen', False):
+                    cmd = [sys.executable, "--ai-webview", "--prompt", prompt]
+                else:
+                    script = os.path.join(os.path.dirname(__file__), "main.py")
+                    cmd = [sys.executable, script, "--ai-webview", "--prompt", prompt]
                 print(f"[AI Tank Build] running for {tag}")
                 proc = subprocess.Popen(
                     cmd,
@@ -2906,11 +2909,11 @@ class StatsAI:
 
         def run_browser_process():
             try:
-                script = os.path.join(os.path.dirname(__file__), "ai_webview_gui.py")
-                cmd = [
-                    sys.executable, script,
-                    "--prompt", ai_prompt,
-                ]
+                if getattr(sys, 'frozen', False):
+                    cmd = [sys.executable, "--ai-webview", "--prompt", ai_prompt]
+                else:
+                    script = os.path.join(os.path.dirname(__file__), "main.py")
+                    cmd = [sys.executable, script, "--ai-webview", "--prompt", ai_prompt]
                 print(f"[AI Browser] running: {' '.join(cmd)}")
                 if progress_cb:
                     progress_cb(10, self.locale_manager.t_ui('data_updating'))

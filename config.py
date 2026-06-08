@@ -5,7 +5,16 @@ if getattr(sys, 'frozen', False):
 else:
     BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if '__file__' in locals() else os.getcwd()
 
-LOGO_FILE = "logo.png" 
+VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
+
+def load_version():
+    try:
+        with open(VERSION_FILE, "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return "0.0.0"
+
+LOGO_FILE = os.path.join(BASE_DIR, "logo.png")
 MAPS_DIR = os.path.join(BASE_DIR, "maps")
 SETTINGS_FILE = os.path.join(BASE_DIR, "settings.json")
 DRAWINGS_FILE = os.path.join(BASE_DIR, "map_drawings.json")

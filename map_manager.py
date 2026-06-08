@@ -100,9 +100,9 @@ class MapManager:
                 tth_has_data = False
                 tth_count = 0
                 tth_json = {}
-                if os.path.exists("tank_tth.json"):
+                if os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json")):
                     try:
-                        with open("tank_tth.json", "r", encoding="utf-8") as f:
+                        with open(os.path.join(config.BASE_DIR, "tank_tth.json"), "r", encoding="utf-8") as f:
                             tth_json = json.load(f)
                         tth_has_data = isinstance(tth_json, dict) and bool(tth_json)
                         if isinstance(tth_json, dict):
@@ -111,9 +111,9 @@ class MapManager:
                         tth_has_data = False
 
                 tank_db_count = 0
-                if os.path.exists("tank_db.json"):
+                if os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")):
                     try:
-                        with open("tank_db.json", "r", encoding="utf-8") as f:
+                        with open(os.path.join(config.BASE_DIR, "tank_db.json"), "r", encoding="utf-8") as f:
                             tank_db_json = json.load(f)
                         if isinstance(tank_db_json, dict):
                             tank_db_count = len(tank_db_json)
@@ -123,7 +123,7 @@ class MapManager:
                 tank_db_has_data = tank_db_count > 0
 
                 # Перевіряємо, чи присутні критичні папки іконок для СТАТ AI (збірки).
-                loadout_base = os.path.join("extracted_icons", "loadout")
+                loadout_base = os.path.join(config.BASE_DIR, "extracted_icons", "loadout")
                 loadout_dirs = [
                     os.path.join(loadout_base, "artefacts"),
                     os.path.join(loadout_base, "ammo"),
@@ -170,8 +170,8 @@ class MapManager:
                                 break
 
                 need_tank_rebuild = tank_extractor and (
-                    not os.path.exists("tank_db.json")
-                    or not os.path.exists("tank_tth.json")
+                    not os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json"))
+                    or not os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json"))
                     or not tank_db_has_data
                     or not tth_has_data
                     or tth_coverage_bad
@@ -240,7 +240,7 @@ class MapManager:
                         tank_pipeline_ran = True
                         emit(62, "СТАТ AI: аналіз техніки...")
                         tex = tank_extractor.TankExtractor(ext.wot_path)
-                        db_exists = os.path.exists("tank_db.json") and os.path.exists("tank_tth.json")
+                        db_exists = os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")) and os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json"))
                         force_full_extract = bool(need_tank_rebuild or should_force_refresh)
                         if tex.extract_metadata(force_full=force_full_extract) and tex.extract_icons():
                             emit(70, f"СТАТ AI: змінено XML: {tex.changed_metadata_count}")
@@ -361,8 +361,8 @@ class MapManager:
         internal_mode = mode_mapping.get(ui_mode, "ctf")
         is_tactic = self.app.btn_mode_maps_1.cget("bg") == "#ff4500"
 
-        dict_path = os.path.join("extracted_maps", "map_dictionary.json")
-        data_path = os.path.join("extracted_maps", "map_data.json")
+        dict_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_dictionary.json")
+        data_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_data.json")
 
         loaded_dict = self.app.data_mgr.load_json(dict_path)
         self.app.map_data = self.app.data_mgr.load_json(data_path)

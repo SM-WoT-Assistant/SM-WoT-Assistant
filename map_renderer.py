@@ -15,7 +15,7 @@ class MapRenderer:
         
         paths = []
         if self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
-            paths.append(os.path.join("extracted_maps", f"{self.app.current_map_eng}.png"))
+            paths.append(os.path.join(config.BASE_DIR, "extracted_maps", f"{self.app.current_map_eng}.png"))
         else:
             eng_name = self.app.map_mgr._resolve_tactic_folder(self.app.current_map_eng)
             safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
@@ -245,16 +245,7 @@ class MapRenderer:
                 
         if not map_drawn:
             if app.mode == "edit":
-                version = "1.03"
-                try:
-                    import subprocess
-                    result = subprocess.run(['git', 'describe', '--tags', '--always'], capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
-                    if result.returncode == 0:
-                        git_version = result.stdout.strip()
-                        if git_version:
-                            version = git_version
-                except Exception:
-                    pass
+                version = config.load_version()
                 app.canvas.create_text(cw//2, ch - 20, text=f"SETUP & MAPS WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"))
                 app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9))
                 app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"))

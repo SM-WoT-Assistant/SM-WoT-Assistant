@@ -54,8 +54,8 @@ class DataManager:
                 if hp <= 1750: return 9
                 return 10
 
-            if os.path.exists("tank_db.json"):
-                with open("tank_db.json", "r", encoding="utf-8") as f:
+            if os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")):
+                with open(os.path.join(config.BASE_DIR, "tank_db.json"), "r", encoding="utf-8") as f:
                     db = json.load(f)
                     clean_db = {}
                     # Технічні / евентові / видалені з гри танки
@@ -67,7 +67,7 @@ class DataManager:
                         "a08_t23", "a26_t18", "a15_t57",  # USA вилучені танки
                         "_newonboarding", "_storymode",   # Тренувальні
                     ]
-                    icons_dir = "extracted_icons"
+                    icons_dir = os.path.join(config.BASE_DIR, "extracted_icons")
                     for k, v in db.items():
                         if any(b in k.lower() for b in bad_tags) or any(b in v["name"].lower() for b in bad_tags):
                             continue
@@ -79,7 +79,7 @@ class DataManager:
                     if clean_db:
                         return clean_db
 
-            tth_path = "tank_tth.json"
+            tth_path = os.path.join(config.BASE_DIR, "tank_tth.json")
             tth_db = {}
             if os.path.exists(tth_path):
                 with open(tth_path, "r", encoding="utf-8") as f:
@@ -111,7 +111,7 @@ class DataManager:
                         print(f"[DB] Fallback: завантажено {len(clean_db)} танків із tank_tth.json")
                         return clean_db
 
-            extracted_root = "extracted_data"
+            extracted_root = os.path.join(config.BASE_DIR, "extracted_data")
             if os.path.isdir(extracted_root):
                 nation_map_folder = {
                     "usa": "USA", "ussr": "USSR", "germany": "Germany", "france": "France", "uk": "UK",
@@ -146,7 +146,7 @@ class DataManager:
                         }
                 if rough_db:
                     try:
-                        with open("tank_db.json", "w", encoding="utf-8") as f:
+                        with open(os.path.join(config.BASE_DIR, "tank_db.json"), "w", encoding="utf-8") as f:
                             json.dump(rough_db, f, ensure_ascii=False, indent=2)
                     except Exception as e:
                         print(f"[DB] Попередження: не вдалося зберегти fallback tank_db.json: {e}")
