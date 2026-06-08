@@ -17,10 +17,11 @@ class MapRenderer:
         if self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
             paths.append(os.path.join("extracted_maps", f"{self.app.current_map_eng}.png"))
         else:
-            safe_folder = self.app.current_map_eng.replace('?', '').replace(':', '').replace('|', '').replace(' - ', '_').replace(' ', '_')
+            eng_name = self.app.map_mgr._resolve_tactic_folder(self.app.current_map_eng)
+            safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
             paths = [os.path.join(config.MAPS_DIR, safe_folder, "map.webp"), 
-                     os.path.join(config.MAPS_DIR, f"{self.app.current_map_eng}.jpg"),
-                     os.path.join(config.MAPS_DIR, f"{self.app.current_map_eng}.png")]
+                     os.path.join(config.MAPS_DIR, f"{eng_name}.jpg"),
+                     os.path.join(config.MAPS_DIR, f"{eng_name}.png")]
                      
         for p in paths:
             if os.path.exists(p):
@@ -39,6 +40,21 @@ class MapRenderer:
                     return ImageTk.PhotoImage(img)
                 except: pass
         return None
+
+    def draw_frame(self, cw, ch):
+        sc = min(cw, ch) / 800.0
+        border = max(5, int(self.grid_border * sc))
+        size = min(cw, ch) - 2 * border
+        if size <= 10: return
+        map_x = border
+        map_y = border
+        if cw > ch:
+            map_x = border + (cw - 2 * border - size) / 2
+        fc = "#333333"
+        self.app.canvas.create_rectangle(0, map_y - border, cw, map_y, fill=fc, outline="", tags="frame")
+        self.app.canvas.create_rectangle(0, map_y + size, cw, map_y + size + border, fill=fc, outline="", tags="frame")
+        self.app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + size, fill=fc, outline="", tags="frame")
+        self.app.canvas.create_rectangle(map_x + size, map_y, map_x + size + border, map_y + size, fill=fc, outline="", tags="frame")
 
     def draw_arena_bases(self, cw, ch):
         app = self.app
@@ -196,7 +212,7 @@ class MapRenderer:
         
         map_drawn = False
         if app.current_map_eng:
-            use_border = app.btn_mode_maps_2.cget("bg") == "#ff4500"
+            use_border = True
             app.current_tk_map = self.load_and_resize_map(cw, ch, use_border)
             if app.current_tk_map:
                 if use_border:
@@ -216,13 +232,16 @@ class MapRenderer:
                 map_drawn = True
                 app.status_label.config(text=f"КАРТА: {app.translate_map_name(app.current_map_eng)}", fg="lime")
                 
+                self.draw_frame(cw, ch)
                 if app.btn_mode_maps_2.cget("bg") == "#ff4500":
                     self.draw_grid(cw, ch)
                     self.draw_arena_bases(cw, ch)
             else:
-                app.canvas.create_text(cw//2, ch//2, text=app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng)), fill="red", font=("Arial", 10))
+                is_tactic = app.btn_mode_maps_1.cget("bg") == "#ff4500"
+                msg = app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
+                app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10))
                 map_drawn = True 
-                app.status_label.config(text=app.t('ui', 'map_not_found'), fg="red")
+                app.status_label.config(text=app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found'), fg="red")
                 
         if not map_drawn:
             if app.mode == "edit":

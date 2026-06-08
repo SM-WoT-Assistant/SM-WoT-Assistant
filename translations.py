@@ -20,7 +20,8 @@ TRANSLATIONS = {
             "data_updating": "Оновлюються дані...",
             "fetching_info": "Отримання інформації...",
             "processing": "Обробка результатів...",
-            "ready": "Готово"
+            "ready": "Готово",
+            "tactic_no_maps": "Немає мап для цього режиму"
         },
         "maps": {
             "Karelia": "Карелія", "Malinovka": "Малинівка", "Province": "Провінція",
@@ -65,7 +66,8 @@ TRANSLATIONS = {
             "data_updating": "Data is updating...",
             "fetching_info": "Fetching information...",
             "processing": "Processing results...",
-            "ready": "Ready"
+            "ready": "Ready",
+            "tactic_no_maps": "No maps for this mode"
         },
         "maps": {
             "Karelia": "Karelia", "Malinovka": "Malinovka", "Province": "Province",
@@ -110,7 +112,8 @@ TRANSLATIONS = {
             "data_updating": "Обновляются данные...",
             "fetching_info": "Получение информации...",
             "processing": "Обработка результатов...",
-            "ready": "Готово"
+            "ready": "Готово",
+            "tactic_no_maps": "Нет карт для этого режима"
         },
         "maps": {
             "Karelia": "Карелия", "Malinovka": "Малиновка", "Province": "Провинция",

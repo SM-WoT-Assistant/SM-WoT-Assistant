@@ -359,54 +359,36 @@ class MapManager:
             "Onslaught": "comp7"
         }
         internal_mode = mode_mapping.get(ui_mode, "ctf")
+        is_tactic = self.app.btn_mode_maps_1.cget("bg") == "#ff4500"
 
-        if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
-            # TACTIC mode - use map_list.json (from website)
-            map_list_path = os.path.join(os.path.dirname(config.SETTINGS_FILE), "map_list.json")
-            loaded_list = self.app.data_mgr.load_json(map_list_path)
-            if isinstance(loaded_list, list) and loaded_list:
-                if ui_mode == "Assault":
-                    self.app.map_list_eng = [m for m in loaded_list if "Assault" in m or "assault" in m.lower()]
-                elif ui_mode == "Encounter":
-                    self.app.map_list_eng = [m for m in loaded_list if "Encounter" in m or "encounter" in m.lower()]
-                else:
-                    self.app.map_list_eng = [m for m in loaded_list if "Assault" not in m and "Encounter" not in m]
-            else:
-                self.app.map_list_eng = list(config.LANG_DATA["ua"]["maps"].keys())
-            self.app.map_data = {}
-            # Still load extractor_names for consistent naming
-            dict_path = os.path.join("extracted_maps", "map_dictionary.json")
-            loaded_dict = self.app.data_mgr.load_json(dict_path)
-            if isinstance(loaded_dict, dict) and loaded_dict:
-                self.app.extractor_names = loaded_dict
-        else:
-            # MAPS mode - use map_dictionary.json (from game client)
-            dict_path = os.path.join("extracted_maps", "map_dictionary.json")
-            data_path = os.path.join("extracted_maps", "map_data.json")
-            
-            loaded_dict = self.app.data_mgr.load_json(dict_path)
-            self.app.map_data = self.app.data_mgr.load_json(data_path)
-            
-            if isinstance(loaded_dict, dict) and loaded_dict:
-                self.app.extractor_names = loaded_dict
-                all_maps = list(loaded_dict.keys())
-                filtered_maps = []
-                for m in all_maps:
-                    if m in self.app.map_data:
-                        gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
-                        has_mode = internal_mode in gameplay_types
-                        if internal_mode == "assault" and "assault2" in gameplay_types:
-                            has_mode = True
-                        if has_mode:
-                            filtered_maps.append(m)
-                    else:
+        dict_path = os.path.join("extracted_maps", "map_dictionary.json")
+        data_path = os.path.join("extracted_maps", "map_data.json")
+
+        loaded_dict = self.app.data_mgr.load_json(dict_path)
+        self.app.map_data = self.app.data_mgr.load_json(data_path)
+
+        if isinstance(loaded_dict, dict) and loaded_dict:
+            self.app.extractor_names = loaded_dict
+            all_maps = list(loaded_dict.keys())
+            filtered_maps = []
+            for m in all_maps:
+                if m in self.app.map_data:
+                    gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
+                    has_mode = internal_mode in gameplay_types
+                    if internal_mode == "assault" and "assault2" in gameplay_types:
+                        has_mode = True
+                    if has_mode:
                         filtered_maps.append(m)
-                self.app.map_list_eng = filtered_maps
-            else:
-                self.app.extractor_names = {}
-                self.app.map_list_eng = []
-        
-        # Remove duplicates based on display name
+                else:
+                    filtered_maps.append(m)
+            self.app.map_list_eng = filtered_maps
+        else:
+            self.app.extractor_names = {}
+            self.app.map_list_eng = []
+
+        if is_tactic:
+            self.app.map_list_eng = [m for m in self.app.map_list_eng if self._tactic_image_exists(m)]
+
         unique_maps = []
         seen_names = set()
         for m in self.app.map_list_eng:
@@ -427,4 +409,29 @@ class MapManager:
         else:
             self.app.current_map_eng = None
             self.app.map_var.set("")
+            if is_tactic:
+                self.app.status_label.config(text=self.app.t('ui', 'tactic_no_maps'), fg="red")
             self.app.map_renderer.show_main_splash()
+
+
+    def _resolve_tactic_folder(self, eng_key):
+        folder = config.TECH_MAPS_STAGING.get(eng_key)
+        if folder:
+            return folder
+        for suffix in ['_v', '_big', '_sm24', '_sm25', '_nom', '_scc', '_ctf']:
+            if eng_key.endswith(suffix):
+                base = eng_key[:-len(suffix)]
+                folder = config.TECH_MAPS_STAGING.get(base)
+                if folder:
+                    return folder
+        return eng_key
+
+    def _tactic_image_exists(self, eng_key):
+        folder_name = self._resolve_tactic_folder(eng_key)
+        safe_folder = folder_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
+        webp_path = os.path.join(config.MAPS_DIR, safe_folder, "map.webp")
+        if os.path.exists(webp_path):
+            return True
+        jpg_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.jpg")
+        png_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.png")
+        return os.path.exists(jpg_path) or os.path.exists(png_path)

@@ -40,11 +40,11 @@ class UIManager:
         self.app.btn_mode_ai_stats = tk.Button(self.app.top_bar, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
         self.app.btn_mode_ai_stats.pack(side="left", padx=(0,1), pady=7)
 
-        self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
-        self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=7)
-
         self.app.btn_mode_maps_2 = tk.Button(self.app.top_bar, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
         self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=7)
+
+        self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
+        self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=7)
 
         self.app.map_toolbar = tk.Frame(self.app.top_bar, bg="#222")
         self.app.map_var = tk.StringVar()
@@ -88,11 +88,15 @@ class UIManager:
             mode = kwargs.get('mode', 1)
             self.app.map_mode = mode
             if hasattr(self.app, '_po_win'):
+                self.app._po_win.attributes("-topmost", True)
                 self.app._po_win.deiconify()
+                self.app.root.update_idletasks()
                 self.app._sync_po_pos()
             if mode == 1:
                 self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
                 self.app.battle_status_top.pack(side="top", fill="x")
+                self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+                self.app.status_label.pack(side="bottom", fill="x")
             else:
                 self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
                 self.app.filter_panel.pack(side="bottom", fill="x")
@@ -100,11 +104,16 @@ class UIManager:
                 self.app.status_label.config(height=2, bg="#1a1a1a")
                 self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
             self.app.canvas.pack(side="top", fill="both", expand=True)
+            self.app.root.update_idletasks()
+            self.app._sync_po_pos()
+            self.app._start_po_sync_timer()
             
             self.app.map_mgr.load_map_list()
 
         elif view_name == "stats":
+            self.app._stop_po_sync_timer()
             if hasattr(self.app, '_po_win'):
+                self.app._po_win.attributes("-topmost", False)
                 self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
@@ -120,7 +129,9 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
+            self.app._stop_po_sync_timer()
             if hasattr(self.app, '_po_win'):
+                self.app._po_win.attributes("-topmost", False)
                 self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()

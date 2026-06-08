@@ -430,6 +430,15 @@ class MapPainter:
         ch = self.canvas.winfo_height()
         if cw < 10 or ch < 10: return
         
+        if self.active_tool == "marker" and self.start_x == event.x and self.start_y == event.y:
+            self.canvas.delete("temp_draw")
+            self.temp_item = None
+            palette = getattr(self.app, 'drawing_palette', None)
+            if palette:
+                palette._deactivate_tool()
+            self.active_tool = None
+            return
+        
         px1, py1 = self.start_x / cw, self.start_y / ch
         px2, py2 = event.x / cw, event.y / ch
 

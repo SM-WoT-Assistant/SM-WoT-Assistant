@@ -19,6 +19,9 @@ class DrawingPalette(tk.Toplevel):
         self._saved_pos = None
 
         self.current_color = "#ffaa00"
+        self._default_colors = ["#ff0000", "#00ff00", "#00bbff", "#ffff00", "#ffaa00"]
+        self._custom_colors = list(self._default_colors)
+        self._color_buttons = []
 
         self._active_tool_code = None
 
@@ -159,12 +162,11 @@ class DrawingPalette(tk.Toplevel):
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         clf = tk.Frame(self, bg=bg)
         clf.pack(fill="x", padx=8)
-        colors = [("#ff0000", "\u0427\u0435\u0440\u0432\u043e\u043d\u0438\u0439"), ("#00ff00", "\u0417\u0435\u043b\u0435\u043d\u0438\u0439"),
-                  ("#00bbff", "\u0421\u0438\u043d\u0456\u0439"), ("#ffff00", "\u0416\u043e\u0432\u0442\u0438\u0439"),
-                  ("#ffaa00", "\u041f\u043e\u043c\u0430\u0440\u0430\u043d\u0447\u0435\u0432\u0438\u0439")]
-        for hex_code, name in colors:
-            btn = tk.Button(clf, bg=hex_code, width=2, bd=0, command=lambda c=hex_code: self._set_color(c))
+        for i, hex_code in enumerate(self._custom_colors):
+            btn = tk.Button(clf, bg=hex_code, width=2, bd=0,
+                            command=lambda idx=i: self._set_color(self._custom_colors[idx]))
             btn.pack(side="left", padx=1, pady=3)
+            self._color_buttons.append(btn)
         tk.Button(clf, text="\u0406\u043d\u0448\u0438\u0439...", bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._pick_color).pack(side="left", padx=4)
         self._color_preview = tk.Label(clf, text=" \u25a0 ", bg=bg, fg=self.current_color, font=("Arial", 14))
@@ -251,10 +253,25 @@ class DrawingPalette(tk.Toplevel):
     def _set_color(self, c):
         self.current_color = c
         self._color_preview.config(fg=c)
+        if c in self._custom_colors:
+            self._custom_colors.remove(c)
+        self._custom_colors.insert(0, c)
+        self._custom_colors = self._custom_colors[:5]
+        self._update_color_buttons()
         self._on_any_change()
 
+    def _update_color_buttons(self):
+        for i, btn in enumerate(self._color_buttons):
+            if i < len(self._custom_colors):
+                btn.config(bg=self._custom_colors[i])
+
     def _pick_color(self):
+        self.attributes("-topmost", False)
+        self.master.attributes("-topmost", False)
+        self.master.update_idletasks()
         c = colorchooser.askcolor(color=self.current_color, parent=self)[1]
+        self.attributes("-topmost", True)
+        self.master.attributes("-topmost", True)
         if c:
             self._set_color(c)
 
@@ -299,12 +316,13 @@ class DrawingPalette(tk.Toplevel):
         self.after(100, self._lift_self)
 
     def _sync_tool_state(self):
-        if self._active_tool_code is None:
-            active = self.painter.active_tool
-            if active == "marker":
-                self._active_tool_code = "marker"
-            elif active == "text":
-                self._active_tool_code = 0x2B
+        active = self.painter.active_tool
+        if not active:
+            self._active_tool_code = None
+        elif active == "marker":
+            self._active_tool_code = "marker"
+        elif active == "text":
+            self._active_tool_code = 0x2B
         self._update_toolbar_buttons()
 
     def _drag_start(self, event):
@@ -329,6 +347,7 @@ class DrawingPalette(tk.Toplevel):
                 px, py = int(m.group(3)), int(m.group(4))
                 self.app.settings["palette_x"] = px
                 self.app.settings["palette_y"] = py
+                self.app.settings["palette_custom_colors"] = self._custom_colors
                 self.app.save_settings()
         except Exception:
             pass
@@ -337,6 +356,10 @@ class DrawingPalette(tk.Toplevel):
         try:
             px = self.app.settings.get("palette_x", 100)
             py = self.app.settings.get("palette_y", 100)
+            saved_colors = self.app.settings.get("palette_custom_colors", None)
+            if saved_colors and isinstance(saved_colors, list) and len(saved_colors) == 5:
+                self._custom_colors = saved_colors
+                self._update_color_buttons()
             self.geometry(f"500x420+{px}+{py}")
             self._saved_pos = f"500x420+{px}+{py}"
         except Exception:
@@ -387,6 +410,9 @@ class DrawingPalette(tk.Toplevel):
         self.painter.data_mgr.save_drawings(self.painter.drawings)
         self._edit_obj = None
         self.painter._editing_idx = -1
+        self._active_tool_code = None
+        self._update_toolbar_buttons()
+        self.painter.set_tool(None)
         self._del_frame.pack_forget()
         if hasattr(self.app, 'status_label'):
             self.app.status_label.config(text="")

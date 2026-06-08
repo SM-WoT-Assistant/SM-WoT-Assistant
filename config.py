@@ -24,7 +24,7 @@ TECH_MAPS_STAGING = {
     "04_himmelsdorf": "Himmelsdorf", "05_prohorovka": "Prokhorovka", "06_ensk": "Ensk",
     "07_lakeville": "Lakeville", "08_ruinberg": "Ruinberg", "10_hills": "Mines",
     "11_murovanka": "Murovanka", "13_erlenberg": "Erlenberg", "14_siegfried_line": "Siegfried Line",
-    "17_munchen": "Westfield", "18_cliff": "Cliff", "19_monastery": "Abbey",
+    "17_munchen": "Widepark", "18_cliff": "Cliff", "19_monastery": "Abbey",
     "22_slough": "Swamp", "23_westfeld": "Westfield", "28_desert": "Sand River",
     "29_el_halluf": "El Halluf", "29_el_hallouf": "El Halluf", "31_airfield": "Airfield", 
     "33_fjords": "Fjords", "33_fjord": "Fjords",
@@ -38,7 +38,7 @@ TECH_MAPS_STAGING = {
     "114_czech": "Pilsen", "115_sweden": "Glacier", "127_j_city": "Pearl River", 
     "127_japort": "Safe Haven", "128_last_frontier": "Outpost", "137_tierra_del_fuego": "Outpost", 
     "121_lost_paradise": "Oyster Bay", "144_oyster_bay": "Oyster Bay", 
-    "120_graf_zeppelin": "Graf Zeppelin",
+     "120_graf_zeppelin": "Nordskar", "120_graf_zeppelin_scc": "Nordskar",
     "Live Oaks": "Live Oaks", "Glacier": "Glacier"
 }
 

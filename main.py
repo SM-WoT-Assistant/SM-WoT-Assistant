@@ -157,6 +157,7 @@ class WotAssistantHQ:
         self._po_win.overrideredirect(True)
         self._po_win.attributes("-topmost", True)
         self._po_win.attributes("-transparentcolor", "#010101")
+        self._po_win.transient(self.root)
         self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
         self._po_canvas.pack(fill="both", expand=True)
         self.painter.bind_events_to(self.canvas)
@@ -164,6 +165,9 @@ class WotAssistantHQ:
         self.painter.canvas = self._po_canvas
         self.canvas.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Configure>", self._sync_po_pos, "+")
+        self.root.bind("<Unmap>", self._on_root_hide, "+")
+        self.root.bind("<Map>", self._on_root_show, "+")
+        self._po_sync_timer = None
 
     def _sync_po_pos(self, event=None):
         palette = getattr(self, 'drawing_palette', None)
@@ -175,9 +179,40 @@ class WotAssistantHQ:
         cy = self.canvas.winfo_rooty()
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
-        if cw > 100 and ch > 100:
+        if cw > 50 and ch > 50:
             self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
             self._po_win.lift()
+
+    def _on_root_hide(self, event=None):
+        self._stop_po_sync_timer()
+        if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
+            self._po_win.attributes("-topmost", False)
+            self._po_win.withdraw()
+
+    def _on_root_show(self, event=None):
+        if self.active_view == "maps" and hasattr(self, '_po_win'):
+            self._po_win.attributes("-topmost", True)
+            self._po_win.deiconify()
+            self._sync_po_pos()
+            self._start_po_sync_timer()
+
+    def _start_po_sync_timer(self):
+        self._stop_po_sync_timer()
+        if self.active_view != "maps":
+            return
+        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
+
+    def _stop_po_sync_timer(self):
+        if hasattr(self, '_po_sync_timer') and self._po_sync_timer:
+            self.root.after_cancel(self._po_sync_timer)
+            self._po_sync_timer = None
+
+    def _po_sync_tick(self):
+        if self.active_view != "maps":
+            self._po_sync_timer = None
+            return
+        self._sync_po_pos()
+        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
 
     def _start_startup_checks(self):
         allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
@@ -389,14 +424,20 @@ class WotAssistantHQ:
                 if self.map_mode == 2:
                     self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
                     self.filter_panel.pack(side="bottom", fill="x")
+                elif self.map_mode == 1:
+                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
                 self.status_label.pack(side="bottom", fill="x")
             self.canvas.pack(side="top", fill="both", expand=True)
             if hasattr(self, '_po_win'):
+                self.root.update_idletasks()
                 self._po_win.deiconify()
                 self._sync_po_pos()
                 self.painter.redraw()
+                self._start_po_sync_timer()
         elif self.active_view == "stats":
+            self._stop_po_sync_timer()
             if hasattr(self, '_po_win'):
+                self._po_win.attributes("-topmost", False)
                 self._po_win.withdraw()
             if hasattr(self, 'drawing_palette'):
                 self.drawing_palette.exit_edit_mode()
@@ -405,7 +446,9 @@ class WotAssistantHQ:
             self.status_label.pack(side="bottom", fill="x")
             self.browser_frame.pack(side="top", fill="both", expand=True)
         elif self.active_view == "ai_stats":
+            self._stop_po_sync_timer()
             if hasattr(self, '_po_win'):
+                self._po_win.attributes("-topmost", False)
                 self._po_win.withdraw()
             if hasattr(self, 'drawing_palette'):
                 self.drawing_palette.exit_edit_mode()
@@ -520,13 +563,17 @@ class WotAssistantHQ:
             self.root.lift()
             self.root.focus_force()
             if self.active_view == "maps" and hasattr(self, '_po_win'):
+                self._po_win.attributes("-topmost", True)
                 self._po_win.deiconify()
                 self._sync_po_pos()
+                self._start_po_sync_timer()
         else:
+            self._stop_po_sync_timer()
             if hasattr(self, 'stats_ai_module'):
                 self.stats_ai_module.stop_browser()
             self.save_settings()
             if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
+                self._po_win.attributes("-topmost", False)
                 self._po_win.withdraw()
             self.root.withdraw()
 
