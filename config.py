@@ -9,7 +9,7 @@ BASE_DIR = BUNDLE_DIR
 
 def _appdata_dir():
     base = os.environ.get('APPDATA', BUNDLE_DIR)
-    return os.path.join(base, 'WoT Assistant')
+    return os.path.join(base, 'SM WoT Assistant')
 
 USER_DATA_DIR = _appdata_dir()
 

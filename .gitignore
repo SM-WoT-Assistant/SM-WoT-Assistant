@@ -76,3 +76,7 @@ _archive/
 # Windows
 Thumbs.db
 Desktop.ini
+
+# Build output
+build/
+dist/

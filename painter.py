@@ -4,12 +4,12 @@ import tkinter as tk
 import config
 import ctypes
 
-font_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "xvmsymbol.ttf")
+font_path = os.path.join(config.BASE_DIR, "xvmsymbol.ttf")
 if os.path.exists(font_path):
     FR_PRIVATE = 0x10
     ctypes.windll.gdi32.AddFontResourceExW(font_path, FR_PRIVATE, 0)
 
-fa_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fontawesome-webfont.ttf")
+fa_path = os.path.join(config.BASE_DIR, "fontawesome-webfont.ttf")
 if os.path.exists(fa_path):
     FR_PRIVATE = 0x10
     ctypes.windll.gdi32.AddFontResourceExW(fa_path, FR_PRIVATE, 0)

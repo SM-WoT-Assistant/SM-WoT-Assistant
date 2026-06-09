@@ -25,7 +25,7 @@ class AIBrowserWindow(QWidget):
         self._max_polls = 200
         self._response_found = False
 
-        self.setWindowTitle("WoT Assistant — Data Update")
+        self.setWindowTitle("SM WoT Assistant — Data Update")
         self.setGeometry(100, 100, 1000, 700)
         self.setStyleSheet("background-color: white;")
 

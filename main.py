@@ -1104,6 +1104,6 @@ if __name__ == "__main__":
         webview_main()
         sys.exit(0)
     root = tk.Tk()
-    root.title(f"WoT Assistant v{config.load_version()}")
+    root.title(f"SM WoT Assistant v{config.load_version()}")
     app = WotAssistantHQ(root)
     root.mainloop()

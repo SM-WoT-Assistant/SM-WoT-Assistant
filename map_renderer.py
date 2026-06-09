@@ -246,7 +246,7 @@ class MapRenderer:
         if not map_drawn:
             if app.mode == "edit":
                 version = config.load_version()
-                app.canvas.create_text(cw//2, ch - 20, text=f"SETUP & MAPS WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"))
+                app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"))
                 app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9))
                 app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"))
                 app.canvas.create_text(cw//2, ch - 105, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"))

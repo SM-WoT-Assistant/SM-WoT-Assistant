@@ -77,15 +77,6 @@ if os.path.exists(ed_pp):
             rel = os.path.relpath(src, _rp("extracted_data"))
             datas.append((src, os.path.join("extracted_data", os.path.dirname(rel))))
 
-orion_dir = _rp(os.path.join("tools", "orion"))
-if os.path.exists(orion_dir):
-    for root2, dirs2, files2 in os.walk(orion_dir):
-        for f in files2:
-            if f == "WebUpdate.ini":
-                continue
-            src = os.path.join(root2, f)
-            rel = os.path.relpath(src, _rp("tools"))
-            datas.append((src, os.path.join("tools", os.path.dirname(rel))))
 
 hiddenimports = [
     "keyboard",
@@ -113,7 +104,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name="WoT Assistant",
+    name="SM WoT Assistant",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -134,5 +125,5 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="WoT Assistant",
+    name="SM WoT Assistant",
 )
