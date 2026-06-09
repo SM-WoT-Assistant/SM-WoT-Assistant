@@ -16,21 +16,11 @@ InstallDir "$PROGRAMFILES64\${PRODUCT_NAME}"
 InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
 RequestExecutionLevel admin
 
-; ----- MUI (Modern UI) -----
-!include "MUI2.nsh"
+Page directory
+Page instfiles
 
-!define MUI_ABORTWARNING
-!define MUI_ICON "logo.ico"
-!define MUI_UNICON "logo.ico"
-
-!insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
-!insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_INSTFILES
-!insertmacro MUI_PAGE_FINISH
-
-!insertmacro MUI_UNPAGE_INSTFILES
-!insertmacro MUI_LANGUAGE "English"
+UninstPage uninstConfirm
+UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
