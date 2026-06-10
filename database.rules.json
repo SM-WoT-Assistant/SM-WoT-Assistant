@@ -13,6 +13,9 @@
     },
     "schemes": {
       ".indexOn": ["created_at", "map_id"]
+    },
+    "versions": {
+      ".indexOn": ["release_date"]
     }
   }
 }
