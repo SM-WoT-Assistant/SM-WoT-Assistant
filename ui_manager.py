@@ -126,7 +126,13 @@ class UIManager:
         os.startfile(url)
 
     def _show_settings_menu(self):
+        if hasattr(self, '_settings_win') and self._settings_win and self._settings_win.winfo_exists():
+            self._settings_win.destroy()
+            self._settings_win = None
+            return
+
         menu = tk.Toplevel(self.app.root)
+        self._settings_win = menu
         menu.overrideredirect(True)
         menu.attributes("-topmost", True)
         menu.configure(bg="#252525", bd=1, relief="solid", highlightthickness=0)
@@ -171,6 +177,7 @@ class UIManager:
 
         def close():
             try:
+                self._settings_win = None
                 menu.destroy()
             except Exception:
                 pass

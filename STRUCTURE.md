@@ -75,6 +75,12 @@
 ├── selenium_parse_consumables.py # Selenium: parse consumable data
 ├── selenium_selected.py        # Selenium: handle selected state
 ├── name_localizer.py           # Tank name localization utilities
+├── firebase_identity.py        # Local identity system (nickname + 4-digit PIN, SHA-256 hash, stored in AppData/identity.json)
+├── firebase_reporter.py        # RTDB REST: error reports, version pings, update checks, service events
+├── firebase_drawings.py        # RTDB REST: publish/download/delete tactical drawings (schemes/ node)
+├── firebase.json               # Firebase Hosting + Database configuration
+├── .firebaserc                 # Firebase project alias ("sm-wot-assistant")
+├── database.rules.json         # RTDB security rules + indexes (versions, schemes, error_reports, installations, service_events)
 ├── network_requests.py         # HTTP request utilities
 ├── finder.py                   # File/pattern finder utility
 ├── find_refs3.py               # Reference finder
@@ -99,6 +105,14 @@
 ├── tth_orion_batch.py          # Orion-based TTH batch processing
 ├── _fill_all_builds.py         # Batch AI build filler
 ├── patch_stats_ai_*.py         # Stats AI patches
+├── public/                     # Firebase Hosting static website (sm-wot-assistant.web.app)
+│   ├── index.html              # Landing page (UA/EN toggle, download, features, schemes, releases from RTDB)
+│   ├── schemes.html            # Community tactical schemes browser (map filter, invite-code groups, PIN auth)
+│   ├── drawings.html           # Drawing gallery with download
+│   ├── admin.html              # Admin dashboard (stats, schemes management, version management)
+│   ├── 404.html                # Custom 404 page
+│   ├── logo.png                # Website logo
+│   └── example_map.png         # Example map image
 ├── maps/                       # Map images for TACTIC mode (webp/jpg/png)
 │   ├── Karelia/                # One subfolder per map
 │   ├── Malinovka/
@@ -118,6 +132,8 @@
 │   ├── ussr/
 │   └── ...
 ├── extracted_gui/              # Extracted GUI assets
+├── extrated_icons/             # Additional tank icons extracted from client (.png per tank)
+├── Tactik_Shemi/               # Exported tactical drawing JSONs (per-map tactic files)
 ├── icon/                       # Custom icons
 │   └── Broken_tree.svg         # Broken tree marker icon
 ├── localization/               # Translation JSON files
@@ -134,6 +150,7 @@
 ├── _decoded_search/            # Decoded XML map search results (per-map .xml files)
 ├── temp_scripts/               # Temporary extraction scripts (scripts/, arena_defs/, common/, entity_defs/, space_defs/)
 ├── temp_scripts2/              # Temporary extraction scripts v2 (scripts/, arena_defs/, common/, component_defs/, entity_defs/)
+├── .firebase/                  # Firebase CLI cache (auto-generated)
 ├── .kilo/                      # Kilo worktree system data
 ├── .venv/                      # Python virtual environment(s)
 ├── .vscode/                    # VS Code workspace settings
@@ -146,6 +163,11 @@
 - Purpose: All application source code, data files, and configuration live at root level (no `src/` directory)
 - Contains: 180+ Python scripts, JSON data files, TTF fonts, markdown docs, SVG icons, `installer.nsi`
 - Key files: `main.py`, `config.py`, `settings.json`
+
+**public/:**
+- Purpose: Firebase Hosting static website served at `sm-wot-assistant.web.app`
+- Contains: Landing page (`index.html`) with UA/EN language toggle, download button, features grid, tactical schemes promo, releases table from RTDB; `schemes.html` community schemes browser with map filter, invite-code groups, and PIN-based auth; `drawings.html` gallery; `admin.html` admin dashboard; `404.html` custom error page; static assets (`logo.png`, `example_map.png`)
+- Key files: `index.html`, `schemes.html`
 
 **maps/:**
 - Purpose: Map images for TACTIC mode (sourced from website, not game client)
@@ -168,6 +190,12 @@
 
 **extracted_gui/:**
 - Purpose: Extracted GUI assets from game client
+
+**extrated_icons/:**
+- Purpose: Additional tank icon set extracted from game client, one `.png` per tank (historically variant of `extracted_icons/`)
+
+**Tactik_Shemi/:**
+- Purpose: Exported tactical drawing JSON files, one per map, for backup/sharing
 
 **icon/:**
 - Purpose: Custom application icons not extracted from game
@@ -211,7 +239,7 @@
 
 ## Key File Locations
 
-**Entry Points:** `main.py`: Application startup, creates `WotAssistantHQ` with all managers, `--ai-webview` CLI routing, `os.chdir(config.BASE_DIR)`, AppData seeding via `config.DEFAULT_FILES`; `build.py`: 7-phase PyInstaller onedir build + NSIS installer + portable ZIP + GitHub release
+**Entry Points:** `main.py`: Application startup, creates `WotAssistantHQ` with all managers, `--ai-webview` CLI routing, `os.chdir(config.BASE_DIR)`, AppData seeding via `config.DEFAULT_FILES`, Firebase global excepthook + ping + auto-update check; `build.py`: 7-phase PyInstaller onedir build + NSIS installer + portable ZIP + GitHub release + RTDB version publish
 **Configuration:** `config.py`: File paths (`BUNDLE_DIR` for bundled assets, `USER_DATA_DIR` for writable AppData), `load_version()`, `TECH_MAPS_STAGING` map name mappings, `DEFAULT_FILES` seeding list; `VERSION`: Plaintext semver consumed by config and build; `wot_assistant.spec`: PyInstaller packaging spec (fixed `runtime_jsons`, COLLECT step); `installer.nsi`: NSIS installer script (lzma, standard pages); `settings.json`: Runtime user settings
 **Core Logic:** `main.py` (class WotAssistantHQ): Central hub; `map_manager.py`: Map data and game version management, unified TACTIC↔MAPS list; `stats_ai.py` (class StatsAI): AI build system, subprocess webview launch
 **Window Management:** `window_manager.py`: Window positioning, resizing, transparency, click-through, game focus; `ui_manager.py`: UI layout construction, view switching
@@ -220,7 +248,8 @@
 **Drawing System:** `painter.py` (class MapPainter): Tactical markers/arrows/text with Ctrl+Z undo, resize, right-click edit/delete, edit-mode selection rectangle, _draw_class_icons filtered against active checkboxes, overlay canvas (_po_win Toplevel) with transient/Unmap/Map bindings, _po_sync_timer 500ms; `painting_palette.py` (class DrawingPalette): Floating non-modal palette with toolbar (marker, XVMSymbol class icons, tree FontAwesome icon, 8 tactical icons), mode/class checkboxes, text entry, 5-color history color picker, delete button, status bar, deselection on click-away
 **AI Pipeline:** `generate_prompt_v2.py`: Build AI prompts from client data (popular tanks prompt asks for tiers 8-11); `ai_webview_gui.py`: PyQt6 QWebEngineView browser launched as subprocess via `--ai-webview`, starts minimized with taskbar icon hidden, file-based capture (wot_ai_response.txt) with stdout fallback and RESPONSE_READY sentinel; `ai_normalizer.py`: Response validation; `stats_data.py`: Equipment/skill/consumable mappings
 **Localization:** `translations.py`: Default translations; `locale_manager.py` (class LocaleManager): Runtime translation resolution; `locales.json`: Editable translation overrides
-**Persistence Data:** `settings.json`, `tank_db.json`, `tank_tth.json`, `crew_builds.json`, `equipment_loadouts.json`, `tank_slots_full.json`, `map_drawings.json`, `game_entities_english.json`, `ai_builds_cache.json`, `popular_tanks_cache.json`
+**Persistence Data:** `settings.json`, `tank_db.json`, `tank_tth.json`, `crew_builds.json`, `equipment_loadouts.json`, `tank_slots_full.json`, `map_drawings.json`, `game_entities_english.json`, `ai_builds_cache.json`, `popular_tanks_cache.json`, `identity.json` (AppData — nickname, PIN hash, user_id)
+**Firebase/Cloud:** `firebase_identity.py`: Local identity + PIN auth; `firebase_reporter.py`: RTDB error/analytics/versions; `firebase_drawings.py`: RTDB drawing CRUD; `firebase.json` + `.firebaserc`: Firebase project config; `database.rules.json`: RTDB security rules; `public/`: Static website deployed to Firebase Hosting
 **Tests:** Scattered `test_*.py` files at root (no dedicated `tests/` directory)
 
 ## Naming Conventions
@@ -246,4 +275,6 @@
 **New settings:** Add property to `config.py`, read/write in `main.py:save_settings/__init__`, add UI control in `ui_manager.py:build_filters` or settings menu
 **New view:** Add button in `ui_manager.py:setup_ui`, implement show_view logic in `ui_manager.py:show_view`, wire in `main.py`
 **New deployment target:** Add to `build.py:copy_data_files()` exclusion logic or `wot_assistant.spec` `runtime_jsons` list (for JSONs), or extend `build.py` with new packaging steps (e.g., new directories)
+**New Firebase feature:** Add to `firebase_reporter.py` for analytics/reporting, `firebase_drawings.py` for cloud data sync, or create new `firebase_*.py` module following the REST API pattern (API key auth, `_rtdb_url()` path builder, `_put`/`_post`/`_get` helpers)
+**New website page:** Create `.html` file in `public/`, link from `public/index.html`, use Firebase RTDB REST API for dynamic data (same API key pattern as Python modules)
 **New version scheme:** Edit `VERSION`, update `config.load_version()` format handling if needed

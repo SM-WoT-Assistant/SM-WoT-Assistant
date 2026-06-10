@@ -54,8 +54,9 @@
     <img src="logo.png" alt="SM WoT Assistant">
     <h1>SM WoT Assistant</h1>
     <p class="subtitle" id="t-subtitle">Тактичний помічник для World of Tanks — карти, тактики, AI білди</p>
-    <a href="#" id="download-btn" class="btn btn-primary" id="t-download">Завантажити</a>
+    <a href="#" id="download-btn" class="btn btn-primary">Завантажити</a>
     <p class="version" id="latest-version">Windows 10/11</p>
+    <p class="version" id="t-smartscreen" style="color:#777;font-size:11px;margin-top:4px;">Windows SmartScreen може попередити про невідомого видавця. Натисніть «Виконати в будь-якому разі».</p>
 </header>
 
 <main>
@@ -150,6 +151,7 @@ const T = {
         "releases-dl": "Завантажити",
         update: "Як оновитись",
         "update-desc": "Програма автоматично перевіряє наявність нової версії при запуску. Якщо доступне оновлення — ви побачите повідомлення в статус-барі. Також ви завжди можете завантажити останню версію вручну з цієї сторінки.",
+        smartscreen: "Windows SmartScreen може попередити про невідомого видавця. Натисніть «Виконати в будь-якому разі».",
     },
     en: {
         subtitle: "Tactical assistant for World of Tanks — maps, tactics, AI builds",
@@ -173,6 +175,7 @@ const T = {
         "releases-dl": "Download",
         update: "How to update",
         "update-desc": "The app automatically checks for new versions on startup. If an update is available, you'll see a notification in the status bar. You can also always download the latest version manually from this page.",
+        smartscreen: "Windows SmartScreen may warn about an unknown publisher. Click \"Run anyway\".",
     }
 };
 
@@ -205,6 +208,7 @@ function applyTranslations() {
     document.getElementById("t-update").textContent = t("update");
     document.getElementById("t-update-desc").textContent = t("update-desc");
     document.getElementById("t-releases-loading").textContent = t("releases-loading");
+    document.getElementById("t-smartscreen").textContent = t("smartscreen");
 }
 setLang(siteLang);
 

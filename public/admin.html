@@ -73,6 +73,15 @@
         </div>
 
         <div class="card">
+            <h2>Релізи (RTDB versions/)</h2>
+            <div style="margin-bottom:10px;">
+                <button class="btn btn-danger" onclick="deleteOldReleases()">🗑 Видалити всі крім останнього</button>
+                <span style="color:#888;font-size:12px;margin-left:10px;" id="release-count"></span>
+            </div>
+            <div id="releases-container"><div class="empty">Завантаження...</div></div>
+        </div>
+
+        <div class="card">
             <h2>Схеми (RTDB schemes/)</h2>
             <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
                 <button class="btn btn-danger" onclick="deleteAllLegacySchemes()">🗑 Видалити всі старі (без PIN)</button>
@@ -147,6 +156,7 @@ function loadDashboard() {
     loadErrors();
     loadInstallations();
     loadAdminSchemes();
+    loadAdminReleases();
 }
 
 function objSize(obj) { return obj ? Object.keys(obj).length : 0; }
@@ -294,6 +304,74 @@ function deleteAllLegacySchemes() {
     function finish() {
         alert(`Видалено: ${done}, помилок: ${failed}`);
         loadAdminSchemes();
+    }
+}
+
+// ═══ Releases management ═══
+let allAdminReleases = [];
+
+function loadAdminReleases() {
+    db.ref("versions").once("value")
+        .then(snap => {
+            const data = snap.val();
+            if (!data) {
+                document.getElementById("releases-container").innerHTML = '<div class="empty">Немає релізів</div>';
+                allAdminReleases = [];
+                return;
+            }
+            allAdminReleases = Object.entries(data)
+                .map(([key, val]) => ({ ...val, _key: key }))
+                .filter(r => r.version);
+            allAdminReleases.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
+            document.getElementById("release-count").textContent = `Всього: ${allAdminReleases.length}`;
+            renderAdminReleases();
+        })
+        .catch(() => {
+            document.getElementById("releases-container").innerHTML = '<div class="empty">Помилка завантаження</div>';
+        });
+}
+
+function renderAdminReleases() {
+    const container = document.getElementById("releases-container");
+    if (!allAdminReleases.length) {
+        container.innerHTML = '<div class="empty">Немає релізів</div>';
+        return;
+    }
+    let html = '<table><tr><th>Версія</th><th>Дата</th><th>Розмір</th><th>URL</th><th></th></tr>';
+    allAdminReleases.forEach(r => {
+        html += `<tr>
+            <td style="color:#ff4500;font-weight:bold">v${r.version || ''}</td>
+            <td>${(r.release_date || '').slice(0,10)}</td>
+            <td>${r.build_size || '—'}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${r.download_url || '—'}</td>
+            <td><button class="btn btn-danger" onclick="deleteAdminRelease('${r._key}')">🗑</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+function deleteAdminRelease(key) {
+    if (!confirm("Видалити реліз " + key.replace(/_/g, '.') + "?")) return;
+    db.ref("versions/" + key).remove()
+        .then(() => loadAdminReleases())
+        .catch(() => alert("Помилка видалення"));
+}
+
+function deleteOldReleases() {
+    if (allAdminReleases.length <= 1) { alert("Немає старих релізів для видалення."); return; }
+    const toDelete = allAdminReleases.slice(1); // all except latest
+    if (!confirm(`Видалити ${toDelete.length} старих релізів, залишивши v${allAdminReleases[0].version}?`)) return;
+
+    let done = 0, failed = 0;
+    toDelete.forEach(r => {
+        db.ref("versions/" + r._key).remove()
+            .then(() => { done++; if (done + failed >= toDelete.length) finishR(); })
+            .catch(() => { failed++; if (done + failed >= toDelete.length) finishR(); });
+    });
+    function finishR() {
+        alert(`Видалено: ${done}, помилок: ${failed}`);
+        loadAdminReleases();
     }
 }
 </script>

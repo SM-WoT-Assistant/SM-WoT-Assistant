@@ -48,6 +48,13 @@
 - Depends on: World of Tanks game client, `ctypes`, `keyboard`, `mouse`, PyInstaller, GitHub CLI (`gh`)
 - Used by: Application Logic Layer
 
+**Firebase / Cloud Layer:**
+- Purpose: Local identity (nickname + 4-digit PIN), error reporting, usage pings, auto-update checks, drawing publication/sync via Firebase Realtime Database REST API
+- Location: `firebase_identity.py`, `firebase_reporter.py`, `firebase_drawings.py`, `public/` (Firebase Hosting static website), `firebase.json`, `.firebaserc`, `database.rules.json`
+- Contains: Local identity system (nickname + 4-digit PIN stored as SHA-256 hash in `identity.json` under `config.USER_DATA_DIR`), RTDB REST API client (PUT/POST with Firebase API key auth), error reporting with stack traces, version ping/check via `versions/` node, drawing publish/load/delete via `schemes/` node, auto-update dialog in `main.py`
+- Depends on: `requests`, Firebase RTDB (`europe-west1`), Firebase Hosting, `config.USER_DATA_DIR`
+- Used by: Application Logic Layer (`main.py` startup, quit, auto-update), Presentation Layer (`ui_manager.py` identity display, identity registration dialog)
+
 ## Data Flow
 
 **Startup Flow:**
@@ -82,11 +89,25 @@
 5. Response parsed and normalized by `ai_normalizer.py`
 6. Result cached to `ai_builds_cache.json` and rendered as composite icons
 
+**Auto-Update Flow:**
+1. On startup → `firebase_reporter.ping_version_async()` sends current version to RTDB (`installations/` node)
+2. On startup → `main.py:_check_for_app_updates()` calls `firebase_reporter.check_for_updates()`
+3. Reads latest release from RTDB `versions/` node → compares via `firebase_reporter.compare_versions()`
+4. If newer version available → shows status label update + optional auto-update dialog → opens download URL in browser
+5. On release build → `build.py:write_version_to_rtdb()` publishes version metadata (version, release_date, download_url, build_size) to RTDB `versions/` node
+
+**Drawing Publish/Download Flow:**
+1. User clicks publish (TACTIC mode with identity registered) → `firebase_drawings.publish_drawing()` serializes drawing elements, map info, author identity → PUT to RTDB `schemes/{drawing_id}`
+2. `public/schemes.html` (Firebase Hosting) reads from RTDB `schemes/` node, renders community schemes table with filters
+3. `public/drawings.html` renders gallery with download links
+4. Application can download published schemes via `firebase_drawings.download_drawing()` → GET from RTDB
+
 **Memory to Persistence (Cross-Session):**
 1. Tactical drawings → save on every edit → `data_manager.py:save_drawings` → `map_drawings.json`
 2. AI build cache → save after each successful AI response → `ai_builds_cache.json`
 3. Settings → save on window changes/close → `settings.json`
-4. Service events → `service_messages.json` queue for future server delivery
+4. Identity → save on registration/PIN change → `identity.json` in `config.USER_DATA_DIR`
+5. Service events → `service_messages.json` queue for future server delivery
 
 ## Key Abstractions
 
@@ -147,6 +168,12 @@
 - Triggers: Application startup
 - Responsibilities: Compare stored version with `version.xml`, trigger map/tank extraction if changed, update crew/equipment databases
 
+**Website (Firebase Hosting):**
+- Location: `public/` directory — served by Firebase Hosting at `sm-wot-assistant.web.app`
+- Pages: `index.html` (landing page with UA/EN toggle, download button, features, schemes promo, releases list from RTDB), `schemes.html` (community tactical schemes browser with map filter, invite-code groups, PIN-based auth), `drawings.html` (drawing gallery), `admin.html` (admin dashboard with stats, schemes management, version management), `404.html`
+- Data source: All dynamic data (schemes, versions, releases) read from Firebase RTDB via REST API with API key auth
+- Triggers: User visits website URL; `build.py` publishes version info on release
+
 ## Error Handling
 
 **Strategy:** Defensive with graceful degradation — fallback chains in data loading, try/except around external calls, safety timeouts for AI operations
@@ -178,6 +205,8 @@
 - Python 3.12 (C:\\Users\\PRO\\AppData\\Local\\Programs\\Python\\Python312) with PyInstaller 6.20.0 preferred — Python 3.14 has known DATA TOC bug
 - NSIS: `C:\\Program Files (x86)\\NSIS\\makensis.exe` (auto-detected by `build.py:find_nsis()`)
 - `config.DEFAULT_FILES` seeds 6 files to AppData on first launch: settings.json, locales.json, map_drawings.json, service_messages.json, popular_tanks_cache.json, ai_builds_cache.json
+- `build.py:write_version_to_rtdb()` — publishes version metadata (version, release_date, download_url, build_size) to Firebase RTDB `versions/{version}/` via REST API PUT after successful build; consumed by `main.py` auto-update check and `public/index.html` releases list
+- Firebase Hosting: `public/` directory deployed via `firebase deploy --only hosting` (manual); serves static website with RTDB-backed dynamic content
 
 **Logging:** Print-based console output with bracketed tags (`[INIT]`, `[SYNC]`, `[AI Tank Build]`, `[SERVICE]`, `[BUILD]`). No structured logging framework.
 
