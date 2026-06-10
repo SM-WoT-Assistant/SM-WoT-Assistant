@@ -212,11 +212,12 @@ def copy_data_files():
     def _cp(src, dst_rel):
         nonlocal total
         dst = os.path.join(target, dst_rel)
-        parent = os.path.dirname(dst) if os.path.splitext(dst)[1] else dst
-        os.makedirs(parent, exist_ok=True)
         if os.path.isfile(src):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
             shutil.copy2(src, dst)
             total += 1
+        elif os.path.isdir(src):
+            os.makedirs(dst, exist_ok=True)
 
     # Root JSONs — glob all, exclude debug/temp/tracking files
     _exclude_root = {
@@ -506,7 +507,7 @@ def write_version_to_rtdb(version):
         "version": version,
         "release_date": today,
         "build_size": installer_size,
-        "download_url": f"https://github.com/sm-wot-assistant/releases/tag/v{version}",
+        "download_url": f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Setup_v{version}.exe",
         "changelog": f"Release v{version}",
     }).encode("utf-8")
 

@@ -33,6 +33,8 @@ class UIManager:
         self.app.settings_menu.add_checkbutton(label="Автооновлення", variable=self.app.auto_update_var, command=self.app.save_settings)
         self.app.settings_menu.add_separator()
         self.app.settings_menu.add_command(label="Допомога (F1)", command=self.app.help_manager.toggle_overlay)
+        self.app.settings_menu.add_separator()
+        self.app.settings_menu.add_command(label=f"v{config.load_version()}", state="disabled")
         self.app.settings_menu.bind("<Unmap>", self.app._on_settings_unmap)
 
         self._build_identity_bar()
