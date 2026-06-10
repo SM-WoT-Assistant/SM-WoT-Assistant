@@ -19,23 +19,8 @@ class UIManager:
 
         tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
 
-        self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self.app.toggle_settings)
+        self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self._show_settings_menu)
         self.app.settings_btn.pack(side="right", padx=5, pady=7)
-        
-        self.app.settings_menu = tk.Menu(self.app.settings_btn, tearoff=0, bg="#333", fg="white")
-        self.app.settings_menu.add_command(label="Вказати папку гри (WoT)", command=self.app.ask_wot_path)
-        self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_checkbutton(label="Авто-фільтри (за логом)", variable=self.app.auto_sync_var, command=self.app.save_settings)
-        self.app.settings_menu.add_checkbutton(label="Авто-вибір режиму бою", variable=self.app.auto_mode_filter_var, command=self.app.save_settings)
-        self.app.settings_menu.add_checkbutton(label="Авто-вибір виду техніки", variable=self.app.auto_vehicle_filter_var, command=self.app.save_settings)
-        self.app.settings_menu.add_checkbutton(label="Авто-бойовий режим", variable=self.app.auto_battle_var, command=self.app.save_settings)
-        self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_checkbutton(label="Автооновлення", variable=self.app.auto_update_var, command=self.app.save_settings)
-        self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_command(label="Допомога (F1)", command=self.app.help_manager.toggle_overlay)
-        self.app.settings_menu.add_separator()
-        self.app.settings_menu.add_command(label=f"v{config.load_version()}", state="disabled")
-        self.app.settings_menu.bind("<Unmap>", self.app._on_settings_unmap)
 
         self._build_identity_bar()
 
@@ -139,6 +124,60 @@ class UIManager:
             from urllib.parse import quote
             url += f"?nick={quote(nick)}"
         os.startfile(url)
+
+    def _show_settings_menu(self):
+        menu = tk.Toplevel(self.app.root)
+        menu.overrideredirect(True)
+        menu.attributes("-topmost", True)
+        menu.configure(bg="#252525", bd=1, relief="solid", highlightthickness=0)
+
+        x = self.app.settings_btn.winfo_rootx() - 100
+        y = self.app.settings_btn.winfo_rooty() + self.app.settings_btn.winfo_height() + 2
+        menu.geometry(f"260x260+{x}+{y}")
+
+        def make_btn(text, cmd):
+            btn = tk.Button(menu, text=text, command=cmd, anchor="w",
+                           bg="#252525", fg="#cccccc", activebackground="#444",
+                           activeforeground="#ffffff", bd=0, font=("Arial", 9),
+                           padx=12, pady=4)
+            btn.pack(fill="x")
+
+        def make_chk(text, var):
+            cb = tk.Checkbutton(menu, text=text, variable=var, command=self.app.save_settings,
+                               anchor="w", bg="#252525", fg="#cccccc",
+                               selectcolor="#252525", activebackground="#444",
+                               activeforeground="#ffffff", bd=0, font=("Arial", 9),
+                               padx=12, pady=3)
+            cb.pack(fill="x")
+
+        def sep():
+            tk.Frame(menu, height=1, bg="#444").pack(fill="x", padx=12, pady=4)
+
+        make_btn("Вказати папку гри (WoT)", self.app.ask_wot_path)
+        sep()
+        make_chk("Автовибір мапи (за логом)", self.app.auto_sync_var)
+        make_chk("Автовибір режиму бою", self.app.auto_mode_filter_var)
+        make_chk("Автовибір класу техніки", self.app.auto_vehicle_filter_var)
+        make_chk("Авто-бойовий режим", self.app.auto_battle_var)
+        sep()
+        make_chk("Автооновлення", self.app.auto_update_var)
+        sep()
+        make_btn("Допомога (F1)", self.app.help_manager.toggle_overlay)
+        sep()
+
+        ver_label = tk.Label(menu, text=f"v{config.load_version()}",
+                            bg="#252525", fg="#666666", font=("Arial", 8))
+        ver_label.pack(pady=(4, 6))
+
+        def close():
+            try:
+                menu.destroy()
+            except Exception:
+                pass
+
+        menu.bind("<FocusOut>", lambda e: self.app.root.after(100, close))
+        menu.bind("<Escape>", lambda e: close())
+        menu.focus_set()
 
     def _confirm_logout(self):
         dlg = tk.Toplevel(self.app.root)

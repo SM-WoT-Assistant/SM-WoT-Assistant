@@ -9,9 +9,11 @@ if os.name == 'nt':
     except:
         pass
 
-import threading
 import time
+import threading
 import subprocess
+import tempfile
+import requests
 import tkinter as tk
 from tkinter import ttk, filedialog
 from PIL import Image, ImageTk, ImageOps, ImageEnhance
@@ -92,7 +94,6 @@ class WotAssistantHQ:
         self.current_map_eng = None
         self.current_tk_map = None
         self.drag = None
-        self._menu_is_active = False
         self.help_manager = help_system.HelpManager(self)
 
         self.selected_battle_mode = tk.StringVar(value="Standard")
@@ -312,21 +313,7 @@ class WotAssistantHQ:
             self.status_label.config(text="[СТАТ АІ] Ключ оновлено успішно!", fg="lime")
 
 
-    def toggle_settings(self):
-        if self._menu_is_active:
-            self.settings_menu.unpost()
-            self._menu_is_active = False
-        else:
-            x = self.settings_btn.winfo_rootx()
-            y = self.settings_btn.winfo_rooty() + self.settings_btn.winfo_height()
-            self.settings_menu.post(x, y)
-            self._menu_is_active = True
-
-    def _on_settings_unmap(self, event):
-        self.root.after(100, self._set_menu_inactive)
-
-    def _set_menu_inactive(self):
-        self._menu_is_active = False
+        self._last_mode_hotkey_ts = 0
 
     def toggle_editor(self):
         if self.dialog_open: return 
@@ -740,20 +727,96 @@ class WotAssistantHQ:
         sys.exit(0)
 
     def _check_for_app_updates(self):
-        if not self.auto_update_var.get():
-            return
         def _on_result(latest):
-            if latest:
-                latest_ver = latest.get("version", "")
-                current_ver = config.load_version()
-                if firebase_reporter.compare_versions(current_ver, latest_ver):
-                    dl = latest.get("download_url", "https://sm-wot-assistant.web.app")
-                    msg = f"[ОНОВЛЕННЯ] Доступна v{latest_ver} (у вас v{current_ver})"
-                    if hasattr(self, "status_label"):
-                        self.status_label.config(text=msg, fg="lime")
-                    print(msg)
-                    print(f"           Завантажити: {dl}")
+            if not latest:
+                return
+            latest_ver = latest.get("version", "")
+            current_ver = config.load_version()
+            if not firebase_reporter.compare_versions(current_ver, latest_ver):
+                return
+            dl = latest.get("download_url", "")
+            msg = f"[ОНОВЛЕННЯ] Доступна v{latest_ver} (у вас v{current_ver})"
+            print(msg)
+            def _show():
+                if hasattr(self, "status_label"):
+                    self.status_label.config(text=msg, fg="lime")
+                if self.auto_update_var.get():
+                    self._show_update_dialog(latest_ver, current_ver, dl)
+            self.root.after(0, _show)
         firebase_reporter.check_for_updates(on_done=_on_result)
+
+    def _show_update_dialog(self, latest_ver, current_ver, download_url):
+        dlg = tk.Toplevel(self.root)
+        dlg.title("Оновлення")
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+
+        cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
+        cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 80
+        dlg.geometry(f"300x180+{cx}+{cy}")
+
+        tk.Label(dlg, text="Доступне оновлення", font=("Arial", 12, "bold"),
+                 bg="#222", fg="#ffaa00").pack(pady=(15, 5))
+        tk.Label(dlg, text=f"SM WoT Assistant v{latest_ver}",
+                 font=("Arial", 11), bg="#222", fg="#ff4500").pack()
+        tk.Label(dlg, text=f"готовий до встановлення.\nУ вас: v{current_ver}",
+                 font=("Arial", 9), bg="#222", fg="#aaa", justify="center").pack(pady=(4, 12))
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack()
+
+        def do_update():
+            dlg.destroy()
+            if download_url:
+                self._download_and_install(download_url)
+
+        def do_later():
+            dlg.destroy()
+
+        tk.Button(bf, text="  Оновити зараз  ", bg="#335533", fg="#99cc99", bd=0,
+                  font=("Arial", 10, "bold"), padx=12, pady=6,
+                  command=do_update).pack(side="left", padx=8)
+        tk.Button(bf, text="  Пізніше  ", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 10), padx=12, pady=6,
+                  command=do_later).pack(side="left", padx=8)
+
+        self.root.wait_window(dlg)
+
+    def _download_and_install(self, url):
+
+        def _run():
+            def status(msg, fg="cyan"):
+                if hasattr(self, "status_label"):
+                    self.root.after(0, lambda: self.status_label.config(text=msg, fg=fg))
+            try:
+                tmp = os.path.join(tempfile.gettempdir(), "SM_WoT_Assistant_Setup.exe")
+                print(f"[ОНОВЛЕННЯ] Завантаження: {url}")
+                status("[ОНОВЛЕННЯ] Завантаження...")
+                r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
+                total = int(r.headers.get("content-length", 0))
+                downloaded = 0
+                with open(tmp, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total:
+                            pct = downloaded * 100 // total
+                            if pct % 10 == 0:
+                                status(f"[ОНОВЛЕННЯ] Завантаження... {pct}%")
+                print(f"[ОНОВЛЕННЯ] Завантажено: {downloaded / (1024*1024):.0f} MB")
+                status("[ОНОВЛЕННЯ] Встановлення...", "lime")
+                subprocess.Popen([tmp, "/S", "/NCRC"], shell=True)
+                self.root.after(800, lambda: (self.save_settings(), sys.exit(0)))
+            except Exception as e:
+                print(f"[ОНОВЛЕННЯ] Помилка: {e}")
+                status(f"[ОНОВЛЕННЯ] Помилка: {e}", "red")
+
+        t = threading.Thread(target=_run, daemon=True)
+        t.start()
 
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
