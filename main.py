@@ -30,6 +30,9 @@ import locale_manager
 import map_manager
 import data_manager
 import ui_manager
+import firebase_identity
+import firebase_reporter
+import firebase_drawings
 
 try:
     import map_extractor
@@ -80,6 +83,7 @@ class WotAssistantHQ:
         self.auto_battle_var = tk.BooleanVar(value=self.settings.get("auto_battle", False))
         self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
         self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
+        self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
         
         self.win_mgr = window_manager.WindowManager(self)
         self.win_mgr.initialize_window()
@@ -137,7 +141,7 @@ class WotAssistantHQ:
         self.load_logo()
         
         self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
-        self._init_painter_overlay()
+        self.painter.bind_events_to(self.canvas)
         self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
         self.drawing_palette.withdraw()
         
@@ -145,74 +149,15 @@ class WotAssistantHQ:
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
 
+        firebase_reporter.setup_global_excepthook(self)
+        firebase_reporter.ping_version_async(self)
+        self._check_for_app_updates()
+
         if bool(self.settings.get("disable_startup_splash", False)):
             self._start_startup_checks()
         else:
             self.show_small_loading_splash()
             self.root.after(120, self._start_startup_checks)
-
-    def _init_painter_overlay(self):
-        self._po_win = tk.Toplevel(self.root)
-        self._po_win.withdraw()
-        self._po_win.overrideredirect(True)
-        self._po_win.attributes("-topmost", True)
-        self._po_win.attributes("-transparentcolor", "#010101")
-        self._po_win.transient(self.root)
-        self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
-        self._po_canvas.pack(fill="both", expand=True)
-        self.painter.bind_events_to(self.canvas)
-        self.painter.bind_events_to(self._po_canvas)
-        self.painter.canvas = self._po_canvas
-        self.canvas.bind("<Configure>", self._sync_po_pos, "+")
-        self.root.bind("<Configure>", self._sync_po_pos, "+")
-        self.root.bind("<Unmap>", self._on_root_hide, "+")
-        self.root.bind("<Map>", self._on_root_show, "+")
-        self._po_sync_timer = None
-
-    def _sync_po_pos(self, event=None):
-        palette = getattr(self, 'drawing_palette', None)
-        if palette and palette.state() != 'withdrawn':
-            palette.lift()
-        if not hasattr(self, '_po_win') or self._po_win.state() == "withdrawn":
-            return
-        cx = self.canvas.winfo_rootx()
-        cy = self.canvas.winfo_rooty()
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
-        if cw > 50 and ch > 50:
-            self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
-            self._po_win.lift()
-
-    def _on_root_hide(self, event=None):
-        self._stop_po_sync_timer()
-        if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
-            self._po_win.attributes("-topmost", False)
-            self._po_win.withdraw()
-
-    def _on_root_show(self, event=None):
-        if self.active_view == "maps" and hasattr(self, '_po_win'):
-            self._po_win.attributes("-topmost", True)
-            self._po_win.deiconify()
-            self._sync_po_pos()
-            self._start_po_sync_timer()
-
-    def _start_po_sync_timer(self):
-        self._stop_po_sync_timer()
-        if self.active_view != "maps":
-            return
-        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
-
-    def _stop_po_sync_timer(self):
-        if hasattr(self, '_po_sync_timer') and self._po_sync_timer:
-            self.root.after_cancel(self._po_sync_timer)
-            self._po_sync_timer = None
-
-    def _po_sync_tick(self):
-        if self.active_view != "maps":
-            self._po_sync_timer = None
-            return
-        self._sync_po_pos()
-        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
 
     def _start_startup_checks(self):
         allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
@@ -235,9 +180,10 @@ class WotAssistantHQ:
 
         self.root.update_idletasks()
         top_h = self.top_bar.winfo_reqheight()
+        identity_h = self.identity_bar.winfo_reqheight() if hasattr(self, "identity_bar") else 0
         filter_h = self.filter_panel.winfo_reqheight() if hasattr(self, "filter_panel") else 0
         status_h = self.status_label.winfo_reqheight() if hasattr(self, "status_label") else 0
-        return top_h + filter_h + status_h
+        return top_h + identity_h + filter_h + status_h
 
     def process_queue(self):
         while self.thread_queue:
@@ -275,6 +221,7 @@ class WotAssistantHQ:
         self.settings["auto_battle"] = self.auto_battle_var.get()
         self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
         self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
+        self.settings["auto_update"] = self.auto_update_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
@@ -396,6 +343,7 @@ class WotAssistantHQ:
             self.root.after_cancel(self._rsz_timer)
         self.battle_status_top.pack_forget()
         self.top_bar.pack_forget()
+        if hasattr(self, 'identity_bar'): self.identity_bar.pack_forget()
         self.map_toolbar.pack_forget()
         self.filter_panel.pack_forget()
         self.status_label.pack_forget()
@@ -413,10 +361,12 @@ class WotAssistantHQ:
                 self.mode = "edit"
                 self.win_mgr.set_clickthrough(False)
                 self.top_bar.pack(side="top", fill="x")
+                if hasattr(self, 'identity_bar'): self.identity_bar.pack(side="top", fill="x")
         else:
             self.mode = "edit"
             self.win_mgr.set_clickthrough(False)
             self.top_bar.pack(side="top", fill="x")
+            if hasattr(self, 'identity_bar'): self.identity_bar.pack(side="top", fill="x")
 
         if self.active_view == "maps":
             self.status_label.pack_forget()
@@ -428,17 +378,8 @@ class WotAssistantHQ:
                     self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
                 self.status_label.pack(side="bottom", fill="x")
             self.canvas.pack(side="top", fill="both", expand=True)
-            if hasattr(self, '_po_win'):
-                self.root.update_idletasks()
-                self._po_win.deiconify()
-                self._sync_po_pos()
-                self.painter.redraw()
-                self._start_po_sync_timer()
+            self.painter.redraw()
         elif self.active_view == "stats":
-            self._stop_po_sync_timer()
-            if hasattr(self, '_po_win'):
-                self._po_win.attributes("-topmost", False)
-                self._po_win.withdraw()
             if hasattr(self, 'drawing_palette'):
                 self.drawing_palette.exit_edit_mode()
                 if self.drawing_palette.state() != 'withdrawn':
@@ -446,10 +387,6 @@ class WotAssistantHQ:
             self.status_label.pack(side="bottom", fill="x")
             self.browser_frame.pack(side="top", fill="both", expand=True)
         elif self.active_view == "ai_stats":
-            self._stop_po_sync_timer()
-            if hasattr(self, '_po_win'):
-                self._po_win.attributes("-topmost", False)
-                self._po_win.withdraw()
             if hasattr(self, 'drawing_palette'):
                 self.drawing_palette.exit_edit_mode()
                 if self.drawing_palette.state() != 'withdrawn':
@@ -527,11 +464,6 @@ class WotAssistantHQ:
         if hasattr(self, "battle_status_label"):
             self.battle_status_label.config(text=text, fg=fg)
 
-    def _lift_po_win(self):
-        if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
-            self._po_win.lift()
-            self._sync_po_pos()
-
     def toggle_formatting_mode(self):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
         if self.dialog_open:
@@ -548,12 +480,10 @@ class WotAssistantHQ:
             self.win_mgr.set_clickthrough(False)
             self.root.lift()
             self.root.focus_force()
-            self._lift_po_win()
         else:
             if self.mode == "norm":
                 self.win_mgr.set_clickthrough(True)
                 self.win_mgr.focus_game_window()
-            self._lift_po_win()
         self.refresh_mode_indicator()
 
     def toggle_visibility(self):
@@ -562,19 +492,10 @@ class WotAssistantHQ:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
-            if self.active_view == "maps" and hasattr(self, '_po_win'):
-                self._po_win.attributes("-topmost", True)
-                self._po_win.deiconify()
-                self._sync_po_pos()
-                self._start_po_sync_timer()
         else:
-            self._stop_po_sync_timer()
             if hasattr(self, 'stats_ai_module'):
                 self.stats_ai_module.stop_browser()
             self.save_settings()
-            if hasattr(self, '_po_win') and self._po_win.state() != "withdrawn":
-                self._po_win.attributes("-topmost", False)
-                self._po_win.withdraw()
             self.root.withdraw()
 
     def _ensure_edit_focus(self):
@@ -670,7 +591,7 @@ class WotAssistantHQ:
     def import_external_tactic(self):
         if not self.current_map_eng: return
         def on_success():
-            self.painter.save_data()
+            self.painter.data_mgr.save_drawings(self.painter.drawings)
             self.painter.redraw()
         
         tactics_manager.import_tactic(
@@ -812,9 +733,27 @@ class WotAssistantHQ:
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
         self.save_settings()
+        firebase_identity._save(firebase_identity._load())
+        firebase_reporter.try_flush_service_messages(self)
         keyboard.unhook_all() 
         self.root.destroy()
         sys.exit(0)
+
+    def _check_for_app_updates(self):
+        if not self.auto_update_var.get():
+            return
+        def _on_result(latest):
+            if latest:
+                latest_ver = latest.get("version", "")
+                current_ver = config.load_version()
+                if firebase_reporter.compare_versions(current_ver, latest_ver):
+                    dl = latest.get("download_url", "https://sm-wot-assistant.web.app")
+                    msg = f"[ОНОВЛЕННЯ] Доступна v{latest_ver} (у вас v{current_ver})"
+                    if hasattr(self, "status_label"):
+                        self.status_label.config(text=msg, fg="lime")
+                    print(msg)
+                    print(f"           Завантажити: {dl}")
+        firebase_reporter.check_for_updates(on_done=_on_result)
 
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))

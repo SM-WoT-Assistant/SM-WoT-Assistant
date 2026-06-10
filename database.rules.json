@@ -1,0 +1,18 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "error_reports": {
+      ".indexOn": ["timestamp", "version"]
+    },
+    "installations": {
+      ".indexOn": ["last_seen", "version"]
+    },
+    "service_events": {
+      ".indexOn": ["timestamp", "category"]
+    },
+    "schemes": {
+      ".indexOn": ["created_at", "map_id"]
+    }
+  }
+}

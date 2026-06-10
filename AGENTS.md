@@ -74,6 +74,57 @@
 5. MapPainter отримує overlay canvas замість основного.
 6. Події (click/drag/right-click) біндяться на обидва канваси (main + overlay) через `bind_events_to()` (painter.py:232), викликається з `_init_painter_overlay()` (main.py:159-160).
 
+## Релізний механізм (09.06.2026)
+
+### Створення релізу
+1. `python build.py` — білд з поточною VERSION
+2. `python build.py 1.0.2` — оновити VERSION → білд
+3. `python build.py 1.0.2 --release` — білд + GitHub release (gh)
+
+### Фази білду (build.py)
+1. **Pre-flight** — валідація semver (X.Y.Z), Python 3.12+PyInstaller, NSIS (makensis.exe), gh CLI, критичні файли (main.py, VERSION, wot_assistant.spec, logo.png), git status
+2. **Clean** — видалення `dist/SM WoT Assistant/` та `build/`
+3. **PyInstaller** (onedir) → `copy_data_files()` (3065 data files) → NSIS installer
+4. **Rename** onedir: `dist/SM WoT Assistant/` → `dist/SM WoT Assistant vX.Y.Z/`
+5. **Portable ZIP**: `SM_WoT_Assistant_Portable_vX.Y.Z.zip` (~390 MB)
+6. **Verify**: EXE, 10 critical JSONs, VERSION, fonts, maps/≥50, extracted_maps/≥60, extracted_icons/≥8
+7. **Manifest**: `dist/build_manifest_vX.Y.Z.txt` (усі файли + розміри)
+
+### Артефакти релізу в dist/
+- `SM WoT Assistant vX.Y.Z/` — версіонований onedir (~5795 файлів, ~750 MB)
+- `SM_WoT_Assistant_Setup_vX.Y.Z.exe` — NSIS інсталер (~320 MB, lzma 42.4%)
+- `SM_WoT_Assistant_Portable_vX.Y.Z.zip` — portable ZIP (~390 MB)
+- `build_manifest_vX.Y.Z.txt` — маніфест білду
+
+### Інструменти для білду
+- Python: Python 3.12 (PyInstaller 6.20.0) — Python 3.14 має баг DATA TOC
+- NSIS: `C:\Program Files (x86)\NSIS\makensis.exe` (build.py:find_nsis auto-detect)
+- GitHub CLI: `gh` (опціонально, для --release)
+- `PyInstaller 6.x` баг: DATA entries з Analysis не потрапляють у COLLECT → обхід: `copy_data_files()` копіює дані вручну після PyInstaller
+
+### Включення файлів у бандл (copy_data_files)
+- Усі `*.json` з кореня проєкту, КРІМ: `opencode.json`, `magic-context.jsonc`, `_fill_progress.json`, `.*_manifest.json` (3), `tomato_*.json` (6), `ukrainian_map_names.json`, `vehicle_slots_*.json` (2)
+- `VERSION`, TTF шрифти (xvmsymbol.ttf, fontawesome-webfont.ttf), .mo файли (3), `logo.png`
+- `maps/` (51 папка), `extracted_maps/` (63 файли), `extracted_icons/` (8 піддиректорій), `extracted_data/common/post_progression/`
+- `wot_assistant.spec` — синхронізований exclusion-list (довідково, не використовується через баг)
+
+### Версія у вікнах програми
+- Головне вікно: `main.py:1107` — `root.title(f"SM WoT Assistant v{config.load_version()}")`
+- Splash: `main.py:1045` — `config.load_version()`
+- Редактор (водяний знак): `map_renderer.py:249` — `config.load_version()`
+- Довідка (F1): `help_system.py:49` — `config.load_version()` (через import config)
+- AI WebView: `ai_webview_gui.py:28` — `_read_version()` (читає VERSION, не імпортує config)
+
+### Seeding файлів у AppData (перший запуск)
+- `config.DEFAULT_FILES` (config.py:34) = `["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]`
+- `main.py:1093-1101` — копіює з `config.BUNDLE_DIR` в `config.USER_DATA_DIR` якщо файл ще не існує
+
+### Порядок дій для нового релізу
+1. `python build.py X.Y.Z` — білд з новою версією
+2. Перевірити `dist/` артефакти (Verify phase перевіряє автоматично)
+3. Запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test
+4. Якщо все OK: `python build.py X.Y.Z --release` для GitHub release (або вручну через `gh`)
+
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.
 2. **Наприкінці сесії:** зберегти ключові факти в `ctx_memory`:
@@ -81,5 +132,5 @@
    - які баги/проблеми знайдено
    - які рішення прийнято
    - наступний крок
-3. **Під час сесії:** зберігати важливі архітектурні рішення, знайдені шляхи файлів, конфігурації, робочі команди негайно після їх виявлення.
+3. **Під час сесії:** зберегти важливі архітектурні рішення, знайдені шляхи файлів, конфігурації, робочі команди негайно після їх виявлення.
 4. **magic-context.jsonc** (02.06.2026): налаштовано на максимум — memory.injection_budget_tokens=20000, auto_promote=true, promotion_threshold=2, retrieval_count=1, auto_search score_threshold=0.3, pin_key_files enabled, embedding=local, sidekick enabled, two_pass historian.

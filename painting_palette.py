@@ -179,9 +179,9 @@ class DrawingPalette(tk.Toplevel):
         bf.pack(fill="x", padx=8, pady=(2, 6))
         tk.Button(bf, text=self.app.t('ui', 'clear'), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._clear_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text="\u0415\u043a\u0441\u043f\u043e\u0440\u0442 (.json)", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text="\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438", bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text="\u0406\u043c\u043f\u043e\u0440\u0442 (.json)", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text="\u0417\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0438\u0442\u0438", bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
@@ -236,6 +236,8 @@ class DrawingPalette(tk.Toplevel):
 
     def _lift_self(self):
         try:
+            self.master.lift()
+            self.master.attributes("-topmost", True)
             self.lift()
             self.attributes("-topmost", True)
         except:
@@ -270,8 +272,10 @@ class DrawingPalette(tk.Toplevel):
         self.master.attributes("-topmost", False)
         self.master.update_idletasks()
         c = colorchooser.askcolor(color=self.current_color, parent=self)[1]
-        self.attributes("-topmost", True)
+        self.master.lift()
         self.master.attributes("-topmost", True)
+        self.lift()
+        self.attributes("-topmost", True)
         if c:
             self._set_color(c)
 
@@ -304,14 +308,13 @@ class DrawingPalette(tk.Toplevel):
         self._save_position()
 
     def show(self):
-        self.attributes("-topmost", True)
-        self.transient(self.master)
         self.deiconify()
+        self.lift()
+        self.focus_force()
         self.update_idletasks()
         if self._saved_pos:
             self.geometry(self._saved_pos)
-        self.lift()
-        self.focus_force()
+        self.attributes("-topmost", True)
         self._sync_tool_state()
         self.after(100, self._lift_self)
 

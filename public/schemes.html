@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тактичні схеми — SM WoT Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a0a; color: #ccc; }
+        header { background: #1a1a1a; padding: 14px 24px; border-bottom: 2px solid #ff4500; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+        header h1 { font-size: 18px; }
+        header h1 a { color: #ff4500; text-decoration: none; }
+        nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .btn { display: inline-block; background: #333; color: #ccc; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; text-decoration: none; }
+        .btn:hover { background: #444; }
+        .btn-primary { background: #ff4500; color: #fff; }
+        .btn-primary:hover { background: #ff5722; }
+        .btn-green { background: #2a5a2a; color: #9f9; }
+        .btn-green:hover { background: #3a7a3a; }
+        .btn-blue { background: #1a3355; color: #7ab; }
+        .btn-blue:hover { background: #224466; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
+        main { max-width: 960px; margin: 0 auto; padding: 20px 24px; }
+        .filters { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+        .filters select, .filters input { background: #1a1a1a; color: #ccc; border: 1px solid #333; padding: 7px 12px; border-radius: 4px; font-size: 13px; }
+        .filters select { min-width: 180px; }
+        .stats { color: #666; font-size: 12px; margin-left: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid #1a1a1a; font-size: 13px; }
+        th { color: #888; font-weight: normal; font-size: 11px; text-transform: uppercase; background: #0d0d0d; }
+        .scheme-map { color: #ffaa00; font-weight: bold; }
+        .scheme-author { color: #aaa; }
+        .scheme-date { color: #666; font-size: 12px; }
+        .scheme-count { color: #888; font-size: 12px; }
+        .scheme-actions { display: flex; gap: 4px; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: #1a1a1a; border: 1px solid #333; border-radius: 10px; padding: 28px; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal h3 { color: #ffaa00; margin-bottom: 16px; font-size: 16px; }
+        .modal label { display: block; color: #888; font-size: 12px; margin-bottom: 4px; margin-top: 12px; }
+        .modal input, .modal select { width: 100%; background: #111; color: #ccc; border: 1px solid #333; padding: 8px 12px; border-radius: 4px; font-size: 14px; }
+        .modal .actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+        .empty { text-align: center; color: #555; padding: 40px; }
+        .toast { position: fixed; bottom: 20px; right: 20px; background: #2a5a2a; color: #9f9; padding: 12px 20px; border-radius: 6px; font-size: 13px; z-index: 200; opacity: 0; transition: opacity .3s; }
+        .toast.show { opacity: 1; }
+        .toast.error { background: #553333; color: #f66; }
+        .section-divider { border-top: 1px solid #1a1a1a; margin: 24px 0; padding-top: 16px; }
+        .section-divider h3 { color: #ffaa00; font-size: 14px; margin-bottom: 12px; }
+        .group-card { background: #151515; border: 1px solid #222; border-radius: 6px; padding: 12px 16px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; }
+        .group-card .code { font-family: monospace; color: #ffaa00; font-size: 15px; letter-spacing: 2px; }
+        .group-card .name { color: #ccc; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1><a href="index.html">SM WoT Assistant</a> — Тактичні схеми</h1>
+    <nav>
+        <button class="btn btn-sm" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff">UA</button>
+        <button class="btn btn-sm" id="lang-en" onclick="setLang('en')">EN</button>
+        <button class="btn btn-green" onclick="openUpload()">📤 Опублікувати схему</button>
+        <a href="index.html" class="btn">← На головну</a>
+    </nav>
+</header>
+
+<main>
+    <div class="filters">
+        <select id="map-filter" onchange="filterSchemes()">
+            <option value="">Всі мапи (60+)</option>
+        </select>
+        <select id="author-filter" onchange="filterSchemes()">
+            <option value="">Всі автори</option>
+        </select>
+        <span class="stats" id="stats"></span>
+    </div>
+
+    <div id="schemes-table">
+        <div class="empty">Завантаження...</div>
+    </div>
+</main>
+
+<!-- Upload Modal -->
+<div id="upload-modal" class="modal-overlay">
+    <div class="modal">
+        <h3>Опублікувати тактичну схему</h3>
+        <label>Нікнейм</label>
+        <input type="text" id="upload-nick" placeholder="Ваш нікнейм" maxlength="20">
+        <label>PIN (4 цифри)</label>
+        <input type="password" id="upload-pin" placeholder="Ваш PIN-код" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
+        <label>Назва схеми</label>
+        <input type="text" id="upload-title" placeholder="Напр. «Важка техніка ліворуч»" maxlength="60">
+        <label>Опис (необов'язково)</label>
+        <textarea id="upload-comment" placeholder="Опишіть тактику..." maxlength="500" rows="3" style="width:100%;background:#111;color:#ccc;border:1px solid #333;padding:8px;border-radius:4px;font-size:13px;resize:vertical;"></textarea>
+        <label>Файл JSON (один або декілька)</label>
+        <input type="file" id="upload-file" accept=".json" multiple onchange="updateUploadCount()">
+        <p id="upload-count" style="color:#888;font-size:12px;margin-top:4px;"></p>
+        <div class="actions">
+            <button class="btn" onclick="closeUpload()">Скасувати</button>
+            <button class="btn btn-primary" onclick="doUpload()">Опублікувати</button>
+        </div>
+    </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE",
+    authDomain: "sm-wot-assistant.firebaseapp.com",
+    databaseURL: "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "sm-wot-assistant",
+    storageBucket: "sm-wot-assistant.firebasestorage.app",
+    messagingSenderId: "154255345343",
+    appId: "1:154255345343:web:270af95b541878e2f9e80a",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ═══ Map Dictionary (UA + EN) ═══
+const MAP_NAMES = {
+    "ua": {
+        "01_karelia":"Карелія","02_malinovka":"Малинівка","03_campania_big":"Провінція",
+        "04_himmelsdorf":"Хіммельсдорф","05_prohorovka":"Прохорівка","06_ensk":"Енськ",
+        "06_ensk_big":"Регіон Енськ","07_lakeville":"Ласвілль","08_ruinberg":"Руїнберґ",
+        "08_ruinberg_sm24":"Лауерберг","101_dday":"Оверлорд","101_dday_sm24":"Пляж «Омаха»",
+        "105_germany":"Берлін","105_germany_sm24":"Фалленштат","108_normandy_nom":"Одер",
+        "10_hills":"Копальні","112_eiffel_tower_ctf":"Париж","114_czech":"Промзона",
+        "115_sweden":"Штиль","11_murovanka":"Мурованка","120_graf_zeppelin":"Нордскар",
+        "120_graf_zeppelin_scc":"Нордскар","121_lost_paradise_v":"Устрична затока",
+        "127_japort":"Стара гавань","128_last_frontier_v":"Застава","13_erlenberg":"Ерленберґ",
+        "140_fall_tanks":"Стара школа","141_dash_to_go":"Нова школа","142_road_to_dash":"Бойова школа",
+        "14_siegfried_line":"Лінія Зигфріда","14_siegfried_line_nom":"Західний вал",
+        "17_munchen":"Вайдпарк","18_cliff":"Круча","19_monastery":"Монастир",
+        "208_bf_epic_normandy":"Нормандія","209_wg_epic_suburbia":"Крафтверк",
+        "210_bf_epic_desert":"Фата-моргана","212_epic_random_valley_sm25":"Нібельбурґ",
+        "217_er_alaska":"Клондайк","23_westfeld":"Вестфілд","250_br_battle_city2-1":"Зона 404",
+        "251_br_battle_city3":"Арзагир 4.04","252_br_battle_city4":"Фірнульфір",
+        "28_desert":"Піщана ріка","29_el_hallouf":"Ель-Халлуф","31_airfield":"Летовище",
+        "33_fjord":"Фіорди","34_redshire":"Редшир","35_steppes":"Степи",
+        "36_fishing_bay":"Рибальська бухта","37_caucasus":"Перевал",
+        "38_mannerheim_line":"Лінія Маннергейма","44_north_america":"Лайв Окс",
+        "45_north_america":"Хайвей","47_canada_a":"Тихий берег",
+        "59_asia_great_wall":"Кордон імперії","60_asia_miao":"Перлинна річка",
+        "63_tundra":"Тундра","95_lost_city_ctf":"Загублене місто","99_poland":"Студзянки"
+    },
+    "en": {
+        "01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province",
+        "04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk",
+        "06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg",
+        "08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach",
+        "105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder",
+        "10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen",
+        "115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar",
+        "120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay",
+        "127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg",
+        "140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School",
+        "14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall",
+        "17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey",
+        "208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk",
+        "210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg",
+        "217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404",
+        "251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir",
+        "28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield",
+        "33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes",
+        "36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass",
+        "38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks",
+        "45_north_america":"Highway","47_canada_a":"Serene Coast",
+        "59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River",
+        "63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"
+    }
+};
+
+let currentLang = (localStorage.getItem("site_lang") || "ua");
+
+function setLang(lang) {
+    currentLang = lang;
+    localStorage.setItem("site_lang", lang);
+    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
+    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
+    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
+    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
+    const mapSel = document.getElementById("map-filter");
+    mapSel.innerHTML = '<option value="">Всі мапи / All maps</option>';
+    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
+    mapKeys.sort().forEach(id => {
+        mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
+    });
+    loadSchemes();
+}
+
+function mapLabel(id) { return (MAP_NAMES[currentLang] || MAP_NAMES["en"])[id] || id; }
+
+// ═══ State ═══
+let allSchemes = [];
+let allAuthors = new Set();
+let allMaps = new Set();
+
+function init() {
+    const mapSel = document.getElementById("map-filter");
+    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["ua"]);
+    mapKeys.sort().forEach(id => {
+        mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
+    });
+    // Auto-fill nickname from URL
+    const params = new URLSearchParams(window.location.search);
+    const nickParam = params.get("nick");
+    if (nickParam) {
+        document.getElementById("upload-nick").value = decodeURIComponent(nickParam);
+    }
+    setLang(currentLang);
+    loadSchemes();
+}
+
+function loadSchemes() {
+    db.ref("schemes").orderByChild("created_at").limitToLast(200).once("value")
+        .then(snap => {
+            allSchemes = [];
+            allAuthors.clear();
+            allMaps.clear();
+            const data = snap.val();
+            if (data) {
+                Object.values(data).forEach(s => {
+                    allSchemes.push(s);
+                    allAuthors.add(s.author_nickname);
+                    allMaps.add(s.map_id);
+                });
+                allSchemes.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+            }
+            const authSel = document.getElementById("author-filter");
+            authSel.innerHTML = '<option value="">Всі автори</option>';
+            [...allAuthors].sort().forEach(a => {
+                authSel.innerHTML += `<option value="${a}">${a}</option>`;
+            });
+            document.getElementById("stats").textContent =
+                `${allSchemes.length} схем · ${allAuthors.size} авторів · ${allMaps.size} мап`;
+            renderSchemes(allSchemes);
+        })
+        .catch(() => {
+            document.getElementById("schemes-table").innerHTML =
+                '<div class="empty">Помилка завантаження. Спробуйте пізніше.</div>';
+        });
+}
+
+function renderSchemes(schemes) {
+    const container = document.getElementById("schemes-table");
+    if (!schemes.length) {
+        container.innerHTML = '<div class="empty">Немає опублікованих схем. <a href="#" onclick="openUpload()" style="color:#ffaa00">Опублікувати першу!</a></div>';
+        return;
+    }
+    let html = '<table><tr><th>Мапа</th><th>Назва</th><th>Автор</th><th>Дата</th><th>Елем.</th><th></th></tr>';
+    schemes.forEach(s => {
+        html += `<tr>
+            <td class="scheme-map" title="${(s.map_id || '')}">${mapLabel(s.map_id) || s.map_name || ''}</td>
+            <td style="color:#ffaa00;font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.title || '').replace(/"/g, '&quot;')}">${s.title || '—'}</td>
+            <td class="scheme-author">${s.author_nickname || '—'}</td>
+            <td class="scheme-date">${(s.created_at || '').slice(0, 16)}</td>
+            <td class="scheme-count">${s.element_count || 0}</td>
+            <td class="scheme-actions">
+                <button class="btn btn-sm" onclick="deleteScheme('${s.drawing_id || ''}')" title="Видалити">🗑</button>
+                <button class="btn btn-sm" onclick="downloadScheme('${s.drawing_id || ''}')">⬇ JSON</button>
+                <button class="btn btn-sm btn-blue" onclick="downloadAuthorSchemes('${s.author_nickname || ''}')">⬇ Автор</button>
+            </td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+function filterSchemes() {
+    const mapVal = document.getElementById("map-filter").value;
+    const authorVal = document.getElementById("author-filter").value;
+    let filtered = allSchemes;
+    if (mapVal) filtered = filtered.filter(s => s.map_id === mapVal || s.map_name === mapVal);
+    if (authorVal) filtered = filtered.filter(s => s.author_nickname === authorVal);
+    document.getElementById("stats").textContent =
+        `${filtered.length} / ${allSchemes.length} схем`;
+    renderSchemes(filtered);
+}
+
+// ═══ Download ═══
+
+function downloadJSON(data, filename) {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast("Завантажено: " + filename);
+}
+
+function downloadScheme(drawingId) {
+    const s = allSchemes.find(x => x.drawing_id === drawingId);
+    if (!s) { toast("Схему не знайдено", true); return; }
+    const data = {
+        map_id: s.map_id,
+        map_name: s.map_name || mapLabel(s.map_id),
+        title: s.title || "",
+        comment: s.comment || "",
+        author: s.author_nickname,
+        elements: typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || [])
+    };
+    downloadJSON(data, `${mapLabel(s.map_id)}_${s.author_nickname || "anon"}.json`);
+}
+
+function downloadAuthorSchemes(nickname) {
+    const schemes = allSchemes.filter(s => s.author_nickname === nickname);
+    if (!schemes.length) { toast("Немає схем цього автора", true); return; }
+    const data = {
+        author: nickname,
+        scheme_count: schemes.length,
+        schemes: schemes.map(s => ({
+            map_id: s.map_id,
+            map_name: s.map_name || mapLabel(s.map_id),
+            elements: typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || []),
+            created_at: s.created_at
+        }))
+    };
+    downloadJSON(data, `schemes_by_${nickname}.json`);
+}
+
+// ═══ Upload ═══
+
+function openUpload() { document.getElementById("upload-modal").classList.add("active"); }
+function closeUpload() {
+    document.getElementById("upload-modal").classList.remove("active");
+    document.getElementById("upload-file").value = "";
+    document.getElementById("upload-count").textContent = "";
+}
+function updateUploadCount() {
+    const f = document.getElementById("upload-file");
+    document.getElementById("upload-count").textContent =
+        f.files.length ? `Вибрано файлів: ${f.files.length}` : "";
+}
+
+async function doUpload() {
+    const nick = document.getElementById("upload-nick").value.trim();
+    const pin = document.getElementById("upload-pin").value.trim();
+    const title = document.getElementById("upload-title").value.trim();
+    const comment = document.getElementById("upload-comment").value.trim();
+    const files = document.getElementById("upload-file").files;
+
+    if (!nick) { toast("Введіть нікнейм", true); return; }
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN має бути рівно 4 цифри", true); return; }
+    if (!title) { toast("Введіть назву схеми", true); return; }
+    if (!files.length) { toast("Виберіть JSON файл(и)", true); return; }
+
+    let pinHash;
+    try { pinHash = await hashPin(pin); } catch (e) { toast("Помилка хешування PIN", true); return; }
+
+    let uploaded = 0;
+    let errors = 0;
+
+    const processNext = (idx) => {
+        if (idx >= files.length) {
+            if (uploaded) {
+                let msg = `Опубліковано: ${uploaded} схем(и)`;
+                if (errors) msg += `, помилок: ${errors}`;
+                toast(msg);
+                closeUpload();
+                setTimeout(loadSchemes, 1000);
+            }
+            return;
+        }
+
+        const file = files[idx];
+        const reader = new FileReader();
+        reader.onload = () => {
+            try {
+                const data = JSON.parse(reader.result);
+                const mapId = data.map_id;
+                if (!mapId) {
+                    errors++;
+                    processNext(idx + 1);
+                    return;
+                }
+                let elements = data.drawings || data.elements || data;
+                if (Array.isArray(elements)) {
+                    // ok
+                } else if (Array.isArray(data.drawings)) {
+                    elements = data.drawings;
+                } else {
+                    throw new Error("Не знайдено масив елементів");
+                }
+                const drawingId = "web_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+                const scheme = {
+                    drawing_id: drawingId,
+                    map_id: mapId,
+                    map_name: mapLabel(mapId),
+                    author_nickname: nick,
+                    pin_hash: pinHash,
+                    title: title,
+                    comment: comment,
+                    elements: JSON.stringify(elements),
+                    element_count: elements.length,
+                    created_at: new Date().toISOString().replace("T", " ").slice(0, 19)
+                };
+                db.ref("schemes/" + drawingId).set(scheme)
+                    .then(() => { uploaded++; processNext(idx + 1); })
+                    .catch(() => { errors++; processNext(idx + 1); });
+            } catch (e) {
+                errors++;
+                processNext(idx + 1);
+            }
+        };
+        reader.readAsText(file);
+    };
+
+    processNext(0);
+}
+
+// ═══ SHA256 Hash (same salt as firebase_identity.py) ═══
+async function hashPin(pin) {
+    const msg = new TextEncoder().encode("wot_assistant_pin_salt_" + pin);
+    const hash = await crypto.subtle.digest("SHA-256", msg);
+    return [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+// ═══ Delete ═══
+async function deleteScheme(drawingId) {
+    const s = allSchemes.find(x => x.drawing_id === drawingId);
+    if (!s) { toast("Схему не знайдено", true); return; }
+
+    const pin = prompt("Введіть ваш PIN (4 цифри) для видалення схеми:\n\nМапа: " + mapLabel(s.map_id) + "\nНазва: " + (s.title || "—"));
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN має бути 4 цифри", true); return; }
+
+    let pinHash;
+    try { pinHash = await hashPin(pin); } catch (e) { toast("Помилка хешування", true); return; }
+
+    if (pinHash !== s.pin_hash) {
+        toast("Невірний PIN! Видалення відхилено.", true);
+        return;
+    }
+
+    db.ref("schemes/" + drawingId).remove()
+        .then(() => {
+            toast("Схему видалено.");
+            setTimeout(loadSchemes, 500);
+        })
+        .catch(() => toast("Помилка видалення.", true));
+}
+
+// ═══ Toast ═══
+
+let toastTimer;
+function toast(msg, isError) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.className = "toast show" + (isError ? " error" : "");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { el.className = "toast"; }, 3000);
+}
+
+init();
+</script>
+
+</body>
+</html>

@@ -80,3 +80,12 @@ Desktop.ini
 # Build output
 build/
 dist/
+
+# Firebase local cache
+.firebase/
+
+# Local tactic exports
+Tactik_Shemi/
+
+# Large temp archives
+temp_scripts.zip

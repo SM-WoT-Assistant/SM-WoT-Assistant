@@ -1,4 +1,5 @@
 import tkinter as tk
+import config
 
 class HelpManager:
     def __init__(self, app):
@@ -46,7 +47,7 @@ class HelpManager:
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
-        tk.Label(hdr, text="  SM WoT Assistant: ДОВІДКА", bg=hdr_bg, fg=title_fg,
+        tk.Label(hdr, text=f"  SM WoT Assistant v{config.load_version()}: ДОВІДКА", bg=hdr_bg, fg=title_fg,
                  font=("Arial", 9, "bold")).pack(side="left")
         tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
                   font=("Arial", 8), command=lambda: self.toggle_overlay()).pack(side="right", padx=4)

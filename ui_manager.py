@@ -1,6 +1,9 @@
+import os
 import tkinter as tk
 from tkinter import ttk
+import config
 import stats_ai
+import firebase_identity
 
 class UIManager:
     def __init__(self, app):
@@ -27,8 +30,12 @@ class UIManager:
         self.app.settings_menu.add_checkbutton(label="Авто-вибір виду техніки", variable=self.app.auto_vehicle_filter_var, command=self.app.save_settings)
         self.app.settings_menu.add_checkbutton(label="Авто-бойовий режим", variable=self.app.auto_battle_var, command=self.app.save_settings)
         self.app.settings_menu.add_separator()
+        self.app.settings_menu.add_checkbutton(label="Автооновлення", variable=self.app.auto_update_var, command=self.app.save_settings)
+        self.app.settings_menu.add_separator()
         self.app.settings_menu.add_command(label="Допомога (F1)", command=self.app.help_manager.toggle_overlay)
         self.app.settings_menu.bind("<Unmap>", self.app._on_settings_unmap)
+
+        self._build_identity_bar()
 
         self.app.battle_status_top = tk.Frame(self.app.root, bg="#111", height=18)
         self.app.battle_status_top.pack_propagate(False)
@@ -67,6 +74,174 @@ class UIManager:
         
         self.app.canvas.pack(side="top", fill="both", expand=True)
 
+    def _build_identity_bar(self):
+        self.app.identity_bar = tk.Frame(self.app.root, bg="#1a1a1a", height=28)
+        self.app.identity_bar.pack_propagate(False)
+        self.app.identity_bar.pack(side="top", fill="x")
+
+        self.app.identity_nick_label = tk.Label(
+            self.app.identity_bar, text="", bg="#1a1a1a", fg="#cccccc",
+            font=("Arial", 9, "bold")
+        )
+        self.app.identity_nick_label.pack(side="left", padx=10, pady=4)
+
+        self.app.identity_pin_label = tk.Label(
+            self.app.identity_bar, text="", bg="#1a1a1a", fg="#888888",
+            font=("Arial", 8)
+        )
+        self.app.identity_pin_label.pack(side="left", padx=(2, 15), pady=4)
+        self.app.identity_publish_btn = tk.Button(
+            self.app.identity_bar, text="Опублікувати", bg="#335555", fg="#ccc", bd=0,
+            font=("Arial", 8), padx=8,
+            command=self._open_publish_site
+        )
+        self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
+
+        self.app.identity_action_btn = tk.Button(
+            self.app.identity_bar, text="", bg="#333", fg="#ccc", bd=0,
+            font=("Arial", 8), padx=8,
+            command=self._identity_action
+        )
+        self.app.identity_action_btn.pack(side="right", padx=10, pady=3)
+
+        self._refresh_identity_bar()
+
+    def _refresh_identity_bar(self):
+        if firebase_identity.is_registered():
+            nick = firebase_identity.get_nickname()
+            pin_text = firebase_identity.get_pin_text()
+            self.app.identity_nick_label.config(text=f"  {nick}")
+            self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#888888")
+            self.app.identity_action_btn.config(text="Вийти", bg="#553333", fg="#cc9999")
+            if self.app.active_view == "maps" and self.app.map_mode == 2:
+                self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
+            else:
+                self.app.identity_publish_btn.pack_forget()
+        else:
+            self.app.identity_nick_label.config(text="  Не зареєстровано")
+            self.app.identity_pin_label.config(text="")
+            self.app.identity_action_btn.config(text="Зареєструватись", bg="#335533", fg="#99cc99")
+            self.app.identity_publish_btn.pack_forget()
+
+    def _identity_action(self):
+        if firebase_identity.is_registered():
+            self._confirm_logout()
+        else:
+            self._show_registration_dialog()
+
+    def _open_publish_site(self):
+        import os
+        nick = firebase_identity.get_nickname()
+        url = "https://sm-wot-assistant.web.app/schemes.html"
+        if nick:
+            from urllib.parse import quote
+            url += f"?nick={quote(nick)}"
+        os.startfile(url)
+
+    def _confirm_logout(self):
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title("Вийти")
+        dlg.configure(bg="#2a2a2a")
+        dlg.resizable(False, False)
+        dlg.minsize(260, 100)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 130
+        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 50
+        dlg.geometry(f"+{cx}+{cy}")
+
+        tk.Label(dlg, text="Вийти з облікового запису?\nМалюнки не будуть втрачені.",
+                 font=("Arial", 10), bg="#2a2a2a", fg="#cccccc", justify="center").pack(pady=(15, 10))
+
+        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf.pack(pady=(0, 10))
+        def on_yes():
+            dlg.destroy()
+            os.remove(os.path.join(config.USER_DATA_DIR, "identity.json"))
+            self._refresh_identity_bar()
+            self.app.status_label.config(text="Ви вийшли з облікового запису.", fg="#ffb347")
+            self.app.root.after(3000, lambda: self.app.status_label.config(text="[HANGAR]", fg="gray"))
+        tk.Button(bf, text="  Так  ", bg="#553333", fg="white", bd=0,
+                  font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
+        tk.Button(bf, text="  Ні  ", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=15, pady=4, command=dlg.destroy).pack(side="left", padx=10)
+        self.app.root.wait_window(dlg)
+
+    def _show_registration_dialog(self):
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title("Реєстрація")
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+
+        tk.Label(dlg, text="SM WoT Assistant", font=("Arial", 14, "bold"),
+                 bg="#222", fg="#ff4500").pack(pady=(15, 5))
+        tk.Label(dlg, text="Створіть обліковий запис для публікації малюнків",
+                 font=("Arial", 9), bg="#222", fg="#aaa").pack(pady=(0, 10))
+
+        f = tk.Frame(dlg, bg="#222")
+        f.pack(padx=25, pady=5)
+
+        tk.Label(f, text="Нікнейм:", font=("Arial", 10), bg="#222", fg="#ccc",
+                 anchor="e", width=10).grid(row=0, column=0, padx=(0, 10), pady=5, sticky="e")
+        nick_var = tk.StringVar()
+        nick_entry = tk.Entry(f, textvariable=nick_var, font=("Arial", 11),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=18, relief="flat", bd=4)
+        nick_entry.grid(row=0, column=1, pady=5)
+
+        tk.Label(f, text="PIN (4 цифри):", font=("Arial", 10), bg="#222", fg="#ccc",
+                 anchor="e", width=10).grid(row=1, column=0, padx=(0, 10), pady=5, sticky="e")
+        pin_var = tk.StringVar()
+        pin_entry = tk.Entry(f, textvariable=pin_var, font=("Arial", 11),
+                             bg="#333", fg="white", insertbackground="white",
+                             width=18, relief="flat", bd=4, show="•")
+        pin_entry.grid(row=1, column=1, pady=5)
+
+        status_var = tk.StringVar()
+        status_label = tk.Label(dlg, textvariable=status_var, font=("Arial", 9),
+                                bg="#222", fg="#ff6666", wraplength=280)
+        status_label.pack(pady=(5, 0))
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(10, 15))
+
+        def do_register():
+            nick = nick_var.get().strip()
+            pin = pin_var.get().strip()
+            ok, msg = firebase_identity.register(nick, pin)
+            if ok:
+                dlg.destroy()
+                self._refresh_identity_bar()
+                self.app.status_label.config(text=f"[АКАУНТ] Ласкаво просимо, {nick}!", fg="lime")
+                self.app.root.after(3000, lambda: self.app.status_label.config(text="[HANGAR]", fg="gray"))
+            else:
+                status_var.set(msg)
+
+        tk.Button(bf, text="  Зареєструватись  ", bg="#335533", fg="#99cc99", bd=0,
+                  font=("Arial", 10, "bold"), padx=15, pady=6,
+                  command=do_register).pack(side="left", padx=10)
+
+        def skip_registration():
+            dlg.destroy()
+        tk.Button(bf, text="  Пропустити  ", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=15, pady=6,
+                  command=skip_registration).pack(side="left", padx=10)
+
+        nick_entry.bind("<Return>", lambda e: pin_entry.focus_set())
+        pin_entry.bind("<Return>", lambda e: do_register())
+
+        dlg.update_idletasks()
+        w = dlg.winfo_reqwidth()
+        h = dlg.winfo_reqheight()
+        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - w // 2
+        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - h // 2
+        dlg.geometry(f"+{cx}+{cy}")
+
+        nick_entry.focus_set()
+        self.app.root.wait_window(dlg)
+
     def show_view(self, view_name, **kwargs):
         self.app.active_view = view_name
 
@@ -80,18 +255,21 @@ class UIManager:
         self.app.status_label.pack_forget()
         self.app.ai_frame.pack_forget()
         self.app.map_toolbar.pack_forget()
+        self.app.battle_status_top.pack_forget()
         
         self.app.top_bar.pack_forget()
+        self.app.identity_bar.pack_forget()
         self.app.top_bar.pack(side="top", fill="x")
+        self.app.identity_bar.pack(side="top", fill="x")
+
+        if view_name == "maps" and kwargs.get('mode', 1) == 2 and firebase_identity.is_registered():
+            self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
+        else:
+            self.app.identity_publish_btn.pack_forget()
 
         if view_name == "maps":
             mode = kwargs.get('mode', 1)
             self.app.map_mode = mode
-            if hasattr(self.app, '_po_win'):
-                self.app._po_win.attributes("-topmost", True)
-                self.app._po_win.deiconify()
-                self.app.root.update_idletasks()
-                self.app._sync_po_pos()
             if mode == 1:
                 self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
                 self.app.battle_status_top.pack(side="top", fill="x")
@@ -104,17 +282,10 @@ class UIManager:
                 self.app.status_label.config(height=2, bg="#1a1a1a")
                 self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
             self.app.canvas.pack(side="top", fill="both", expand=True)
-            self.app.root.update_idletasks()
-            self.app._sync_po_pos()
-            self.app._start_po_sync_timer()
             
             self.app.map_mgr.load_map_list()
 
         elif view_name == "stats":
-            self.app._stop_po_sync_timer()
-            if hasattr(self.app, '_po_win'):
-                self.app._po_win.attributes("-topmost", False)
-                self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
             self.app.status_label.config(text="[СТАТ] Запуск браузера...", fg="yellow", height=1, bg="#222")
@@ -129,10 +300,6 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
-            self.app._stop_po_sync_timer()
-            if hasattr(self.app, '_po_win'):
-                self.app._po_win.attributes("-topmost", False)
-                self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")

@@ -11,13 +11,15 @@ def export_tactic(parent, map_id, map_name, drawings):
         title=f"Експорт тактики: {map_name}",
         defaultextension=".json",
         filetypes=[("JSON files", "*.json")],
-        initialfile=f"tactic_{map_id}.json"
+        initialfile=f"{map_name}.json"
     )
     
     if file_path:
         data = {
             "map_id": map_id,
             "map_name": map_name,
+            "title": "",
+            "comment": "",
             "drawings": drawings[map_id]
         }
         try:

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SM WoT Assistant — Тактичний помічник для World of Tanks</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a0a; color: #ccc; line-height: 1.5; }
+        header { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 24px 40px; text-align: center; border-bottom: 3px solid #ff4500; }
+        header img { width: 96px; height: 96px; margin-bottom: 16px; border-radius: 16px; }
+        header h1 { font-size: 34px; color: #ff4500; margin-bottom: 6px; }
+        header .subtitle { font-size: 17px; color: #aaa; margin-bottom: 20px; }
+        .btn { display: inline-block; background: #333; color: #ccc; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-size: 15px; text-decoration: none; font-weight: bold; transition: background .2s; }
+        .btn:hover { background: #444; }
+        .btn-primary { background: #ff4500; color: #fff; font-size: 18px; padding: 14px 40px; }
+        .btn-primary:hover { background: #ff5722; }
+        .btn-secondary { background: #2a5a2a; color: #9f9; }
+        .btn-secondary:hover { background: #3a7a3a; }
+        .btn-schemes { background: #1a3355; color: #7ab; font-size: 16px; padding: 16px 36px; }
+        .btn-schemes:hover { background: #224466; color: #9cf; }
+        .version { color: #888; font-size: 13px; margin-top: 8px; }
+        main { max-width: 820px; margin: 0 auto; padding: 40px 24px; }
+        section { margin-bottom: 48px; }
+        section h2 { font-size: 22px; color: #ffaa00; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #222; }
+        .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+        @media (max-width: 700px) { .features { grid-template-columns: repeat(2, 1fr); } }
+        .feature-card { background: #151515; border-radius: 8px; padding: 18px 14px; border: 1px solid #222; text-align: center; }
+        .feature-card h3 { color: #ff4500; font-size: 16px; margin-bottom: 6px; }
+        .feature-card p { color: #999; font-size: 12px; }
+        .schemes-hero { background: #111; border: 1px solid #222; border-radius: 10px; padding: 32px 24px; text-align: center; }
+        .schemes-hero h3 { color: #ffaa00; font-size: 18px; margin-bottom: 8px; }
+        .schemes-hero p { color: #888; font-size: 14px; margin-bottom: 16px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #1a1a1a; font-size: 14px; }
+        th { color: #888; font-weight: normal; font-size: 12px; text-transform: uppercase; }
+        .release-ver { color: #ff4500; font-weight: bold; }
+        .release-date { color: #888; }
+        .release-size { color: #666; }
+        .release-dl { text-align: right; }
+        .empty { text-align: center; color: #555; padding: 40px; }
+        footer { text-align: center; padding: 40px 24px; color: #555; font-size: 13px; border-top: 1px solid #111; }
+        footer a { color: #777; text-decoration: none; }
+        footer a:hover { color: #aaa; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="text-align:right;padding:0 24px 10px;">
+        <button class="btn" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff;padding:4px 12px;font-size:12px;">UA</button>
+        <button class="btn" id="lang-en" onclick="setLang('en')" style="padding:4px 12px;font-size:12px;">EN</button>
+    </div>
+    <img src="logo.png" alt="SM WoT Assistant">
+    <h1>SM WoT Assistant</h1>
+    <p class="subtitle" id="t-subtitle">Тактичний помічник для World of Tanks — карти, тактики, AI білди</p>
+    <a href="#" id="download-btn" class="btn btn-primary" id="t-download">Завантажити</a>
+    <p class="version" id="latest-version">Windows 10/11</p>
+</header>
+
+<main>
+    <section id="features">
+        <h2 id="t-features">Можливості</h2>
+        <div class="features">
+            <div class="feature-card">
+                <h3>SETUP</h3>
+                <p id="t-feat-setup">AI білди для танків через Google Gemini. Обладнання, перки, витратні — оптимальний вибір для будь-якої машини.</p>
+            </div>
+            <div class="feature-card">
+                <h3>MAPS</h3>
+                <p id="t-feat-maps">60+ карт з гри з координатною сіткою 10×10. Всі дані з клієнта WoT, без хардкоду.</p>
+            </div>
+            <div class="feature-card">
+                <h3>TACTIC</h3>
+                <p id="t-feat-tactic">Малювання тактичних схем: маркери, стрілки, текст, іконки. Експорт/імпорт JSON. Публікація для клану.</p>
+            </div>
+            <div class="feature-card">
+                <h3>Overlay</h3>
+                <p id="t-feat-overlay">Напівпрозоре вікно поверх гри. Авто-виявлення мапи через python.log під час бою.</p>
+            </div>
+        </div>
+    </section>
+
+    <section id="schemes">
+        <div class="schemes-hero">
+            <h3 id="t-schemes-title">🗺️ Тактичні схеми спільноти</h3>
+            <p id="t-schemes-desc">60+ мап · Завантаження JSON · Обмін з кланом · Invite-коди для груп</p>
+            <a href="schemes.html" class="btn btn-schemes" id="t-schemes-btn">Переглянути схеми</a>
+        </div>
+    </section>
+
+    <section id="releases">
+        <h2 id="t-releases">Релізи</h2>
+        <div id="releases-container">
+            <div class="empty" id="t-releases-loading">Завантаження...</div>
+        </div>
+    </section>
+
+    <section id="update">
+        <h2 id="t-update">Як оновитись</h2>
+        <p id="t-update-desc" style="color:#999;font-size:14px;">
+            Програма автоматично перевіряє наявність нової версії при запуску.
+            Якщо доступне оновлення — ви побачите повідомлення в статус-барі.
+            Також ви завжди можете завантажити останню версію вручну з цієї сторінки.
+        </p>
+    </section>
+</main>
+
+<footer>
+    <p>SM WoT Assistant &copy; 2026 &nbsp;·&nbsp;
+    <a href="https://sm-wot-assistant.web.app">sm-wot-assistant.web.app</a></p>
+</footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE",
+    authDomain: "sm-wot-assistant.firebaseapp.com",
+    projectId: "sm-wot-assistant",
+    storageBucket: "sm-wot-assistant.firebasestorage.app",
+    messagingSenderId: "154255345343",
+    appId: "1:154255345343:web:270af95b541878e2f9e80a",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+// ═══ Translations ═══
+const T = {
+    ua: {
+        subtitle: "Тактичний помічник для World of Tanks — карти, тактики, AI білди",
+        download: "Завантажити",
+        features: "Можливості",
+        "feat-setup": "AI білди для танків через Google Gemini. Обладнання, перки, витратні — оптимальний вибір для будь-якої машини.",
+        "feat-maps": "60+ карт з гри з координатною сіткою 10×10. Всі дані з клієнта WoT, без хардкоду.",
+        "feat-tactic": "Малювання тактичних схем: маркери, стрілки, текст, іконки. Експорт/імпорт JSON. Публікація для клану.",
+        "feat-overlay": "Напівпрозоре вікно поверх гри. Авто-виявлення мапи через python.log під час бою.",
+        "schemes-title": "🗺️ Тактичні схеми спільноти",
+        "schemes-desc": "60+ мап · Завантаження JSON · Обмін з кланом · Invite-коди для груп",
+        "schemes-btn": "Переглянути схеми",
+        releases: "Релізи",
+        "releases-loading": "Завантаження...",
+        "releases-empty": "Немає опублікованих релізів",
+        "releases-error": "Помилка завантаження релізів",
+        "releases-check": "Перевірте",
+        "releases-table-ver": "Версія",
+        "releases-table-date": "Дата",
+        "releases-table-size": "Розмір",
+        "releases-dl": "Завантажити",
+        update: "Як оновитись",
+        "update-desc": "Програма автоматично перевіряє наявність нової версії при запуску. Якщо доступне оновлення — ви побачите повідомлення в статус-барі. Також ви завжди можете завантажити останню версію вручну з цієї сторінки.",
+    },
+    en: {
+        subtitle: "Tactical assistant for World of Tanks — maps, tactics, AI builds",
+        download: "Download",
+        features: "Features",
+        "feat-setup": "AI tank builds via Google Gemini. Equipment, perks, consumables — optimal choice for any vehicle.",
+        "feat-maps": "60+ in-game maps with 10×10 coordinate grid. All data from WoT client, no hardcoding.",
+        "feat-tactic": "Draw tactical schemes: markers, arrows, text, icons. JSON export/import. Clan publishing.",
+        "feat-overlay": "Semi-transparent overlay window on top of the game. Auto-detection of map via python.log during battle.",
+        "schemes-title": "🗺️ Community Tactical Schemes",
+        "schemes-desc": "60+ maps · JSON upload · Clan sharing · Group invite codes",
+        "schemes-btn": "Browse Schemes",
+        releases: "Releases",
+        "releases-loading": "Loading...",
+        "releases-empty": "No published releases",
+        "releases-error": "Error loading releases",
+        "releases-check": "Check",
+        "releases-table-ver": "Version",
+        "releases-table-date": "Date",
+        "releases-table-size": "Size",
+        "releases-dl": "Download",
+        update: "How to update",
+        "update-desc": "The app automatically checks for new versions on startup. If an update is available, you'll see a notification in the status bar. You can also always download the latest version manually from this page.",
+    }
+};
+
+let siteLang = (localStorage.getItem("site_lang") || "ua");
+function setLang(lang) {
+    siteLang = lang;
+    localStorage.setItem("site_lang", lang);
+    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
+    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
+    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
+    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
+    applyTranslations();
+    loadReleases();
+}
+function t(key) { return (T[siteLang] || T["en"])[key] || key; }
+
+function applyTranslations() {
+    document.getElementById("t-subtitle").textContent = t("subtitle");
+    const dlBtn = document.getElementById("download-btn");
+    if (dlBtn && dlBtn.textContent.indexOf("v") === -1) dlBtn.textContent = t("download");
+    document.getElementById("t-features").textContent = t("features");
+    document.getElementById("t-feat-setup").textContent = t("feat-setup");
+    document.getElementById("t-feat-maps").textContent = t("feat-maps");
+    document.getElementById("t-feat-tactic").textContent = t("feat-tactic");
+    document.getElementById("t-feat-overlay").textContent = t("feat-overlay");
+    document.getElementById("t-schemes-title").textContent = t("schemes-title");
+    document.getElementById("t-schemes-desc").textContent = t("schemes-desc");
+    document.getElementById("t-schemes-btn").textContent = t("schemes-btn");
+    document.getElementById("t-releases").textContent = t("releases");
+    document.getElementById("t-update").textContent = t("update");
+    document.getElementById("t-update-desc").textContent = t("update-desc");
+    document.getElementById("t-releases-loading").textContent = t("releases-loading");
+}
+setLang(siteLang);
+
+const GITHUB_RELEASES = "https://github.com/sm-wot-assistant/releases";
+
+function loadReleases() {
+    db.ref("versions").once("value")
+        .then(snap => {
+            const data = snap.val();
+            const container = document.getElementById("releases-container");
+            const dlBtn = document.getElementById("download-btn");
+            const latestSpan = document.getElementById("latest-version");
+
+            if (!data) {
+                container.innerHTML = '<div class="empty"><p>' + t("releases-empty") + '</p><p style="margin-top:8px">' + t("releases-check") + ' <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">GitHub Releases</a></p></div>';
+                dlBtn.href = GITHUB_RELEASES;
+                return;
+            }
+
+            const items = Object.values(data).sort((a, b) =>
+                (b.release_date || '').localeCompare(a.release_date || '')
+            );
+
+            const latest = items[0];
+            if (latest) {
+                dlBtn.href = latest.download_url || (GITHUB_RELEASES + "/tag/v" + latest.version);
+                dlBtn.textContent = t("download") + " v" + (latest.version || "");
+                latestSpan.textContent = (latest.build_size || "") + " · Windows 10/11 · " + (latest.release_date || "").slice(0, 10);
+            }
+
+            container.innerHTML = '<table><tr><th>' + t("releases-table-ver") + '</th><th>' + t("releases-table-date") + '</th><th>' + t("releases-table-size") + '</th><th></th></tr>' +
+                items.map(d => `<tr>
+                    <td class="release-ver">v${d.version || ''}</td>
+                    <td class="release-date">${(d.release_date || '').slice(0, 10)}</td>
+                    <td class="release-size">${d.build_size || ''}</td>
+                    <td class="release-dl"><a href="${d.download_url || (GITHUB_RELEASES + '/tag/v' + d.version)}" class="btn btn-secondary" style="padding:6px 14px;font-size:13px">${t("releases-dl")}</a></td>
+                </tr>`).join('') + '</table>';
+        })
+        .catch(() => {
+            document.getElementById("releases-container").innerHTML =
+                '<div class="empty"><p>' + t("releases-error") + '</p><p style="margin-top:8px">' + t("releases-check") + ' <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">GitHub Releases</a></p></div>';
+            document.getElementById("download-btn").href = GITHUB_RELEASES;
+        });
+}
+
+loadReleases();
+</script>
+
+</body>
+</html>

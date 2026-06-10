@@ -713,5 +713,3 @@ class MapPainter:
                 if obj.get("text"):
                     ty = y + int(15 * sc) if poi_data else y
                     self.canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
-
-

@@ -31,7 +31,7 @@ TECH_IDS_FILE = os.path.join(BUNDLE_DIR, "map_tech_ids.json")
 CUSTOM_NAMES_FILE = os.path.join(USER_DATA_DIR, "custom_names.json")
 LOCALES_FILE = os.path.join(USER_DATA_DIR, "locales.json")
 
-DEFAULT_FILES = ["settings.json", "locales.json", "map_drawings.json", "service_messages.json"]
+DEFAULT_FILES = ["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]
 
 BG_COLOR = "#000000"
 

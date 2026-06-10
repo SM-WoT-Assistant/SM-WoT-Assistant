@@ -51,10 +51,10 @@ class MapRenderer:
         if cw > ch:
             map_x = border + (cw - 2 * border - size) / 2
         fc = "#333333"
-        self.app.canvas.create_rectangle(0, map_y - border, cw, map_y, fill=fc, outline="", tags="frame")
-        self.app.canvas.create_rectangle(0, map_y + size, cw, map_y + size + border, fill=fc, outline="", tags="frame")
-        self.app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + size, fill=fc, outline="", tags="frame")
-        self.app.canvas.create_rectangle(map_x + size, map_y, map_x + size + border, map_y + size, fill=fc, outline="", tags="frame")
+        self.app.canvas.create_rectangle(0, map_y - border, cw, map_y, fill=fc, outline="", tags=("map", "frame"))
+        self.app.canvas.create_rectangle(0, map_y + size, cw, map_y + size + border, fill=fc, outline="", tags=("map", "frame"))
+        self.app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + size, fill=fc, outline="", tags=("map", "frame"))
+        self.app.canvas.create_rectangle(map_x + size, map_y, map_x + size + border, map_y + size, fill=fc, outline="", tags=("map", "frame"))
 
     def draw_arena_bases(self, cw, ch):
         app = self.app
@@ -119,13 +119,13 @@ class MapRenderer:
         
         for cx, cy in processed_bases:
             angle = 180 if (rightmost_x is not None and cx == rightmost_x) else 0
-            app.canvas.create_text(cx, cy, text=chr(0x73), font=("XVMSymbol", base_font), fill="#cccccc", angle=angle)
+            app.canvas.create_text(cx, cy, text=chr(0x73), font=("XVMSymbol", base_font), fill="#cccccc", angle=angle, tags="map")
                 
         spawns = mode_data.get("spawns", [])
         for coords in spawns:
             if len(coords) >= 2:
                 cx, cy = to_map(coords[0], coords[1])
-                app.canvas.create_text(cx, cy, text=chr(0x44), font=("XVMSymbol", spawn_font), fill="#cccccc")
+                app.canvas.create_text(cx, cy, text=chr(0x44), font=("XVMSymbol", spawn_font), fill="#cccccc", tags="map")
 
     def draw_grid(self, cw, ch):
         app = self.app
@@ -160,10 +160,10 @@ class MapRenderer:
             return px, py
 
         fc = "#333333"
-        app.canvas.create_rectangle(0, map_y - border, cw, map_y, fill=fc, outline="")
-        app.canvas.create_rectangle(0, map_y + map_h, cw, map_y + map_h + border, fill=fc, outline="")
-        app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + map_h, fill=fc, outline="")
-        app.canvas.create_rectangle(map_x + map_w, map_y, map_x + map_w + border, map_y + map_h, fill=fc, outline="")
+        app.canvas.create_rectangle(0, map_y - border, cw, map_y, fill=fc, outline="", tags="map")
+        app.canvas.create_rectangle(0, map_y + map_h, cw, map_y + map_h + border, fill=fc, outline="", tags="map")
+        app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + map_h, fill=fc, outline="", tags="map")
+        app.canvas.create_rectangle(map_x + map_w, map_y, map_x + map_w + border, map_y + map_h, fill=fc, outline="", tags="map")
 
         cols, rows = self.grid_cols, self.grid_rows
         cell_w = width_game / cols
@@ -174,13 +174,13 @@ class MapRenderer:
             gx = minX + cell_w * col
             px, _ = to_map(gx, 0)
             if map_x <= px <= map_x + map_w:
-                app.canvas.create_line(px, map_y, px, map_y + map_h, fill=gc, width=1)
+                app.canvas.create_line(px, map_y, px, map_y + map_h, fill=gc, width=1, tags="map")
 
         for row in range(rows + 1):
             gz = maxZ - cell_h * row
             _, py = to_map(0, gz)
             if map_y <= py <= map_y + map_h:
-                app.canvas.create_line(map_x, py, map_x + map_w, py, fill=gc, width=1)
+                app.canvas.create_line(map_x, py, map_x + map_w, py, fill=gc, width=1, tags="map")
 
         row_letters = [chr(ord('A') + i) for i in range(rows)]
 
@@ -188,27 +188,27 @@ class MapRenderer:
             gx = minX + cell_w * (col + 0.5)
             px, _ = to_map(gx, 0)
             app.canvas.create_text(px, map_y - b2, text=str((col + 1) % 10),
-                fill=gc, font=("Arial", 9), anchor="center")
+                fill=gc, font=("Arial", 9), anchor="center", tags="map")
             app.canvas.create_text(px, map_y + map_h + b2, text=str((col + 1) % 10),
-                fill=gc, font=("Arial", 9), anchor="center")
+                fill=gc, font=("Arial", 9), anchor="center", tags="map")
 
         for row in range(rows):
             gz = maxZ - cell_h * (row + 0.5)
             _, py = to_map(0, gz)
             app.canvas.create_text(map_x - b2, py, text=row_letters[row],
-                fill=gc, font=("Arial", 9), anchor="center")
+                fill=gc, font=("Arial", 9), anchor="center", tags="map")
             app.canvas.create_text(map_x + map_w + b2, py, text=row_letters[row],
-                fill=gc, font=("Arial", 9), anchor="center")
+                fill=gc, font=("Arial", 9), anchor="center", tags="map")
 
     def show_main_splash(self):
         app = self.app
-        app.canvas.delete("all")
+        app.canvas.delete("map")
         app.root.update_idletasks()
         cw, ch = app.canvas.winfo_width(), app.canvas.winfo_height()
         if cw < 10:
             extra = app.get_edit_extra_height() if app.mode == "edit" else 18
             cw, ch = app.w, app.h - extra
-        app.canvas.create_rectangle(0, 0, cw, ch, fill="black")
+        app.canvas.create_rectangle(0, 0, cw, ch, fill="black", tags="map")
         
         map_drawn = False
         if app.current_map_eng:
@@ -224,11 +224,11 @@ class MapRenderer:
                         map_y = border
                         if cw > ch:
                             map_x = border + (cw - 2 * border - size) / 2
-                        app.canvas.create_image(map_x + size // 2, map_y + size // 2, image=app.current_tk_map)
+                        app.canvas.create_image(map_x + size // 2, map_y + size // 2, image=app.current_tk_map, tags="map")
                     else:
-                        app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map)
+                        app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map, tags="map")
                 else:
-                    app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map)
+                    app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map, tags="map")
                 map_drawn = True
                 app.status_label.config(text=f"КАРТА: {app.translate_map_name(app.current_map_eng)}", fg="lime")
                 
@@ -239,17 +239,17 @@ class MapRenderer:
             else:
                 is_tactic = app.btn_mode_maps_1.cget("bg") == "#ff4500"
                 msg = app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
-                app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10))
+                app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
                 map_drawn = True 
                 app.status_label.config(text=app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found'), fg="red")
                 
         if not map_drawn:
             if app.mode == "edit":
                 version = config.load_version()
-                app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"))
-                app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9))
-                app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"))
-                app.canvas.create_text(cw//2, ch - 105, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"))
+                app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
+                app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"), tags="map")
+                app.canvas.create_text(cw//2, ch - 105, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
                 if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110
@@ -257,10 +257,10 @@ class MapRenderer:
                         lw, lh = mw, int(mw * ratio)
                         if lh > mh: lh = mh; lw = int(lh / ratio)
                         app.logo_img = ImageTk.PhotoImage(app.logo_image_object.resize((lw, lh), Image.Resampling.LANCZOS))
-                        app.canvas.create_image(cw//2, 10 + mh//2, image=app.logo_img)
+                        app.canvas.create_image(cw//2, 10 + mh//2, image=app.logo_img, tags="map")
                     except: pass
             else: 
-                app.canvas.create_text(cw//2, ch//2, text=f"{app.t('ui', 'battle_mode')}\n{app.t('ui', 'press_e_to_exit')}", fill="#555", font=("Arial", 12, "bold"), justify="center")
+                app.canvas.create_text(cw//2, ch//2, text=f"{app.t('ui', 'battle_mode')}\n{app.t('ui', 'press_e_to_exit')}", fill="#555", font=("Arial", 12, "bold"), justify="center", tags="map")
             
         if hasattr(app, 'painter'):
             app.painter.redraw(cw, ch)

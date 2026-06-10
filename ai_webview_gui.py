@@ -17,6 +17,14 @@ from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 REAL_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
 
+def _read_version():
+    try:
+        with open("VERSION", "r", encoding="utf-8") as f:
+            return f.read().strip()
+    except Exception:
+        return "0.0.0"
+
+
 class AIBrowserWindow(QWidget):
     def __init__(self, prompt):
         super().__init__()
@@ -25,7 +33,7 @@ class AIBrowserWindow(QWidget):
         self._max_polls = 200
         self._response_found = False
 
-        self.setWindowTitle("SM WoT Assistant — Data Update")
+        self.setWindowTitle(f"SM WoT Assistant v{_read_version()} — Data Update")
         self.setGeometry(100, 100, 1000, 700)
         self.setStyleSheet("background-color: white;")
 

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SM WoT Assistant — Admin</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #111; color: #ccc; }
+        header { background: #1a1a1a; padding: 16px 24px; border-bottom: 2px solid #ffaa00; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 18px; color: #ffaa00; }
+        header h1 span { color: #ff4500; }
+        nav a { color: #aaa; text-decoration: none; margin-left: 20px; font-size: 14px; }
+        nav a:hover { color: #fff; }
+        main { max-width: 1100px; margin: 0 auto; padding: 24px; }
+        .card { background: #1a1a1a; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .card h2 { color: #ffaa00; font-size: 16px; margin-bottom: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #222; font-size: 13px; }
+        th { color: #aaa; font-weight: normal; background: #181818; }
+        .stat-box { display: inline-block; background: #222; padding: 16px 24px; border-radius: 8px; margin-right: 16px; margin-bottom: 12px; text-align: center; min-width: 110px; }
+        .stat-box .num { font-size: 28px; color: #ff4500; font-weight: bold; }
+        .stat-box .label { font-size: 11px; color: #888; margin-top: 4px; }
+        .btn { background: #333; color: #ccc; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .btn:hover { background: #444; }
+        .btn-danger { background: #553333; }
+        .btn-danger:hover { background: #774444; }
+        .error-msg { color: #ff4444; font-size: 12px; margin-top: 4px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px; }
+        .badge-error { background: #553333; color: #ff6666; }
+        .badge-warning { background: #555533; color: #ffcc66; }
+        .badge-info { background: #334455; color: #6699cc; }
+        #login-screen { text-align: center; padding: 60px; }
+        #login-screen input { background: #222; color: #ccc; border: 1px solid #333; padding: 8px 12px; border-radius: 4px; font-size: 14px; margin: 6px; }
+        #dashboard { display: none; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>SM WoT <span>Assistant</span> — Admin</h1>
+    <nav>
+        <button class="btn btn-sm" id="lang-ua" onclick="setAdminLang('ua')" style="background:#ff4500;color:#fff;padding:4px 10px;">UA</button>
+        <button class="btn btn-sm" id="lang-en" onclick="setAdminLang('en')" style="padding:4px 10px;">EN</button>
+        <a href="index.html">Сайт</a>
+        <span id="user-info"></span>
+    </nav>
+</header>
+
+<main>
+    <div id="login-screen">
+        <h2 style="margin-bottom:20px;color:#ffaa00;">Вхід для адміністратора</h2>
+        <input type="email" id="email" placeholder="Email"><br>
+        <input type="password" id="password" placeholder="Пароль"><br>
+        <button class="btn" onclick="login()" style="margin-top:10px;">Увійти</button>
+        <p id="login-error" class="error-msg" style="margin-top:10px;"></p>
+    </div>
+
+    <div id="dashboard">
+        <div class="card">
+            <h2>Статистика</h2>
+            <div id="stats-container"></div>
+        </div>
+
+        <div class="card">
+            <h2>Помилки (останні)</h2>
+            <div id="errors-container"><div class="empty">Завантаження...</div></div>
+        </div>
+
+        <div class="card">
+            <h2>Встановлення по версіях</h2>
+            <div id="installs-container"><div class="empty">Завантаження...</div></div>
+        </div>
+
+        <div class="card">
+            <h2>Схеми (RTDB schemes/)</h2>
+            <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-danger" onclick="deleteAllLegacySchemes()">🗑 Видалити всі старі (без PIN)</button>
+                <span style="color:#888;font-size:12px;margin-left:10px;" id="scheme-count"></span>
+            </div>
+            <div id="schemes-container"><div class="empty">Завантаження...</div></div>
+        </div>
+    </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE",
+    authDomain: "sm-wot-assistant.firebaseapp.com",
+    databaseURL: "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "sm-wot-assistant",
+    storageBucket: "sm-wot-assistant.firebasestorage.app",
+    messagingSenderId: "154255345343",
+    appId: "1:154255345343:web:270af95b541878e2f9e80a",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const auth = firebase.auth();
+
+// ═══ Map Dictionary (UA + EN) ═══
+const MAP_NAMES = {
+    "ua": {"01_karelia":"Карелія","02_malinovka":"Малинівка","03_campania_big":"Провінція","04_himmelsdorf":"Хіммельсдорф","05_prohorovka":"Прохорівка","06_ensk":"Енськ","06_ensk_big":"Регіон Енськ","07_lakeville":"Ласвілль","08_ruinberg":"Руїнберґ","08_ruinberg_sm24":"Лауерберг","101_dday":"Оверлорд","101_dday_sm24":"Пляж «Омаха»","105_germany":"Берлін","105_germany_sm24":"Фалленштат","108_normandy_nom":"Одер","10_hills":"Копальні","112_eiffel_tower_ctf":"Париж","114_czech":"Промзона","115_sweden":"Штиль","11_murovanka":"Мурованка","120_graf_zeppelin":"Нордскар","120_graf_zeppelin_scc":"Нордскар","121_lost_paradise_v":"Устрична затока","127_japort":"Стара гавань","128_last_frontier_v":"Застава","13_erlenberg":"Ерленберґ","140_fall_tanks":"Стара школа","141_dash_to_go":"Нова школа","142_road_to_dash":"Бойова школа","14_siegfried_line":"Лінія Зигфріда","14_siegfried_line_nom":"Західний вал","17_munchen":"Вайдпарк","18_cliff":"Круча","19_monastery":"Монастир","208_bf_epic_normandy":"Нормандія","209_wg_epic_suburbia":"Крафтверк","210_bf_epic_desert":"Фата-моргана","212_epic_random_valley_sm25":"Нібельбурґ","217_er_alaska":"Клондайк","23_westfeld":"Вестфілд","250_br_battle_city2-1":"Зона 404","251_br_battle_city3":"Арзагир 4.04","252_br_battle_city4":"Фірнульфір","28_desert":"Піщана ріка","29_el_hallouf":"Ель-Халлуф","31_airfield":"Летовище","33_fjord":"Фіорди","34_redshire":"Редшир","35_steppes":"Степи","36_fishing_bay":"Рибальська бухта","37_caucasus":"Перевал","38_mannerheim_line":"Лінія Маннергейма","44_north_america":"Лайв Окс","45_north_america":"Хайвей","47_canada_a":"Тихий берег","59_asia_great_wall":"Кордон імперії","60_asia_miao":"Перлинна річка","63_tundra":"Тундра","95_lost_city_ctf":"Загублене місто","99_poland":"Студзянки"},
+    "en": {"01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province","04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk","06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg","08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach","105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder","10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen","115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar","120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay","127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg","140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School","14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall","17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey","208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk","210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg","217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404","251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir","28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield","33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes","36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass","38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks","45_north_america":"Highway","47_canada_a":"Serene Coast","59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River","63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"}
+};
+let adminLang = (localStorage.getItem("site_lang") || "ua");
+function setAdminLang(lang) {
+    adminLang = lang;
+    localStorage.setItem("site_lang", lang);
+    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
+    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
+    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
+    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
+    renderAdminSchemes();
+}
+function mapLabel(id) { return (MAP_NAMES[adminLang] || MAP_NAMES["en"])[id] || id; }
+
+auth.onAuthStateChanged(user => {
+    if (user) {
+        document.getElementById("login-screen").style.display = "none";
+        document.getElementById("dashboard").style.display = "block";
+        document.getElementById("user-info").innerHTML =
+            `${user.email} <a href="#" onclick="auth.signOut()">Вийти</a>`;
+        loadDashboard();
+    } else {
+        document.getElementById("login-screen").style.display = "block";
+        document.getElementById("dashboard").style.display = "none";
+        document.getElementById("user-info").innerHTML = "";
+    }
+});
+
+function login() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    document.getElementById("login-error").textContent = "";
+    auth.signInWithEmailAndPassword(email, password)
+        .catch(e => {
+            document.getElementById("login-error").textContent = e.message;
+        });
+}
+
+function loadDashboard() {
+    setAdminLang(adminLang);
+    loadStats();
+    loadErrors();
+    loadInstallations();
+    loadAdminSchemes();
+}
+
+function objSize(obj) { return obj ? Object.keys(obj).length : 0; }
+
+function loadStats() {
+    Promise.all([
+        db.ref("error_reports").once("value"),
+        db.ref("installations").once("value"),
+    ]).then(([errSnap, instSnap]) => {
+        document.getElementById("stats-container").innerHTML = `
+            <div class="stat-box"><div class="num">${objSize(errSnap.val())}</div><div class="label">Помилок</div></div>
+            <div class="stat-box"><div class="num">${objSize(instSnap.val())}</div><div class="label">Встановлень</div></div>
+        `;
+    });
+}
+
+function loadErrors() {
+    db.ref("error_reports").orderByChild("timestamp").limitToLast(30).once("value")
+        .then(snap => {
+            const container = document.getElementById("errors-container");
+            const data = snap.val();
+            if (!data) {
+                container.innerHTML = '<div class="empty">Немає помилок — чудово!</div>';
+                return;
+            }
+            const items = Object.values(data).reverse();
+            let html = '<table><tr><th>Дата</th><th>Версія</th><th>Тип</th><th>Повідомлення</th><th>OS</th></tr>';
+            items.forEach(d => {
+                const levelClass = d.error_type === 'crash' ? 'badge-error' :
+                    (d.error_type || '').includes('Warning') ? 'badge-warning' : 'badge-info';
+                html += `<tr>
+                    <td>${(d.timestamp || '').slice(0,19)}</td>
+                    <td>${d.version || ''}</td>
+                    <td><span class="badge ${levelClass}">${d.error_type || ''}</span></td>
+                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.message || ''}</td>
+                    <td>${d.os || ''}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        });
+}
+
+function loadInstallations() {
+    db.ref("installations").orderByChild("last_seen").limitToLast(20).once("value")
+        .then(snap => {
+            const container = document.getElementById("installs-container");
+            const data = snap.val();
+            if (!data) {
+                container.innerHTML = '<div class="empty">Немає даних</div>';
+                return;
+            }
+            const items = Object.values(data).reverse();
+            let html = '<table><tr><th>ID</th><th>Версія</th><th>Last Seen</th><th>OS</th></tr>';
+            items.forEach(d => {
+                html += `<tr>
+                    <td>${(d.install_id || '').slice(0,8)}...</td>
+                    <td>${d.version || ''}</td>
+                    <td>${(d.last_seen || '').slice(0,19)}</td>
+                    <td>${d.os || ''}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        });
+}
+
+// ═══ Schemes management ═══
+let allAdminSchemes = [];
+
+function loadAdminSchemes() {
+    db.ref("schemes").once("value")
+        .then(snap => {
+            const data = snap.val();
+            if (!data) {
+                document.getElementById("schemes-container").innerHTML = '<div class="empty">Немає опублікованих схем</div>';
+                document.getElementById("scheme-count").textContent = "";
+                allAdminSchemes = [];
+                return;
+            }
+            allAdminSchemes = Object.entries(data).map(([key, val]) => ({ ...val, _key: key }));
+            allAdminSchemes.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+            document.getElementById("scheme-count").textContent =
+                `Всього: ${allAdminSchemes.length} | Старих: ${allAdminSchemes.filter(s => !s.pin_hash).length}`;
+            renderAdminSchemes();
+        })
+        .catch(() => {
+            document.getElementById("schemes-container").innerHTML = '<div class="empty">Помилка завантаження</div>';
+        });
+}
+
+function renderAdminSchemes() {
+    const container = document.getElementById("schemes-container");
+    if (!allAdminSchemes.length) {
+        container.innerHTML = '<div class="empty">Немає схем</div>';
+        return;
+    }
+    let html = '<table><tr><th>ID мапи</th><th>Назва мапи</th><th>Автор</th><th>Назва схеми</th><th>Дата</th><th>PIN?</th><th></th></tr>';
+    allAdminSchemes.forEach(s => {
+        const hasPin = s.pin_hash ? "✅" : "❌";
+        html += `<tr>
+            <td style="font-family:monospace;font-size:11px;color:#888">${s.map_id || ''}</td>
+            <td style="color:#ffaa00">${mapLabel(s.map_id) || (s.map_name || '')}</td>
+            <td>${s.author_nickname || '—'}</td>
+            <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.title || '—'}</td>
+            <td>${(s.created_at || '').slice(0,16)}</td>
+            <td>${hasPin}</td>
+            <td><button class="btn btn-danger" onclick="deleteAdminScheme('${s._key}')">🗑</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+function deleteAdminScheme(key) {
+    if (!confirm("Видалити схему " + key + "?")) return;
+    db.ref("schemes/" + key).remove()
+        .then(() => {
+            loadAdminSchemes();
+        })
+        .catch(() => alert("Помилка видалення"));
+}
+
+function deleteAllLegacySchemes() {
+    const legacy = allAdminSchemes.filter(s => !s.pin_hash);
+    if (!legacy.length) { alert("Немає старих схем для видалення."); return; }
+    if (!confirm(`Видалити ВСІ ${legacy.length} старі схеми (без PIN)?\nЦю дію неможливо скасувати!`)) return;
+
+    let done = 0;
+    let failed = 0;
+    const total = legacy.length;
+
+    legacy.forEach(s => {
+        db.ref("schemes/" + s._key).remove()
+            .then(() => {
+                done++;
+                if (done + failed >= total) finish();
+            })
+            .catch(() => {
+                failed++;
+                if (done + failed >= total) finish();
+            });
+    });
+
+    function finish() {
+        alert(`Видалено: ${done}, помилок: ${failed}`);
+        loadAdminSchemes();
+    }
+}
+</script>
+
+</body>
+</html>

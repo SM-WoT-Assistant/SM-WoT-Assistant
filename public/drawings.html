@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Галерея малюнків — SM WoT Assistant</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #111; color: #ccc; }
+        header { background: #1a1a1a; padding: 16px 24px; border-bottom: 2px solid #ff4500; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 20px; color: #ff4500; }
+        header h1 a { color: #ff4500; text-decoration: none; }
+        nav a { color: #aaa; text-decoration: none; margin-left: 20px; font-size: 14px; }
+        nav a:hover { color: #fff; }
+        main { max-width: 960px; margin: 0 auto; padding: 24px; }
+        .drawing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .drawing-card { background: #222; border-radius: 6px; padding: 14px; cursor: pointer; border: 1px solid #333; transition: border-color .2s; }
+        .drawing-card:hover { border-color: #ff4500; }
+        .drawing-card .map { color: #ffaa00; font-weight: bold; font-size: 14px; }
+        .drawing-card .author { color: #888; font-size: 12px; margin-top: 4px; }
+        .drawing-card .meta { color: #666; font-size: 11px; margin-top: 4px; }
+        .empty { text-align: center; color: #666; padding: 40px; }
+        .filter-bar { margin-bottom: 16px; }
+        .filter-bar select, .filter-bar input { background: #222; color: #ccc; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1><a href="index.html">SM WoT Assistant</a> — Галерея малюнків</h1>
+    <nav>
+        <button class="btn btn-sm" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff;padding:4px 10px;">UA</button>
+        <button class="btn btn-sm" id="lang-en" onclick="setLang('en')" style="padding:4px 10px;">EN</button>
+        <a href="index.html">Головна</a>
+        <a href="admin.html">Адмінка</a>
+    </nav>
+</header>
+
+<main>
+    <div class="filter-bar">
+        <input type="text" id="search-input" placeholder="Пошук по карті чи автору..." oninput="filterDrawings()">
+        <select id="map-filter" onchange="filterDrawings()">
+            <option value="">Всі мапи</option>
+        </select>
+    </div>
+    <div id="drawings-container" class="drawing-grid">
+        <div class="empty">Завантаження...</div>
+    </div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE",
+    authDomain: "sm-wot-assistant.firebaseapp.com",
+    projectId: "sm-wot-assistant",
+    storageBucket: "sm-wot-assistant.firebasestorage.app",
+    messagingSenderId: "154255345343",
+    appId: "1:154255345343:web:270af95b541878e2f9e80a",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+let siteLang = (localStorage.getItem("site_lang") || "ua");
+function setLang(lang) {
+    siteLang = lang;
+    localStorage.setItem("site_lang", lang);
+    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
+    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
+    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
+    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
+}
+setLang(siteLang);
+
+let allDrawings = [];
+
+function loadDrawings() {
+    db.ref("drawings").once("value")
+        .then(snap => {
+            allDrawings = [];
+            const data = snap.val();
+            if (data) {
+                allDrawings = Object.values(data).sort((a, b) =>
+                    (b.created_at || '').localeCompare(a.created_at || '')
+                ).slice(0, 50);
+            }
+            const maps = new Set();
+            allDrawings.forEach(d => maps.add(d.map_name));
+            const sel = document.getElementById("map-filter");
+            sel.innerHTML = '<option value="">Всі мапи</option>';
+            [...maps].sort().forEach(m => {
+                sel.innerHTML += `<option value="${m}">${m}</option>`;
+            });
+            renderDrawings(allDrawings);
+        })
+        .catch(() => {
+            document.getElementById("drawings-container").innerHTML =
+                '<div class="empty">Помилка завантаження. Можливо, база даних порожня.</div>';
+        });
+}
+
+function renderDrawings(drawings) {
+    const container = document.getElementById("drawings-container");
+    if (!drawings.length) {
+        container.innerHTML = '<div class="empty">Немає опублікованих малюнків</div>';
+        return;
+    }
+    container.innerHTML = drawings.map(d => `
+        <div class="drawing-card" onclick="viewDrawing('${d.drawing_id}')">
+            <div class="map">${d.map_name || d.map_id}</div>
+            <div class="author">${d.author_nickname || 'Анонім'}</div>
+            <div class="meta">${Array.isArray(d.elements) ? d.elements.length : 0} елементів
+                ${d.visibility === 'public' ? '· Публічний' : (d.visibility || '').startsWith('group:') ? '· Група' : '· Приватний'}
+                · ${(d.created_at || '').slice(0,10)}</div>
+        </div>
+    `).join('');
+}
+
+function filterDrawings() {
+    const search = (document.getElementById("search-input").value || "").toLowerCase();
+    const map = document.getElementById("map-filter").value;
+    let filtered = allDrawings;
+    if (map) filtered = filtered.filter(d => d.map_name === map || d.map_id === map);
+    if (search) filtered = filtered.filter(d =>
+        (d.map_name || "").toLowerCase().includes(search) ||
+        (d.author_nickname || "").toLowerCase().includes(search)
+    );
+    renderDrawings(filtered);
+}
+
+function viewDrawing(id) {
+    alert("Детальний перегляд малюнка буде доступний після інтеграції.");
+}
+
+loadDrawings();
+</script>
+
+</body>
+</html>

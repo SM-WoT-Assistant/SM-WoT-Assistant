@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Будь-хто може створювати error_reports (десктоп-апп)
+    match /error_reports/{docId} {
+      allow create: if true;
+      allow read, list, update, delete: if request.auth != null;
+    }
+
+    // Будь-хто може створювати service_events
+    match /service_events/{docId} {
+      allow create: if true;
+      allow read, list, update, delete: if request.auth != null;
+    }
+
+    // Будь-хто може створювати/оновлювати installations
+    match /installations/{docId} {
+      allow create, update: if true;
+      allow read, list, delete: if request.auth != null;
+    }
+
+    // Будь-хто може читати users, створювати тільки для себе
+    match /users/{userId} {
+      allow create: if request.resource.data.user_id == userId;
+      allow read, list: if true;
+      allow update: if request.auth != null && resource.data.user_id == request.auth.uid;
+      allow delete: if request.auth != null;
+    }
+
+    // Малюнки: створювати може будь-хто зареєстрований, читати всі
+    match /drawings/{docId} {
+      allow create: if true;
+      allow read, list: if true;
+      allow update, delete: if request.auth != null
+        && resource.data.author_id == request.auth.uid;
+    }
+
+    // Групи: читати всі, створювати/оновлювати тільки авторизовані
+    match /groups/{groupId} {
+      allow create: if request.auth != null;
+      allow read, list: if true;
+      allow update: if request.auth != null
+        && resource.data.created_by == request.auth.uid;
+      allow delete: if request.auth != null;
+    }
+
+    // Версії: створювати тільки авторизовані, читати всі
+    match /versions/{version} {
+      allow create: if request.auth != null;
+      allow read, list: if true;
+      allow update, delete: if request.auth != null;
+    }
+  }
+}

@@ -6,21 +6,25 @@ root = os.path.dirname(os.path.abspath(SPECPATH))
 def _rp(rel):
     return os.path.join(root, rel)
 
-runtime_jsons = [
-    "crew_builds.json",
-    "equipment_loadouts.json",
-    "game_entities.json",
-    "game_entities_english.json",
-    "icon_mapping.json",
-    "map_list.json",
-    "map_links.json",
-    "tank_db.json",
-    "tank_slots_db.json",
-    "tank_slots_full.json",
-    "tank_tth.json",
-    "tui.json",
-    "VERSION",
-]
+runtime_jsons = []
+_exclude_spec = {
+    "opencode.json", "magic-context.jsonc",
+    "_fill_progress.json",
+    ".client_update_manifest.json", ".icon_extract_manifest.json",
+    ".tank_extract_manifest.json",
+    "tomato_build_cache.json", "tomato_consumables_json.json",
+    "tomato_debug.json", "tomato_full_debug.json",
+    "tomato_next_data.json", "tomato_result.json",
+    "ukrainian_map_names.json",
+    "vehicle_slots_test.json", "vehicle_slots_v2.json",
+}
+
+for fn in os.listdir(root):
+    if fn.endswith(".json") and os.path.isfile(os.path.join(root, fn)):
+        if fn not in _exclude_spec:
+            runtime_jsons.append(fn)
+
+runtime_jsons.append("VERSION")
 
 datas = []
 

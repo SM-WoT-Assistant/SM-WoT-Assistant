@@ -37,7 +37,7 @@
 **Data Layer:**
 - Purpose: Load/save JSON, manage tank database, extract data from game client, provide translations
 - Location: `data_manager.py`, `config.py`, `locale_manager.py`, `translations.py`, `map_manager.py`, `map_extractor.py`, `tank_extractor.py`, `wot_decoder.py`, `decode_xml.py`
-- Contains: DataManager, MapExtractor, TankExtractor, WotXmlDecoder, LocaleManager, configuration constants, version loader (`config.load_version()`), `config.BASE_DIR` for portable path resolution
+- Contains: DataManager, MapExtractor, TankExtractor, WotXmlDecoder, LocaleManager, configuration constants, version loader (`config.load_version()`), dual-path storage (`config.BUNDLE_DIR` for read-only bundled assets, `config.USER_DATA_DIR` for writable user data in `%APPDATA%/SM WoT Assistant`)
 - Depends on: Game client files (res/packages/*.pkg, version.xml, python.log), filesystem
 - Used by: Application Logic Layer, AI Pipeline Layer
 
@@ -130,7 +130,7 @@
 **Build Entry:**
 - Location: `build.py`
 - Triggers: `python build.py [version] [--release]`
-- Responsibilities: Update `VERSION` file if version arg given, run PyInstaller via `wot_assistant.spec` for ~115 MB bundled `.exe`, optionally create GitHub release via `gh` CLI
+- Responsibilities: Update `VERSION` file if version arg given, run PyInstaller via `wot_assistant.spec` producing a onedir output (~5795 files, ~750 MB total), manually copy data files via `build.py:copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug), run NSIS to produce installer (~320 MB), create portable ZIP (~390 MB), optionally create GitHub release via `gh` CLI
 
 **Map List Loading:**
 - Location: `map_manager.py:load_map_list`
@@ -162,17 +162,22 @@
 
 **Version System:**
 - `VERSION` file at project root contains a plaintext semver string (e.g., `1.0.0`)
-- `config.load_version()` reads it with `"0.0.0"` fallback
+- `config.load_version()` reads it with `"0.0.0"` fallback — all window titles use this function
+- Version displayed in: main window (`main.py:1107`), splash (`main.py:1045`), editor watermark (`map_renderer.py:249`), help dialog (`help_system.py:49`), AI WebView (`ai_webview_gui.py:28`)
 - `config.BASE_DIR` resolves to `sys.executable` directory when frozen (PyInstaller), or `__file__` directory in dev — all file paths are constructed relative to `BASE_DIR`
-- `main.py` sets window title to `WoT Assistant v<version>` and calls `os.chdir(config.BASE_DIR)` at startup for consistent CWD
 - `build.py` reads/writes `VERSION`, offers version bump + build + GitHub release commands
+- `installer.nsi` version auto-synced via `build.py:update_nsi_version()` using regex on `!define PRODUCT_VERSION`
 
-**Build & Packaging:**
-- `build.py` — orchestrates version update, PyInstaller build (`--clean --noconfirm`), and optional GitHub release via `gh` CLI
-- `wot_assistant.spec` — PyInstaller spec with explicit `datas` list: root JSONs, VERSION, fonts (`.ttf`), `.mo` localization files, `logo.png`, `maps/` subdirectories, `extracted_maps/` (excluding caches), `extracted_icons/` (all 8 subdirectories), `extracted_data/common/post_progression/` (field mod data), and `tools/orion/` decoder
+**Build &amp; Packaging:**
+- `build.py` — 7-phase release pipeline: (1) Pre-flight validation (semver, Python 3.12+PyInstaller, NSIS, gh CLI, critical source files, git status), (2) Clean dist/build, (3) PyInstaller onedir + manual `copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug — data files from Analysis not propagated to COLLECT), (4) NSIS installer via makensis, (5) Rename onedir to versioned directory (`dist/SM WoT Assistant vX.Y.Z/`), (6) Build verification (EXE, critical JSONs, VERSION, fonts, directory counts), (7) Build manifest (`dist/build_manifest_vX.Y.Z.txt`)
+- `wot_assistant.spec` — PyInstaller spec with fixed `runtime_jsons` list (13 critical JSONs), fonts (`.ttf`), `.mo` localization files, `logo.png`, `maps/` subdirectories, `extracted_maps/` (excluding caches), `extracted_icons/` (all 8 subdirectories), `extracted_data/common/post_progression/` (field mod data). EXE name: `SM WoT Assistant`. Includes `COLLECT` step for onedir output
+- `build.py:copy_data_files()` — manual file copy workaround for PyInstaller 6.x DATA TOC bug (data from Analysis not propagated to COLLECT). Uses exclusion-based glob: all root `*.json` except debug/temp/tomato/manifest files (`opencode.json`, `magic-context.jsonc`, `tomato_*.json`, `vehicle_slots_*.json`, etc.); also copies fonts, `.mo` files, `logo.png`, `maps/`, `extracted_maps/`, `extracted_icons/`, `extracted_data/common/post_progression/`. New JSON files automatically included without list updates
 - Hidden imports: `keyboard`, `PIL._tkinter_finder`
 - `console=False`, `upx=True`, icon from `logo.png`
-- Output: `dist/WoT Assistant.exe` (~115 MB)
+- Output artifacts: `dist/SM WoT Assistant vX.Y.Z/` (versioned onedir, ~5795 files, ~750 MB), `dist/SM_WoT_Assistant_Setup_vX.Y.Z.exe` (NSIS installer, ~320 MB, lzma 42.4%), `dist/SM_WoT_Assistant_Portable_vX.Y.Z.zip` (portable ZIP, ~390 MB), `dist/build_manifest_vX.Y.Z.txt` (full file manifest)
+- Python 3.12 (C:\\Users\\PRO\\AppData\\Local\\Programs\\Python\\Python312) with PyInstaller 6.20.0 preferred — Python 3.14 has known DATA TOC bug
+- NSIS: `C:\\Program Files (x86)\\NSIS\\makensis.exe` (auto-detected by `build.py:find_nsis()`)
+- `config.DEFAULT_FILES` seeds 6 files to AppData on first launch: settings.json, locales.json, map_drawings.json, service_messages.json, popular_tanks_cache.json, ai_builds_cache.json
 
 **Logging:** Print-based console output with bracketed tags (`[INIT]`, `[SYNC]`, `[AI Tank Build]`, `[SERVICE]`, `[BUILD]`). No structured logging framework.
 
