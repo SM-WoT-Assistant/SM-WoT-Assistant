@@ -62,34 +62,35 @@ class MapManager:
                         break
 
     def check_game_version(self, progress_cb=None, done_cb=None, allow_map_decode=True):
-        def emit(percent, text, fg="yellow"):
+        def emit(percent, text_key, fg="yellow", **fmt):
+            text = self.app.t('ui', text_key).format(**fmt) if fmt else self.app.t('ui', text_key)
             if progress_cb:
                 self.app.safe_execute(lambda: progress_cb(percent, text))
             if hasattr(self.app, "status_label"):
-                self.app.safe_execute(lambda: self.app.status_label.config(text=f"[ОНОВЛЕННЯ] {text}", fg=fg))
+                self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg=fg))
 
         def finish():
             if done_cb:
                 self.app.safe_execute(done_cb)
 
         if not map_extractor:
-            emit(100, "Модуль map_extractor.py не знайдено", "orange")
+            emit(100, "update_module_missing", "orange", module="map_extractor.py")
             finish()
             return
 
         def checker():
             if not self._try_begin_update():
-                emit(100, "Оновлення вже виконується", "orange")
+                emit(100, "update_already_running", "orange")
                 finish()
                 return
             try:
-                emit(8, "Триває перевірка оновлень...")
+                emit(8, "checking_updates")
                 ext = map_extractor.MapExtractor()
-                emit(15, "Читання версії клієнта...")
+                emit(15, "reading_client_version")
                 current_v = ext.get_version()
                 saved_v = self.app.settings.get("game_version", "")
                 if not current_v:
-                    emit(100, "Не вдалося прочитати version.xml", "orange")
+                    emit(100, "failed_read_version", "orange")
                     return
 
                 real_version_changed = current_v != saved_v
@@ -183,14 +184,14 @@ class MapManager:
                 should_refresh_data = version_changed or need_tank_rebuild or should_force_refresh or need_ui_icon_refresh
 
                 if version_changed:
-                    emit(25, f"Виявлено нову версію {current_v}: триває оновлення")
+                    emit(25, "version_changed_detected", version=current_v)
 
                 elif should_force_refresh:
-                    emit(25, f"Тестовий режим: примусове оновлення даних для {current_v}", "orange")
+                    emit(25, "forced_update_mode", "orange", version=current_v)
                 elif need_ui_icon_refresh:
-                    emit(25, f"Відновлюю іконки збірок ({sum(loadout_counts)} файлів)", "yellow")
+                    emit(25, "restoring_icons", "yellow", count=sum(loadout_counts))
                 else:
-                    emit(25, f"Версія {current_v} без змін")
+                    emit(25, "version_unchanged", version=current_v)
 
                 maps_ok = True
                 if version_changed and allow_map_decode:
@@ -203,14 +204,14 @@ class MapManager:
                             pct = 45
                         elif "оновлено" in low or "актуаль" in low:
                             pct = 55
-                        emit(pct, text)
+                        emit(pct, "parsing_xml" if "аналіз" in low else "decoding_xml" if "декодування" in low else "xml_decode_complete")
 
                     maps_ok = ext.extract(callback_status=map_status_cb)
-                    emit(58, "МАПИ II: етап завершено")
+                    emit(58, "maps_stage2_done")
                 elif version_changed and not allow_map_decode:
-                    emit(55, "МАПИ II: автооновлення на старті вимкнено (оновіть вручну)", "orange")
+                    emit(55, "maps_autoupdate_disabled", "orange")
                 else:
-                    emit(45, "Оновлення не потрібне: МАПИ II актуальні")
+                    emit(45, "maps_up_to_date")
 
                 tanks_ok = True
                 tank_pipeline_ran = False
@@ -218,54 +219,54 @@ class MapManager:
                 if tank_extractor and should_refresh_data:
                     stability_mode = bool(getattr(self.app, "settings", {}).get("pause_tank_auto_rebuild", True))
                     if stability_mode:
-                        emit(62, "СТАТ AI: режим стабільності (оновлюю тільки TTH)...", "orange")
+                        emit(62, "stats_ai_stability_mode", "orange")
                         tex = tank_extractor.TankExtractor(ext.wot_path)
                         force_full = bool(need_tank_rebuild or should_force_refresh)
                         if tex.extract_metadata(force_full=force_full):
-                            emit(88, "СТАТ AI: оновлюю UI-іконки (збірки/снаряди/навички)...")
+                            emit(88, "stats_ai_updating_icons")
                             if not tex.extract_icons():
-                                emit(90, "СТАТ AI: іконки оновлено частково", "orange")
-                            emit(94, "СТАТ AI: безпечне оновлення TTH...")
+                                emit(90, "stats_ai_tth_done", "orange")
+                            emit(94, "stats_ai_updating_tth")
                             allow_decode_retry = bool(getattr(self.app, "settings", {}).get("tth_decode_retry_enabled", False))
                             if tex.update_tth_database_safe(
                                 allow_decode_retry=allow_decode_retry,
                             ):
                                 tth_pipeline_ran = True
-                                emit(98, "СТАТ AI: TTH оновлено (tank_db без змін)")
+                                emit(98, "stats_ai_tth_done")
                             else:
                                 tanks_ok = False
                         else:
                             tanks_ok = False
                     else:
                         tank_pipeline_ran = True
-                        emit(62, "СТАТ AI: аналіз техніки...")
+                        emit(62, "stats_ai_analyzing")
                         tex = tank_extractor.TankExtractor(ext.wot_path)
                         db_exists = os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")) and os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json"))
                         force_full_extract = bool(need_tank_rebuild or should_force_refresh)
                         if tex.extract_metadata(force_full=force_full_extract) and tex.extract_icons():
-                            emit(70, f"СТАТ AI: змінено XML: {tex.changed_metadata_count}")
+                            emit(70, "stats_ai_xml_changed", count=tex.changed_metadata_count)
                             if tex.changed_metadata_count == 0 and db_exists and not need_tank_rebuild:
-                                emit(85, "СТАТ AI актуальний, декодування пропущено")
+                                emit(85, "stats_ai_up_to_date")
                             else:
-                                emit(88, "СТАТ AI: формую базу техніки...")
+                                emit(88, "stats_ai_building_db")
                                 db_ok = tex.build_database()
                                 if not db_ok:
                                     # На старті не запускаємо Orion автоматично: він може відкрити REPL-вікно і заблокувати splash.
-                                    emit(90, "СТАТ AI: база недоступна, використовую fallback (декодування вручну)", "orange")
-                                emit(94, "СТАТ AI: формую TTH...")
+                                    emit(90, "stats_ai_db_unavailable", "orange")
+                                emit(94, "stats_ai_building_tth")
                                 tex.build_tth_database()
-                                emit(98, "СТАТ AI оновлено")
+                                emit(98, "stats_ai_updated")
                         else:
                             tanks_ok = False
                 elif tank_extractor:
-                    emit(85, "Оновлення не потрібне: СТАТ AI актуальний")
+                    emit(85, "stats_ai_up_to_date_full")
 
                 # Auto-update crew and equipment ONLY when game client version changed
                 if version_changed:
                     try:
                         import build_crew_builds
                         build_crew_builds.main()
-                        emit(86, "Оновлення екіпажу з клієнта завершено")
+                        emit(86, "crew_update_done")
                     except Exception as e:
                         print(f"[WARN] crew_builds update failed: {e}")
 
@@ -275,7 +276,7 @@ class MapManager:
                             pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
                             import extract_equipment_loadouts
                             extract_equipment_loadouts.extract_loadouts(pkg_path, "equipment_loadouts.json")
-                            emit(87, "Оновлення обладнання з клієнта завершено")
+                            emit(87, "equipment_update_done")
                     except Exception as e:
                         print(f"[WARN] equipment_loadouts update failed: {e}")
 
@@ -288,18 +289,18 @@ class MapManager:
                     if (tank_pipeline_ran or tth_pipeline_ran) and hasattr(self.app, "reload_tank_data"):
                         self.app.safe_execute(self.app.reload_tank_data)
                     if should_refresh_data:
-                        emit(100, "Перевірка завершена: оновлення виконано", "lime")
+                        emit(100, "update_complete_ai", "lime")
                     else:
-                        emit(100, "Перевірка завершена: оновлення не потрібне", "lime")
+                        emit(100, "update_complete_no_ai", "lime")
                     if version_changed and self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
                         self.app.safe_execute(self.load_map_list)
                 elif maps_ok and not tanks_ok:
-                    emit(100, "МАПИ II оновлено, але СТАТ AI з помилками", "orange")
+                    emit(100, "update_complete_ai", "orange")
                 else:
-                    emit(100, "Оновлення завершено з помилками", "red")
+                    emit(100, "update_failed", "red")
             except Exception as e:
                 import traceback
-                print(f"[ШТАБ] Помилка фонового оновлення: {e}")
+                print(f"[MAP_MGR] Background update error: {e}")
                 traceback.print_exc()
             finally:
                 self._end_update()
@@ -310,41 +311,41 @@ class MapManager:
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
             try: import map_updater
             except ImportError:
-                self.app.status_label.config(text="[ПОМИЛКА] Файл map_updater.py не знайдено!", fg="red")
+                self.app.status_label.config(text=self.app.t('ui', 'map_updater_missing'), fg="red")
                 return
-            self.app.status_label.config(text="[ОНОВЛЕННЯ МАП I...] Запуск браузера...", fg="yellow")
+            self.app.status_label.config(text=self.app.t('ui', 'maps1_launching_browser'), fg="yellow")
             def update_thread():
-                def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[ОНОВЛЕННЯ] {text}", fg="yellow"))
+                def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg="yellow"))
                 success = False
                 try: success = map_updater.sync_all(callback_status=status_cb)
-                except Exception as e: print(f"[ШТАБ] Помилка апдейтера: {e}")
+                except Exception as e: print(f"[MAP_MGR] Updater error: {e}")
                 def on_finish():
                     if success:
-                        self.app.status_label.config(text="[ОНОВЛЕННЯ МАП I] Успішно завершено!", fg="lime")
+                        self.app.status_label.config(text=self.app.t('ui', 'maps1_done'), fg="lime")
                         self.load_map_list()
                     else:
-                        self.app.status_label.config(text="[ОНОВЛЕННЯ МАП I] Завершено з помилками", fg="red")
+                        self.app.status_label.config(text=self.app.t('ui', 'maps1_failed'), fg="red")
                 self.app.safe_execute(on_finish)
             threading.Thread(target=update_thread, daemon=True).start()
         else:
             if not map_extractor:
-                self.app.status_label.config(text="[ПОМИЛКА] Файл map_extractor.py не знайдено!", fg="red")
+                self.app.status_label.config(text=self.app.t('ui', 'map_extractor_missing'), fg="red")
                 return
             if not self._try_begin_update():
-                self.app.status_label.config(text="[ОНОВЛЕННЯ] Вже виконується фонове оновлення", fg="yellow")
+                self.app.status_label.config(text=self.app.t('ui', 'update_already_running_short'), fg="yellow")
                 return
-            self.app.status_label.config(text="[ОНОВЛЕННЯ МАП II...] Витягуємо з клієнта...", fg="yellow")
+            self.app.status_label.config(text=self.app.t('ui', 'maps2_extracting'), fg="yellow")
             def update_thread():
                 try:
                     ext = map_extractor.MapExtractor()
-                    def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[ОНОВЛЕННЯ] {text}", fg="yellow"))
+                    def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg="yellow"))
                     success = ext.extract(callback_status=status_cb)
                     def on_finish():
                         if success:
-                            self.app.status_label.config(text="[ОНОВЛЕННЯ МАП II] Успішно завершено!", fg="lime")
+                            self.app.status_label.config(text=self.app.t('ui', 'maps2_done'), fg="lime")
                             self.load_map_list()
                         else:
-                            self.app.status_label.config(text="[ОНОВЛЕННЯ МАП II] Помилка екстрактора (перевір шлях до гри)", fg="red")
+                            self.app.status_label.config(text=self.app.t('ui', 'maps2_extractor_error'), fg="red")
                     self.app.safe_execute(on_finish)
                 finally:
                     self._end_update()
