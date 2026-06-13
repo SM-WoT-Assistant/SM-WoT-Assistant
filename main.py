@@ -161,6 +161,8 @@ class WotAssistantHQ:
         self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
         self.drawing_palette.withdraw()
         
+        self.map_mgr.load_map_list()
+        
         self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())

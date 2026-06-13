@@ -158,7 +158,7 @@ class DrawingPalette(tk.Toplevel):
         sep4 = tk.Frame(self, bg="#333", height=1)
         sep4.pack(fill="x", padx=6, pady=2)
 
-        tk.Label(self, text="\u041a\u043e\u043b\u0456\u0440:", font=("Arial", 8, "bold"),
+        tk.Label(self, text=self.app.t('ui', 'color_label'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         clf = tk.Frame(self, bg=bg)
         clf.pack(fill="x", padx=8)
