@@ -46,7 +46,6 @@ class WotAssistantHQ:
         self.root = root
         self.root.withdraw()
         
-        self.lang = "ua"
         self.mode = "edit" 
         self.map_mode = 1 
         self.dialog_open = False 
@@ -59,6 +58,13 @@ class WotAssistantHQ:
         self.map_mgr = map_manager.MapManager(self)
         self.map_mgr.auto_detect_wot_path()
         self.custom_names = self.data_mgr.load_json(config.CUSTOM_NAMES_FILE)
+        
+        import language_module
+        self.lang = language_module.setup(
+            self.settings.get("wot_path", ""),
+            self.settings,
+            self.save_settings
+        )
         
         self.locale = locale_manager.LocaleManager(self)
         self.map_renderer = map_renderer.MapRenderer(self)
@@ -1058,6 +1064,8 @@ class WotAssistantHQ:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
         version = config.load_version()
         self.splash_canvas.create_text(sw//2, sh - 72, text=version, fill="white", font=("Verdana", 12, "bold"))
+        lang_text = f"Language: {self.lang.upper()}"
+        self.splash_canvas.create_text(sw//2, sh - 90, text=lang_text, fill="#888888", font=("Arial", 8))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
             sh - 46,

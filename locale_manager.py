@@ -6,7 +6,7 @@ import translations
 class LocaleManager:
     def __init__(self, app):
         self.app = app
-        self.lang = app.settings.get("language", "ua")
+        self.lang = app.settings.get("language", "en")
         
         self.locales_file = config.LOCALES_FILE
         self.languages = self.load_locales()
