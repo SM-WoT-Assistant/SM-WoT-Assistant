@@ -457,9 +457,9 @@ class WotAssistantHQ:
             self._redrawing = False
 
     def refresh_mode_indicator(self):
-        mode_text = "РЕДАГУВАННЯ" if self.mode == "edit" else "БОЙОВИЙ"
+        mode_text = self.t('ui', 'mode_edit') if self.mode == "edit" else self.t('ui', 'mode_battle')
         fmt_text = "ON" if self.win_mgr.format_mode_enabled else "OFF"
-        text = f"[РЕЖИМ] {mode_text} | [ФОРМАТУВАННЯ] {fmt_text}"
+        text = f"{self.t('ui', 'mode_label')} {mode_text} | {self.t('ui', 'format_label')} {fmt_text}"
         fg = "cyan" if self.mode == "edit" else "#bbbbbb"
         if hasattr(self, "status_label"):
             self.status_label.config(text=text, fg=fg)

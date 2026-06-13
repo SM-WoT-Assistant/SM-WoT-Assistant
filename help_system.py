@@ -47,7 +47,7 @@ class HelpManager:
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
 
-        tk.Label(hdr, text=f"  SM WoT Assistant v{config.load_version()}: ДОВІДКА", bg=hdr_bg, fg=title_fg,
+        tk.Label(hdr, text=f"  {self.app.t('ui', 'help_title').format(version=config.load_version())}", bg=hdr_bg, fg=title_fg,
                  font=("Arial", 9, "bold")).pack(side="left")
         tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
                   font=("Arial", 8), command=lambda: self.toggle_overlay()).pack(side="right", padx=4)
@@ -58,9 +58,6 @@ class HelpManager:
 
         body = tk.Frame(self._help_win, bg=bg)
         body.pack(fill="both", expand=True, padx=12, pady=(8, 4))
-
-        TK = tk.Label(body, bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w", width=20)
-        TD = tk.Label(body, bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w", width=36)
 
         def row(hotkey, desc, first=False):
             p = (6, 0) if first else (0, 0)
@@ -85,45 +82,45 @@ class HelpManager:
 
         _r = [0]
 
-        row("F10", "Показати / Приховати вікно", first=True)
-        row("E", "Перемикання: БОЙОВИЙ ↔ РЕДАКТОР")
-        row("F1", "Ця довідка")
+        row("F10", self.app.t('ui', 'help_f10'), first=True)
+        row("E", self.app.t('ui', 'help_e'))
+        row("F1", self.app.t('ui', 'help_f1'))
 
-        section("Керування вікном (Режим РЕДАКТОР)")
-        hint("• Натисніть F8 для вмикання/вимикання режиму змін")
-        row("Ctrl + ЛКМ", "Перетягнути вікно редактора")
-        row("Ctrl + ↕", "Змінити розмір вікна")
-        row("Ctrl + ↔", "Змінити прозорість")
-        row("Ctrl+Shift + ↕", "Змінити контрастність мапи")
+        section(self.app.t('ui', 'help_section_editor'))
+        hint(self.app.t('ui', 'help_hint_editor'))
+        row("Ctrl + LMB", self.app.t('ui', 'help_ctrl_lmb'))
+        row("Ctrl + \u2195", self.app.t('ui', 'help_ctrl_updown'))
+        row("Ctrl + \u2194", self.app.t('ui', 'help_ctrl_leftright'))
+        row("Ctrl+Shift + \u2195", self.app.t('ui', 'help_ctrlshift_updown'))
 
-        section("Керування вікном (Бойовий режим)")
-        hint("• Натисніть F8 для вмикання/вимикання режиму змін")
-        row("Ctrl + ЛКМ", "Перетягнути вікно у бою")
-        row("Ctrl + ↕", "Змінити розмір вікна")
-        row("Ctrl + ↔", "Змінити прозорість")
-        row("Ctrl+Shift + ↕", "Змінити контрастність мапи")
+        section(self.app.t('ui', 'help_section_battle'))
+        hint(self.app.t('ui', 'help_hint_battle'))
+        row("Ctrl + LMB", self.app.t('ui', 'help_ctrl_lmb_battle'))
+        row("Ctrl + \u2195", self.app.t('ui', 'help_ctrl_updown'))
+        row("Ctrl + \u2194", self.app.t('ui', 'help_ctrl_leftright'))
+        row("Ctrl+Shift + \u2195", self.app.t('ui', 'help_ctrlshift_updown'))
 
-        section("Малювання (Режим РЕДАКТОР → MAPS)")
-        row("ЛКМ + тягнути", "Створити маркер / текст")
-        row("Ctrl + ЛКМ + тягнути", "Перемістити об'єкт")
-        row("Ctrl + тягнути стрілочку", "Змінити напрямок вектора")
-        row("Правий клік", "Контекстне меню")
-        row("Ctrl + ↑", "Збільшити виділений об'єкт")
-        row("Ctrl + ↓", "Зменшити виділений об'єкт")
-        row("Ctrl + Z", "Скасувати (Undo)")
+        section(self.app.t('ui', 'help_section_draw'))
+        row("LMB + drag", self.app.t('ui', 'help_lmb_drag'))
+        row("Ctrl + LMB + drag", self.app.t('ui', 'help_ctrl_lmb_drag'))
+        row("Ctrl + drag arrow", self.app.t('ui', 'help_ctrl_arrow_drag'))
+        row("Right click", self.app.t('ui', 'help_right_click'))
+        row("Ctrl + \u2191", self.app.t('ui', 'help_ctrl_up'))
+        row("Ctrl + \u2193", self.app.t('ui', 'help_ctrl_down'))
+        row("Ctrl + Z", self.app.t('ui', 'help_ctrl_z'))
 
-        section("Палітра малювання (кнопка з пензлем)")
-        row("Ряд 1", "Маркер, ЛТ, СТ, ТТ, ПТ, САУ")
-        row("Ряд 2", "Дерево + 8 тактичних значків")
-        row("«Видалити»", "З'являється при редагуванні")
-        row("Рядок стану", "Показує тип редагованого об'єкта")
-        row("Клік на пусте поле", "Знімає виділення")
+        section(self.app.t('ui', 'help_section_palette'))
+        row("Row 1", self.app.t('ui', 'help_palette_row1'))
+        row("Row 2", self.app.t('ui', 'help_palette_row2'))
+        row("Delete", self.app.t('ui', 'help_palette_delete'))
+        row("Status row", self.app.t('ui', 'help_palette_status'))
+        row("Click empty", self.app.t('ui', 'help_palette_click_empty'))
 
-        section("Фільтри (Нижня панель)")
-        row("РЕЖИМ БОЮ", "Фільтрація мап за типом бою")
-        row("ТЕХНІКА", "Фільтрація міток за класом техніки")
+        section(self.app.t('ui', 'help_section_filters'))
+        row(self.app.t('ui', 'battle_mode_label'), self.app.t('ui', 'help_filter_mode'))
+        row(self.app.t('ui', 'vehicle_class_label'), self.app.t('ui', 'help_filter_class'))
 
         tk.Frame(body, bg="#333", height=1).grid(row=_r[0], column=0, columnspan=2, sticky="ew", pady=(8, 4))
         _r[0] += 1
-        tk.Label(body, text="Натисніть F1 для закриття", bg=bg, fg=hint_fg,
+        tk.Label(body, text=self.app.t('ui', 'help_close'), bg=bg, fg=hint_fg,
                  font=("Arial", 8)).grid(row=_r[0], column=0, columnspan=2, pady=(0, 4))
