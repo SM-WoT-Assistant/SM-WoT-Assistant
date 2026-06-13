@@ -11,41 +11,39 @@ class LocaleManager:
         self.locales_file = config.LOCALES_FILE
         self.languages = self.load_locales()
         
-        # Якщо немає файлу або він порожній - копіюємо дефолт з translations
-        if not self.languages:
-            self.languages = translations.TRANSLATIONS
-            self.save_locales()
-        else:
-            # Додаємо нові ключі з translations.py без перезапису існуючих
-            self._merge_missing()
-            
-    def _merge_missing(self):
-        """Add missing keys from translations.py to self.languages (preserves existing)."""
+        # Ensure English base exists
+        if "en" not in self.languages:
+            self.languages["en"] = translations.TRANSLATIONS["en"]
+        
+        # Ensure current language exists
+        if self.lang not in self.languages:
+            self.languages[self.lang] = {"ui": {}}
+        
+        # Ensure all EN UI keys exist in current language (translate if needed)
+        self._ensure_ui_keys()
+        
+    def _ensure_ui_keys(self):
+        """Ensure current language has all EN UI keys (translated or fallback)."""
+        en_ui = translations.TRANSLATIONS.get("en", {}).get("ui", {})
+        curr_ui = self.languages[self.lang].setdefault("ui", {})
+        
         changed = False
-        for lang, lang_data in translations.TRANSLATIONS.items():
-            if lang not in self.languages:
-                self.languages[lang] = lang_data
+        for key, en_val in en_ui.items():
+            if key not in curr_ui:
+                # Will be translated on demand via t_ui
+                curr_ui[key] = en_val  # Fallback to EN initially
                 changed = True
-                continue
-            for section, section_data in lang_data.items():
-                if section not in self.languages[lang]:
-                    self.languages[lang][section] = section_data
-                    changed = True
-                    continue
-                for key, value in section_data.items():
-                    if key not in self.languages[lang][section]:
-                        self.languages[lang][section][key] = value
-                        changed = True
+        
         if changed:
             self.save_locales()
-            
+        
     def load_locales(self):
         if os.path.exists(self.locales_file):
             try:
                 with open(self.locales_file, "r", encoding="utf-8") as f:
                     return json.load(f)
             except Exception as e:
-                print(f"[ЛОКАЛІЗАЦІЯ] Помилка завантаження {self.locales_file}: {e}")
+                print(f"[LOCALE] Load error {self.locales_file}: {e}")
         return {}
         
     def save_locales(self):
@@ -53,25 +51,54 @@ class LocaleManager:
             with open(self.locales_file, "w", encoding="utf-8") as f:
                 json.dump(self.languages, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"[ЛОКАЛІЗАЦІЯ] Помилка збереження {self.locales_file}: {e}")
+            print(f"[LOCALE] Save error {self.locales_file}: {e}")
 
     def set_language(self, lang_code):
         self.lang = lang_code
         self.app.settings["language"] = lang_code
         self.app.save_settings()
+        # Ensure new language has structure
+        if lang_code not in self.languages:
+            self.languages[lang_code] = {"ui": {}}
+        self._ensure_ui_keys()
 
     def t_ui(self, key, default=None):
-        """Отримати переклад UI елементу"""
-        if default is None: 
+        """Get UI translation with dynamic translation via Google Translate."""
+        if default is None:
             default = str(key)
-        return self.languages.get(self.lang, {}).get("ui", {}).get(key, default)
+        
+        # Get English source value (authoritative from translations.py)
+        en_val = translations.TRANSLATIONS.get("en", {}).get("ui", {}).get(key, key)
+        
+        # 1. Try to get from cache (locales.json)
+        val = self.languages.get(self.lang, {}).get("ui", {}).get(key)
+        
+        # If cached value exists and differs from English source -> already translated, return it
+        if val and val != en_val:
+            return val
+        
+        # 2. If language != EN and (no cache or cache equals English) -> translate
+        if self.lang != "en":
+            try:
+                from ui_translator import translate
+                translated = translate(en_val, self.lang)
+                if translated != en_val:
+                    # Save to cache
+                    self.languages.setdefault(self.lang, {}).setdefault("ui", {})[key] = translated
+                    self.save_locales()
+                    return translated
+            except Exception as e:
+                print(f"[LOCALE] Translation failed for '{key}': {e}")
+        
+        # 3. Fallback to EN
+        return en_val if en_val != key else default
         
     def t_tank(self, tank_id, default_name):
-        """Отримати переклад назви диску (майбутній заділ)"""
+        """Get tank name translation (future use)"""
         return self.languages.get(self.lang, {}).get("tanks", {}).get(tank_id, default_name)
 
     def t_map(self, eng):
-        """Основна функція для перекладу та форматування назви мапи (заміна translate_map_name)"""
+        """Main function for map name translation and formatting."""
         lmaps = self.languages.get(self.lang, {}).get("maps", {})
 
         if hasattr(self.app, 'custom_names') and eng in self.app.custom_names:
@@ -94,7 +121,7 @@ class LocaleManager:
             
             ext = self.app.extractor_names.get(lookup_key)
             if ext and ext != eng:
-                # ext is Ukrainian name from map_dictionary.json
+                # ext is localized name from map_dictionary.json
                 return ext
 
         if eng in lmaps:
@@ -127,9 +154,9 @@ class LocaleManager:
                     base = lmaps.get(en, en)
                 if base:
                     second = pts[1].strip()
-                    if second.lower() == "assault": second = self.t_ui("assault", "Штурм")
-                    elif second.lower() == "encounter": second = self.t_ui("encounter", "Зустріч")
-                    elif second.lower() == "region": second = self.t_ui("region", "Регіон")
+                    if second.lower() == "assault": second = self.t_ui("assault", "Assault")
+                    elif second.lower() == "encounter": second = self.t_ui("encounter", "Encounter")
+                    elif second.lower() == "region": second = self.t_ui("region", "Region")
                     return f"{base} ({second})"
         
         for tech_name, en_name in sorted(config.TECH_MAPS_STAGING.items(), key=lambda x: len(x[0]), reverse=True):

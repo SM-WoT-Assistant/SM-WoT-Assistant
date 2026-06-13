@@ -18,7 +18,7 @@ _KNOWN_KEYS = [
 _KEY_RE = re.compile(
     r'\b(?:' + '|'.join(re.escape(k) for k in sorted(_KNOWN_KEYS, key=len, reverse=True)) + r')\b'
 )
-_SYM_RE = re.compile(r'[|/\\\u2190\u2191\u2192\u2193\u2194+\-:\[\](){}<>]')
+_SYM_RE = re.compile(r'(?:->|=>|<-|<=|\{[^}]+\}|[|/\\\u2190\u2191\u2192\u2193\u2194+\-:\[\]()<>])')
 
 def _shield(text):
     """Replace keyboard shortcuts and symbols with placeholders for safe translation."""

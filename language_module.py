@@ -333,12 +333,6 @@ def setup(wot_path, settings, save_callback):
     lm = LanguageModule(wot_path)
     lang = lm.detect_language()
     
-    import translations
-    supported_langs = set(translations.TRANSLATIONS.keys())
-    if lang not in supported_langs:
-        print(f"[LANG SETUP] detected lang '{lang}' not supported, falling back to 'en'")
-        lang = "en"
-    
     saved = settings.get("language", "")
     print(f"[LANG SETUP] detected={lang}, saved={saved}")
 
