@@ -1,5 +1,5 @@
 TRANSLATIONS = {
-    "ua": {
+    "uk": {
         "ui": {
             "show": "ПОКАЗАТИ", "bind": "ПРИВ'ЯЗАТИ",
             "draw": "МАЛЮВАТИ", "clear": "ОЧИСТИТИ ВСЕ", "marker": "Маркер",
@@ -21,7 +21,10 @@ TRANSLATIONS = {
             "fetching_info": "Отримання інформації...",
             "processing": "Обробка результатів...",
             "ready": "Готово",
-            "tactic_no_maps": "Немає мап для цього режиму"
+            "tactic_no_maps": "Немає мап для цього режиму",
+            "log_found": "Лог знайдено: {path}",
+            "log_waiting": "Гру знайдено за {path}. Лог з'явиться після першого бою.",
+            "game_not_found": "Гру не знайдено. Встановіть шлях у Налаштування -> WoT"
         },
         "maps": {
             "Karelia": "Карелія", "Malinovka": "Малинівка", "Province": "Провінція",
@@ -67,7 +70,10 @@ TRANSLATIONS = {
             "fetching_info": "Fetching information...",
             "processing": "Processing results...",
             "ready": "Ready",
-            "tactic_no_maps": "No maps for this mode"
+            "tactic_no_maps": "No maps for this mode",
+            "log_found": "Log found: {path}",
+            "log_waiting": "Game found at {path}. Log will appear after first battle.",
+            "game_not_found": "Game not found. Set path in Settings \u2192 WoT"
         },
         "maps": {
             "Karelia": "Karelia", "Malinovka": "Malinovka", "Province": "Province",
@@ -113,7 +119,10 @@ TRANSLATIONS = {
             "fetching_info": "Получение информации...",
             "processing": "Обработка результатов...",
             "ready": "Готово",
-            "tactic_no_maps": "Нет карт для этого режима"
+            "tactic_no_maps": "Нет карт для этого режима",
+            "log_found": "Лог найден: {path}",
+            "log_waiting": "Игра найдена по {path}. Лог появится после первого боя.",
+            "game_not_found": "Игра не найдена. Установите путь в Настройки -> WoT"
         },
         "maps": {
             "Karelia": "Карелия", "Malinovka": "Малиновка", "Province": "Провинция",

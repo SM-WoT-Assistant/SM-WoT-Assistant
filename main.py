@@ -107,20 +107,29 @@ class WotAssistantHQ:
         self.process_queue()
         
         log_path = self.settings.get("log_path", "")
+        wot_path = self.settings.get("wot_path", "")
+        
         if log_path:
             log_path = os.path.normpath(log_path)
             self.settings["log_path"] = log_path
+        
         print(f"[INIT] log_path = {log_path}")
-        if not log_path or not os.path.exists(log_path):
+        print(f"[INIT] wot_path = {wot_path}")
+        
+        game_exists = wot_path and os.path.exists(os.path.join(wot_path, "WorldOfTanks.exe"))
+        
+        if log_path and os.path.exists(log_path):
+            print(f"[INIT] {self.t('ui', 'log_found').format(path=log_path)}")
+        elif game_exists:
+            print(f"[INIT] {self.t('ui', 'log_waiting').format(path=wot_path)}")
             self._auto_detect_log_path()
             log_path = self.settings.get("log_path", "")
             if log_path:
                 log_path = os.path.normpath(log_path)
                 self.settings["log_path"] = log_path
-        if log_path and os.path.exists(log_path):
-            print(f"[INIT] ✓ Лог знайдено: {log_path}")
         else:
-            print(f"[INIT] ✗ Лог НЕ знайдено. Встановіть шлях у ⚙ -> WoT")
+            print(f"[INIT] {self.t('ui', 'game_not_found')}")
+            self._auto_detect_log_path()
         
         self.last_battle_map = None
         self.last_battle_mode = None
@@ -852,6 +861,10 @@ class WotAssistantHQ:
             os.path.join(os.path.expanduser("~"), "AppData", "Local", "Wargaming.net", "World of Tanks", "logs", "python.log"),
             os.path.join("C:", "Games", "World_of_Tanks", "logs", "python.log"),
             os.path.join("D:", "Games", "World_of_Tanks", "logs", "python.log"),
+            os.path.join("C:", "Games", "World_of_Tanks_EU", "python.log"),
+            os.path.join("C:", "Games", "World_of_Tanks_EU", "logs", "python.log"),
+            os.path.join("D:", "Games", "World_of_Tanks_EU", "python.log"),
+            os.path.join("D:", "Games", "World_of_Tanks_EU", "logs", "python.log"),
             os.path.join(os.getcwd(), "logs", "python.log"),
         ]
         for p in common_logs:

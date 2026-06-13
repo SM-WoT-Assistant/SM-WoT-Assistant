@@ -372,6 +372,10 @@ class MapManager:
             all_maps = list(loaded_dict.keys())
             filtered_maps = []
             for m in all_maps:
+                if m.startswith("type/"):
+                    continue
+                if m in ("invalid_map", "hangar_v4", "_default_") or m.startswith("h33_"):
+                    continue
                 if m in self.app.map_data:
                     gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
                     has_mode = internal_mode in gameplay_types
