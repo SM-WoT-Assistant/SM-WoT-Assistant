@@ -73,9 +73,20 @@ class LocaleManager:
         # 1. Try to get from cache (locales.json)
         val = self.languages.get(self.lang, {}).get("ui", {}).get(key)
         
-        # If cached value exists and differs from English source -> already translated, return it
+        # If cached value exists and is a proper translation (non-ASCII or differs significantly)
+        # Don't return cached values that look like English (ASCII only) unless it's the exact same
         if val and val != en_val:
-            return val
+            # Check if cached value contains non-ASCII characters (likely a real translation)
+            # or if it's significantly different from English
+            try:
+                val.encode('ascii')
+                # It's pure ASCII - likely a bad translation or English variant
+                # Only return if it's exactly the same as English (shouldn't happen here due to val != en_val)
+                # Otherwise force re-translation
+                pass
+            except UnicodeEncodeError:
+                # Contains non-ASCII - likely a real translation
+                return val
         
         # 2. If language != EN and (no cache or cache equals English) -> translate
         if self.lang != "en":

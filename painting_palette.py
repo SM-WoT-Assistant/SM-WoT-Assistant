@@ -32,18 +32,18 @@ class DrawingPalette(tk.Toplevel):
             "Onslaught": tk.BooleanVar(value=False),
         }
         self.mode_labels = {
-            "Standard": "\u0421\u0442\u0430\u043d\u0434\u0430\u0440\u0442",
-            "Encounter": "\u0417\u0443\u0441\u0442\u0440\u0456\u0447",
-            "Assault": "\u0428\u0442\u0443\u0440\u043c",
-            "Onslaught": "\u041d\u0410\u0422\u0418\u0421\u041a",
+            "Standard": "Standard",
+            "Encounter": "Encounter",
+            "Assault": "Assault",
+            "Onslaught": "Onslaught",
         }
 
         self.class_vars = {
-            "\u041b\u0422": tk.BooleanVar(value=False),
-            "\u0421\u0422": tk.BooleanVar(value=False),
-            "\u0422\u0422": tk.BooleanVar(value=False),
-            "\u041f\u0422": tk.BooleanVar(value=False),
-            "\u0421\u0410\u0423": tk.BooleanVar(value=False),
+            "LT": tk.BooleanVar(value=False),
+            "MT": tk.BooleanVar(value=False),
+            "HT": tk.BooleanVar(value=False),
+            "TD": tk.BooleanVar(value=False),
+            "SPG": tk.BooleanVar(value=False),
         }
 
         self.text_var = tk.StringVar(value="")
@@ -61,7 +61,7 @@ class DrawingPalette(tk.Toplevel):
         hdr = tk.Frame(self, bg="#2a2a2a", height=26)
         hdr.pack(fill="x")
         hdr.pack_propagate(False)
-        tk.Label(hdr, text="\u041c\u0430\u043b\u044e\u0432\u0430\u043d\u043d\u044f", bg="#2a2a2a", fg="white",
+        tk.Label(hdr, text=self.app.t('ui', 'palette_title'), bg="#2a2a2a", fg="white",
                  font=("Arial", 9, "bold")).pack(side="left", padx=8)
         tk.Button(hdr, text="\u2715", bg="#2a2a2a", fg="#aaa", bd=0,
                   font=("Arial", 8), command=self._close).pack(side="right", padx=4)
@@ -112,24 +112,24 @@ class DrawingPalette(tk.Toplevel):
         sep = tk.Frame(self, bg="#333", height=1)
         sep.pack(fill="x", padx=6, pady=3)
 
-        tk.Label(self, text="\u0420\u0435\u0436\u0438\u043c \u0431\u043e\u044e:", font=("Arial", 8, "bold"),
+        tk.Label(self, text=self.app.t('ui', 'battle_mode'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         mf = tk.Frame(self, bg=bg)
         mf.pack(fill="x", padx=8)
         for k, v in self.mode_vars.items():
-            cb = tk.Checkbutton(mf, text=self.mode_labels[k], variable=v, command=self._on_any_change,
+            cb = tk.Checkbutton(mf, text=self.app.t('ui', 'mode_' + k.lower()), variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
             cb.pack(side="left", padx=1)
 
         sep2 = tk.Frame(self, bg="#333", height=1)
         sep2.pack(fill="x", padx=6, pady=2)
 
-        tk.Label(self, text="\u0422\u0435\u0445\u043d\u0456\u043a\u0430:", font=("Arial", 8, "bold"),
+        tk.Label(self, text=self.app.t('ui', 'vehicle_class'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         cf = tk.Frame(self, bg=bg)
         cf.pack(fill="x", padx=8)
         for k, v in self.class_vars.items():
-            cb = tk.Checkbutton(cf, text=k, variable=v, command=self._on_any_change,
+            cb = tk.Checkbutton(cf, text=self.app.t('ui', 'class_' + k.lower()), variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
             cb.pack(side="left", padx=1)
 
@@ -137,7 +137,7 @@ class DrawingPalette(tk.Toplevel):
         sep3.pack(fill="x", padx=6, pady=2)
 
         self._text_frame = tk.Frame(self, bg=bg)
-        tk.Label(self._text_frame, text="\u0422\u0435\u043a\u0441\u0442:", font=("Arial", 8, "bold"),
+        tk.Label(self._text_frame, text=self.app.t('ui', 'text_label'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(anchor="w")
         tef = tk.Frame(self._text_frame, bg=bg)
         tef.pack(fill="x")
@@ -149,7 +149,7 @@ class DrawingPalette(tk.Toplevel):
         self._text_frame.pack(fill="x", padx=8)
 
         self._del_frame = tk.Frame(self, bg=bg)
-        self._del_btn = tk.Button(self._del_frame, text="\u0412\u0438\u0434\u0430\u043b\u0438\u0442\u0438", bg="#cc3333",
+        self._del_btn = tk.Button(self._del_frame, text=self.app.t('ui', 'delete_btn'), bg="#cc3333",
                                   fg="white", bd=0, font=("Arial", 8), command=self._delete_selected)
         self._del_btn.pack(fill="x", padx=8, pady=4)
         self._del_frame.pack(fill="x")
@@ -167,7 +167,7 @@ class DrawingPalette(tk.Toplevel):
                             command=lambda idx=i: self._set_color(self._custom_colors[idx]))
             btn.pack(side="left", padx=1, pady=3)
             self._color_buttons.append(btn)
-        tk.Button(clf, text="\u0406\u043d\u0448\u0438\u0439...", bg="#444", fg="white", bd=0,
+        tk.Button(clf, text=self.app.t('ui', 'other_color'), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._pick_color).pack(side="left", padx=4)
         self._color_preview = tk.Label(clf, text=" \u25a0 ", bg=bg, fg=self.current_color, font=("Arial", 14))
         self._color_preview.pack(side="left", padx=3)
@@ -179,9 +179,9 @@ class DrawingPalette(tk.Toplevel):
         bf.pack(fill="x", padx=8, pady=(2, 6))
         tk.Button(bf, text=self.app.t('ui', 'clear'), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._clear_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text="\u0417\u0431\u0435\u0440\u0435\u0433\u0442\u0438", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'save_btn'), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text="\u0417\u0430\u0432\u0430\u043d\u0442\u0430\u0436\u0438\u0442\u0438", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'load_btn'), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
@@ -400,8 +400,8 @@ class DrawingPalette(tk.Toplevel):
                 self._highlight_toolbar_button("marker")
             self.painter.set_tool(None)
             self._del_frame.pack(fill="x")
-            label = "Маркер" if obj["type"] == "marker" else "Текст/Знак"
-            self._status_lbl.config(text=f"Редагування: {label}")
+            label = self.app.t('ui', 'status_editing_marker') if obj["type"] == "marker" else self.app.t('ui', 'status_editing_text')
+            self._status_lbl.config(text=f"{label}")
         finally:
             self._loading_obj = False
 

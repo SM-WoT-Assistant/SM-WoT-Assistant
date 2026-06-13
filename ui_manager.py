@@ -31,13 +31,13 @@ class UIManager:
 
         tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="left")
 
-        self.app.btn_mode_ai_stats = tk.Button(self.app.top_bar, text=self.app.t('ui', 'ai_stats'), padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
+        self.app.btn_mode_ai_stats = tk.Button(self.app.top_bar, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
         self.app.btn_mode_ai_stats.pack(side="left", padx=(0,1), pady=7)
 
-        self.app.btn_mode_maps_2 = tk.Button(self.app.top_bar, text=self.app.t('ui', 'maps_2'), padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
+        self.app.btn_mode_maps_2 = tk.Button(self.app.top_bar, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
         self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=7)
 
-        self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text=self.app.t('ui', 'maps_1'), padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
+        self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
         self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=7)
 
         self.app.map_toolbar = tk.Frame(self.app.top_bar, bg="#222")
