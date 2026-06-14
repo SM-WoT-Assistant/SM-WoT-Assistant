@@ -175,7 +175,10 @@ TRANSLATIONS = {
             "help_palette_click_empty": "Deselect",
             "help_section_filters": "Filters (Bottom Panel)",
             "help_filter_mode": "Filter maps by battle type",
-            "help_filter_class": "Filter markers by vehicle class"
+            "help_filter_class": "Filter markers by vehicle class",
+            "search_placeholder": "Search among {count} tanks...",
+            "select_tank_placeholder": "Select a tank to get build...",
+            "loadout_main": "Main equipment"
         }
     }
 }

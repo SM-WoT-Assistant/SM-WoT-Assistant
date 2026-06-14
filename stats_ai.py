@@ -90,6 +90,8 @@ def _is_cache_expired(updated_iso, max_days=7):
         return True
 
 class StatsAI:
+    PLACEHOLDER_PREFIX = "Search among "
+
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
         self.ai_frame = ai_frame
         self.tank_db = tank_db
@@ -163,7 +165,7 @@ class StatsAI:
         self._available_icons = {}
         self._load_available_icons()
 
-        self.search_placeholder = f"Пошук серед {len(self.tank_db)} танків..."
+        self.search_placeholder = self.main_app.t('ui', 'search_placeholder').format(count=len(self.tank_db))
         
         self.build_ai_ui()
         self.refresh_ai_view()
@@ -378,7 +380,9 @@ class StatsAI:
         current_text = (self.ai_search_var.get() or "").strip()
         self.search_placeholder = new_placeholder
 
-        looks_like_placeholder = current_text.startswith("Пошук серед ") and current_text.endswith("танків...")
+        looks_like_placeholder = (
+            current_text.startswith(self.PLACEHOLDER_PREFIX) and current_text.endswith("...")
+        )
         if current_text == "" or current_text.casefold() == old_placeholder.casefold() or looks_like_placeholder:
             self.ai_search_var.set(new_placeholder)
             if hasattr(self, 'ai_search_entry') and self.ai_search_entry:
@@ -1016,7 +1020,7 @@ class StatsAI:
             if not self.popular_tanks:
                 for widget in self.ai_grid_frame.winfo_children():
                     widget.destroy()
-                placeholder = tk.Label(self.ai_grid_frame, text="Отримання популярних танків...",
+                placeholder = tk.Label(self.ai_grid_frame, text=self.app.t("ui", "select_tank_placeholder"),
                                        bg="#000", fg="#555", font=("Arial", 12))
                 placeholder.pack(expand=True)
                 return
@@ -2299,8 +2303,7 @@ class StatsAI:
                 cons = build_data.get(key, [])
                 for i, c in enumerate(cons):
                     if c in ration_map.values():
-                        cons[i] = correct_ration
-            
+                        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_main")))
         loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_1.pack(side="left", padx=(0, 2))
         loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
