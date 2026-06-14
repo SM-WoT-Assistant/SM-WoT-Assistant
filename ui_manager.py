@@ -46,7 +46,7 @@ class UIManager:
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
         self.app.map_selector.pack(side="left", padx=5, pady=2)
         
-        self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw'), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
+        self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw').upper(), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
         self.app.draw_btn.pack(side="left", padx=5, pady=2)
 
         self.app.status_label = tk.Label(self.app.root, text=self.app.t('ui', 'hangar_status'), bg="#222", fg="gray", font=("Arial", 8))
