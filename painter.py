@@ -492,9 +492,9 @@ class MapPainter:
         menu = tk.Menu(self.canvas, tearoff=0, bg="#333", fg="white",
                        activebackground="#555", activeforeground="white",
                        font=("Arial", 10))
-        menu.add_command(label="Редагувати", command=lambda: self.app.root.after(50, self._edit_object_at, idx))
+        menu.add_command(label=self.app.t('ui', 'edit_btn'), command=lambda: self.app.root.after(50, self._edit_object_at, idx))
         menu.add_separator(background="#555")
-        menu.add_command(label="Видалити", command=lambda: self.app.root.after(50, self._delete_object_at, idx))
+        menu.add_command(label=self.app.t('ui', 'delete_btn'), command=lambda: self.app.root.after(50, self._delete_object_at, idx))
         menu.post(event.x_root, event.y_root)
 
     def _edit_object_at(self, idx):
@@ -511,8 +511,8 @@ class MapPainter:
         needs_show = palette.state() == 'withdrawn'
         palette.exit_edit_mode()
         self._editing_idx = idx
-        label = "Маркер" if obj["type"] == "marker" else "Текст/Знак"
-        self.app.status_label.config(text=f"РЕДАГУВАННЯ: {label}", fg="#ffff00")
+        label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
+        self.app.status_label.config(text=self.app.t('ui', 'editing_label').format(label=label), fg="#ffff00")
         palette.load_object(obj)
         if needs_show:
             palette.show()
@@ -541,7 +541,7 @@ class MapPainter:
 
     def _confirm_delete(self, label):
         dlg = tk.Toplevel(self.app.root)
-        dlg.title("Підтвердження")
+        dlg.title(self.app.t('ui', 'confirm_title'))
         dlg.configure(bg="#2a2a2a")
         dlg.resizable(False, False)
         dlg.minsize(300, 120)
@@ -552,7 +552,7 @@ class MapPainter:
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 60
         dlg.geometry(f"+{cx}+{cy}")
 
-        tk.Label(dlg, text=f"Видалити {label}?", font=("Arial", 10),
+        tk.Label(dlg, text=self.app.t('ui', 'confirm_delete_msg').format(label=label), font=("Arial", 10),
                  bg="#2a2a2a", fg="#cccccc").pack(pady=(20, 15))
 
         bf = tk.Frame(dlg, bg="#2a2a2a")
@@ -561,9 +561,9 @@ class MapPainter:
         def on_yes(): result["ok"] = True; dlg.destroy()
         def on_no(): dlg.destroy()
 
-        tk.Button(bf, text="  Так  ", bg="#555", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'btn_yes'), bg="#555", fg="white", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
-        tk.Button(bf, text="  Ні  ", bg="#444", fg="#aaa", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'btn_no'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_no).pack(side="left", padx=10)
 
         self.app.root.wait_window(dlg)
@@ -577,7 +577,7 @@ class MapPainter:
         if idx < 0 or idx >= len(objects):
             return
         obj = objects[idx]
-        label = "Маркер" if obj["type"] == "marker" else "Текст/Знак"
+        label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
         ok = self._confirm_delete(label)
         if ok:
             del objects[idx]

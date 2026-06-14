@@ -2,7 +2,7 @@ TRANSLATIONS = {
     "en": {
         "ui": {
             "show": "SHOW", "bind": "BIND",
-            "draw": "DRAW", "clear": "CLEAR ALL", "marker": "Marker",
+            "draw": "Draw", "clear": "Clear all", "marker": "Marker",
             "arrow": "Arrow", "class": "Class:", "set_path": "Set python.log file",
             "rename_map": "Rename map",
             "stats": "STATS",
@@ -215,7 +215,13 @@ TRANSLATIONS = {
             "language_label": "Language: {lang}",
             "ai_key_title": "AI Settings",
             "ai_key_prompt": "Enter your Gemini API Key:",
-            "welcome_msg": "[ACCOUNT] Welcome, {nick}!"
+            "welcome_msg": "[ACCOUNT] Welcome, {nick}!",
+            "edit_btn": "Edit",
+            "confirm_title": "Confirm",
+            "confirm_delete_msg": "Delete {label}?",
+            "marker_type": "Marker",
+            "text_type": "Text/Sign",
+            "editing_label": "EDITING: {label}"
         }
     }
 }

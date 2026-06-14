@@ -1081,9 +1081,9 @@ class WotAssistantHQ:
         if self.logo_splash:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
         version = config.load_version()
-        self.splash_canvas.create_text(sw//2, sh - 72, text=version, fill="white", font=("Verdana", 12, "bold"))
+        self.splash_canvas.create_text(sw//2, sh - 65, text=version, fill="white", font=("Verdana", 12, "bold"))
         lang_text = self.t('ui', 'language_label').format(lang=self.lang.upper())
-        self.splash_canvas.create_text(sw//2, sh - 90, text=lang_text, fill="#888888", font=("Arial", 8))
+        self.splash_canvas.create_text(sw//2, sh - 98, text=lang_text, fill="#888888", font=("Arial", 8))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
             sh - 46,
