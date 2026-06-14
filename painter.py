@@ -514,6 +514,7 @@ class MapPainter:
         label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
         self.app.status_label.config(text=self.app.t('ui', 'editing_label').format(label=label), fg="#ffff00")
         palette.load_object(obj)
+        palette._lift_self()
         if needs_show:
             palette.show()
             if hasattr(self.app, 'draw_btn'):

@@ -56,7 +56,7 @@ TRANSLATIONS = {
             "battle_mode_label": "Battle mode",
             "vehicle_class_label": "VEHICLE CLASS",
             "standard_battle": "Standard",
-            "encounter_battle": "Encounter",
+            "encounter_battle": "Encounter battle",
             "assault_battle": "Assault",
             "onslaught_battle": "Onslaught",
             "mode_edit": "EDITING",
