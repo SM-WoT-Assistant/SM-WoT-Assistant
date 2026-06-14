@@ -32,6 +32,7 @@ class LanguageModule:
                     if lang:
                         self.language = lang
                         print(f"[LANG] detect: {lang} from game_info.xml")
+                        return lang
             except Exception as e:
                 print(f"[LANG] detect: parse error {e}")
 
