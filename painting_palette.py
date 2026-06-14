@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import colorchooser
-import language_module
 
 FONT_AWE = "FontAwesome"
 
@@ -117,19 +116,8 @@ class DrawingPalette(tk.Toplevel):
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         mf = tk.Frame(self, bg=bg)
         mf.pack(fill="x", padx=8)
-        _mode_mo_keys = {
-            "Standard": "type/ctf/name",
-            "Encounter": "type/domination/name",
-            "Assault": "type/assault/name",
-            "Onslaught": "type/comp7/name",
-        }
-        lm = language_module.get_lang_module()
         for k, v in self.mode_vars.items():
-            mo_key = _mode_mo_keys.get(k)
-            txt = lm.t(mo_key) if mo_key else None
-            if not txt or txt == mo_key:
-                txt = self.app.t('ui', 'mode_' + k.lower())
-            cb = tk.Checkbutton(mf, text=txt, variable=v, command=self._on_any_change,
+            cb = tk.Checkbutton(mf, text=self.app.t('ui', 'mode_' + k.lower()), variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
             cb.pack(side="left", padx=1)
 

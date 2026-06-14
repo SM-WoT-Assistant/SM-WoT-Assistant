@@ -329,7 +329,6 @@ def reset_lang_module():
 
 def setup(wot_path, settings, save_callback):
     """Called on app startup. Detects language, rebuilds if changed."""
-    global _lang_module
     print(f"[LANG SETUP] wot_path={wot_path}")
     lm = LanguageModule(wot_path)
     lang = lm.detect_language()
@@ -370,7 +369,6 @@ def setup(wot_path, settings, save_callback):
     else:
         print("[LANG SETUP] no change, skipping rebuild")
 
-    _lang_module = lm
     return lang
 
 
