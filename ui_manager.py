@@ -4,6 +4,7 @@ from tkinter import ttk
 import config
 import stats_ai
 import firebase_identity
+import language_module
 
 class UIManager:
     def __init__(self, app):
@@ -362,7 +363,13 @@ class UIManager:
         self.app.filters_container.pack(expand=True, pady=4)
         m_frame = tk.LabelFrame(self.app.filters_container, text=" " + self.app.t('ui', 'battle_mode_label') + " ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
         m_frame.pack(side="left", padx=5)
-        for t, v in [(self.app.t('ui', 'standard_battle'), "Standard"), (self.app.t('ui', 'encounter_battle'), "Encounter"), (self.app.t('ui', 'assault_battle'), "Assault"), (self.app.t('ui', 'onslaught_battle'), "Onslaught")]:
+        lm = language_module.get_lang_module()
+        for t, v in [
+            (lm.t('type/ctf/name') or self.app.t('ui', 'standard_battle'), "Standard"),
+            (lm.t('type/domination/name') or self.app.t('ui', 'encounter_battle'), "Encounter"),
+            (lm.t('type/assault/name') or self.app.t('ui', 'assault_battle'), "Assault"),
+            (lm.t('type/comp7/name') or self.app.t('ui', 'onslaught_battle'), "Onslaught")
+        ]:
             clr = "#ffaa00" if v == "Onslaught" else "white"
             tk.Radiobutton(m_frame, text=t, variable=self.app.selected_battle_mode, value=v, bg="#222", fg=clr, selectcolor="black").pack(side="left", padx=3)
         c_frame = tk.LabelFrame(self.app.filters_container, text=" " + self.app.t('ui', 'vehicle_class_label') + " ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
