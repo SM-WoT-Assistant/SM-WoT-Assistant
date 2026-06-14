@@ -2298,15 +2298,9 @@ class StatsAI:
         }
         nation = data.get("nation", "").split('_')[0]
         correct_ration = ration_map.get(nation.lower())
-        if correct_ration:
-            for key in ["consumables_1", "consumables_2"]:
-                cons = build_data.get(key, [])
-                for i, c in enumerate(cons):
-                    if c in ration_map.values():
-                        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_main")))
         loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_1.pack(side="left", padx=(0, 2))
-        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "1 - Відкриті мапи"))
+        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_main")))
         loadout_num_label_1.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
@@ -2315,7 +2309,7 @@ class StatsAI:
         
         loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_2.pack(side="left", padx=(0, 2))
-        loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, "2 - Міські мапи"))
+        loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_alt")))
         loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")

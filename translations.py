@@ -178,7 +178,8 @@ TRANSLATIONS = {
             "help_filter_class": "Filter markers by vehicle class",
             "search_placeholder": "Search among {count} tanks...",
             "select_tank_placeholder": "Select a tank to get build...",
-            "loadout_main": "Main equipment"
+            "loadout_main": "Main equipment",
+            "loadout_alt": "Alternative equipment"
         }
     }
 }
