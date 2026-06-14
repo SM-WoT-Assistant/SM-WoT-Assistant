@@ -262,7 +262,7 @@ class UIManager:
             if ok:
                 dlg.destroy()
                 self._refresh_identity_bar()
-                self.app.status_label.config(text=f"[ACCOUNT] Welcome, {nick}!", fg="lime")
+                self.app.status_label.config(text=self.app.t('ui', 'welcome_msg').format(nick=nick), fg="lime")
                 self.app.root.after(3000, lambda: self.app.status_label.config(text=self.app.t('ui', 'hangar_status'), fg="gray"))
             else:
                 status_var.set(msg)

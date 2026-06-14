@@ -1,1 +1,0 @@
-C:\Users\PRO\AppData\Local\Programs\Python\Python314\python.exe: can't open file 'D:\\!WORK\\WOT\\WOTtraner\\WORK\\SETUP & MAPS WoT Assistant_1.00\\scan_files.py': [Errno 2] No such file or directory

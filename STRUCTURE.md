@@ -14,7 +14,7 @@
 ├── ui_manager.py               # UI layout, view switching, filter construction
 ├── data_manager.py             # JSON file I/O, tank DB loading with fallback chain
 ├── locale_manager.py           # Translation system, map name resolution
-├── map_manager.py              # Map list loading (unified TACTIC↔MAPS from extracted_maps/map_dictionary.json), game version check, data updates, TACTIC image existence filter
+├── map_manager.py              # Map list loading (unified TACTIC↔MAPS from extracted_maps/map_dictionary.json), game version check, data updates, TACTIC image existence filter, filters out type/*, invalid_map, hangar_v4, h33_* maps
 ├── map_renderer.py             # Map image rendering, 10×10 grid, draw_frame() border, _resolve_tactic_folder(), arena bases
 ├── painter.py                  # Canvas drawing: markers, arrows, text, tree icons, undo, edit mode, class icon filtering, overlay (_po_win) with transient/Unmap/focus management, _po_sync_timer (500ms)
 ├── painting_palette.py         # Floating DrawingPalette: toolbar, live-sync editing, 5-color history (_custom_colors), status bar, delete button, deselection
@@ -75,6 +75,8 @@
 ├── selenium_parse_consumables.py # Selenium: parse consumable data
 ├── selenium_selected.py        # Selenium: handle selected state
 ├── name_localizer.py           # Tank name localization utilities
+├── language_module.py          # .mo file parser, game language detection, locale JSON exporter for website
+├── ui_translator.py            # Runtime UI translation via Google Translate with shortcut/symbol shielding
 ├── firebase_identity.py        # Local identity system (nickname + 4-digit PIN, SHA-256 hash, stored in AppData/identity.json)
 ├── firebase_reporter.py        # RTDB REST: error reports, version pings, update checks, service events
 ├── firebase_drawings.py        # RTDB REST: publish/download/delete tactical drawings (schemes/ node)
@@ -112,7 +114,8 @@
 │   ├── admin.html              # Admin dashboard (stats, schemes management, version management)
 │   ├── 404.html                # Custom 404 page
 │   ├── logo.png                # Website logo
-│   └── example_map.png         # Example map image
+│   ├── example_map.png         # Example map image
+│   └── locale/                 # Exported locale JSON files (e.g., uk.json) for website i18n
 ├── maps/                       # Map images for TACTIC mode (webp/jpg/png)
 │   ├── Karelia/                # One subfolder per map
 │   ├── Malinovka/
@@ -166,7 +169,7 @@
 
 **public/:**
 - Purpose: Firebase Hosting static website served at `sm-wot-assistant.web.app`
-- Contains: Landing page (`index.html`) with UA/EN language toggle, download button, features grid, tactical schemes promo, releases table from RTDB; `schemes.html` community schemes browser with map filter, invite-code groups, and PIN-based auth; `drawings.html` gallery; `admin.html` admin dashboard; `404.html` custom error page; static assets (`logo.png`, `example_map.png`)
+- Contains: Landing page (`index.html`) with UA/EN language toggle, download button, features grid, tactical schemes promo, releases table from RTDB; `schemes.html` community schemes browser with map filter, invite-code groups, and PIN-based auth; `drawings.html` gallery; `admin.html` admin dashboard; `404.html` custom error page; static assets (`logo.png`, `example_map.png`); `locale/` subdirectory with exported locale JSON files (e.g., `uk.json`) for website internationalization
 - Key files: `index.html`, `schemes.html`
 
 **maps/:**
@@ -247,7 +250,7 @@
 **Battle Integration:** `log_reader.py` (class LogWatcher): python.log tailing with regex-based event detection
 **Drawing System:** `painter.py` (class MapPainter): Tactical markers/arrows/text with Ctrl+Z undo, resize, right-click edit/delete, edit-mode selection rectangle, _draw_class_icons filtered against active checkboxes, overlay canvas (_po_win Toplevel) with transient/Unmap/Map bindings, _po_sync_timer 500ms; `painting_palette.py` (class DrawingPalette): Floating non-modal palette with toolbar (marker, XVMSymbol class icons, tree FontAwesome icon, 8 tactical icons), mode/class checkboxes, text entry, 5-color history color picker, delete button, status bar, deselection on click-away
 **AI Pipeline:** `generate_prompt_v2.py`: Build AI prompts from client data (popular tanks prompt asks for tiers 8-11); `ai_webview_gui.py`: PyQt6 QWebEngineView browser launched as subprocess via `--ai-webview`, starts minimized with taskbar icon hidden, file-based capture (wot_ai_response.txt) with stdout fallback and RESPONSE_READY sentinel; `ai_normalizer.py`: Response validation; `stats_data.py`: Equipment/skill/consumable mappings
-**Localization:** `translations.py`: Default translations; `locale_manager.py` (class LocaleManager): Runtime translation resolution; `locales.json`: Editable translation overrides
+**Localization:** `translations.py`: Default translations; `locale_manager.py` (class LocaleManager): Runtime translation resolution; `locales.json`: Editable translation overrides; `language_module.py` (class LanguageModule): WoT client .mo file parser, game language detection, per-category JSON cache builder, locale JSON exporter to `public/locale/` and Firebase RTDB; `ui_translator.py`: Runtime UI translation via Google Translate (`deep_translator`) with shortcut/symbol shielding, per-language cache in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
 **Persistence Data:** `settings.json`, `tank_db.json`, `tank_tth.json`, `crew_builds.json`, `equipment_loadouts.json`, `tank_slots_full.json`, `map_drawings.json`, `game_entities_english.json`, `ai_builds_cache.json`, `popular_tanks_cache.json`, `identity.json` (AppData — nickname, PIN hash, user_id)
 **Firebase/Cloud:** `firebase_identity.py`: Local identity + PIN auth; `firebase_reporter.py`: RTDB error/analytics/versions; `firebase_drawings.py`: RTDB drawing CRUD; `firebase.json` + `.firebaserc`: Firebase project config; `database.rules.json`: RTDB security rules; `public/`: Static website deployed to Firebase Hosting
 **Tests:** Scattered `test_*.py` files at root (no dedicated `tests/` directory)
@@ -272,6 +275,7 @@
 **New AI feature:** Add to `stats_ai.py:StatsAI` class or create a companion module imported from there
 **New data extraction:** Create `extract_*.py` at root, follow the pattern of `map_extractor.py` / `tank_extractor.py` (manifest tracking, callback_status)
 **New translation:** Add keys to `translations.py`, they auto-merge into `locales.json` on next startup
+**New localization category:** Add .mo filename to `LanguageModule.build_all_dictionaries()` categories dict in `language_module.py`, it auto-parses and caches on next language setup
 **New settings:** Add property to `config.py`, read/write in `main.py:save_settings/__init__`, add UI control in `ui_manager.py:build_filters` or settings menu
 **New view:** Add button in `ui_manager.py:setup_ui`, implement show_view logic in `ui_manager.py:show_view`, wire in `main.py`
 **New deployment target:** Add to `build.py:copy_data_files()` exclusion logic or `wot_assistant.spec` `runtime_jsons` list (for JSONs), or extend `build.py` with new packaging steps (e.g., new directories)

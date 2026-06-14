@@ -14,6 +14,7 @@ import sys
 from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
 import config
+import language_module
 
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
@@ -969,6 +970,33 @@ class StatsAI:
         if hasattr(self, '_legend_tooltip') and self._legend_tooltip.winfo_exists():
             self._legend_tooltip.withdraw()
 
+    def _resolve_item_name(self, item_key, category="artefacts"):
+        """Resolve item key to localized name from game client .mo files."""
+        msgid = f"{item_key}/name"
+        wot_path = self.main_app.settings.get("wot_path", "") if hasattr(self, 'main_app') else ""
+        lm = language_module.get_lang_module(wot_path)
+        if lm:
+            result = lm.t(msgid)
+            if result and result != msgid and not result.startswith("#"):
+                return result
+        return item_key
+
+    def _mo_label(self, msgid, fallback=""):
+        """Look up a label from game client .mo files via msgid."""
+        wot_path = self.main_app.settings.get("wot_path", "") if hasattr(self, 'main_app') else ""
+        lm = language_module.get_lang_module(wot_path)
+        if lm:
+            result = lm.t(msgid)
+            if result and result != msgid and not result.startswith("#"):
+                return result
+        return fallback
+
+    def _bind_item_tooltip(self, widget, item_key, category="artefacts"):
+        """Bind hover tooltip showing localized item name."""
+        name = self._resolve_item_name(item_key, category)
+        widget.bind("<Enter>", lambda e, n=name: self._show_legend_tooltip(e, n))
+        widget.bind("<Leave>", lambda e: self._hide_legend_tooltip())
+
     def _build_name_to_tag_lookup(self):
         lookup = {}
         for tag, data in self.tank_db.items():
@@ -1020,7 +1048,7 @@ class StatsAI:
             if not self.popular_tanks:
                 for widget in self.ai_grid_frame.winfo_children():
                     widget.destroy()
-                placeholder = tk.Label(self.ai_grid_frame, text=self.app.t("ui", "select_tank_placeholder"),
+                placeholder = tk.Label(self.ai_grid_frame, text=self.main_app.t("ui", "select_tank_placeholder"),
                                        bg="#000", fg="#555", font=("Arial", 12))
                 placeholder.pack(expand=True)
                 return
@@ -1928,7 +1956,7 @@ class StatsAI:
         
         tth_rows = []
         if tth.get('hp'):
-            tth_rows.append(("relativeArmor.png", "Міцність (HP):", str(tth['hp'])))
+            tth_rows.append(("relativeArmor.png", self._mo_label("vehicleInfo/params/maxHealth", "HP"), str(tth['hp'])))
         hull = tth.get('hull_armor', {})
         if isinstance(hull, dict) and hull:
             front = hull.get('front') or hull.get('f') or hull.get(list(hull.keys())[0])
@@ -1936,9 +1964,9 @@ class StatsAI:
             rear = hull.get('rear') or hull.get('r')
             parts = [str(v) for v in [front, side, rear] if v is not None]
             if parts:
-                tth_rows.append(("relativeArmor.png", "Броня корпусу:", " / ".join(parts)))
+                tth_rows.append(("relativeArmor.png", self._mo_label("vehicleParams/hullArmor", "Hull armor"), " / ".join(parts)))
         elif hull:
-            tth_rows.append(("relativeArmor.png", "Броня корпусу:", str(hull)))
+            tth_rows.append(("relativeArmor.png", self._mo_label("vehicleParams/hullArmor", "Hull armor"), str(hull)))
         turret = tth.get('turret_armor', {})
         if isinstance(turret, dict) and turret:
             front = turret.get('front') or turret.get('f') or turret.get(list(turret.keys())[0])
@@ -1946,9 +1974,9 @@ class StatsAI:
             rear = turret.get('rear') or turret.get('r')
             parts = [str(v) for v in [front, side, rear] if v is not None]
             if parts:
-                tth_rows.append(("relativeArmor.png", "Броня башти:", " / ".join(parts)))
+                tth_rows.append(("relativeArmor.png", self._mo_label("vehicleParams/turretArmor", "Turret armor"), " / ".join(parts)))
         elif turret:
-            tth_rows.append(("relativeArmor.png", "Броня башти:", str(turret)))
+            tth_rows.append(("relativeArmor.png", self._mo_label("vehicleParams/turretArmor", "Turret armor"), str(turret)))
         shells = tth.get('shells', [])
         if isinstance(shells, list) and shells:
             ap = next((s for s in shells if str(s.get('type', '')).upper() in ('AP', 'APCR', 'APBC', 'APCBC')), None)
@@ -1956,20 +1984,20 @@ class StatsAI:
             dmg = sh.get('damage') or sh.get('alphaDamage')
             pen = sh.get('piercing_power') or sh.get('piercingPower') or sh.get('penetration')
             if dmg:
-                tth_rows.append(("relativePower.png", "Шкода:", str(dmg)))
+                tth_rows.append(("relativePower.png", self._mo_label("vehicleParams/damage", "Damage"), str(dmg)))
             if pen:
                 if isinstance(pen, (list, tuple)):
                     pen = pen[0]
-                tth_rows.append(("relativePower.png", "Пробиття (мм):", str(pen)))
+                tth_rows.append(("relativePower.png", self._mo_label("vehicleParams/piercingPower", "Penetration"), str(pen)))
         if tth.get('reload'):
-            tth_rows.append(("relativePower.png", "Перезарядка (с):", str(tth['reload'])))
+            tth_rows.append(("relativePower.png", self._mo_label("vehicleInfo/params/reloadTimeSecs", "Reload"), str(tth['reload'])))
         spd = tth.get('speed_fwd') or tth.get('maxSpeed') or tth.get('speed')
         if spd:
             spd_bwd = tth.get('speed_bwd') or tth.get('maxSpeedBackward')
             spd_str = f"{spd}" + (f" / -{spd_bwd}" if spd_bwd else "")
-            tth_rows.append(("relativeMobility.png", "Швидкість (км/г):", spd_str))
+            tth_rows.append(("relativeMobility.png", self._mo_label("vehicleParams/speedLimits", "Speed"), spd_str))
         if tth.get('view_range'):
-            tth_rows.append(("relativeVisibility.png", "Огляд (м):", str(tth['view_range'])))
+            tth_rows.append(("relativeVisibility.png", self._mo_label("vehicleInfo/params/circularVisionRadius", "View range"), str(tth['view_range'])))
         
         tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0, width=self._detail_info_fixed_width)
         tth_wrapper.pack(side="top", anchor="center", padx=0)
@@ -1998,12 +2026,12 @@ class StatsAI:
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
         
-        equip_body = self._make_tiles_section(self.ai_equipment_frame, "ОБЛАДНАННЯ", "equipment")
-        cons_body = self._make_tiles_section(self.ai_consumables_frame, "ВИТРАТНІ", "consumables")
-        ammo_body = self._make_tiles_section(self.ai_ammo_frame, "СНАРЯДИ", "ammo")
-        crew_body = self._make_tiles_section(self.ai_crew_frame, "НАВИЧКИ ЕКІПАЖУ", "crew")
-        
-        fm_body = self._make_tiles_section(self.ai_field_mod_frame, "ПОЛЬОВА МОДЕРНІЗАЦІЯ", "field_mod")
+        equip_body = self._make_tiles_section(self.ai_equipment_frame, self._mo_label("easyTankEquipView/optDevices/title", "EQUIPMENT"), "equipment")
+        cons_body = self._make_tiles_section(self.ai_consumables_frame, self._mo_label("easyTankEquipView/consumables/title", "CONSUMABLES"), "consumables")
+        ammo_body = self._make_tiles_section(self.ai_ammo_frame, self._mo_label("easyTankEquipView/shells/title", "AMMUNITION"), "ammo")
+        crew_body = self._make_tiles_section(self.ai_crew_frame, self._mo_label("easyTankEquipView/crew/title", "CREW"), "crew")
+
+        fm_body = self._make_tiles_section(self.ai_field_mod_frame, self._mo_label("postProgressionIntro/title", "FIELD MODIFICATION"), "field_mod")
         
 
         equip_body_2 = tk.Frame(self.ai_equipment_frame_2, bg="#111111")
@@ -2154,7 +2182,7 @@ class StatsAI:
                                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
         tank_name = data.get('name', tag)
-        self.update_status_bar(f"⚡ Отримання AI build для {tank_name}...", "#ffaa00")
+        self.update_status_bar(f"⚡ {self.main_app.t('ui', 'status_ai_build_fetching').format(name=tank_name)}", "#ffaa00")
         tag_copy = tag
         name_copy = tank_name
         self.root.after(100, lambda t=tag_copy, n=name_copy: self._launch_ai_tank_build(t, n))
@@ -2261,6 +2289,7 @@ class StatsAI:
                 else:
                     lbl.config(width=4, height=2, bg="#2a3a28" if category == "artefacts" else "#272a3a")
                 lbl.pack(expand=True, fill="both")
+                self._bind_item_tooltip(slot, name, category)
                 slots.append(slot)
             self._layout_tile_row(parent, slots, gap=3)
             return slots
@@ -2287,6 +2316,7 @@ class StatsAI:
                 if count > 0:
                     t_lbl = tk.Label(icon_box, text=str(count), fg="#ffffff", bg="#0a0b12", font=("Arial", 8, "bold"), padx=2, pady=0)
                     t_lbl.place(relx=1.0, rely=1.0, anchor="se")
+                self._bind_item_tooltip(slot, name, category)
                 slots.append(slot)
             self._layout_tile_row(parent, slots, gap=0)
             return slots
@@ -2300,7 +2330,7 @@ class StatsAI:
         correct_ration = ration_map.get(nation.lower())
         loadout_num_label_1 = tk.Label(equip_body, text="1", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_1.pack(side="left", padx=(0, 2))
-        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_main")))
+        loadout_num_label_1.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.main_app.t("ui", "loadout_main")))
         loadout_num_label_1.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
@@ -2309,7 +2339,7 @@ class StatsAI:
         
         loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_2.pack(side="left", padx=(0, 2))
-        loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.app.t("ui", "loadout_alt")))
+        loadout_num_label_2.bind("<Enter>", lambda e: self._show_legend_tooltip(e, self.main_app.t("ui", "loadout_alt")))
         loadout_num_label_2.bind("<Leave>", lambda e: self._hide_legend_tooltip())
         
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
@@ -2453,6 +2483,7 @@ class StatsAI:
                 sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                 sk_box.pack(side="left", padx=(0, 3))
                 sk_box.pack_propagate(False)
+                self._bind_item_tooltip(sk_box, sk, "crew_perks")
                 sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
                 sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
                 if sk_photo:
@@ -2467,6 +2498,7 @@ class StatsAI:
                     sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                     sk_box.pack(side="left", padx=(0, 3))
                     sk_box.pack_propagate(False)
+                    self._bind_item_tooltip(sk_box, sk, "crew_perks")
                     sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
                     sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
                     if sk_photo:

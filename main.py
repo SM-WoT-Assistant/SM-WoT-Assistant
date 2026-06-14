@@ -151,21 +151,8 @@ class WotAssistantHQ:
         self.log_watcher.start()
 
         self.ui_mgr = ui_manager.UIManager(self)
-        self.ui_mgr.setup_ui()
-        self.refresh_mode_indicator()
-        self.bind_events()
+
         self.load_logo()
-        
-        self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
-        self.painter.bind_events_to(self.canvas)
-        self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
-        self.drawing_palette.withdraw()
-        
-        self.map_mgr.load_map_list()
-        
-        self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
-        for var in self.selected_classes.values():
-            var.trace_add("write", lambda *args: self.painter.redraw())
 
         firebase_reporter.setup_global_excepthook(self)
         firebase_reporter.ping_version_async(self)
@@ -178,6 +165,29 @@ class WotAssistantHQ:
             self.root.after(120, self._start_startup_checks)
 
     def _start_startup_checks(self):
+        # 1. Batch translate UI on splash (atomic — all or nothing)
+        if hasattr(self, 'locale'):
+            self.locale.batch_translate_ui(progress_cb=self._on_startup_progress)
+        # If batch succeeded: _batch_ui_done=True, cache populated, t_ui() returns translated text
+        # If batch failed: _batch_ui_done=False, t_ui() returns EN (no individual Google Translate calls)
+
+        # 2. Build UI — t_ui() reads from cache (translated if batch OK, EN if batch failed)
+        self.ui_mgr.setup_ui()
+        self.refresh_mode_indicator()
+        self.bind_events()
+
+        self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
+        self.painter.bind_events_to(self.canvas)
+        self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
+        self.drawing_palette.withdraw()
+
+        self.map_mgr.load_map_list()
+
+        self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
+        for var in self.selected_classes.values():
+            var.trace_add("write", lambda *args: self.painter.redraw())
+
+        # 3. Game version check with progress on splash
         allow_decode = bool(self.settings.get("allow_map_decode_on_startup", True))
         self.map_mgr.check_game_version(
             progress_cb=self._on_startup_progress,
@@ -256,7 +266,7 @@ class WotAssistantHQ:
         if hasattr(self, "stats_ai_module") and self.stats_ai_module:
             self.stats_ai_module.tank_db = self.tank_db
             self.stats_ai_module.reload_tth_data()
-            self.stats_ai_module.update_search_placeholder(f"Пошук серед {len(self.tank_db)} танків...")
+            self.stats_ai_module.update_search_placeholder(self.t('ui', 'search_placeholder').format(count=len(self.tank_db)))
             self.stats_ai_module.refresh_ai_view()
 
 
@@ -269,7 +279,7 @@ class WotAssistantHQ:
 
     def ask_wot_path(self):
         self.dialog_open = True
-        path = filedialog.askdirectory(title="Виберіть головну папку гри World of Tanks")
+        path = filedialog.askdirectory(title=self.t('ui', 'dialog_select_wot_path'))
         self.dialog_open = False
         
         if path:
@@ -279,11 +289,11 @@ class WotAssistantHQ:
             self.save_settings()
             
             if os.path.exists(log_path):
-                self.status_label.config(text=f"[ШТАБ] Путь та логи збережено: {path}", fg="lime")
+                self.status_label.config(text=self.t('ui', 'status_log_saved').format(path=path), fg="lime")
                 print(f"[CONFIG] log_path встановлено: {log_path}")
                 self.log_watcher.update_path(log_path)
             else:
-                self.status_label.config(text=f"[ШТАБ] ⚠ Лог не знайдено: {log_path}", fg="orange")
+                self.status_label.config(text=self.t('ui', 'status_log_not_found').format(path=log_path), fg="orange")
                 print(f"[CONFIG] ПОМИЛКА: log_path не існує: {log_path}")
             
             if self.btn_mode_maps_2.cget("bg") == "#ff4500":
@@ -291,7 +301,7 @@ class WotAssistantHQ:
 
     def ask_clear_confirm(self, map_title, on_done):
         dlg = tk.Toplevel(self.root)
-        dlg.title("\u041e\u0447\u0438\u0441\u0442\u0438\u0442\u0438 \u043c\u0430\u043b\u044e\u043d\u043a\u0438")
+        dlg.title(self.t('ui', 'dialog_clear_title'))
         dlg.configure(bg="#2a2a2a")
         dlg.resizable(False, False)
         dlg.minsize(300, 120)
@@ -302,7 +312,7 @@ class WotAssistantHQ:
         cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 60
         dlg.geometry(f"+{cx}+{cy}")
 
-        tk.Label(dlg, text=f"\u0412\u0438\u0434\u0430\u043b\u0438\u0442\u0438 \u0432\u0441\u0456 \u043c\u0456\u0442\u043a\u0438 \u043d\u0430 \u043a\u0430\u0440\u0442\u0456 \u00ab{map_title}\u00bb?",
+        tk.Label(dlg, text=self.t('ui', 'dialog_clear_msg').format(map_title=map_title),
                  font=("Arial", 10), bg="#2a2a2a", fg="#cccccc").pack(pady=(20, 15))
 
         bf = tk.Frame(dlg, bg="#2a2a2a")
@@ -311,9 +321,9 @@ class WotAssistantHQ:
         def on_yes(): result["ok"] = True; dlg.destroy()
         def on_no(): dlg.destroy()
 
-        tk.Button(bf, text="  \u0422\u0430\u043a  ", bg="#555", fg="white", bd=0,
+        tk.Button(bf, text=f"  {self.t('ui', 'btn_yes')}  ", bg="#555", fg="white", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
-        tk.Button(bf, text="  \u041d\u0456  ", bg="#444", fg="#aaa", bd=0,
+        tk.Button(bf, text=f"  {self.t('ui', 'btn_no')}  ", bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_no).pack(side="left", padx=10)
 
         self.root.wait_window(dlg)
@@ -321,13 +331,13 @@ class WotAssistantHQ:
 
     def ask_ai_key(self):
         from tkinter import simpledialog
-        new_key = simpledialog.askstring("Налаштування ШІ", "Вставте ваш Gemini API Key:", initialvalue=self.settings.get("ai_key", ""), parent=self.root)
+        new_key = simpledialog.askstring(self.t('ui', 'ai_key_title'), self.t('ui', 'ai_key_prompt'), initialvalue=self.settings.get("ai_key", ""), parent=self.root)
         if new_key is not None:
             self.settings["ai_key"] = new_key.strip()
             self.save_settings()
             if hasattr(self, "ai_stats") and self.ai_stats:
                 self.ai_stats.configure(self.settings["ai_key"])
-            self.status_label.config(text="[СТАТ АІ] Ключ оновлено успішно!", fg="lime")
+            self.status_label.config(text=self.t('ui', 'status_ai_key_updated'), fg="lime")
 
 
         self._last_mode_hotkey_ts = 0
@@ -336,7 +346,7 @@ class WotAssistantHQ:
         if self.dialog_open: return 
 
         if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
-            msg = "[РЕЖИМ] Перехід у БОЙОВИЙ недоступний. Спочатку виберіть режим МАПИ."
+            msg = self.t('ui', 'status_auto_mode_unavailable')
             if hasattr(self, "status_label"):
                 self.status_label.config(text=msg, fg="#ffb347")
             print(msg)
@@ -682,7 +692,7 @@ class WotAssistantHQ:
 
     def safe_battle_sync(self, map_id, ui_mode):
         if not self.settings.get("log_path", ""):
-            self.status_label.config(text="[AUTO] ПОМИЛКА: Не встановлено log_path", fg="red")
+            self.status_label.config(text=self.t('ui', 'status_auto_error_log_path'), fg="red")
             return
 
         self.switch_to_maps(2)
@@ -699,24 +709,24 @@ class WotAssistantHQ:
         if target_name in tmaps:
             self.map_var.set(target_name)
             self.on_map_select()
-            self.status_label.config(text=f"[AUTO] Виявлено: {target_name}", fg="lime")
+            self.status_label.config(text=self.t('ui', 'status_auto_detected').format(name=target_name), fg="lime")
             return
             
         for t in tmaps:
             if t.lower() == target_name.lower():
                 self.map_var.set(t)
                 self.on_map_select()
-                self.status_label.config(text=f"[AUTO] Виявлено (регістр): {t} ({map_id})", fg="lime")
+                self.status_label.config(text=self.t('ui', 'status_auto_detected_case').format(name=t, map_id=map_id), fg="lime")
                 return
-        
+            
         for t in tmaps:
             if target_name in t or t.lower() in target_name.lower():
                 self.map_var.set(t)
                 self.on_map_select()
-                self.status_label.config(text=f"[AUTO] Виявлено (схоже): {t} ({map_id})", fg="yellow")
+                self.status_label.config(text=self.t('ui', 'status_auto_detected_similar').format(name=t, map_id=map_id), fg="yellow")
                 return
-        
-        self.status_label.config(text=f"[AUTO] ПОМИЛКА: Карта '{map_id}' ('{target_name}') не в списку", fg="red")
+            
+        self.status_label.config(text=self.t('ui', 'status_auto_map_not_in_list').format(map_id=map_id, name=target_name), fg="red")
 
     def setup_ui(self):
         pass
@@ -752,7 +762,7 @@ class WotAssistantHQ:
             if not firebase_reporter.compare_versions(current_ver, latest_ver):
                 return
             dl = latest.get("download_url", "")
-            msg = f"[ОНОВЛЕННЯ] Доступна v{latest_ver} (у вас v{current_ver})"
+            msg = self.t('ui', 'status_update_available').format(latest=latest_ver, current=current_ver)
             print(msg)
             def _show():
                 if hasattr(self, "status_label"):
@@ -764,7 +774,7 @@ class WotAssistantHQ:
 
     def _show_update_dialog(self, latest_ver, current_ver, download_url):
         dlg = tk.Toplevel(self.root)
-        dlg.title("Оновлення")
+        dlg.title(self.t('ui', 'dialog_update_title'))
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
@@ -774,11 +784,11 @@ class WotAssistantHQ:
         cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 80
         dlg.geometry(f"300x180+{cx}+{cy}")
 
-        tk.Label(dlg, text="Доступне оновлення", font=("Arial", 12, "bold"),
+        tk.Label(dlg, text=self.t('ui', 'dialog_update_available'), font=("Arial", 12, "bold"),
                  bg="#222", fg="#ffaa00").pack(pady=(15, 5))
         tk.Label(dlg, text=f"SM WoT Assistant v{latest_ver}",
                  font=("Arial", 11), bg="#222", fg="#ff4500").pack()
-        tk.Label(dlg, text=f"готовий до встановлення.\nУ вас: v{current_ver}",
+        tk.Label(dlg, text=self.t('ui', 'dialog_update_ready').format(current=current_ver),
                  font=("Arial", 9), bg="#222", fg="#aaa", justify="center").pack(pady=(4, 12))
 
         bf = tk.Frame(dlg, bg="#222")
@@ -792,10 +802,10 @@ class WotAssistantHQ:
         def do_later():
             dlg.destroy()
 
-        tk.Button(bf, text="  Оновити зараз  ", bg="#335533", fg="#99cc99", bd=0,
+        tk.Button(bf, text=self.t('ui', 'btn_update_now'), bg="#335533", fg="#99cc99", bd=0,
                   font=("Arial", 10, "bold"), padx=12, pady=6,
                   command=do_update).pack(side="left", padx=8)
-        tk.Button(bf, text="  Пізніше  ", bg="#444", fg="#aaa", bd=0,
+        tk.Button(bf, text=self.t('ui', 'btn_later'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 10), padx=12, pady=6,
                   command=do_later).pack(side="left", padx=8)
 
@@ -809,8 +819,8 @@ class WotAssistantHQ:
                     self.root.after(0, lambda: self.status_label.config(text=msg, fg=fg))
             try:
                 tmp = os.path.join(tempfile.gettempdir(), "SM_WoT_Assistant_Setup.exe")
-                print(f"[ОНОВЛЕННЯ] Завантаження: {url}")
-                status("[ОНОВЛЕННЯ] Завантаження...")
+                print(f"[UPDATE] Downloading: {url}")
+                status(self.t('ui', 'status_update_downloading'))
                 r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
                 total = int(r.headers.get("content-length", 0))
                 downloaded = 0
@@ -823,14 +833,14 @@ class WotAssistantHQ:
                         if total:
                             pct = downloaded * 100 // total
                             if pct % 10 == 0:
-                                status(f"[ОНОВЛЕННЯ] Завантаження... {pct}%")
-                print(f"[ОНОВЛЕННЯ] Завантажено: {downloaded / (1024*1024):.0f} MB")
-                status("[ОНОВЛЕННЯ] Встановлення...", "lime")
+                                status(self.t('ui', 'status_update_downloading_pct').format(pct=pct))
+                print(f"[UPDATE] Downloaded: {downloaded / (1024*1024):.0f} MB")
+                status(self.t('ui', 'status_update_installing'), "lime")
                 subprocess.Popen([tmp, "/S", "/NCRC"], shell=True)
                 self.root.after(800, lambda: (self.save_settings(), sys.exit(0)))
             except Exception as e:
-                print(f"[ОНОВЛЕННЯ] Помилка: {e}")
-                status(f"[ОНОВЛЕННЯ] Помилка: {e}", "red")
+                print(f"[UPDATE] Error: {e}")
+                status(self.t('ui', 'status_update_error').format(error=e), "red")
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
@@ -983,13 +993,19 @@ class WotAssistantHQ:
         try:
             percent = max(0, min(100, int(percent)))
             self._startup_target_percent = percent
+            self._startup_display_percent = percent
             if text:
                 self._startup_status_text = text
                 self.splash_canvas.itemconfigure(self.splash_status_text, text=text)
             self.splash_canvas.itemconfigure(
                 self.splash_percent_text,
-                text=f"{int(getattr(self, '_startup_display_percent', 0))}%",
+                text=f"{percent}%",
             )
+            sw = int(self.splash_canvas["width"])
+            sh = int(self.splash_canvas["height"])
+            x2 = int((sw * percent) / 100)
+            self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
+            self.root.update_idletasks()
         except Exception:
             pass
 
@@ -1066,7 +1082,7 @@ class WotAssistantHQ:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
         version = config.load_version()
         self.splash_canvas.create_text(sw//2, sh - 72, text=version, fill="white", font=("Verdana", 12, "bold"))
-        lang_text = f"Language: {self.lang.upper()}"
+        lang_text = self.t('ui', 'language_label').format(lang=self.lang.upper())
         self.splash_canvas.create_text(sw//2, sh - 90, text=lang_text, fill="#888888", font=("Arial", 8))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,

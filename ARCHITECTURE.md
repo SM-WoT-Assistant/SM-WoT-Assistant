@@ -17,6 +17,7 @@
 - Purpose: Render maps, UI controls, drawing overlays, AI build results
 - Location: `main.py`, `ui_manager.py`, `painter.py`, `painting_palette.py`, `map_renderer.py`, `help_system.py`, `ai_webview_gui.py`
 - Contains: tkinter widgets, Canvas drawing, floating tool palettes, help overlay (Toplevel grid of Label widgets, not canvas text)
+- All UI text uses translation keys via `app.t('ui', key)` — fully translated for any game client language (11 supported)
 - Depends on: Data Layer, tkinter, Pillow (PIL), custom TTF fonts (`xvmsymbol.ttf`, `fontawesome-webfont.ttf`)
 - Used by: End user
 
@@ -24,6 +25,7 @@
 - Purpose: Orchestrate views, handle hotkeys, coordinate battle detection, manage AI flows
 - Location: `main.py` (class `WotAssistantHQ`), `window_manager.py`, `log_reader.py`, `tactics_manager.py`
 - Contains: WotAssistantHQ, WindowManager, LogWatcher, tactic import/export
+- Integrates `language_module.setup()` at startup for game language detection and `LocaleManager` for runtime translation
 - Depends on: Presentation Layer managers, Data Layer, `keyboard` library, WinAPI via `ctypes`
 - Used by: Presentation Layer
 
@@ -36,9 +38,9 @@
 
 **Data Layer:**
 - Purpose: Load/save JSON, manage tank database, extract data from game client, provide translations
-- Location: `data_manager.py`, `config.py`, `locale_manager.py`, `translations.py`, `map_manager.py`, `map_extractor.py`, `tank_extractor.py`, `wot_decoder.py`, `decode_xml.py`
-- Contains: DataManager, MapExtractor, TankExtractor, WotXmlDecoder, LocaleManager, configuration constants, version loader (`config.load_version()`), dual-path storage (`config.BUNDLE_DIR` for read-only bundled assets, `config.USER_DATA_DIR` for writable user data in `%APPDATA%/SM WoT Assistant`)
-- Depends on: Game client files (res/packages/*.pkg, version.xml, python.log), filesystem
+- Location: `data_manager.py`, `config.py`, `locale_manager.py`, `translations.py`, `map_manager.py`, `map_extractor.py`, `tank_extractor.py`, `wot_decoder.py`, `decode_xml.py`, `language_module.py`, `ui_translator.py`
+- Contains: DataManager, MapExtractor, TankExtractor, WotXmlDecoder, LocaleManager, LanguageModule, UI Translator, configuration constants, version loader (`config.load_version()`), dual-path storage (`config.BUNDLE_DIR` for read-only bundled assets, `config.USER_DATA_DIR` for writable user data in `%APPDATA%/SM WoT Assistant`)
+- Depends on: Game client files (res/packages/*.pkg, version.xml, python.log, res/text/lc_messages/*.mo), filesystem, `deep_translator` (Google Translate)
 - Used by: Application Logic Layer, AI Pipeline Layer
 
 **External Integration Layer:**
@@ -60,10 +62,11 @@
 **Startup Flow:**
 1. Load settings from `settings.json` — `data_manager.py`
 2. Auto-detect WoT path and python.log — `main.py:_auto_detect_log_path`, `map_manager.py:auto_detect_wot_path`
-3. Check game version, extract/update maps and tank data — `map_manager.py:check_game_version` → `map_extractor.py:MapExtractor`, `tank_extractor.py:TankExtractor`
-4. Start log watcher for battle detection — `log_reader.py:LogWatcher.start`
-5. Load map list for current view — `map_manager.py:load_map_list`
-6. If needed, launch AI browser to refresh tank build data — `stats_ai.py:StatsAI.launch_ai_browser`
+3. Detect game language via `language_module.setup()` — reads `game_info.xml`, parses `.mo` files, rebuilds locale caches if language changed
+4. Check game version, extract/update maps and tank data — `map_manager.py:check_game_version` → `map_extractor.py:MapExtractor`, `tank_extractor.py:TankExtractor`
+5. Start log watcher for battle detection — `log_reader.py:LogWatcher.start`
+6. Load map list for current view — `map_manager.py:load_map_list`
+7. If needed, launch AI browser to refresh tank build data — `stats_ai.py:StatsAI.launch_ai_browser`
 
 **Battle Detection Flow:**
 1. `log_reader.py:LogWatcher._run` tails `python.log` with regex patterns (`arena_re`, `battle_space_re`, `vehicle_re`, etc.)
@@ -101,6 +104,20 @@
 2. `public/schemes.html` (Firebase Hosting) reads from RTDB `schemes/` node, renders community schemes table with filters
 3. `public/drawings.html` renders gallery with download links
 4. Application can download published schemes via `firebase_drawings.download_drawing()` → GET from RTDB
+
+**Localization Flow:**
+1. On startup → `language_module.setup()` detects game language from `game_info.xml` → rebuilds dictionaries if language changed or cache missing
+2. `LanguageModule.build_all_dictionaries()` parses all `.mo` files from `res/text/lc_messages/` into per-category JSON caches under `config.USER_DATA_DIR/localization/<lang>/` (accepts all 11 game client languages, no hardcoded list)
+3. `LanguageModule.export_locale_json()` exports combined locale JSON to `public/locale/<lang>.json` for website consumption and pushes to Firebase RTDB via `firebase_reporter.push_locale()`
+4. `LocaleManager.t_ui()` provides dynamic UI translation:
+   - English `translations.py` is the authoritative source
+   - On-demand Google Translate via `ui_translator.py` with caching in `locales.json`
+   - Rejects ASCII-only cached translations (prevents bad translations like "BATLE MODE")
+   - Protects placeholders (`{path}`) and symbols (`->`) from translation
+5. `LocaleManager.t_map` resolves map names through: `custom_names.json` → `extractor_names` (from `map_dictionary.json`) → `locales.json` → `config.TECH_MAPS_STAGING`
+6. `ui_translator.py` translates app-specific UI text at runtime using Google Translate with placeholder shielding for keyboard shortcuts (F1-F24, Ctrl, Alt, Shift, LMB/RMB, arrows, etc.), symbols, and numbers; caches translations per-language in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
+7. On game version change → `map_manager.py:check_game_version` calls `language_module.check_for_language_change()` to rebuild if game language shifted
+8. Splash screen displays detected language (e.g., "Language: DE", "Language: UK", "Language: EN")
 
 **Memory to Persistence (Cross-Session):**
 1. Tactical drawings → save on every edit → `data_manager.py:save_drawings` → `map_drawings.json`
@@ -166,7 +183,7 @@
 **Game Version Check:**
 - Location: `map_manager.py:check_game_version`
 - Triggers: Application startup
-- Responsibilities: Compare stored version with `version.xml`, trigger map/tank extraction if changed, update crew/equipment databases
+- Responsibilities: Compare stored version with `version.xml`, trigger map/tank extraction if changed, update crew/equipment databases, call `language_module.check_for_language_change()` to rebuild localization if game language shifted
 
 **Website (Firebase Hosting):**
 - Location: `public/` directory — served by Firebase Hosting at `sm-wot-assistant.web.app`
@@ -214,8 +231,15 @@
 - `ai_builds_cache.json` — AI tank builds, 30-day expiry, fail_count tracking (`stats_ai.py`)
 - `popular_tanks_cache.json` — Popular tanks list (tiers 8-11), 30-day expiry via shared `_is_cache_expired(updated, max_days=30)`, fail_count tracking; saves top 30 tanks (`stats_ai.py`)
 - `ukrainian_map_names_cache.json` — Map name translations (`map_extractor.py`)
+- `locales.json` — Dynamic UI translation cache per language (Google Translate results, rejects ASCII-only entries)
+- `config.USER_DATA_DIR/localization/<lang>/ui_cache.json` — Per-language UI translation cache from `ui_translator.py`
+- `config.USER_DATA_DIR/localization/<lang>/` — Per-language `.mo` parsed dictionaries from `language_module.py`
 - In-memory caches: composite icons, loadout icons, TTH icons, field mod pairs (`stats_ai.py:82-86`)
 
 **Storage:** Flat JSON files at project root. No database engine. Key files: `settings.json`, `tank_db.json`, `tank_tth.json`, `crew_builds.json`, `equipment_loadouts.json`, `map_drawings.json`, `game_entities_english.json`
 
-**Localization:** `translations.py` provides default UI/map translations. `locales.json` serves as a runtime-editable override that merges missing keys from `translations.py`. `LocaleManager.t_map` resolves map names through multiple sources: `custom_names.json` → `extractor_names` → `locales.json` → `config.TECH_MAPS_STAGING`.
+**Localization:** `translations.py` provides English-only authoritative source for all UI text (100+ keys). `LocaleManager` (`locale_manager.py`) resolves translations dynamically:
+- `t_ui(key)` — on-demand Google Translate via `ui_translator.py` with caching in `locales.json`; rejects ASCII-only cached values; protects placeholders (`{path}`) and symbols (`->`)
+- `t_map(eng)` — resolves map names through: `custom_names.json` → `extractor_names` (from `map_dictionary.json`) → `locales.json` → `config.TECH_MAPS_STAGING`
+- `LanguageModule` (`language_module.py`) parses WoT client `.mo` files (gettext binary format) on startup or game version change, detects language via `game_info.xml` (accepts all 11 client languages, no hardcoded list), builds per-category JSON caches in `config.USER_DATA_DIR/localization/<lang>/`, exports `public/locale/<lang>.json` for the website, and pushes locale to Firebase RTDB
+- `UITranslator` (`ui_translator.py`) translates app UI text at runtime via Google Translate (`deep_translator`), shielding keyboard shortcuts (F1-F24, Ctrl, Alt, Shift, LMB/RMB, arrows, etc.), symbols, and numbers from translation; caches per-language in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
