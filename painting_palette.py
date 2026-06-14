@@ -149,7 +149,7 @@ class DrawingPalette(tk.Toplevel):
         self._text_frame.pack(fill="x", padx=8)
 
         self._del_frame = tk.Frame(self, bg=bg)
-        self._del_btn = tk.Button(self._del_frame, text=self.app.t('ui', 'delete_btn'), bg="#cc3333",
+        self._del_btn = tk.Button(self._del_frame, text=self.app.t('ui', 'delete_btn').upper(), bg="#cc3333",
                                   fg="white", bd=0, font=("Arial", 8), command=self._delete_selected)
         self._del_btn.pack(fill="x", padx=8, pady=4)
         self._del_frame.pack(fill="x")
@@ -177,11 +177,11 @@ class DrawingPalette(tk.Toplevel):
 
         bf = tk.Frame(self, bg=bg)
         bf.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Button(bf, text=self.app.t('ui', 'clear'), bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'clear').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._clear_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'save_btn'), bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'load_btn'), bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",

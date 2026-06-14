@@ -135,7 +135,7 @@ TRANSLATIONS = {
             "delete_btn": "Delete",
             "other_color": "Other...",
             "save_btn": "Save",
-            "load_btn": "Load",
+            "load_btn": "Import",
             "status_editing_marker": "Editing: Marker",
             "status_editing_text": "Editing: Text/Sign",
             "mode_standard": "Standard",
