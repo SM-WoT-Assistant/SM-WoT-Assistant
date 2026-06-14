@@ -127,7 +127,7 @@ class DrawingPalette(tk.Toplevel):
         for k, v in self.mode_vars.items():
             mo_key = _mode_mo_keys.get(k)
             txt = lm.t(mo_key) if mo_key else None
-            if not txt:
+            if not txt or txt == mo_key:
                 txt = self.app.t('ui', 'mode_' + k.lower())
             cb = tk.Checkbutton(mf, text=txt, variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
