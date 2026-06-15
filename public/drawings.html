@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Галерея малюнків — SM WoT Assistant</title>
+    <title>Drawings Gallery — SM WoT Assistant</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #111; color: #ccc; }
@@ -29,20 +29,20 @@
 <header>
     <h1><a href="index.html">SM WoT Assistant</a> — Drawings</h1>
     <nav>
-        <a href="index.html">Головна</a>
-        <a href="admin.html">Адмінка</a>
+        <a href="index.html">Home</a>
+        <a href="admin.html">Admin</a>
     </nav>
 </header>
 
 <main>
     <div class="filter-bar">
-        <input type="text" id="search-input" placeholder="Пошук по карті чи автору..." oninput="filterDrawings()">
+        <input type="text" id="search-input" placeholder="Search by map or author..." oninput="filterDrawings()">
         <select id="map-filter" onchange="filterDrawings()">
-            <option value="">Всі мапи</option>
+            <option value="">All maps</option>
         </select>
     </div>
     <div id="drawings-container" class="drawing-grid">
-        <div class="empty">Завантаження...</div>
+        <div class="empty">Loading...</div>
     </div>
 </main>
 
@@ -75,7 +75,7 @@ function loadDrawings() {
             const maps = new Set();
             allDrawings.forEach(d => maps.add(d.map_name));
             const sel = document.getElementById("map-filter");
-            sel.innerHTML = '<option value="">Всі мапи</option>';
+            sel.innerHTML = '<option value="">All maps</option>';
             [...maps].sort().forEach(m => {
                 sel.innerHTML += `<option value="${m}">${m}</option>`;
             });
@@ -83,22 +83,22 @@ function loadDrawings() {
         })
         .catch(() => {
             document.getElementById("drawings-container").innerHTML =
-                '<div class="empty">Помилка завантаження. Можливо, база даних порожня.</div>';
+                '<div class="empty">Loading error. Database may be empty.</div>';
         });
 }
 
 function renderDrawings(drawings) {
     const container = document.getElementById("drawings-container");
     if (!drawings.length) {
-        container.innerHTML = '<div class="empty">Немає опублікованих малюнків</div>';
+        container.innerHTML = '<div class="empty">No published drawings</div>';
         return;
     }
     container.innerHTML = drawings.map(d => `
         <div class="drawing-card" onclick="viewDrawing('${d.drawing_id}')">
             <div class="map">${d.map_name || d.map_id}</div>
-            <div class="author">${d.author_nickname || 'Анонім'}</div>
-            <div class="meta">${Array.isArray(d.elements) ? d.elements.length : 0} елементів
-                ${d.visibility === 'public' ? '· Публічний' : (d.visibility || '').startsWith('group:') ? '· Група' : '· Приватний'}
+            <div class="author">${d.author_nickname || 'Anonymous'}</div>
+            <div class="meta">${Array.isArray(d.elements) ? d.elements.length : 0} elements
+                ${d.visibility === 'public' ? '· Public' : (d.visibility || '').startsWith('group:') ? '· Group' : '· Private'}
                 · ${(d.created_at || '').slice(0,10)}</div>
         </div>
     `).join('');
@@ -117,7 +117,7 @@ function filterDrawings() {
 }
 
 function viewDrawing(id) {
-    alert("Детальний перегляд малюнка буде доступний після інтеграції.");
+    alert("Detailed drawing view will be available after integration.");
 }
 
 loadDrawings();

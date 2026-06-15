@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -56,45 +56,48 @@
 <header>
     <h1><a href="index.html">SM WoT Assistant</a> — Tactical Schemes</h1>
     <nav>
-        <button class="btn btn-green" onclick="openUpload()">📤 Publish scheme</button>
-        <a href="index.html" class="btn">← Home</a>
+        <button class="btn btn-green" onclick="openUpload()">Publish scheme</button>
+        <a href="index.html" class="btn">Home</a>
     </nav>
 </header>
 
 <main>
     <div class="filters">
         <select id="map-filter" onchange="filterSchemes()">
-            <option value="">All maps (60+)</option>
+            <option value="">All maps</option>
         </select>
         <select id="author-filter" onchange="filterSchemes()">
-            <option value="">Всі автори</option>
+            <option value="">All authors</option>
         </select>
         <span class="stats" id="stats"></span>
     </div>
 
     <div id="schemes-table">
-        <div class="empty">Завантаження...</div>
+        <div class="empty">Loading...</div>
     </div>
 </main>
 
 <!-- Upload Modal -->
 <div id="upload-modal" class="modal-overlay">
     <div class="modal">
-        <h3>Опублікувати тактичну схему</h3>
-        <label>Нікнейм</label>
-        <input type="text" id="upload-nick" placeholder="Ваш нікнейм" maxlength="20">
-        <label>PIN (4 цифри)</label>
-        <input type="password" id="upload-pin" placeholder="Ваш PIN-код" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
-        <label>Назва схеми</label>
-        <input type="text" id="upload-title" placeholder="Напр. «Важка техніка ліворуч»" maxlength="60">
-        <label>Опис (необов'язково)</label>
-        <textarea id="upload-comment" placeholder="Опишіть тактику..." maxlength="500" rows="3" style="width:100%;background:#111;color:#ccc;border:1px solid #333;padding:8px;border-radius:4px;font-size:13px;resize:vertical;"></textarea>
-        <label>Файл JSON (один або декілька)</label>
-        <input type="file" id="upload-file" accept=".json" multiple onchange="updateUploadCount()">
-        <p id="upload-count" style="color:#888;font-size:12px;margin-top:4px;"></p>
+        <h3>Publish Tactical Scheme</h3>
+        <label>Nickname</label>
+        <input type="text" id="upload-nick" placeholder="Your nickname" maxlength="20">
+        <label>PIN (4 digits)</label>
+        <input type="password" id="upload-pin" placeholder="Your PIN" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
+        <label>Scheme title</label>
+        <input type="text" id="upload-title" placeholder="e.g. Heavies left flank" maxlength="60">
+        <label>Description (optional)</label>
+        <textarea id="upload-comment" placeholder="Describe the tactic..." maxlength="500" rows="3" style="width:100%;background:#111;color:#ccc;border:1px solid #333;padding:8px;border-radius:4px;font-size:13px;resize:vertical;"></textarea>
+        <label>JSON file (one or more)</label>
+        <input type="file" id="upload-file" accept=".json" multiple onchange="updateUploadCount()" style="display:none">
+        <div style="display:flex;align-items:center;gap:10px;">
+            <button type="button" class="btn" onclick="document.getElementById('upload-file').click()">Choose Files</button>
+            <span id="upload-count" style="color:#888;font-size:12px;">No files chosen</span>
+        </div>
         <div class="actions">
-            <button class="btn" onclick="closeUpload()">Скасувати</button>
-            <button class="btn btn-primary" onclick="doUpload()">Опублікувати</button>
+            <button class="btn" onclick="closeUpload()">Cancel</button>
+            <button class="btn btn-primary" onclick="doUpload()">Publish</button>
         </div>
     </div>
 </div>
@@ -116,74 +119,45 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ═══ Map Dictionary (UA + EN) ═══
+// ═══ Map Dictionary (EN) ═══
 const MAP_NAMES = {
-    "ua": {
-        "01_karelia":"Карелія","02_malinovka":"Малинівка","03_campania_big":"Провінція",
-        "04_himmelsdorf":"Хіммельсдорф","05_prohorovka":"Прохорівка","06_ensk":"Енськ",
-        "06_ensk_big":"Регіон Енськ","07_lakeville":"Ласвілль","08_ruinberg":"Руїнберґ",
-        "08_ruinberg_sm24":"Лауерберг","101_dday":"Оверлорд","101_dday_sm24":"Пляж «Омаха»",
-        "105_germany":"Берлін","105_germany_sm24":"Фалленштат","108_normandy_nom":"Одер",
-        "10_hills":"Копальні","112_eiffel_tower_ctf":"Париж","114_czech":"Промзона",
-        "115_sweden":"Штиль","11_murovanka":"Мурованка","120_graf_zeppelin":"Нордскар",
-        "120_graf_zeppelin_scc":"Нордскар","121_lost_paradise_v":"Устрична затока",
-        "127_japort":"Стара гавань","128_last_frontier_v":"Застава","13_erlenberg":"Ерленберґ",
-        "140_fall_tanks":"Стара школа","141_dash_to_go":"Нова школа","142_road_to_dash":"Бойова школа",
-        "14_siegfried_line":"Лінія Зигфріда","14_siegfried_line_nom":"Західний вал",
-        "17_munchen":"Вайдпарк","18_cliff":"Круча","19_monastery":"Монастир",
-        "208_bf_epic_normandy":"Нормандія","209_wg_epic_suburbia":"Крафтверк",
-        "210_bf_epic_desert":"Фата-моргана","212_epic_random_valley_sm25":"Нібельбурґ",
-        "217_er_alaska":"Клондайк","23_westfeld":"Вестфілд","250_br_battle_city2-1":"Зона 404",
-        "251_br_battle_city3":"Арзагир 4.04","252_br_battle_city4":"Фірнульфір",
-        "28_desert":"Піщана ріка","29_el_hallouf":"Ель-Халлуф","31_airfield":"Летовище",
-        "33_fjord":"Фіорди","34_redshire":"Редшир","35_steppes":"Степи",
-        "36_fishing_bay":"Рибальська бухта","37_caucasus":"Перевал",
-        "38_mannerheim_line":"Лінія Маннергейма","44_north_america":"Лайв Окс",
-        "45_north_america":"Хайвей","47_canada_a":"Тихий берег",
-        "59_asia_great_wall":"Кордон імперії","60_asia_miao":"Перлинна річка",
-        "63_tundra":"Тундра","95_lost_city_ctf":"Загублене місто","99_poland":"Студзянки"
-    },
-    "en": {
-        "01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province",
-        "04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk",
-        "06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg",
-        "08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach",
-        "105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder",
-        "10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen",
-        "115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar",
-        "120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay",
-        "127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg",
-        "140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School",
-        "14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall",
-        "17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey",
-        "208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk",
-        "210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg",
-        "217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404",
-        "251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir",
-        "28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield",
-        "33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes",
-        "36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass",
-        "38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks",
-        "45_north_america":"Highway","47_canada_a":"Serene Coast",
-        "59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River",
-        "63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"
-    }
+    "01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province",
+    "04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk",
+    "06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg",
+    "08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach",
+    "105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder",
+    "10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen",
+    "115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar",
+    "120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay",
+    "127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg",
+    "140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School",
+    "14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall",
+    "17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey",
+    "208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk",
+    "210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg",
+    "217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404",
+    "251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir",
+    "28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield",
+    "33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes",
+    "36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass",
+    "38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks",
+    "45_north_america":"Highway","47_canada_a":"Serene Coast",
+    "59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River",
+    "63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"
 };
-
-const currentLang = "en";
 
 function initLang() {
     const mapSel = document.getElementById("map-filter");
     if (mapSel) {
         mapSel.innerHTML = '<option value="">All maps</option>';
-        const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
+        const mapKeys = Object.keys(MAP_NAMES);
         mapKeys.sort().forEach(id => {
             mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
         });
     }
 }
 
-function mapLabel(id) { return (MAP_NAMES[currentLang] || MAP_NAMES["en"])[id] || id; }
+function mapLabel(id) { return MAP_NAMES[id] || id; }
 
 // ═══ State ═══
 let allSchemes = [];
@@ -191,7 +165,6 @@ let allAuthors = new Set();
 let allMaps = new Set();
 
 function init() {
-    // Auto-fill nickname from URL
     const params = new URLSearchParams(window.location.search);
     const nickParam = params.get("nick");
     if (nickParam) {
@@ -217,38 +190,40 @@ function loadSchemes() {
                 allSchemes.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
             }
             const authSel = document.getElementById("author-filter");
-            authSel.innerHTML = '<option value="">Всі автори</option>';
+            authSel.innerHTML = '<option value="">All authors</option>';
             [...allAuthors].sort().forEach(a => {
                 authSel.innerHTML += `<option value="${a}">${a}</option>`;
             });
             document.getElementById("stats").textContent =
-                `${allSchemes.length} схем · ${allAuthors.size} авторів · ${allMaps.size} мап`;
+                `${allSchemes.length} schemes · ${allAuthors.size} authors · ${allMaps.size} maps`;
             renderSchemes(allSchemes);
         })
         .catch(() => {
             document.getElementById("schemes-table").innerHTML =
-                '<div class="empty">Помилка завантаження. Спробуйте пізніше.</div>';
+                '<div class="empty">Loading error. Try again later.</div>';
         });
 }
 
 function renderSchemes(schemes) {
     const container = document.getElementById("schemes-table");
     if (!schemes.length) {
-        container.innerHTML = '<div class="empty">Немає опублікованих схем. <a href="#" onclick="openUpload()" style="color:#ffaa00">Опублікувати першу!</a></div>';
+        container.innerHTML = '<div class="empty">No published schemes. <a href="#" onclick="openUpload()" style="color:#ffaa00">Publish the first!</a></div>';
         return;
     }
-    let html = '<table><tr><th>Мапа</th><th>Назва</th><th>Автор</th><th>Дата</th><th>Елем.</th><th></th></tr>';
+    let html = '<table><tr><th>Map</th><th>Title</th><th>Description</th><th>Author</th><th>Date</th><th>Elem.</th><th></th></tr>';
     schemes.forEach(s => {
+        const desc = (s.comment || '').slice(0, 60);
         html += `<tr>
             <td class="scheme-map" title="${(s.map_id || '')}">${mapLabel(s.map_id) || s.map_name || ''}</td>
-            <td style="color:#ffaa00;font-size:12px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.title || '').replace(/"/g, '&quot;')}">${s.title || '—'}</td>
+            <td style="color:#ffaa00;font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.title || '').replace(/"/g, '&quot;')}">${s.title || '—'}</td>
+            <td style="color:#999;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.comment || '').replace(/"/g, '&quot;')}">${desc || '—'}</td>
             <td class="scheme-author">${s.author_nickname || '—'}</td>
             <td class="scheme-date">${(s.created_at || '').slice(0, 16)}</td>
             <td class="scheme-count">${s.element_count || 0}</td>
             <td class="scheme-actions">
-                <button class="btn btn-sm" onclick="deleteScheme('${s.drawing_id || ''}')" title="Видалити">🗑</button>
-                <button class="btn btn-sm" onclick="downloadScheme('${s.drawing_id || ''}')">⬇ JSON</button>
-                <button class="btn btn-sm btn-blue" onclick="downloadAuthorSchemes('${s.author_nickname || ''}')">⬇ Автор</button>
+                <button class="btn btn-sm" onclick="deleteScheme('${s.drawing_id || ''}')" title="Delete">&#x1F5D1;</button>
+                <button class="btn btn-sm" onclick="downloadScheme('${s.drawing_id || ''}')">Download</button>
+                <button class="btn btn-sm btn-blue" onclick="downloadAuthorSchemes('${s.author_nickname || ''}')">All by author</button>
             </td>
         </tr>`;
     });
@@ -263,7 +238,7 @@ function filterSchemes() {
     if (mapVal) filtered = filtered.filter(s => s.map_id === mapVal || s.map_name === mapVal);
     if (authorVal) filtered = filtered.filter(s => s.author_nickname === authorVal);
     document.getElementById("stats").textContent =
-        `${filtered.length} / ${allSchemes.length} схем`;
+        `${filtered.length} / ${allSchemes.length} schemes`;
     renderSchemes(filtered);
 }
 
@@ -276,12 +251,12 @@ function downloadJSON(data, filename) {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
-    toast("Завантажено: " + filename);
+    toast("Downloaded: " + filename);
 }
 
 function downloadScheme(drawingId) {
     const s = allSchemes.find(x => x.drawing_id === drawingId);
-    if (!s) { toast("Схему не знайдено", true); return; }
+    if (!s) { toast("Scheme not found", true); return; }
     const data = {
         map_id: s.map_id,
         map_name: s.map_name || mapLabel(s.map_id),
@@ -295,7 +270,7 @@ function downloadScheme(drawingId) {
 
 function downloadAuthorSchemes(nickname) {
     const schemes = allSchemes.filter(s => s.author_nickname === nickname);
-    if (!schemes.length) { toast("Немає схем цього автора", true); return; }
+    if (!schemes.length) { toast("No schemes by this author", true); return; }
     const data = {
         author: nickname,
         scheme_count: schemes.length,
@@ -315,12 +290,12 @@ function openUpload() { document.getElementById("upload-modal").classList.add("a
 function closeUpload() {
     document.getElementById("upload-modal").classList.remove("active");
     document.getElementById("upload-file").value = "";
-    document.getElementById("upload-count").textContent = "";
+    document.getElementById("upload-count").textContent = "No files chosen";
 }
 function updateUploadCount() {
     const f = document.getElementById("upload-file");
     document.getElementById("upload-count").textContent =
-        f.files.length ? `Вибрано файлів: ${f.files.length}` : "";
+        f.files.length ? `Files selected: ${f.files.length}` : "No files chosen";
 }
 
 async function doUpload() {
@@ -330,13 +305,13 @@ async function doUpload() {
     const comment = document.getElementById("upload-comment").value.trim();
     const files = document.getElementById("upload-file").files;
 
-    if (!nick) { toast("Введіть нікнейм", true); return; }
-    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN має бути рівно 4 цифри", true); return; }
-    if (!title) { toast("Введіть назву схеми", true); return; }
-    if (!files.length) { toast("Виберіть JSON файл(и)", true); return; }
+    if (!nick) { toast("Enter nickname", true); return; }
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN must be exactly 4 digits", true); return; }
+    if (!title) { toast("Enter scheme title", true); return; }
+    if (!files.length) { toast("Select JSON file(s)", true); return; }
 
     let pinHash;
-    try { pinHash = await hashPin(pin); } catch (e) { toast("Помилка хешування PIN", true); return; }
+    try { pinHash = await hashPin(pin); } catch (e) { toast("PIN hash error", true); return; }
 
     let uploaded = 0;
     let errors = 0;
@@ -344,8 +319,8 @@ async function doUpload() {
     const processNext = (idx) => {
         if (idx >= files.length) {
             if (uploaded) {
-                let msg = `Опубліковано: ${uploaded} схем(и)`;
-                if (errors) msg += `, помилок: ${errors}`;
+                let msg = `Published: ${uploaded} scheme(s)`;
+                if (errors) msg += `, errors: ${errors}`;
                 toast(msg);
                 closeUpload();
                 setTimeout(loadSchemes, 1000);
@@ -370,7 +345,7 @@ async function doUpload() {
                 } else if (Array.isArray(data.drawings)) {
                     elements = data.drawings;
                 } else {
-                    throw new Error("Не знайдено масив елементів");
+                    throw new Error("No elements array found");
                 }
                 const drawingId = "web_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
                 const scheme = {
@@ -399,7 +374,7 @@ async function doUpload() {
     processNext(0);
 }
 
-// ═══ SHA256 Hash (same salt as firebase_identity.py) ═══
+// ═══ SHA256 Hash ═══
 async function hashPin(pin) {
     const msg = new TextEncoder().encode("wot_assistant_pin_salt_" + pin);
     const hash = await crypto.subtle.digest("SHA-256", msg);
@@ -409,25 +384,25 @@ async function hashPin(pin) {
 // ═══ Delete ═══
 async function deleteScheme(drawingId) {
     const s = allSchemes.find(x => x.drawing_id === drawingId);
-    if (!s) { toast("Схему не знайдено", true); return; }
+    if (!s) { toast("Scheme not found", true); return; }
 
-    const pin = prompt("Введіть ваш PIN (4 цифри) для видалення схеми:\n\nМапа: " + mapLabel(s.map_id) + "\nНазва: " + (s.title || "—"));
-    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN має бути 4 цифри", true); return; }
+    const pin = prompt("Enter your PIN (4 digits) to delete scheme:\n\nMap: " + mapLabel(s.map_id) + "\nTitle: " + (s.title || "—"));
+    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN must be 4 digits", true); return; }
 
     let pinHash;
-    try { pinHash = await hashPin(pin); } catch (e) { toast("Помилка хешування", true); return; }
+    try { pinHash = await hashPin(pin); } catch (e) { toast("Hash error", true); return; }
 
     if (pinHash !== s.pin_hash) {
-        toast("Невірний PIN! Видалення відхилено.", true);
+        toast("Wrong PIN! Deletion denied.", true);
         return;
     }
 
     db.ref("schemes/" + drawingId).remove()
         .then(() => {
-            toast("Схему видалено.");
+            toast("Scheme deleted.");
             setTimeout(loadSchemes, 500);
         })
-        .catch(() => toast("Помилка видалення.", true));
+        .catch(() => toast("Delete error.", true));
 }
 
 // ═══ Toast ═══

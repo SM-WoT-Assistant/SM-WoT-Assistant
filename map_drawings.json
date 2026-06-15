@@ -80,7 +80,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -104,7 +104,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -128,7 +128,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "2",
             "poi": [],
@@ -210,7 +210,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -276,7 +276,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -334,7 +334,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -556,7 +556,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -576,7 +576,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -600,7 +600,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "2",
             "poi": [],
@@ -642,7 +642,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "ЛТ"
+                "LT"
             ],
             "text": "",
             "poi": [],
@@ -696,7 +696,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -952,7 +952,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -972,7 +972,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1040,7 +1040,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1076,7 +1076,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -1114,7 +1114,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "2",
             "poi": [],
@@ -1138,7 +1138,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "ЛТ"
+                "LT"
             ],
             "text": "",
             "poi": [],
@@ -1160,7 +1160,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1222,7 +1222,7 @@
             "type": "text",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [
@@ -1240,7 +1240,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -1282,8 +1282,8 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "ЛТ",
-                "СТ"
+                "LT",
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1333,7 +1333,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1368,7 +1368,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1504,7 +1504,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1568,7 +1568,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1632,8 +1632,8 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "ЛТ",
-                "СТ"
+                "LT",
+                "MT"
             ],
             "text": "1",
             "poi": [],
@@ -1657,8 +1657,8 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "ЛТ",
-                "СТ"
+                "LT",
+                "MT"
             ],
             "text": "2",
             "poi": [],
@@ -1684,7 +1684,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],
@@ -1978,8 +1978,8 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ",
-                "ТТ"
+                "MT",
+                "HT"
             ],
             "text": "1",
             "poi": [],
@@ -2191,7 +2191,7 @@
             "type": "marker",
             "modes": [],
             "classes": [
-                "СТ"
+                "MT"
             ],
             "text": "",
             "poi": [],

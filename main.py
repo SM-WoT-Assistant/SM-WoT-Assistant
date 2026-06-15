@@ -104,9 +104,9 @@ class WotAssistantHQ:
 
         self.selected_battle_mode = tk.StringVar(value="Standard")
         self.selected_classes = {
-            "ЛТ": tk.BooleanVar(value=True), "СТ": tk.BooleanVar(value=True),
-            "ТТ": tk.BooleanVar(value=True), "ПТ": tk.BooleanVar(value=True),
-            "САУ": tk.BooleanVar(value=True)
+            "LT": tk.BooleanVar(value=True), "MT": tk.BooleanVar(value=True),
+            "HT": tk.BooleanVar(value=True), "TD": tk.BooleanVar(value=True),
+            "SPG": tk.BooleanVar(value=True)
         }
 
         self.thread_queue = []
@@ -629,7 +629,7 @@ class WotAssistantHQ:
             return
 
         cls = info["class"]
-        cls_map = {"LT": "ЛТ", "MT": "СТ", "HT": "ТТ", "TD": "ПТ", "SPG": "САУ"}
+        cls_map = {"LT": "LT", "MT": "MT", "HT": "HT", "TD": "TD", "SPG": "SPG"}
         ui_cls = cls_map.get(cls)
         if not ui_cls:
             return

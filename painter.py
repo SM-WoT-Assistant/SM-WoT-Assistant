@@ -34,11 +34,11 @@ class MapPainter:
         self._editing_idx = -1
 
         self.class_icon_codes = {
-            "ЛТ": 0x3A,
-            "СТ": 0x3B,
-            "ТТ": 0x3F,
-            "ПТ": 0x2E,
-            "САУ": 0x2D,
+            "LT": 0x3A,
+            "MT": 0x3B,
+            "HT": 0x3F,
+            "TD": 0x2E,
+            "SPG": 0x2D,
         }
     
     def bind_events_to(self, target_canvas):
@@ -391,14 +391,14 @@ class MapPainter:
 
     def _draw_class_icons(self, x, y, class_list, color, sc=1.0):
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
-        ordered_classes = [cls for cls in ("ЛТ", "СТ", "ТТ", "ПТ", "САУ")
+        ordered_classes = [cls for cls in ("LT", "MT", "HT", "TD", "SPG")
                            if cls in class_list and cls in active_classes]
         if not ordered_classes:
             return
 
         base_sz = max(10, int(29 * sc))
         gap = max(5, int(21 * sc))
-        class_scale = {"ЛТ": 1.2, "СТ": 1.3, "ПТ": 1.3, "САУ": 1.3}
+        class_scale = {"LT": 1.2, "MT": 1.3, "TD": 1.3, "SPG": 1.3}
         sizes = [base_sz * class_scale.get(cls, 1.0) for cls in ordered_classes]
         gaps = [gap * class_scale.get(cls, 1.0) for cls in ordered_classes]
         total_w = sum(gaps) - gaps[-1] if gaps else 0
@@ -593,6 +593,8 @@ class MapPainter:
             self.data_mgr.save_drawings(self.drawings)
             self.redraw()
 
+    _UKR_TO_EN = {"ЛТ": "LT", "СТ": "MT", "ТТ": "HT", "ПТ": "TD", "САУ": "SPG"}
+
     def is_visible(self, obj):
         current_mode = self.app.selected_battle_mode.get()
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
@@ -602,7 +604,8 @@ class MapPainter:
             
         req_classes = obj.get("classes", [])
         if req_classes:
-            if not any(cls in active_classes for cls in req_classes):
+            req_en = [_UKR_TO_EN.get(c, c) for c in req_classes]
+            if not any(cls in active_classes for cls in req_en):
                 return False
                 
         return True

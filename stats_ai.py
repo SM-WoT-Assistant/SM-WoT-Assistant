@@ -2764,11 +2764,11 @@ class StatsAI:
             builds, updated, _ = _load_ai_build_cache()
             if tag in builds:
                 if tag in updated and not _is_cache_expired(updated[tag], max_days=30):
-                    self.update_status_bar(f"📦 Build для {tank_name} з кешу", "#00cc00")
+                    self.update_status_bar(f"📦 Build для {tank_name}", "#00cc00")
                     print(f"[AI Tank Build] Свіжий кеш для {tag} — скіп, вже відрендерено")
                     return
                 # Stale cache: show stale data while AI updates
-                self.update_status_bar(f"📦 Build для {tank_name} з кешу (застарілий)", "#00cc00")
+                self.update_status_bar(f"📦 Build для {tank_name} (застарілий)", "#00cc00")
                 self.root.after(0, lambda bd=builds[tag]: self._update_ai_setup_ui(
                     bd, *self._current_bodies
                 ) if hasattr(self, '_current_bodies') else None)

@@ -65,7 +65,7 @@ class LocaleManager:
         self._ensure_ui_keys()
 
     def batch_translate_ui(self, progress_cb=None):
-        """Translate ALL untranslated UI keys atomically.
+        """Translate ALL untranslated or stale UI keys atomically.
         ALL keys must succeed or NONE are saved.
         Terminal service messages for diagnostics.
         Progress via progress_cb(pct, text) for splash integration."""
@@ -77,11 +77,14 @@ class LocaleManager:
 
         en_ui = translations.TRANSLATIONS.get("en", {}).get("ui", {})
         curr_ui = self.languages[self.lang].setdefault("ui", {})
+        en_snapshot = self.languages.setdefault("en", {}).setdefault("ui", {})
 
         missing = {}
         for key, en_val in en_ui.items():
             cached = curr_ui.get(key)
-            if cached is None or cached == en_val:
+            stored_en = en_snapshot.get(key)
+            # Re-translate if: no cache, OR EN source changed since last translation
+            if cached is None or stored_en != en_val:
                 missing[key] = en_val
 
         if not missing:
@@ -106,6 +109,7 @@ class LocaleManager:
 
         for key, val in translated.items():
             curr_ui[key] = val
+            en_snapshot[key] = en_ui.get(key, "")
         self.save_locales()
         self._batch_ui_done = True
 

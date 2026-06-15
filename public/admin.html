@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="uk">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,45 +47,45 @@
 
 <main>
     <div id="login-screen">
-        <h2 style="margin-bottom:20px;color:#ffaa00;">Вхід для адміністратора</h2>
+        <h2 style="margin-bottom:20px;color:#ffaa00;">Admin Login</h2>
         <input type="email" id="email" placeholder="Email"><br>
-        <input type="password" id="password" placeholder="Пароль"><br>
-        <button class="btn" onclick="login()" style="margin-top:10px;">Увійти</button>
+        <input type="password" id="password" placeholder="Password"><br>
+        <button class="btn" onclick="login()" style="margin-top:10px;">Login</button>
         <p id="login-error" class="error-msg" style="margin-top:10px;"></p>
     </div>
 
     <div id="dashboard">
         <div class="card">
-            <h2>Статистика</h2>
+            <h2>Statistics</h2>
             <div id="stats-container"></div>
         </div>
 
         <div class="card">
-            <h2>Помилки (останні)</h2>
-            <div id="errors-container"><div class="empty">Завантаження...</div></div>
+            <h2>Errors (recent)</h2>
+            <div id="errors-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Встановлення по версіях</h2>
-            <div id="installs-container"><div class="empty">Завантаження...</div></div>
+            <h2>Installations by version</h2>
+            <div id="installs-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Релізи (RTDB versions/)</h2>
+            <h2>Releases (RTDB versions/)</h2>
             <div style="margin-bottom:10px;">
-                <button class="btn btn-danger" onclick="deleteOldReleases()">🗑 Видалити всі крім останнього</button>
+                <button class="btn btn-danger" onclick="deleteOldReleases()">Delete all except latest</button>
                 <span style="color:#888;font-size:12px;margin-left:10px;" id="release-count"></span>
             </div>
-            <div id="releases-container"><div class="empty">Завантаження...</div></div>
+            <div id="releases-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Схеми (RTDB schemes/)</h2>
+            <h2>Schemes (RTDB schemes/)</h2>
             <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button class="btn btn-danger" onclick="deleteAllLegacySchemes()">🗑 Видалити всі старі (без PIN)</button>
+                <button class="btn btn-danger" onclick="deleteAllLegacySchemes()">Delete all legacy (no PIN)</button>
                 <span style="color:#888;font-size:12px;margin-left:10px;" id="scheme-count"></span>
             </div>
-            <div id="schemes-container"><div class="empty">Завантаження...</div></div>
+            <div id="schemes-container"><div class="empty">Loading...</div></div>
         </div>
     </div>
 </main>
@@ -107,13 +107,33 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 const auth = firebase.auth();
 
-// ═══ Map Dictionary (UA + EN) ═══
+// ═══ Map Dictionary (EN) ═══
 const MAP_NAMES = {
-    "ua": {"01_karelia":"Карелія","02_malinovka":"Малинівка","03_campania_big":"Провінція","04_himmelsdorf":"Хіммельсдорф","05_prohorovka":"Прохорівка","06_ensk":"Енськ","06_ensk_big":"Регіон Енськ","07_lakeville":"Ласвілль","08_ruinberg":"Руїнберґ","08_ruinberg_sm24":"Лауерберг","101_dday":"Оверлорд","101_dday_sm24":"Пляж «Омаха»","105_germany":"Берлін","105_germany_sm24":"Фалленштат","108_normandy_nom":"Одер","10_hills":"Копальні","112_eiffel_tower_ctf":"Париж","114_czech":"Промзона","115_sweden":"Штиль","11_murovanka":"Мурованка","120_graf_zeppelin":"Нордскар","120_graf_zeppelin_scc":"Нордскар","121_lost_paradise_v":"Устрична затока","127_japort":"Стара гавань","128_last_frontier_v":"Застава","13_erlenberg":"Ерленберґ","140_fall_tanks":"Стара школа","141_dash_to_go":"Нова школа","142_road_to_dash":"Бойова школа","14_siegfried_line":"Лінія Зигфріда","14_siegfried_line_nom":"Західний вал","17_munchen":"Вайдпарк","18_cliff":"Круча","19_monastery":"Монастир","208_bf_epic_normandy":"Нормандія","209_wg_epic_suburbia":"Крафтверк","210_bf_epic_desert":"Фата-моргана","212_epic_random_valley_sm25":"Нібельбурґ","217_er_alaska":"Клондайк","23_westfeld":"Вестфілд","250_br_battle_city2-1":"Зона 404","251_br_battle_city3":"Арзагир 4.04","252_br_battle_city4":"Фірнульфір","28_desert":"Піщана ріка","29_el_hallouf":"Ель-Халлуф","31_airfield":"Летовище","33_fjord":"Фіорди","34_redshire":"Редшир","35_steppes":"Степи","36_fishing_bay":"Рибальська бухта","37_caucasus":"Перевал","38_mannerheim_line":"Лінія Маннергейма","44_north_america":"Лайв Окс","45_north_america":"Хайвей","47_canada_a":"Тихий берег","59_asia_great_wall":"Кордон імперії","60_asia_miao":"Перлинна річка","63_tundra":"Тундра","95_lost_city_ctf":"Загублене місто","99_poland":"Студзянки"},
-    "en": {"01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province","04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk","06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg","08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach","105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder","10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen","115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar","120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay","127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg","140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School","14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall","17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey","208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk","210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg","217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404","251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir","28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield","33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes","36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass","38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks","45_north_america":"Highway","47_canada_a":"Serene Coast","59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River","63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"}
+    "01_karelia":"Karelia","02_malinovka":"Malinovka","03_campania_big":"Province",
+    "04_himmelsdorf":"Himmelsdorf","05_prohorovka":"Prokhorovka","06_ensk":"Ensk",
+    "06_ensk_big":"Ensk Region","07_lakeville":"Lakeville","08_ruinberg":"Ruinberg",
+    "08_ruinberg_sm24":"Lauerberg","101_dday":"Overlord","101_dday_sm24":"Omaha Beach",
+    "105_germany":"Berlin","105_germany_sm24":"Fallenstadt","108_normandy_nom":"Oder",
+    "10_hills":"Mines","112_eiffel_tower_ctf":"Paris","114_czech":"Pilsen",
+    "115_sweden":"Glacier","11_murovanka":"Murovanka","120_graf_zeppelin":"Nordskar",
+    "120_graf_zeppelin_scc":"Nordskar","121_lost_paradise_v":"Oyster Bay",
+    "127_japort":"Safe Haven","128_last_frontier_v":"Outpost","13_erlenberg":"Erlenberg",
+    "140_fall_tanks":"Old School","141_dash_to_go":"New School","142_road_to_dash":"Battle School",
+    "14_siegfried_line":"Siegfried Line","14_siegfried_line_nom":"West Wall",
+    "17_munchen":"Widepark","18_cliff":"Cliff","19_monastery":"Abbey",
+    "208_bf_epic_normandy":"Normandy","209_wg_epic_suburbia":"Kraftwerk",
+    "210_bf_epic_desert":"Fata Morgana","212_epic_random_valley_sm25":"Nibelburg",
+    "217_er_alaska":"Klondike","23_westfeld":"Westfield","250_br_battle_city2-1":"Zone 404",
+    "251_br_battle_city3":"Arzaghir 4.04","252_br_battle_city4":"Firnulfir",
+    "28_desert":"Sand River","29_el_hallouf":"El Halluf","31_airfield":"Airfield",
+    "33_fjord":"Fjords","34_redshire":"Redshire","35_steppes":"Steppes",
+    "36_fishing_bay":"Fishermans Bay","37_caucasus":"Pass",
+    "38_mannerheim_line":"Mannerheim Line","44_north_america":"Live Oaks",
+    "45_north_america":"Highway","47_canada_a":"Serene Coast",
+    "59_asia_great_wall":"Empire's Border","60_asia_miao":"Pearl River",
+    "63_tundra":"Tundra","95_lost_city_ctf":"Ghost Town","99_poland":"Studzianki"
 };
-const adminLang = "en";
-function mapLabel(id) { return (MAP_NAMES["en"])[id] || id; }
+function mapLabel(id) { return MAP_NAMES[id] || id; }
 
 auth.onAuthStateChanged(user => {
     if (user) {
@@ -156,8 +176,8 @@ function loadStats() {
         db.ref("installations").once("value"),
     ]).then(([errSnap, instSnap]) => {
         document.getElementById("stats-container").innerHTML = `
-            <div class="stat-box"><div class="num">${objSize(errSnap.val())}</div><div class="label">Помилок</div></div>
-            <div class="stat-box"><div class="num">${objSize(instSnap.val())}</div><div class="label">Встановлень</div></div>
+            <div class="stat-box"><div class="num">${objSize(errSnap.val())}</div><div class="label">Errors</div></div>
+            <div class="stat-box"><div class="num">${objSize(instSnap.val())}</div><div class="label">Installations</div></div>
         `;
     });
 }
@@ -168,11 +188,11 @@ function loadErrors() {
             const container = document.getElementById("errors-container");
             const data = snap.val();
             if (!data) {
-                container.innerHTML = '<div class="empty">Немає помилок — чудово!</div>';
+                container.innerHTML = '<div class="empty">No errors — great!</div>';
                 return;
             }
             const items = Object.values(data).reverse();
-            let html = '<table><tr><th>Дата</th><th>Версія</th><th>Тип</th><th>Повідомлення</th><th>OS</th></tr>';
+            let html = '<table><tr><th>Date</th><th>Version</th><th>Type</th><th>Message</th><th>OS</th></tr>';
             items.forEach(d => {
                 const levelClass = d.error_type === 'crash' ? 'badge-error' :
                     (d.error_type || '').includes('Warning') ? 'badge-warning' : 'badge-info';
@@ -195,11 +215,11 @@ function loadInstallations() {
             const container = document.getElementById("installs-container");
             const data = snap.val();
             if (!data) {
-                container.innerHTML = '<div class="empty">Немає даних</div>';
+                container.innerHTML = '<div class="empty">No data</div>';
                 return;
             }
             const items = Object.values(data).reverse();
-            let html = '<table><tr><th>ID</th><th>Версія</th><th>Last Seen</th><th>OS</th></tr>';
+            let html = '<table><tr><th>ID</th><th>Version</th><th>Last Seen</th><th>OS</th></tr>';
             items.forEach(d => {
                 html += `<tr>
                     <td>${(d.install_id || '').slice(0,8)}...</td>
@@ -221,7 +241,7 @@ function loadAdminSchemes() {
         .then(snap => {
             const data = snap.val();
             if (!data) {
-                document.getElementById("schemes-container").innerHTML = '<div class="empty">Немає опублікованих схем</div>';
+                document.getElementById("schemes-container").innerHTML = '<div class="empty">No published schemes</div>';
                 document.getElementById("scheme-count").textContent = "";
                 allAdminSchemes = [];
                 return;
@@ -229,21 +249,21 @@ function loadAdminSchemes() {
             allAdminSchemes = Object.entries(data).map(([key, val]) => ({ ...val, _key: key }));
             allAdminSchemes.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
             document.getElementById("scheme-count").textContent =
-                `Всього: ${allAdminSchemes.length} | Старих: ${allAdminSchemes.filter(s => !s.pin_hash).length}`;
+                `Total: ${allAdminSchemes.length} | Legacy: ${allAdminSchemes.filter(s => !s.pin_hash).length}`;
             renderAdminSchemes();
         })
         .catch(() => {
-            document.getElementById("schemes-container").innerHTML = '<div class="empty">Помилка завантаження</div>';
+            document.getElementById("schemes-container").innerHTML = '<div class="empty">Loading error</div>';
         });
 }
 
 function renderAdminSchemes() {
     const container = document.getElementById("schemes-container");
     if (!allAdminSchemes.length) {
-        container.innerHTML = '<div class="empty">Немає схем</div>';
+        container.innerHTML = '<div class="empty">No schemes</div>';
         return;
     }
-    let html = '<table><tr><th>ID мапи</th><th>Назва мапи</th><th>Автор</th><th>Назва схеми</th><th>Дата</th><th>PIN?</th><th></th></tr>';
+    let html = '<table><tr><th>Map ID</th><th>Map Name</th><th>Author</th><th>Scheme Name</th><th>Date</th><th>PIN?</th><th></th></tr>';
     allAdminSchemes.forEach(s => {
         const hasPin = s.pin_hash ? "✅" : "❌";
         html += `<tr>
@@ -253,7 +273,7 @@ function renderAdminSchemes() {
             <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.title || '—'}</td>
             <td>${(s.created_at || '').slice(0,16)}</td>
             <td>${hasPin}</td>
-            <td><button class="btn btn-danger" onclick="deleteAdminScheme('${s._key}')">🗑</button></td>
+            <td><button class="btn btn-danger" onclick="deleteAdminScheme('${s._key}')">Delete</button></td>
         </tr>`;
     });
     html += '</table>';
@@ -261,18 +281,18 @@ function renderAdminSchemes() {
 }
 
 function deleteAdminScheme(key) {
-    if (!confirm("Видалити схему " + key + "?")) return;
+    if (!confirm("Delete scheme " + key + "?")) return;
     db.ref("schemes/" + key).remove()
         .then(() => {
             loadAdminSchemes();
         })
-        .catch(() => alert("Помилка видалення"));
+        .catch(() => alert("Delete error"));
 }
 
 function deleteAllLegacySchemes() {
     const legacy = allAdminSchemes.filter(s => !s.pin_hash);
-    if (!legacy.length) { alert("Немає старих схем для видалення."); return; }
-    if (!confirm(`Видалити ВСІ ${legacy.length} старі схеми (без PIN)?\nЦю дію неможливо скасувати!`)) return;
+    if (!legacy.length) { alert("No legacy schemes to delete."); return; }
+    if (!confirm(`Delete ALL ${legacy.length} legacy schemes (no PIN)?\nThis action cannot be undone!`)) return;
 
     let done = 0;
     let failed = 0;
@@ -291,7 +311,7 @@ function deleteAllLegacySchemes() {
     });
 
     function finish() {
-        alert(`Видалено: ${done}, помилок: ${failed}`);
+        alert(`Deleted: ${done}, failed: ${failed}`);
         loadAdminSchemes();
     }
 }
@@ -304,7 +324,7 @@ function loadAdminReleases() {
         .then(snap => {
             const data = snap.val();
             if (!data) {
-                document.getElementById("releases-container").innerHTML = '<div class="empty">Немає релізів</div>';
+                document.getElementById("releases-container").innerHTML = '<div class="empty">No releases</div>';
                 allAdminReleases = [];
                 return;
             }
@@ -312,28 +332,28 @@ function loadAdminReleases() {
                 .map(([key, val]) => ({ ...val, _key: key }))
                 .filter(r => r.version);
             allAdminReleases.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
-            document.getElementById("release-count").textContent = `Всього: ${allAdminReleases.length}`;
+            document.getElementById("release-count").textContent = `Total: ${allAdminReleases.length}`;
             renderAdminReleases();
         })
         .catch(() => {
-            document.getElementById("releases-container").innerHTML = '<div class="empty">Помилка завантаження</div>';
+            document.getElementById("releases-container").innerHTML = '<div class="empty">Loading error</div>';
         });
 }
 
 function renderAdminReleases() {
     const container = document.getElementById("releases-container");
     if (!allAdminReleases.length) {
-        container.innerHTML = '<div class="empty">Немає релізів</div>';
+        container.innerHTML = '<div class="empty">No releases</div>';
         return;
     }
-    let html = '<table><tr><th>Версія</th><th>Дата</th><th>Розмір</th><th>URL</th><th></th></tr>';
+    let html = '<table><tr><th>Version</th><th>Date</th><th>Size</th><th>URL</th><th></th></tr>';
     allAdminReleases.forEach(r => {
         html += `<tr>
             <td style="color:#ff4500;font-weight:bold">v${r.version || ''}</td>
             <td>${(r.release_date || '').slice(0,10)}</td>
             <td>${r.build_size || '—'}</td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${r.download_url || '—'}</td>
-            <td><button class="btn btn-danger" onclick="deleteAdminRelease('${r._key}')">🗑</button></td>
+            <td><button class="btn btn-danger" onclick="deleteAdminRelease('${r._key}')">Delete</button></td>
         </tr>`;
     });
     html += '</table>';
@@ -341,16 +361,16 @@ function renderAdminReleases() {
 }
 
 function deleteAdminRelease(key) {
-    if (!confirm("Видалити реліз " + key.replace(/_/g, '.') + "?")) return;
+    if (!confirm("Delete release " + key.replace(/_/g, '.') + "?")) return;
     db.ref("versions/" + key).remove()
         .then(() => loadAdminReleases())
-        .catch(() => alert("Помилка видалення"));
+        .catch(() => alert("Delete error"));
 }
 
 function deleteOldReleases() {
-    if (allAdminReleases.length <= 1) { alert("Немає старих релізів для видалення."); return; }
+    if (allAdminReleases.length <= 1) { alert("No old releases to delete."); return; }
     const toDelete = allAdminReleases.slice(1); // all except latest
-    if (!confirm(`Видалити ${toDelete.length} старих релізів, залишивши v${allAdminReleases[0].version}?`)) return;
+    if (!confirm(`Delete ${toDelete.length} old releases, keeping v${allAdminReleases[0].version}?`)) return;
 
     let done = 0, failed = 0;
     toDelete.forEach(r => {
@@ -359,7 +379,7 @@ function deleteOldReleases() {
             .catch(() => { failed++; if (done + failed >= toDelete.length) finishR(); });
     });
     function finishR() {
-        alert(`Видалено: ${done}, помилок: ${failed}`);
+        alert(`Deleted: ${done}, failed: ${failed}`);
         loadAdminReleases();
     }
 }

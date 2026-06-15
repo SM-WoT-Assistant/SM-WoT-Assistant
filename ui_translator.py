@@ -30,6 +30,7 @@ _KNOWN_KEYS = [
     "Ctrl", "Alt", "Shift", "LMB", "RMB", "Enter", "Esc", "Tab", "Del", "Delete",
     "Up", "Down", "Left", "Right", "Home", "End", "PgUp", "PgDn", "Space", "Backspace",
     "E", "Z", "X", "C", "V",
+    "LT", "MT", "HT", "TD", "SPG",
 ]
 _KEY_RE = re.compile(
     r'\b(?:' + '|'.join(re.escape(k) for k in sorted(_KNOWN_KEYS, key=len, reverse=True)) + r')\b'

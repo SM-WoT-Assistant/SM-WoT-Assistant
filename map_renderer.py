@@ -247,9 +247,14 @@ class MapRenderer:
             if app.mode == "edit":
                 version = config.load_version()
                 app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
-                app.canvas.create_text(cw//2, ch - 55, text=app.t('ui', 'editor_help'), fill="gray", font=("Arial", 9), tags="map")
-                app.canvas.create_text(cw//2, ch - 80, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"), tags="map")
-                app.canvas.create_text(cw//2, ch - 105, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
+                line1 = f"Ctrl+LMB: {app.t('ui', 'help_ctrl_lmb')}"
+                line2 = f"Ctrl+\u2195: {app.t('ui', 'help_ctrl_updown')} | Ctrl+\u2194: {app.t('ui', 'help_ctrl_leftright')}"
+                line3 = f"Ctrl+Shift+\u2195: {app.t('ui', 'help_ctrlshift_updown')}"
+                app.canvas.create_text(cw//2, ch - 90, text=line1, fill="#aaaaaa", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 70, text=line2, fill="#aaaaaa", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 50, text=line3, fill="#aaaaaa", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 115, text=app.t('ui', 'h2'), fill="white", font=("Arial", 11, "bold"), tags="map")
+                app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
                 if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110

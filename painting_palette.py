@@ -141,7 +141,7 @@ class DrawingPalette(tk.Toplevel):
         cf = tk.Frame(self, bg=bg)
         cf.pack(fill="x", padx=8)
         for k, v in self.class_vars.items():
-            cb = tk.Checkbutton(cf, text=self.app.t('ui', 'class_' + k.lower()), variable=v, command=self._on_any_change,
+            cb = tk.Checkbutton(cf, text=k, variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
             cb.pack(side="left", padx=1)
 
@@ -382,14 +382,18 @@ class DrawingPalette(tk.Toplevel):
 
     # --- Public API ---
 
+    _UKR_TO_EN_CLASS = {"ЛТ": "LT", "СТ": "MT", "ТТ": "HT", "ПТ": "TD", "САУ": "SPG"}
+
     def load_object(self, obj):
         self._loading_obj = True
         try:
             self._edit_obj = obj
             for k, v in self.mode_vars.items():
                 v.set(k in obj.get("modes", []))
+            raw_classes = obj.get("classes", [])
+            en_classes = {_UKR_TO_EN_CLASS.get(c, c) for c in raw_classes}
             for k, v in self.class_vars.items():
-                v.set(k in obj.get("classes", []))
+                v.set(k in en_classes)
             self.text_var.set(obj.get("text", ""))
             self.current_color = obj.get("color", "#ffaa00")
             self._color_preview.config(fg=self.current_color)
