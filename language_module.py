@@ -351,7 +351,6 @@ def setup(wot_path, settings, save_callback):
             os.path.join(config.BASE_DIR, "public", "locale", f"{lang}.json")
         )
         print(f"[LANG SETUP] exported locale/{lang}.json")
-        regenerate_map_dictionary(lm)
         regenerate_game_entities(lm)
         settings["language"] = lang
         try:
@@ -374,6 +373,8 @@ def setup(wot_path, settings, save_callback):
         _lang_module = LanguageModule(wot_path)
         _lang_module._cache_dir = os.path.join(config.USER_DATA_DIR, "localization", lang)
         _lang_module.load_cache()
+    # Always regenerate map dictionary to match current game language
+    regenerate_map_dictionary(_lang_module)
     return lang
 
 
