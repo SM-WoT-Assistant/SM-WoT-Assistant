@@ -172,7 +172,9 @@ const MAP_NAMES = {
     }
 };
 
-let currentLang = (localStorage.getItem("site_lang") || "ua");
+const browserLang = (navigator.language || '').toLowerCase();
+const defaultLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
+let currentLang = (localStorage.getItem("site_lang") || defaultLang);
 
 function setLang(lang) {
     currentLang = lang;
