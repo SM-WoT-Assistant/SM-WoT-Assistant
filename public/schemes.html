@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Тактичні схеми — SM WoT Assistant</title>
+    <title>Schemes — SM WoT Assistant</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a0a; color: #ccc; }
@@ -54,17 +54,17 @@
 <body>
 
 <header>
-    <h1><a href="index.html">SM WoT Assistant</a> — Тактичні схеми</h1>
+    <h1><a href="index.html">SM WoT Assistant</a> — Tactical Schemes</h1>
     <nav>
-        <button class="btn btn-green" onclick="openUpload()">📤 Опублікувати схему</button>
-        <a href="index.html" class="btn">← На головну</a>
+        <button class="btn btn-green" onclick="openUpload()">📤 Publish scheme</button>
+        <a href="index.html" class="btn">← Home</a>
     </nav>
 </header>
 
 <main>
     <div class="filters">
         <select id="map-filter" onchange="filterSchemes()">
-            <option value="">Всі мапи (60+)</option>
+            <option value="">All maps (60+)</option>
         </select>
         <select id="author-filter" onchange="filterSchemes()">
             <option value="">Всі автори</option>
@@ -170,8 +170,7 @@ const MAP_NAMES = {
     }
 };
 
-const browserLang = (navigator.language || '').toLowerCase();
-const currentLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
+const currentLang = "en";
 
 function initLang() {
     const mapSel = document.getElementById("map-filter");
@@ -192,12 +191,6 @@ let allAuthors = new Set();
 let allMaps = new Set();
 
 function init() {
-    initLang();
-    const mapSel = document.getElementById("map-filter");
-    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
-    mapKeys.sort().forEach(id => {
-        mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
-    });
     // Auto-fill nickname from URL
     const params = new URLSearchParams(window.location.search);
     const nickParam = params.get("nick");

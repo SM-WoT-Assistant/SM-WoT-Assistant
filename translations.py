@@ -54,7 +54,7 @@ TRANSLATIONS = {
             "maps_2": "MAPS",
             "maps_1": "TACTIC",
             "battle_mode_label": "Battle mode",
-            "vehicle_class_label": "VEHICLE CLASS",
+            "vehicle_class_label": "Class",
             "standard_battle": "Standard",
             "encounter_battle": "Encounter battle",
             "assault_battle": "Assault",

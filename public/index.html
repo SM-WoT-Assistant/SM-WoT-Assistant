@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a0a; color: #ccc; line-height: 1.5; }
         header { background: linear-gradient(135deg, #1a1a1a 0%, #111 100%); padding: 50px 24px 40px; text-align: center; border-bottom: 3px solid #ff4500; }
-        header img { width: 96px; height: 96px; margin-bottom: 16px; border-radius: 16px; }
+        header img { width: 192px; height: 192px; margin-bottom: 16px; border-radius: 16px; }
         header h1 { font-size: 34px; color: #ff4500; margin-bottom: 6px; }
         header .subtitle { font-size: 17px; color: #aaa; margin-bottom: 20px; }
         .btn { display: inline-block; background: #333; color: #ccc; border: none; padding: 12px 28px; border-radius: 6px; cursor: pointer; font-size: 15px; text-decoration: none; font-weight: bold; transition: background .2s; }
@@ -175,8 +175,7 @@ const T = {
     }
 };
 
-const browserLang = (navigator.language || '').toLowerCase();
-const siteLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
+const siteLang = "en";
 function t(key) { return (T[siteLang] || T["en"])[key] || key; }
 
 function applyTranslations() {
