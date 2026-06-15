@@ -352,6 +352,7 @@ def setup(wot_path, settings, save_callback):
         )
         print(f"[LANG SETUP] exported locale/{lang}.json")
         regenerate_game_entities(lm)
+        regenerate_map_dictionary(lm)
         settings["language"] = lang
         try:
             with open(config.SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -373,8 +374,6 @@ def setup(wot_path, settings, save_callback):
         _lang_module = LanguageModule(wot_path)
         _lang_module._cache_dir = os.path.join(config.USER_DATA_DIR, "localization", lang)
         _lang_module.load_cache()
-    # Always regenerate map dictionary to match current game language
-    regenerate_map_dictionary(_lang_module)
     return lang
 
 
@@ -386,6 +385,11 @@ def check_for_language_change(wot_path, settings, save_callback=None):
 def regenerate_map_dictionary(lm):
     """Regenerate map_dictionary.json from arenas.mo."""
     arenas = lm.dictionaries.get("arenas", {})
+    # Only regenerate if we have valid arenas data
+    map_names = {k: v for k, v in arenas.items() if "/name" in k and v and not v.startswith("#") and len(v) > 2 and v.strip() != "?empty?"}
+    if len(map_names) < 10:
+        print(f"[LANG] regenerate_map_dictionary: only {len(map_names)} valid arenas entries, skipping")
+        return
     dict_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_dictionary.json")
     old_dict = {}
     if os.path.exists(dict_path):
@@ -393,11 +397,9 @@ def regenerate_map_dictionary(lm):
             old_dict = json.load(f)
 
     new_dict = {}
-    for msgid, name in arenas.items():
-        if "/name" in msgid and name and not name.startswith("#"):
-            map_id = msgid.replace("/name", "")
-            if len(name) > 2 and name.strip() != "?empty?":
-                new_dict[map_id] = name.strip()
+    for msgid, name in map_names.items():
+        map_id = msgid.replace("/name", "")
+        new_dict[map_id] = name.strip()
 
     for kid in old_dict:
         if kid not in new_dict:
@@ -405,6 +407,7 @@ def regenerate_map_dictionary(lm):
 
     with open(dict_path, "w", encoding="utf-8") as f:
         json.dump(new_dict, f, indent=2, ensure_ascii=False)
+    print(f"[LANG] regenerate_map_dictionary: {len(new_dict)} maps written")
 
 
 def regenerate_game_entities(lm):

@@ -15,6 +15,8 @@
         .btn:hover { background: #444; }
         .btn-primary { background: #ff4500; color: #fff; font-size: 18px; padding: 14px 40px; }
         .btn-primary:hover { background: #ff5722; }
+        .btn-secondary { background: #2a5a2a; color: #9f9; }
+        .btn-secondary:hover { background: #3a7a3a; }
         .btn-schemes { background: #1a3355; color: #7ab; font-size: 16px; padding: 16px 36px; }
         .btn-schemes:hover { background: #224466; color: #9cf; }
         .version { color: #888; font-size: 13px; margin-top: 8px; }
@@ -28,6 +30,14 @@
         .feature-card p { color: #999; font-size: 12px; }
         .schemes-hero { background: #111; border: 1px solid #222; border-radius: 10px; padding: 32px 24px; text-align: center; }
         .schemes-hero h3 { color: #ffaa00; font-size: 18px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #1a1a1a; font-size: 14px; }
+        th { color: #888; font-weight: normal; font-size: 12px; text-transform: uppercase; }
+        .release-ver { color: #ff4500; font-weight: bold; }
+        .release-date { color: #888; }
+        .release-size { color: #666; }
+        .release-dl { text-align: right; }
+        .empty { text-align: center; color: #555; padding: 40px; }
         footer { text-align: center; padding: 40px 24px; color: #555; font-size: 13px; border-top: 1px solid #111; }
         footer a { color: #777; text-decoration: none; }
         footer a:hover { color: #aaa; }
@@ -39,8 +49,8 @@
     <img src="logo.png" alt="SM WoT Assistant">
     <h1>SM WoT Assistant</h1>
     <p class="subtitle">Tactical assistant for World of Tanks — maps, tactics, AI builds</p>
-    <a href="https://github.com/sm-wot-assistant/releases" class="btn btn-primary">Download</a>
-    <p class="version">Windows 10/11</p>
+    <a href="https://github.com/nkcgml-boop/SM-WoT-Assistant/releases" id="download-btn" class="btn btn-primary">Download</a>
+    <p class="version" id="latest-version">Windows 10/11</p>
     <p class="version" style="color:#777;font-size:11px;margin-top:4px;">Windows SmartScreen may warn about an unknown publisher. Click "Run anyway".</p>
 </header>
 
@@ -76,9 +86,9 @@
 
     <section>
         <h2>Releases</h2>
-        <p style="color:#999;font-size:14px;">
-            Check latest releases on <a href="https://github.com/sm-wot-assistant/releases" style="color:#ffaa00">GitHub</a>.
-        </p>
+        <div id="releases-container">
+            <div class="empty">Loading...</div>
+        </div>
     </section>
 
     <section>
@@ -93,6 +103,65 @@
     <p>SM WoT Assistant &copy; 2026 &nbsp;&middot;&nbsp;
     <a href="https://sm-wot-assistant.web.app">sm-wot-assistant.web.app</a></p>
 </footer>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+const firebaseConfig = {
+    apiKey: "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE",
+    authDomain: "sm-wot-assistant.firebaseapp.com",
+    databaseURL: "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "sm-wot-assistant",
+    storageBucket: "sm-wot-assistant.firebasestorage.app",
+    messagingSenderId: "154255345343",
+    appId: "1:154255345343:web:270af95b541878e2f9e80a",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+
+const GITHUB_RELEASES = "https://github.com/nkcgml-boop/SM-WoT-Assistant/releases";
+
+function loadReleases() {
+    db.ref("versions").once("value")
+        .then(snap => {
+            const data = snap.val();
+            const container = document.getElementById("releases-container");
+            const dlBtn = document.getElementById("download-btn");
+            const latestSpan = document.getElementById("latest-version");
+
+            if (!data) {
+                container.innerHTML = '<div class="empty">No published releases. Check <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">GitHub</a>.</div>';
+                dlBtn.href = GITHUB_RELEASES;
+                return;
+            }
+
+            const items = Object.values(data).sort((a, b) =>
+                (b.release_date || '').localeCompare(a.release_date || '')
+            );
+
+            const latest = items[0];
+            if (latest) {
+                dlBtn.href = latest.download_url || (GITHUB_RELEASES + "/tag/v" + latest.version);
+                dlBtn.textContent = "Download v" + (latest.version || "");
+                latestSpan.textContent = (latest.build_size || "") + " · Windows 10/11 · " + (latest.release_date || "").slice(0, 10);
+            }
+
+            container.innerHTML = '<table><tr><th>Version</th><th>Date</th><th>Size</th><th></th></tr>' +
+                items.map(d => `<tr>
+                    <td class="release-ver">v${d.version || ''}</td>
+                    <td class="release-date">${(d.release_date || '').slice(0, 10)}</td>
+                    <td class="release-size">${d.build_size || ''}</td>
+                    <td class="release-dl"><a href="${d.download_url || (GITHUB_RELEASES + '/tag/v' + d.version)}" class="btn btn-secondary" style="padding:6px 14px;font-size:13px">Download</a></td>
+                </tr>`).join('') + '</table>';
+        })
+        .catch(() => {
+            document.getElementById("releases-container").innerHTML =
+                '<div class="empty">Error loading releases. <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">Check GitHub</a>.</div>';
+            document.getElementById("download-btn").href = GITHUB_RELEASES;
+        });
+}
+loadReleases();
+</script>
 
 </body>
 </html>
