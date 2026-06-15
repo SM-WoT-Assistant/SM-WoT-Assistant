@@ -56,8 +56,6 @@
 <header>
     <h1><a href="index.html">SM WoT Assistant</a> — Тактичні схеми</h1>
     <nav>
-        <button class="btn btn-sm" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff">UA</button>
-        <button class="btn btn-sm" id="lang-en" onclick="setLang('en')">EN</button>
         <button class="btn btn-green" onclick="openUpload()">📤 Опублікувати схему</button>
         <a href="index.html" class="btn">← На головну</a>
     </nav>
@@ -173,23 +171,17 @@ const MAP_NAMES = {
 };
 
 const browserLang = (navigator.language || '').toLowerCase();
-const defaultLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
-let currentLang = (localStorage.getItem("site_lang") || defaultLang);
+const currentLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
 
-function setLang(lang) {
-    currentLang = lang;
-    localStorage.setItem("site_lang", lang);
-    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
-    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
-    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
-    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
+function initLang() {
     const mapSel = document.getElementById("map-filter");
-    mapSel.innerHTML = '<option value="">Всі мапи / All maps</option>';
-    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
-    mapKeys.sort().forEach(id => {
-        mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
-    });
-    loadSchemes();
+    if (mapSel) {
+        mapSel.innerHTML = '<option value="">All maps</option>';
+        const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
+        mapKeys.sort().forEach(id => {
+            mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
+        });
+    }
 }
 
 function mapLabel(id) { return (MAP_NAMES[currentLang] || MAP_NAMES["en"])[id] || id; }
@@ -200,8 +192,9 @@ let allAuthors = new Set();
 let allMaps = new Set();
 
 function init() {
+    initLang();
     const mapSel = document.getElementById("map-filter");
-    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["ua"]);
+    const mapKeys = Object.keys(MAP_NAMES[currentLang] || MAP_NAMES["en"]);
     mapKeys.sort().forEach(id => {
         mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
     });
@@ -211,7 +204,7 @@ function init() {
     if (nickParam) {
         document.getElementById("upload-nick").value = decodeURIComponent(nickParam);
     }
-    setLang(currentLang);
+    initLang();
     loadSchemes();
 }
 

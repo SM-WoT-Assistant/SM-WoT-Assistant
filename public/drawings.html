@@ -29,8 +29,6 @@
 <header>
     <h1><a href="index.html">SM WoT Assistant</a> — Галерея малюнків</h1>
     <nav>
-        <button class="btn btn-sm" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff;padding:4px 10px;">UA</button>
-        <button class="btn btn-sm" id="lang-en" onclick="setLang('en')" style="padding:4px 10px;">EN</button>
         <a href="index.html">Головна</a>
         <a href="admin.html">Адмінка</a>
     </nav>
@@ -63,17 +61,7 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 const browserLang = (navigator.language || '').toLowerCase();
-const defaultLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
-let siteLang = (localStorage.getItem("site_lang") || defaultLang);
-function setLang(lang) {
-    siteLang = lang;
-    localStorage.setItem("site_lang", lang);
-    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
-    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
-    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
-    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
-}
-setLang(siteLang);
+const siteLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
 
 let allDrawings = [];
 

@@ -47,10 +47,6 @@
 <body>
 
 <header>
-    <div style="text-align:right;padding:0 24px 10px;">
-        <button class="btn" id="lang-ua" onclick="setLang('ua')" style="background:#ff4500;color:#fff;padding:4px 12px;font-size:12px;">UA</button>
-        <button class="btn" id="lang-en" onclick="setLang('en')" style="padding:4px 12px;font-size:12px;">EN</button>
-    </div>
     <img src="logo.png" alt="SM WoT Assistant">
     <h1>SM WoT Assistant</h1>
     <p class="subtitle" id="t-subtitle">Тактичний помічник для World of Tanks — карти, тактики, AI білди</p>
@@ -180,18 +176,7 @@ const T = {
 };
 
 const browserLang = (navigator.language || '').toLowerCase();
-const defaultLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
-let siteLang = (localStorage.getItem("site_lang") || defaultLang);
-function setLang(lang) {
-    siteLang = lang;
-    localStorage.setItem("site_lang", lang);
-    document.getElementById("lang-ua").style.background = lang === "ua" ? "#ff4500" : "#333";
-    document.getElementById("lang-ua").style.color = lang === "ua" ? "#fff" : "#ccc";
-    document.getElementById("lang-en").style.background = lang === "en" ? "#ff4500" : "#333";
-    document.getElementById("lang-en").style.color = lang === "en" ? "#fff" : "#ccc";
-    applyTranslations();
-    loadReleases();
-}
+const siteLang = (browserLang.startsWith('uk') || browserLang === 'ru') ? 'ua' : 'en';
 function t(key) { return (T[siteLang] || T["en"])[key] || key; }
 
 function applyTranslations() {
@@ -212,7 +197,7 @@ function applyTranslations() {
     document.getElementById("t-releases-loading").textContent = t("releases-loading");
     document.getElementById("t-smartscreen").textContent = t("smartscreen");
 }
-setLang(siteLang);
+applyTranslations();
 
 const GITHUB_RELEASES = "https://github.com/sm-wot-assistant/releases";
 
