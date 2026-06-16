@@ -320,6 +320,17 @@ function deleteAllLegacySchemes() {
 // ═══ Releases management ═══
 let allAdminReleases = [];
 
+function compareVersions(a, b) {
+    const pa = (a || "0.0.0").replace("v", "").split(".").map(Number);
+    const pb = (b || "0.0.0").replace("v", "").split(".").map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = pa[i] || 0;
+        const nb = pb[i] || 0;
+        if (na !== nb) return na - nb;
+    }
+    return 0;
+}
+
 function loadAdminReleases() {
     db.ref("versions").once("value")
         .then(snap => {
@@ -332,7 +343,11 @@ function loadAdminReleases() {
             allAdminReleases = Object.entries(data)
                 .map(([key, val]) => ({ ...val, _key: key }))
                 .filter(r => r.version);
-            allAdminReleases.sort((a, b) => (b.release_date || "").localeCompare(a.release_date || ""));
+            allAdminReleases.sort((a, b) => {
+                const dateCmp = (b.release_date || "").localeCompare(a.release_date || "");
+                if (dateCmp !== 0) return dateCmp;
+                return compareVersions(b.version || "0.0.0", a.version || "0.0.0");
+            });
             document.getElementById("release-count").textContent = `Total: ${allAdminReleases.length}`;
             renderAdminReleases();
         })

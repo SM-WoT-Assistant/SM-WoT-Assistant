@@ -204,7 +204,7 @@ def check_for_updates(on_done=None):
                 if data:
                     items = [v for v in data.values() if isinstance(v, dict) and v.get("version")]
                     if items:
-                        latest = max(items, key=lambda x: x.get("release_date", ""))
+                        latest = max(items, key=lambda x: (x.get("release_date", ""), tuple(int(n) for n in x.get("version", "0.0.0").replace("v", "").split("."))))
                         if on_done:
                             on_done(latest)
                         return

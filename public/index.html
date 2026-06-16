@@ -122,6 +122,17 @@ const db = firebase.database();
 
 const GITHUB_RELEASES = "https://github.com/nkcgml-boop/SM-WoT-Assistant/releases";
 
+function compareVersions(a, b) {
+    const pa = (a || "0.0.0").replace("v", "").split(".").map(Number);
+    const pb = (b || "0.0.0").replace("v", "").split(".").map(Number);
+    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+        const na = pa[i] || 0;
+        const nb = pb[i] || 0;
+        if (na !== nb) return na - nb;
+    }
+    return 0;
+}
+
 function loadReleases() {
     db.ref("versions").once("value")
         .then(snap => {
@@ -136,9 +147,11 @@ function loadReleases() {
                 return;
             }
 
-            const items = Object.values(data).sort((a, b) =>
-                (b.release_date || '').localeCompare(a.release_date || '')
-            );
+            const items = Object.values(data).sort((a, b) => {
+                const dateCmp = (b.release_date || '').localeCompare(a.release_date || '');
+                if (dateCmp !== 0) return dateCmp;
+                return compareVersions(b.version || '0.0.0', a.version || '0.0.0');
+            });
 
             const latest = items[0];
             if (latest) {
