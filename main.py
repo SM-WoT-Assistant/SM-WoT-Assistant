@@ -646,6 +646,11 @@ class WotAssistantHQ:
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
         self.painter.redraw()
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self.root.update_idletasks()
+            self._sync_po_pos()
+            self._po_win.deiconify()
+            self._start_po_sync_timer()
 
     def _handle_ctrl_up(self):
         import time
@@ -1432,11 +1437,11 @@ class WotAssistantHQ:
         self.current_map_eng = None
         self.map_var.set("")
         self.map_renderer.show_main_splash()
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            self.root.update_idletasks()
-            self._sync_po_pos()
-            self._po_win.deiconify()
-            self._start_po_sync_timer()
+        if hasattr(self, 'painter'):
+            self.painter.canvas.delete("painter_obj")
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._stop_po_sync_timer()
+            self._po_win.withdraw()
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
