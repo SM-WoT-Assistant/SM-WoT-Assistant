@@ -510,6 +510,8 @@ class WotAssistantHQ:
             if hasattr(self, 'stats_ai_module'):
                 self.stats_ai_module.stop_browser()
             self.save_settings()
+            if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn':
+                self.drawing_palette._close()
             self.root.withdraw()
 
     def _ensure_edit_focus(self):
