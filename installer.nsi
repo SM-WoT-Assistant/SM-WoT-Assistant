@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.4"
+!define PRODUCT_VERSION "1.0.5"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant.exe"
@@ -10,8 +10,8 @@
 
 SetCompressor lzma
 
-Icon "dist\SM WoT Assistant\icon.ico"
-UninstallIcon "dist\SM WoT Assistant\icon.ico"
+Icon "dist\SM WoT Assistant\_internal\icon.ico"
+UninstallIcon "dist\SM WoT Assistant\_internal\icon.ico"
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "dist\SM_WoT_Assistant_Setup_v${PRODUCT_VERSION}.exe"
@@ -30,8 +30,8 @@ Section "Install"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\icon.ico"
-    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\icon.ico"
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\_internal\icon.ico"
+    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\_internal\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
