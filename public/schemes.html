@@ -331,8 +331,12 @@ function closeUpload() {
 }
 function updateUploadCount() {
     const f = document.getElementById("upload-file");
-    document.getElementById("upload-count").textContent =
-        f.files.length ? `Files selected: ${f.files.length}` : "No files chosen";
+    if (!f.files.length) {
+        document.getElementById("upload-count").textContent = "No files chosen";
+        return;
+    }
+    const names = Array.from(f.files).map(x => x.name).join(", ");
+    document.getElementById("upload-count").textContent = names;
 }
 
 async function doUpload() {
