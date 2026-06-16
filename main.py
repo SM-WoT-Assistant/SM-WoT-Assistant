@@ -838,8 +838,14 @@ class WotAssistantHQ:
                                 status(self.t('ui', 'status_update_downloading_pct').format(pct=pct))
                 print(f"[UPDATE] Downloaded: {downloaded / (1024*1024):.0f} MB")
                 status(self.t('ui', 'status_update_installing'), "lime")
-                subprocess.Popen([tmp, "/S", "/NCRC"], shell=True)
-                self.root.after(800, lambda: (self.save_settings(), sys.exit(0)))
+                bat = tmp + ".bat"
+                with open(bat, "w") as bf:
+                    bf.write('@echo off\r\n')
+                    bf.write('timeout /t 2 /nobreak >nul\r\n')
+                    bf.write(f'start "" /wait "{tmp}" /S /NCRC\r\n')
+                    bf.write('del "%~f0"\r\n')
+                subprocess.Popen(bat, shell=True, creationflags=0x08000000)
+                self.root.after(0, lambda: (self.save_settings(), sys.exit(0)))
             except Exception as e:
                 print(f"[UPDATE] Error: {e}")
                 status(self.t('ui', 'status_update_error').format(error=e), "red")

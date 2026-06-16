@@ -198,19 +198,18 @@ def check_for_updates(on_done=None):
     def _check():
         try:
             url = _rtdb_url("versions")
-            r = requests.get(url, params={"orderBy": '"release_date"', "limitToLast": 1},
-                           headers=config.HEADERS, timeout=8)
+            r = requests.get(url, headers=config.HEADERS, timeout=8)
             if r.status_code == 200:
                 data = r.json()
                 if data:
-                    items = list(data.values())
+                    items = [v for v in data.values() if isinstance(v, dict) and v.get("version")]
                     if items:
                         latest = max(items, key=lambda x: x.get("release_date", ""))
                         if on_done:
                             on_done(latest)
                         return
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[UPDATE] check_for_updates error: {e}")
         if on_done:
             on_done(None)
 

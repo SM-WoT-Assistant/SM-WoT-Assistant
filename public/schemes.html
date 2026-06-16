@@ -58,6 +58,7 @@
     <h1><a href="index.html">SM WoT Assistant</a> — Tactical Schemes</h1>
     <nav>
         <button class="btn btn-green" onclick="openUpload()">Publish scheme</button>
+        <button class="btn btn-blue" onclick="openHelp()" title="Help">?</button>
         <a href="index.html" class="btn">Home</a>
     </nav>
 </header>
@@ -86,6 +87,7 @@
         <input type="text" id="upload-nick" placeholder="Your nickname" maxlength="20">
         <label>PIN (4 digits)</label>
         <input type="password" id="upload-pin" placeholder="Your PIN" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
+        <div style="color:#888;font-size:11px;margin-top:2px;margin-bottom:4px;">Find your PIN in the app — top bar, next to your nickname</div>
         <label>Scheme title</label>
         <input type="text" id="upload-title" placeholder="e.g. Heavies left flank" maxlength="60">
         <label>Description (optional)</label>
@@ -99,6 +101,40 @@
         <div class="actions">
             <button class="btn" onclick="closeUpload()">Cancel</button>
             <button class="btn btn-primary" onclick="doUpload()">Publish</button>
+        </div>
+    </div>
+</div>
+
+<!-- Help Modal -->
+<div id="help-modal" class="modal-overlay">
+    <div class="modal">
+        <h3>Website Help</h3>
+        <div style="line-height:1.7;font-size:13px;color:#ccc;">
+            <p style="color:#ffaa00;margin-bottom:8px;"><strong>What is this page?</strong></p>
+            <p style="margin-bottom:12px;">Here you can <strong>publish</strong> your tactical schemes from the SM WoT Assistant app and <strong>download</strong> schemes shared by other players.</p>
+
+            <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to publish a scheme:</strong></p>
+            <ol style="padding-left:20px;margin-bottom:12px;">
+                <li>Open SM WoT Assistant app → TACTIC mode</li>
+                <li>Draw your tactics on the map</li>
+                <li>Click the Publish button in the app's top bar</li>
+                <li>The JSON file saves to your Tactik_Shemi folder</li>
+                <li>On this page, click <strong>"Publish scheme"</strong></li>
+                <li>Fill in your <strong>Nickname</strong> and <strong>PIN</strong></li>
+                <li>Select the JSON file and click <strong>Publish</strong></li>
+            </ol>
+
+            <p style="color:#ffaa00;margin-bottom:8px;"><strong>Where to find your PIN?</strong></p>
+            <p style="margin-bottom:12px;">Your 4-digit PIN is displayed in the app — <strong>top bar</strong>, next to your nickname. You set it when you first registered in the app. Example: <span style="color:#ffaa00;font-family:monospace;">PRO [4825]</span></p>
+
+            <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to register?</strong></p>
+            <p style="margin-bottom:12px;">In the app, click the top bar area with your nickname → <strong>Register identity</strong> → enter nickname + 4-digit PIN.</p>
+
+            <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to download:</strong></p>
+            <p style="margin-bottom:4px;">Click <strong>Download</strong> on any scheme row → a JSON file saves to your computer. Open it in the app via TACTIC → Import.</p>
+        </div>
+        <div class="actions">
+            <button class="btn btn-primary" onclick="closeHelp()">Got it</button>
         </div>
     </div>
 </div>
@@ -223,7 +259,7 @@ function renderSchemes(schemes) {
             <td class="scheme-count">${s.element_count || 0}</td>
             <td class="scheme-actions">
                 <button class="btn btn-sm" onclick="deleteScheme('${s.drawing_id || ''}')" title="Delete">&#x1F5D1;</button>
-                <button class="btn btn-sm" onclick="downloadScheme('${s.drawing_id || ''}')">Download</button>
+                <button class="btn btn-sm" onclick="downloadScheme('${s.drawing_id || ''}')" title="Download: ${mapLabel(s.map_id || '')}_${(s.author_nickname || 'anon').replace(/'/g, "&apos;")}.json">Download</button>
                 <button class="btn btn-sm btn-blue" onclick="downloadAuthorSchemes('${s.author_nickname || ''}')">All by author</button>
             </td>
         </tr>`;
@@ -416,6 +452,11 @@ function toast(msg, isError) {
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => { el.className = "toast"; }, 3000);
 }
+
+// ═══ Help ═══
+
+function openHelp() { document.getElementById("help-modal").classList.add("active"); }
+function closeHelp() { document.getElementById("help-modal").classList.remove("active"); }
 
 init();
 </script>
