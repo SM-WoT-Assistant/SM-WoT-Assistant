@@ -252,10 +252,13 @@ def copy_data_files():
         if os.path.exists(p):
             _cp(p, f)
 
-    # logo
+    # logo + icon
     logo = os.path.join(BASE_DIR, "logo.png")
     if os.path.exists(logo):
         _cp(logo, "logo.png")
+    icon = os.path.join(BASE_DIR, "icon.ico")
+    if os.path.exists(icon):
+        _cp(icon, "icon.ico")
 
     # maps/ (TACTIC mode images)
     maps_dir = os.path.join(BASE_DIR, "maps")

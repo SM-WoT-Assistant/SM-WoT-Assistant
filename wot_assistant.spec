@@ -119,7 +119,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=os.path.join(root, "logo.png") if os.path.exists(os.path.join(root, "logo.png")) else None,
+    icon=os.path.join(root, "icon.ico") if os.path.exists(os.path.join(root, "icon.ico")) else None,
 )
 
 coll = COLLECT(
