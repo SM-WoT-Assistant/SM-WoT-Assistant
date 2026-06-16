@@ -49,6 +49,7 @@ class WotAssistantHQ:
         mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
             sys.exit(0)
+        self._update_mutex = mutex
 
         self.mode = "edit" 
         self.map_mode = 1 
@@ -979,6 +980,9 @@ class WotAssistantHQ:
 
                 print(f"[UPDATE] Downloaded: {downloaded / (1024*1024):.0f} MB")
 
+                install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+                install_exe = os.path.join(install_dir, f"SM WoT Assistant v{latest_ver}.exe")
+
                 pw.after(0, lambda: (
                     pbar_canvas.delete("bar"),
                     pbar_canvas.create_rectangle(0, 0, pb_w, 16, fill="#22cc44", outline="", tags="bar"),
@@ -986,22 +990,21 @@ class WotAssistantHQ:
                     status_var.set(self.t('ui', 'dialog_update_installing'))
                 ))
 
-                install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
-                install_exe = os.path.join(install_dir, f"SM WoT Assistant v{latest_ver}.exe")
+                subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
 
-                bat = tmp + ".bat"
-                with open(bat, "w") as bf:
-                    bf.write('@echo off\r\n')
-                    bf.write('timeout /t 2 /nobreak >nul\r\n')
-                    bf.write(f'start "" /wait "{tmp}" /S /NCRC\r\n')
-                    bf.write(f'del "{os.path.join(install_dir, "SM WoT Assistant.exe")}" 2>nul\r\n')
-                    bf.write(f'if exist "{install_exe}" start "" "{install_exe}"\r\n')
-                    bf.write(f'del "{tmp}"\r\n')
-                    bf.write('del "%~f0"\r\n')
-
-                subprocess.Popen(bat, shell=True, creationflags=0x08000000)
+                old_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
+                if os.path.exists(old_exe):
+                    try:
+                        os.remove(old_exe)
+                    except Exception:
+                        pass
 
                 pw.after(0, lambda: status_var.set(self.t('ui', 'dialog_update_starting')))
+                try:
+                    ctypes.windll.kernel32.CloseHandle(self._update_mutex)
+                except Exception:
+                    pass
+                subprocess.Popen([install_exe], creationflags=0x08000000)
                 pw.after(800, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
 
             except Exception as e:
@@ -1147,26 +1150,29 @@ class WotAssistantHQ:
 
             print(f"[UPDATE] Downloaded: {downloaded / (1024 * 1024):.0f} MB")
 
-            self.root.after(0, lambda: self._splash_dl_complete(sw, sh))
-
             install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
             install_exe = os.path.join(install_dir, f"SM WoT Assistant v{latest_ver}.exe")
 
-            bat = tmp + ".bat"
-            with open(bat, "w") as bf:
-                bf.write('@echo off\r\n')
-                bf.write('timeout /t 2 /nobreak >nul\r\n')
-                bf.write(f'start "" /wait "{tmp}" /S /NCRC\r\n')
-                bf.write(f'del "{os.path.join(install_dir, "SM WoT Assistant.exe")}" 2>nul\r\n')
-                bf.write(f'if exist "{install_exe}" start "" "{install_exe}"\r\n')
-                bf.write(f'del "{tmp}"\r\n')
-                bf.write('del "%~f0"\r\n')
+            self.root.after(0, lambda: self._splash_status_safe(
+                self.t('ui', 'dialog_update_installing'), "#ffaa00", ("Arial", 11, "bold")))
 
-            subprocess.Popen(bat, shell=True, creationflags=0x08000000)
+            subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
 
-            self.root.after(500, lambda: self._splash_status_safe(
+            old_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
+            if os.path.exists(old_exe):
+                try:
+                    os.remove(old_exe)
+                except Exception:
+                    pass
+
+            self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold")))
-            self.root.after(1500, lambda: self._quit_app_for_update())
+            try:
+                ctypes.windll.kernel32.CloseHandle(self._update_mutex)
+            except Exception:
+                pass
+            subprocess.Popen([install_exe], creationflags=0x08000000)
+            self.root.after(200, self._quit_app_for_update)
 
         except Exception as e:
             print(f"[UPDATE] Error: {e}")
@@ -1180,8 +1186,7 @@ class WotAssistantHQ:
     def _quit_app_for_update(self):
         self._stop_po_sync_timer()
         try:
-            if hasattr(self, 'splash') and self.splash.winfo_exists():
-                self.splash.destroy()
+            ctypes.windll.kernel32.CloseHandle(self._update_mutex)
         except Exception:
             pass
         self.save_settings()
