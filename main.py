@@ -51,6 +51,18 @@ class WotAssistantHQ:
             sys.exit(0)
         self._update_mutex = mutex
 
+        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+        if os.path.isdir(install_dir):
+            current = os.path.abspath(sys.executable)
+            for f in os.listdir(install_dir):
+                if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
+                    fp = os.path.join(install_dir, f)
+                    if os.path.abspath(fp) != current:
+                        try:
+                            os.remove(fp)
+                        except Exception:
+                            pass
+
         self.mode = "edit" 
         self.map_mode = 1 
         self.dialog_open = False 
@@ -1091,13 +1103,18 @@ class WotAssistantHQ:
             self._splash_proceed_to_main()
 
     def _splash_proceed_to_main(self):
-        if hasattr(self, 'splash') and self.splash.winfo_exists():
-            self.splash.destroy()
-            if hasattr(self, 'splash'):
-                try:
-                    del self.splash
-                except Exception:
-                    pass
+        self.splash_canvas.delete("splash_btn")
+        if hasattr(self, '_splash_ver_info'):
+            self.splash_canvas.delete(self._splash_ver_info)
+        self.splash_canvas.itemconfigure(self.splash_status_text,
+            text=self.t('ui', 'checking_updates'), fill="#bbbbbb", font=("Arial", 9))
+        self.splash_canvas.itemconfigure(self.splash_percent_text, text="0%")
+        sw = int(self.splash_canvas["width"])
+        sh = int(self.splash_canvas["height"])
+        self.splash_canvas.coords(self.pbar, 0, sh - 8, 0, sh)
+        self._startup_target_percent = 0
+        self._startup_display_percent = 0
+        self._animate_startup_progress()
         self._start_startup_checks_continue()
 
     def _download_on_splash(self, latest):
