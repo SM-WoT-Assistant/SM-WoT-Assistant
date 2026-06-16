@@ -331,10 +331,20 @@ class UIManager:
                 self.app.status_label.config(height=2, bg="#1a1a1a")
                 self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
             self.app.canvas.pack(side="top", fill="both", expand=True)
-            
+
             self.app.map_mgr.load_map_list()
 
+            if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists():
+                self.app.root.update_idletasks()
+                self.app._po_win.deiconify()
+                self.app._sync_po_pos()
+                self.app.painter.redraw()
+                self.app._start_po_sync_timer()
+
         elif view_name == "stats":
+            self.app._stop_po_sync_timer()
+            if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
+                self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
             self.app.status_label.config(text=self.app.t('ui', 'stats_loading'), fg="yellow", height=1, bg="#222")
@@ -349,6 +359,9 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
+            self.app._stop_po_sync_timer()
+            if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
+                self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")

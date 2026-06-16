@@ -204,7 +204,7 @@ def check_for_updates(on_done=None):
                 if data:
                     items = [v for v in data.values() if isinstance(v, dict) and v.get("version")]
                     if items:
-                        latest = max(items, key=lambda x: (x.get("release_date", ""), tuple(int(n) for n in x.get("version", "0.0.0").replace("v", "").split("."))))
+                        latest = _pick_latest(items)
                         if on_done:
                             on_done(latest)
                         return
@@ -215,6 +215,29 @@ def check_for_updates(on_done=None):
 
     t = threading.Thread(target=_check, daemon=True)
     t.start()
+
+
+def _pick_latest(items):
+    if not items:
+        return None
+    return max(items, key=lambda x: (x.get("release_date", ""), tuple(int(n) for n in x.get("version", "0.0.0").replace("v", "").split("."))))
+
+
+def check_for_updates_sync():
+    """Синхронно перевіряє RTDB versions/ — повертає dict latest релізу або None."""
+    if not _is_configured():
+        return None
+    try:
+        url = _rtdb_url("versions")
+        r = requests.get(url, headers=config.HEADERS, timeout=8)
+        if r.status_code == 200:
+            data = r.json()
+            if data:
+                items = [v for v in data.values() if isinstance(v, dict) and v.get("version")]
+                return _pick_latest(items)
+    except Exception as e:
+        print(f"[UPDATE] check_for_updates_sync error: {e}")
+    return None
 
 
 def compare_versions(current, latest):

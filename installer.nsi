@@ -34,7 +34,7 @@ Section "Install"
     CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\_internal\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant.exe"
-    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME} ${PRODUCT_VERSION}"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\SM WoT Assistant.exe"

@@ -156,7 +156,6 @@ class WotAssistantHQ:
 
         firebase_reporter.setup_global_excepthook(self)
         firebase_reporter.ping_version_async(self)
-        self._check_for_app_updates()
 
         if bool(self.settings.get("disable_startup_splash", False)):
             self._start_startup_checks()
@@ -165,11 +164,28 @@ class WotAssistantHQ:
             self.root.after(120, self._start_startup_checks)
 
     def _start_startup_checks(self):
+        if self.auto_update_var.get() and hasattr(self, 'splash'):
+            self.update_startup_progress(10, self.t('ui', 'checking_updates'))
+            self.root.update_idletasks()
+            try:
+                latest = firebase_reporter.check_for_updates_sync()
+                if latest:
+                    latest_ver = latest.get("version", "")
+                    current_ver = config.load_version()
+                    if firebase_reporter.compare_versions(current_ver, latest_ver):
+                        self._show_splash_update(latest)
+                        return
+            except Exception as e:
+                print(f"[INIT] Update check error: {e}")
+        elif self.auto_update_var.get():
+            self._check_for_app_updates()
+
+        self._start_startup_checks_continue()
+
+    def _start_startup_checks_continue(self):
         # 1. Batch translate UI on splash (atomic — all or nothing)
         if hasattr(self, 'locale'):
             self.locale.batch_translate_ui(progress_cb=self._on_startup_progress)
-        # If batch succeeded: _batch_ui_done=True, cache populated, t_ui() returns translated text
-        # If batch failed: _batch_ui_done=False, t_ui() returns EN (no individual Google Translate calls)
 
         # 2. Build UI — t_ui() reads from cache (translated if batch OK, EN if batch failed)
         self.ui_mgr.setup_ui()
@@ -178,6 +194,7 @@ class WotAssistantHQ:
 
         self.painter = pnt.MapPainter(self.canvas, self, self.data_mgr)
         self.painter.bind_events_to(self.canvas)
+        self._init_painter_overlay()
         self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
         self.drawing_palette.withdraw()
 
@@ -200,6 +217,72 @@ class WotAssistantHQ:
         if cat == "ui": return self.locale.t_ui(key)
         if cat == "tanks": return self.locale.t_tank(key, key)
         return self.locale.t_map(key)
+
+    def _init_painter_overlay(self):
+        self._po_win = tk.Toplevel(self.root)
+        self._po_win.withdraw()
+        self._po_win.overrideredirect(True)
+        self._po_win.attributes("-topmost", True)
+        self._po_win.attributes("-transparentcolor", "#010101")
+        self._po_win.wm_attributes("-alpha", 1.0)
+        self._po_win.transient(self.root)
+        self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
+        self._po_canvas.pack(fill="both", expand=True)
+        self.painter.bind_events_to(self._po_canvas)
+        self.painter.canvas = self._po_canvas
+        self.canvas.bind("<Configure>", self._sync_po_pos, "+")
+        self.root.bind("<Configure>", self._sync_po_pos, "+")
+        self.root.bind("<Unmap>", self._on_root_hide, "+")
+        self.root.bind("<Map>", self._on_root_show, "+")
+        self._po_sync_timer = None
+
+    def _sync_po_pos(self, event=None):
+        palette = getattr(self, 'drawing_palette', None)
+        if palette and palette.winfo_exists() and palette.state() != 'withdrawn':
+            palette.lift()
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() == "withdrawn":
+            return
+        cx = self.canvas.winfo_rootx()
+        cy = self.canvas.winfo_rooty()
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw > 50 and ch > 50:
+            try:
+                self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
+            except Exception:
+                pass
+            self._po_win.lift()
+
+    def _on_root_hide(self, event=None):
+        self._stop_po_sync_timer()
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.withdraw()
+
+    def _on_root_show(self, event=None):
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.deiconify()
+            self._sync_po_pos()
+            self._start_po_sync_timer()
+
+    def _start_po_sync_timer(self):
+        self._stop_po_sync_timer()
+        if self.active_view != "maps":
+            return
+        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
+
+    def _stop_po_sync_timer(self):
+        if hasattr(self, '_po_sync_timer') and self._po_sync_timer:
+            self.root.after_cancel(self._po_sync_timer)
+            self._po_sync_timer = None
+
+    def _po_sync_tick(self):
+        if self.active_view != "maps":
+            self._po_sync_timer = None
+            return
+        self._sync_po_pos()
+        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
@@ -465,6 +548,7 @@ class WotAssistantHQ:
             self.root.update_idletasks()
             self.map_renderer.show_main_splash()
             self.root.attributes("-alpha", self.alpha)
+            self._sync_po_pos()
         finally:
             self._redrawing = False
 
@@ -506,7 +590,14 @@ class WotAssistantHQ:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
+            if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+                self._po_win.deiconify()
+                self._sync_po_pos()
+                self._start_po_sync_timer()
         else:
+            self._stop_po_sync_timer()
+            if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+                self._po_win.withdraw()
             if hasattr(self, 'stats_ai_module'):
                 self.stats_ai_module.stop_browser()
             self.save_settings()
@@ -746,6 +837,7 @@ class WotAssistantHQ:
         self.ui_mgr.show_view("ai_stats")
 
     def quit_app(self):
+        self._stop_po_sync_timer()
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
         self.save_settings()
@@ -914,6 +1006,213 @@ class WotAssistantHQ:
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()
+
+    def _show_splash_update(self, latest):
+        latest_ver = latest.get("version", "")
+        current_ver = config.load_version()
+        dl_url = latest.get("download_url", "")
+
+        if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+            self._start_startup_checks_continue()
+            return
+
+        self._startup_target_percent = 100
+        self._startup_display_percent = 100
+        sw = int(self.splash_canvas["width"])
+        sh = int(self.splash_canvas["height"])
+
+        self.splash_canvas.itemconfigure(self.splash_percent_text, text="")
+        self.splash_canvas.coords(self.pbar, 0, 0, 0, 0)
+
+        self.splash_canvas.itemconfigure(self.splash_status_text,
+            text=f"New version v{latest_ver} available!",
+            fill="#ffaa00", font=("Arial", 13, "bold"))
+
+        self._splash_ver_info = self.splash_canvas.create_text(
+            sw // 2, sh - 92,
+            text=f"You have v{current_ver}",
+            fill="#aaa", font=("Arial", 9))
+
+        btn_w, btn_h = 140, 36
+        lx = sw // 2 - btn_w - 14
+        rx = sw // 2 + 14
+        by = sh - 68
+
+        self._splash_update_rect = self.splash_canvas.create_rectangle(
+            lx, by, lx + btn_w, by + btn_h,
+            fill="#335533", outline="#66aa66", tags="splash_btn")
+        self._splash_update_txt = self.splash_canvas.create_text(
+            lx + btn_w // 2, by + btn_h // 2,
+            text=self.t('ui', 'btn_update_now').upper(),
+            fill="#99cc99", font=("Arial", 10, "bold"), tags="splash_btn")
+
+        self._splash_later_rect = self.splash_canvas.create_rectangle(
+            rx, by, rx + btn_w, by + btn_h,
+            fill="#444", outline="#666", tags="splash_btn")
+        self._splash_later_txt = self.splash_canvas.create_text(
+            rx + btn_w // 2, by + btn_h // 2,
+            text=self.t('ui', 'btn_later').upper(),
+            fill="#aaa", font=("Arial", 10), tags="splash_btn")
+
+        self._splash_latest = latest
+        self.splash_canvas.tag_bind("splash_btn", "<Button-1>",
+            lambda e: self._on_splash_btn_click(e))
+        self.splash_canvas.tag_bind("splash_btn", "<Enter>",
+            lambda e: self.splash.config(cursor="hand2"))
+        self.splash_canvas.tag_bind("splash_btn", "<Leave>",
+            lambda e: self.splash.config(cursor=""))
+
+    def _on_splash_btn_click(self, event):
+        sw = int(self.splash_canvas["width"])
+        bx = sw // 2 - 140 - 14
+        if bx <= event.x <= bx + 140:
+            self._download_on_splash(self._splash_latest)
+        else:
+            self._splash_proceed_to_main()
+
+    def _splash_proceed_to_main(self):
+        if hasattr(self, 'splash') and self.splash.winfo_exists():
+            self.splash.destroy()
+            if hasattr(self, 'splash'):
+                try:
+                    del self.splash
+                except Exception:
+                    pass
+        self._start_startup_checks_continue()
+
+    def _download_on_splash(self, latest):
+        self.splash_canvas.delete("splash_btn")
+        if hasattr(self, '_splash_ver_info'):
+            self.splash_canvas.delete(self._splash_ver_info)
+
+        latest_ver = latest.get("version", "")
+        dl_url = latest.get("download_url", "")
+
+        sw = int(self.splash_canvas["width"])
+        sh = int(self.splash_canvas["height"])
+
+        self.splash_canvas.itemconfigure(self.splash_status_text,
+            text=self.t('ui', 'dialog_update_downloading').format(version=latest_ver),
+            fill="#ffaa00", font=("Arial", 11, "bold"))
+
+        self.splash_canvas.itemconfigure(self.splash_percent_text, text="0%")
+        self.splash_canvas.coords(self.pbar, 0, sh - 8, 0, sh)
+        self.splash_canvas.itemconfigure(self.pbar, fill="#ff4500")
+
+        self._splash_dl_url = dl_url
+        self._splash_dl_latest = latest
+        t = threading.Thread(target=self._splash_download_thread, daemon=True)
+        t.start()
+
+    def _splash_download_thread(self):
+        url = self._splash_dl_url
+        latest = self._splash_dl_latest
+        latest_ver = latest.get("version", "")
+        tmp = None
+        try:
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                return
+            tmp = os.path.join(tempfile.gettempdir(), "SM_WoT_Assistant_Setup.exe")
+            print(f"[UPDATE] Downloading: {url}")
+
+            r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
+            total = int(r.headers.get("content-length", 0))
+            downloaded = 0
+            last_pct = -1
+            sw = int(self.splash_canvas["width"])
+            sh = int(self.splash_canvas["height"])
+
+            with open(tmp, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total:
+                        pct = downloaded * 100 // total
+                        if pct != last_pct:
+                            last_pct = pct
+                            _pct = pct
+                            self.root.after(0, lambda p=_pct: self._splash_update_pbar(p, sh, sw))
+
+            print(f"[UPDATE] Downloaded: {downloaded / (1024 * 1024):.0f} MB")
+
+            self.root.after(0, lambda: self._splash_dl_complete(sw, sh))
+
+            install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+            install_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
+
+            bat = tmp + ".bat"
+            with open(bat, "w") as bf:
+                bf.write('@echo off\r\n')
+                bf.write('timeout /t 2 /nobreak >nul\r\n')
+                bf.write(f'start "" /wait "{tmp}" /S /NCRC\r\n')
+                bf.write(f'if exist "{install_exe}" start "" "{install_exe}"\r\n')
+                bf.write(f'del "{tmp}"\r\n')
+                bf.write('del "%~f0"\r\n')
+
+            subprocess.Popen(bat, shell=True, creationflags=0x08000000)
+
+            self.root.after(500, lambda: self._splash_status_safe(
+                self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold")))
+            self.root.after(1500, lambda: self._quit_app_for_update())
+
+        except Exception as e:
+            print(f"[UPDATE] Error: {e}")
+            self.root.after(0, lambda: (
+                self._splash_status_safe(
+                    self.t('ui', 'status_update_error').format(error=str(e)[:50]),
+                    "#ff4444", ("Arial", 10, "bold")),
+                self._splash_pct_safe("")
+            ))
+
+    def _quit_app_for_update(self):
+        self._stop_po_sync_timer()
+        try:
+            if hasattr(self, 'splash') and self.splash.winfo_exists():
+                self.splash.destroy()
+        except Exception:
+            pass
+        self.save_settings()
+        sys.exit(0)
+
+    def _splash_update_pbar(self, pct, sh, sw):
+        try:
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                return
+            self.splash_canvas.coords(self.pbar, 0, sh - 8, pct * sw // 100, sh)
+            self.splash_canvas.itemconfigure(self.splash_percent_text, text=f"{pct}%")
+        except Exception:
+            pass
+
+    def _splash_dl_complete(self, sw, sh):
+        try:
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                return
+            self.splash_canvas.coords(self.pbar, 0, sh - 8, sw, sh)
+            self.splash_canvas.itemconfigure(self.pbar, fill="#22cc44")
+            self.splash_canvas.itemconfigure(self.splash_percent_text, text="100%")
+            self.splash_canvas.itemconfigure(self.splash_status_text,
+                text=self.t('ui', 'dialog_update_installing'))
+        except Exception:
+            pass
+
+    def _splash_status_safe(self, text, fill="#ffaa00", font=("Arial", 11, "bold")):
+        try:
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                return
+            self.splash_canvas.itemconfigure(self.splash_status_text,
+                text=text, fill=fill, font=font)
+        except Exception:
+            pass
+
+    def _splash_pct_safe(self, text):
+        try:
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                return
+            self.splash_canvas.itemconfigure(self.splash_percent_text, text=text)
+        except Exception:
+            pass
 
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
@@ -1133,6 +1432,11 @@ class WotAssistantHQ:
         self.current_map_eng = None
         self.map_var.set("")
         self.map_renderer.show_main_splash()
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self.root.update_idletasks()
+            self._sync_po_pos()
+            self._po_win.deiconify()
+            self._start_po_sync_timer()
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
