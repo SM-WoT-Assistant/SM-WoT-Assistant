@@ -12,9 +12,9 @@ SetCompressor lzma
 
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "dist\SM_WoT_Assistant_Setup_v${PRODUCT_VERSION}.exe"
-InstallDir "$PROGRAMFILES64\SM WoT Assistant"
-InstallDirRegKey HKLM "${PRODUCT_DIR_REGKEY}" ""
-RequestExecutionLevel admin
+InstallDir "$LOCALAPPDATA\SM WoT Assistant"
+InstallDirRegKey HKCU "${PRODUCT_DIR_REGKEY}" ""
+RequestExecutionLevel user
 
 Page directory
 Page instfiles
@@ -30,13 +30,13 @@ Section "Install"
     CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe"
     CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe"
 
-    WriteRegStr HKLM "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant.exe"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
-    WriteRegStr HKLM "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-    WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoModify" 1
-    WriteRegDWORD HKLM "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+    WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant.exe"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+    WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
+    WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
 
     WriteUninstaller "$INSTDIR\uninst.exe"
 SectionEnd
@@ -45,6 +45,6 @@ Section "Uninstall"
     RMDir /r "$INSTDIR"
     Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
     RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
-    DeleteRegKey HKLM "${PRODUCT_UNINST_KEY}"
-    DeleteRegKey HKLM "${PRODUCT_DIR_REGKEY}"
+    DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+    DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"
 SectionEnd

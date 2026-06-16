@@ -2,6 +2,7 @@ import os
 import json
 import config
 import translations
+import copy
 
 class LocaleManager:
     def __init__(self, app):
@@ -13,7 +14,7 @@ class LocaleManager:
         
         # Ensure English base exists
         if "en" not in self.languages:
-            self.languages["en"] = translations.TRANSLATIONS["en"]
+            self.languages["en"] = copy.deepcopy(translations.TRANSLATIONS["en"])
         
         # Ensure current language exists
         if self.lang not in self.languages:

@@ -146,7 +146,7 @@ class DataManager:
                         }
                 if rough_db:
                     try:
-                        with open(os.path.join(config.BASE_DIR, "tank_db.json"), "w", encoding="utf-8") as f:
+                        with open(os.path.join(config.USER_DATA_DIR, "tank_db.json"), "w", encoding="utf-8") as f:
                             json.dump(rough_db, f, ensure_ascii=False, indent=2)
                     except Exception as e:
                         print(f"[DB] Попередження: не вдалося зберегти fallback tank_db.json: {e}")
