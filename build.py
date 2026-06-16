@@ -370,7 +370,9 @@ def verify_build(version):
     errors = []
     warnings = []
 
-    exe = os.path.join(onedir, "SM WoT Assistant.exe")
+    exe_ver = os.path.join(onedir, f"SM WoT Assistant v{version}.exe")
+    exe_plain = os.path.join(onedir, "SM WoT Assistant.exe")
+    exe = exe_ver if os.path.exists(exe_ver) else exe_plain
     if not os.path.exists(exe):
         errors.append("EXE not found")
     else:
@@ -571,6 +573,15 @@ def main():
     update_nsi_version(version)
     run_pyinstaller()
     data_count = copy_data_files()
+
+    # Rename EXE to include version
+    exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")
+    exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{version}.exe")
+    if os.path.exists(exe_plain):
+        if os.path.exists(exe_ver):
+            os.remove(exe_ver)
+        os.rename(exe_plain, exe_ver)
+        print(f"[BUILD] EXE renamed: SM WoT Assistant v{version}.exe")
 
     # Phase 3: NSIS installer (needs FIXED_ONEDIR to exist)
     installer = run_nsis(version, makensis_exe)
