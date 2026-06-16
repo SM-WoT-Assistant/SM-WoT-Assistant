@@ -10,6 +10,9 @@
 
 SetCompressor lzma
 
+Icon "dist\SM WoT Assistant\icon.ico"
+UninstallIcon "dist\SM WoT Assistant\icon.ico"
+
 Name "${PRODUCT_NAME} ${PRODUCT_VERSION}"
 OutFile "dist\SM_WoT_Assistant_Setup_v${PRODUCT_VERSION}.exe"
 InstallDir "$LOCALAPPDATA\SM WoT Assistant"
@@ -27,13 +30,14 @@ Section "Install"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe"
-    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe"
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\icon.ico"
+    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant.exe" "" "$INSTDIR\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" "$INSTDIR\uninst.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+    WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" "$INSTDIR\SM WoT Assistant.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
     WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1

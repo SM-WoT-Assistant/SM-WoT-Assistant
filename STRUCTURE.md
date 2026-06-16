@@ -11,18 +11,18 @@
 ├── wot_assistant.spec          # PyInstaller spec: fixed runtime_jsons list, hidden imports, COLLECT step for onedir output
 ├── installer.nsi                # NSIS installer script (lzma-compressed, no MUI2 dependency)
 ├── window_manager.py           # Window positioning, click-through, WinAPI, resizing
-├── ui_manager.py               # UI layout, view switching, filter construction
+├── ui_manager.py               # UI layout, view switching, filter construction; battle mode labels from game client .mo via language_module.get_lang_module() with Google fallback
 ├── data_manager.py             # JSON file I/O, tank DB loading with fallback chain
 ├── locale_manager.py           # Translation system, map name resolution
 ├── map_manager.py              # Map list loading (unified TACTIC↔MAPS from extracted_maps/map_dictionary.json), game version check, data updates, TACTIC image existence filter, filters out type/*, invalid_map, hangar_v4, h33_* maps
 ├── map_renderer.py             # Map image rendering, 10×10 grid, draw_frame() border, _resolve_tactic_folder(), arena bases
 ├── painter.py                  # Canvas drawing: markers, arrows, text, tree icons, undo, edit mode, class icon filtering, overlay (_po_win) with transient/Unmap/focus management, _po_sync_timer (500ms)
-├── painting_palette.py         # Floating DrawingPalette: toolbar, live-sync editing, 5-color history (_custom_colors), status bar, delete button, deselection
+├── painting_palette.py         # Floating DrawingPalette: toolbar, live-sync editing, 5-color history (_custom_colors), status bar, delete button, deselection; battle mode checkboxes with .mo names via language_module.get_lang_module() (Google fallback), class checkboxes always English (LT/MT/HT/TD/SPG)
 ├── log_reader.py               # python.log tailing for battle event detection
 ├── help_system.py              # F1 help overlay via Toplevel grid of Label widgets (table layout)
 ├── tactics_manager.py          # Import/export of tactical drawings as JSON
 ├── service_messages.py         # Internal event logging queue (undelivered messages)
-├── translations.py             # Default UI/map translations (ua)
+├── translations.py             # Default UI/map translations (English-only authoritative source); class labels (LT/MT/HT/TD/SPG) kept in English for all languages
 ├── stats_ai.py                 # AI tank build browser (Treeview + subprocess Gemini WebView), popular tanks (tiers 8-11), 30-day caches
 ├── stats_data.py               # Equipment, consumable, crew skill ID mappings
 ├── ai_engine.py                # AI response normalization, equipment resolution, caching
@@ -75,7 +75,7 @@
 ├── selenium_parse_consumables.py # Selenium: parse consumable data
 ├── selenium_selected.py        # Selenium: handle selected state
 ├── name_localizer.py           # Tank name localization utilities
-├── language_module.py          # .mo file parser, game language detection, locale JSON exporter for website
+├── language_module.py          # .mo file parser, game language detection, locale JSON exporter for website; global _lang_module via get_lang_module()/reset_lang_module(); regenerate_map_dictionary() and regenerate_game_entities() on language change
 ├── ui_translator.py            # Runtime UI translation via Google Translate with shortcut/symbol shielding
 ├── firebase_identity.py        # Local identity system (nickname + 4-digit PIN, SHA-256 hash, stored in AppData/identity.json)
 ├── firebase_reporter.py        # RTDB REST: error reports, version pings, update checks, service events
@@ -108,7 +108,7 @@
 ├── _fill_all_builds.py         # Batch AI build filler
 ├── patch_stats_ai_*.py         # Stats AI patches
 ├── public/                     # Firebase Hosting static website (sm-wot-assistant.web.app)
-│   ├── index.html              # Landing page (UA/EN toggle, download, features, schemes, releases from RTDB)
+│   ├── index.html              # English-only landing page (logo 2x, download link to GitHub releases at github.com/nkcgml-boop/SM-WoT-Assistant/releases, features grid, community schemes, releases table from RTDB)
 │   ├── schemes.html            # Community tactical schemes browser (map filter, invite-code groups, PIN auth)
 │   ├── drawings.html           # Drawing gallery with download
 │   ├── admin.html              # Admin dashboard (stats, schemes management, version management)
@@ -169,7 +169,7 @@
 
 **public/:**
 - Purpose: Firebase Hosting static website served at `sm-wot-assistant.web.app`
-- Contains: Landing page (`index.html`) with UA/EN language toggle, download button, features grid, tactical schemes promo, releases table from RTDB; `schemes.html` community schemes browser with map filter, invite-code groups, and PIN-based auth; `drawings.html` gallery; `admin.html` admin dashboard; `404.html` custom error page; static assets (`logo.png`, `example_map.png`); `locale/` subdirectory with exported locale JSON files (e.g., `uk.json`) for website internationalization
+- Contains: English-only landing page (`index.html`) with logo (2x), download button linking to GitHub releases (`github.com/nkcgml-boop/SM-WoT-Assistant/releases`), features grid, tactical schemes promo, releases table from RTDB; `schemes.html` community schemes browser with map filter, invite-code groups, and PIN-based auth; `drawings.html` gallery; `admin.html` admin dashboard; `404.html` custom error page; static assets (`logo.png`, `example_map.png`); `locale/` subdirectory with exported locale JSON files (e.g., `uk.json`) for website internationalization
 - Key files: `index.html`, `schemes.html`
 
 **maps/:**
@@ -218,10 +218,6 @@
 
 **dist/ (not in repo):**
 - Purpose: Final release output directory generated by `build.py` (git-ignored)
-- Contains: Versioned onedir (`SM WoT Assistant vX.Y.Z/`), NSIS installer, portable ZIP, build manifest
-
-**dist/ (not in repo):**
-- Purpose: Final release output directory (generated by `build.py`, git-ignored)
 - Contains: Versioned onedir (`SM WoT Assistant vX.Y.Z/`), NSIS installer (`SM_WoT_Assistant_Setup_vX.Y.Z.exe`), portable ZIP (`SM_WoT_Assistant_Portable_vX.Y.Z.zip`), build manifest
 
 **_archive/:**
@@ -245,14 +241,14 @@
 **Entry Points:** `main.py`: Application startup, creates `WotAssistantHQ` with all managers, `--ai-webview` CLI routing, `os.chdir(config.BASE_DIR)`, AppData seeding via `config.DEFAULT_FILES`, Firebase global excepthook + ping + auto-update check; `build.py`: 7-phase PyInstaller onedir build + NSIS installer + portable ZIP + GitHub release + RTDB version publish
 **Configuration:** `config.py`: File paths (`BUNDLE_DIR` for bundled assets, `USER_DATA_DIR` for writable AppData), `load_version()`, `TECH_MAPS_STAGING` map name mappings, `DEFAULT_FILES` seeding list; `VERSION`: Plaintext semver consumed by config and build; `wot_assistant.spec`: PyInstaller packaging spec (fixed `runtime_jsons`, COLLECT step); `installer.nsi`: NSIS installer script (lzma, standard pages); `settings.json`: Runtime user settings
 **Core Logic:** `main.py` (class WotAssistantHQ): Central hub; `map_manager.py`: Map data and game version management, unified TACTIC↔MAPS list; `stats_ai.py` (class StatsAI): AI build system, subprocess webview launch
-**Window Management:** `window_manager.py`: Window positioning, resizing, transparency, click-through, game focus; `ui_manager.py`: UI layout construction, view switching
+**Window Management:** `window_manager.py`: Window positioning, resizing, transparency, click-through, game focus; `ui_manager.py`: UI layout construction, view switching, battle mode filter labels from game client .mo (Google fallback)
 **Data Extraction:** `map_extractor.py` (class MapExtractor): Map extraction from client; `tank_extractor.py` (class TankExtractor): Tank data extraction; `wot_decoder.py`: Low-level XML decoding
 **Battle Integration:** `log_reader.py` (class LogWatcher): python.log tailing with regex-based event detection
-**Drawing System:** `painter.py` (class MapPainter): Tactical markers/arrows/text with Ctrl+Z undo, resize, right-click edit/delete, edit-mode selection rectangle, _draw_class_icons filtered against active checkboxes, overlay canvas (_po_win Toplevel) with transient/Unmap/Map bindings, _po_sync_timer 500ms; `painting_palette.py` (class DrawingPalette): Floating non-modal palette with toolbar (marker, XVMSymbol class icons, tree FontAwesome icon, 8 tactical icons), mode/class checkboxes, text entry, 5-color history color picker, delete button, status bar, deselection on click-away
+**Drawing System:** `painter.py` (class MapPainter): Tactical markers/arrows/text with Ctrl+Z undo, resize, right-click edit/delete, edit-mode selection rectangle, _draw_class_icons filtered against active checkboxes, overlay canvas (_po_win Toplevel) with transient/Unmap/Map bindings, _po_sync_timer 500ms; `painting_palette.py` (class DrawingPalette): Floating non-modal palette with toolbar (marker, XVMSymbol class icons, tree FontAwesome icon, 8 tactical icons), mode checkboxes with names from game client .mo (Google fallback), class checkboxes (LT/MT/HT/TD/SPG — always English), text entry, 5-color history color picker, delete button, status bar, deselection on click-away
 **AI Pipeline:** `generate_prompt_v2.py`: Build AI prompts from client data (popular tanks prompt asks for tiers 8-11); `ai_webview_gui.py`: PyQt6 QWebEngineView browser launched as subprocess via `--ai-webview`, starts minimized with taskbar icon hidden, file-based capture (wot_ai_response.txt) with stdout fallback and RESPONSE_READY sentinel; `ai_normalizer.py`: Response validation; `stats_data.py`: Equipment/skill/consumable mappings
-**Localization:** `translations.py`: Default translations; `locale_manager.py` (class LocaleManager): Runtime translation resolution; `locales.json`: Editable translation overrides; `language_module.py` (class LanguageModule): WoT client .mo file parser, game language detection, per-category JSON cache builder, locale JSON exporter to `public/locale/` and Firebase RTDB; `ui_translator.py`: Runtime UI translation via Google Translate (`deep_translator`) with shortcut/symbol shielding, per-language cache in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
+**Localization:** `translations.py`: English-only authoritative translations (class labels kept English); `locale_manager.py` (class LocaleManager): Runtime translation resolution; `locales.json`: Editable translation overrides; `language_module.py` (class LanguageModule): WoT client .mo file parser, game language detection, per-category JSON cache builder, locale JSON exporter to `public/locale/` and Firebase RTDB; `regenerate_map_dictionary()` and `regenerate_game_entities()` on language change; global `_lang_module` via `get_lang_module()`/`reset_lang_module()` for lazy access by other modules (battle mode names, map names, TTH labels); `ui_translator.py`: Runtime UI translation via Google Translate (`deep_translator`) with shortcut/symbol shielding, per-language cache in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
 **Persistence Data:** `settings.json`, `tank_db.json`, `tank_tth.json`, `crew_builds.json`, `equipment_loadouts.json`, `tank_slots_full.json`, `map_drawings.json`, `game_entities_english.json`, `ai_builds_cache.json`, `popular_tanks_cache.json`, `identity.json` (AppData — nickname, PIN hash, user_id)
-**Firebase/Cloud:** `firebase_identity.py`: Local identity + PIN auth; `firebase_reporter.py`: RTDB error/analytics/versions; `firebase_drawings.py`: RTDB drawing CRUD; `firebase.json` + `.firebaserc`: Firebase project config; `database.rules.json`: RTDB security rules; `public/`: Static website deployed to Firebase Hosting
+**Firebase/Cloud:** `firebase_identity.py`: Local identity + PIN auth; `firebase_reporter.py`: RTDB error/analytics/versions; `firebase_drawings.py`: RTDB drawing CRUD; `firebase.json` + `.firebaserc`: Firebase project config; `database.rules.json`: RTDB security rules; `public/`: English-only static website deployed to Firebase Hosting (download links point to `github.com/nkcgml-boop/SM-WoT-Assistant/releases`)
 **Tests:** Scattered `test_*.py` files at root (no dedicated `tests/` directory)
 
 ## Naming Conventions
@@ -280,5 +276,5 @@
 **New view:** Add button in `ui_manager.py:setup_ui`, implement show_view logic in `ui_manager.py:show_view`, wire in `main.py`
 **New deployment target:** Add to `build.py:copy_data_files()` exclusion logic or `wot_assistant.spec` `runtime_jsons` list (for JSONs), or extend `build.py` with new packaging steps (e.g., new directories)
 **New Firebase feature:** Add to `firebase_reporter.py` for analytics/reporting, `firebase_drawings.py` for cloud data sync, or create new `firebase_*.py` module following the REST API pattern (API key auth, `_rtdb_url()` path builder, `_put`/`_post`/`_get` helpers)
-**New website page:** Create `.html` file in `public/`, link from `public/index.html`, use Firebase RTDB REST API for dynamic data (same API key pattern as Python modules)
+**New website page:** Create `.html` file in `public/`, link from `public/index.html`, use Firebase RTDB REST API for dynamic data (same API key pattern as Python modules). All pages use English-only with `lang="en"`; no UA/EN toggle
 **New version scheme:** Edit `VERSION`, update `config.load_version()` format handling if needed

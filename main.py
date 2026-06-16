@@ -799,7 +799,7 @@ class WotAssistantHQ:
         def do_update():
             dlg.destroy()
             if download_url:
-                self._download_and_install(download_url)
+                self._download_and_install(download_url, latest_ver)
 
         def do_later():
             dlg.destroy()
@@ -813,19 +813,52 @@ class WotAssistantHQ:
 
         self.root.wait_window(dlg)
 
-    def _download_and_install(self, url):
+    def _download_and_install(self, url, latest_ver):
+        pw = tk.Toplevel(self.root)
+        pw.title(self.t('ui', 'dialog_update_title'))
+        pw.configure(bg="#222")
+        pw.resizable(False, False)
+        pw.attributes("-topmost", True)
+
+        sw, sh = 380, 160
+        cx = self.root.winfo_screenwidth() // 2 - sw // 2
+        cy = self.root.winfo_screenheight() // 2 - sh // 2
+        pw.geometry(f"{sw}x{sh}+{cx}+{cy}")
+
+        status_var = tk.StringVar(value=self.t('ui', 'dialog_update_downloading').format(version=latest_ver))
+        tk.Label(pw, textvariable=status_var, font=("Arial", 10, "bold"),
+                 bg="#222", fg="#ffaa00").pack(pady=(20, 8))
+
+        pf = tk.Frame(pw, bg="#222")
+        pf.pack(fill="x", padx=40)
+
+        pbar_canvas = tk.Canvas(pf, height=16, bg="#333", highlightthickness=0)
+        pbar_canvas.pack(fill="x")
+
+        pct_var = tk.StringVar(value="0%")
+        tk.Label(pw, textvariable=pct_var, font=("Arial", 9, "bold"),
+                 bg="#222", fg="#ddd").pack(pady=(4, 0))
+
+        close_btn = tk.Button(pw, text="Close", bg="#444", fg="#aaa", bd=0,
+                              font=("Arial", 9), padx=14, pady=3,
+                              command=lambda: pw.destroy())
+
+        error_var = tk.StringVar()
+        err_label = tk.Label(pw, textvariable=error_var, font=("Arial", 8),
+                             bg="#222", fg="#ff4444", wraplength=sw - 40)
 
         def _run():
-            def status(msg, fg="cyan"):
-                if hasattr(self, "status_label"):
-                    self.root.after(0, lambda: self.status_label.config(text=msg, fg=fg))
+            tmp = None
             try:
                 tmp = os.path.join(tempfile.gettempdir(), "SM_WoT_Assistant_Setup.exe")
                 print(f"[UPDATE] Downloading: {url}")
-                status(self.t('ui', 'status_update_downloading'))
+
                 r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
                 total = int(r.headers.get("content-length", 0))
                 downloaded = 0
+                last_pct = -1
+                pb_w = 340
+
                 with open(tmp, "wb") as f:
                     for chunk in r.iter_content(chunk_size=8192):
                         if not chunk:
@@ -834,21 +867,50 @@ class WotAssistantHQ:
                         downloaded += len(chunk)
                         if total:
                             pct = downloaded * 100 // total
-                            if pct % 10 == 0:
-                                status(self.t('ui', 'status_update_downloading_pct').format(pct=pct))
+                            if pct != last_pct:
+                                last_pct = pct
+                                _pct = pct
+                                pw.after(0, lambda p=_pct: (
+                                    pbar_canvas.delete("bar"),
+                                    pbar_canvas.create_rectangle(0, 0, p * pb_w // 100, 16, fill="#ff4500", outline="", tags="bar"),
+                                    pct_var.set(f"{p}%")
+                                ))
+
                 print(f"[UPDATE] Downloaded: {downloaded / (1024*1024):.0f} MB")
-                status(self.t('ui', 'status_update_installing'), "lime")
+
+                pw.after(0, lambda: (
+                    pbar_canvas.delete("bar"),
+                    pbar_canvas.create_rectangle(0, 0, pb_w, 16, fill="#22cc44", outline="", tags="bar"),
+                    pct_var.set("100%"),
+                    status_var.set(self.t('ui', 'dialog_update_installing'))
+                ))
+
+                install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+                install_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
+
                 bat = tmp + ".bat"
                 with open(bat, "w") as bf:
                     bf.write('@echo off\r\n')
                     bf.write('timeout /t 2 /nobreak >nul\r\n')
                     bf.write(f'start "" /wait "{tmp}" /S /NCRC\r\n')
+                    bf.write(f'if exist "{install_exe}" start "" "{install_exe}"\r\n')
+                    bf.write(f'del "{tmp}"\r\n')
                     bf.write('del "%~f0"\r\n')
+
                 subprocess.Popen(bat, shell=True, creationflags=0x08000000)
-                self.root.after(0, lambda: (self.save_settings(), sys.exit(0)))
+
+                pw.after(0, lambda: status_var.set(self.t('ui', 'dialog_update_starting')))
+                pw.after(800, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
+
             except Exception as e:
                 print(f"[UPDATE] Error: {e}")
-                status(self.t('ui', 'status_update_error').format(error=e), "red")
+                def _err():
+                    status_var.set(self.t('ui', 'status_update_error').format(error=str(e)[:50]))
+                    pct_var.set("")
+                    error_var.set(str(e)[:120])
+                    err_label.pack(pady=(0, 4))
+                    close_btn.pack(pady=(0, 12))
+                pw.after(0, _err)
 
         t = threading.Thread(target=_run, daemon=True)
         t.start()

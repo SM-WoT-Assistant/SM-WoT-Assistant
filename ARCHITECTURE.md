@@ -80,9 +80,9 @@
 2. `map_renderer.py:MapRenderer.load_and_resize_map` loads image (`extracted_maps/*.png` for MAPS mode, `maps/<folder>/map.webp` via `_resolve_tactic_folder()` for TACTIC mode)
 3. `map_renderer.py:MapRenderer.draw_grid` overlays 10×10 coordinate grid with A-J/0-9 labels; `draw_frame()` renders a 20px dark border around the map
 4. `map_renderer.py:MapRenderer.draw_arena_bases` renders spawn/base areas from `map_data.json` boundingBox
-5. `painter.py:MapPainter.redraw` renders user drawings (markers, arrows, text, tree icons) on separate overlay canvas (`_po_canvas` in a dedicated `_po_win` Toplevel), with scale-aware rendering and edit-mode selection rectangle. Class icons (`_draw_class_icons`) are filtered against active checkbox state (`app.selected_classes`) — only checked classes render
+5. `painter.py:MapPainter.redraw` renders user drawings (markers, arrows, text, tree icons) on separate overlay canvas (`_po_canvas` in a dedicated `_po_win` Toplevel), with scale-aware rendering and edit-mode selection rectangle. Class icons (`_draw_class_icons`) are filtered against active checkbox state (`app.selected_classes`) — only checked classes render. Battle mode filter labels (Standard/Encounter/Assault/Onslaught) are resolved from game client `.mo` files via `language_module.get_lang_module()`, with Google Translate fallback via `app.t('ui', ...)` when `.mo` lookup fails
 6. Overlay canvas (`_po_canvas`) uses `-transparentcolor=#010101` for independent opacity control; events bound to both main canvas and overlay via `painter.py:bind_events_to()`. Overlay windowed via separate `_po_win` Toplevel with `.transient()`, `Unmap`/`Map` bindings for ghost-window prevention, and `_po_sync_timer` (500ms interval) for position sync. Topmost state managed on focus events
-7. Property editing flows through `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar (marker + XVMSymbol icons + tree `chr(0xF18C)` FontAwesome), mode/class checkboxes, text entry, 5-color history color picker with `_custom_colors` stack, delete button, and status bar. Live-syncs changes to the selected object without modal dialogs. Deselects on click-away. Auto-deactivates tool after object creation. Ctrl+Z undo via creation history stack, Ctrl+↑/↓ resize in edit mode (150ms debounce)
+7. Property editing flows through `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar (marker + XVMSymbol icons + tree `chr(0xF18C)` FontAwesome), mode checkboxes with names from game client `.mo` (Standard/Encounter/Assault/Onslaught, Google fallback via `app.t()`), class checkboxes (LT/MT/HT/TD/SPG — always English), text entry, 5-color history color picker with `_custom_colors` stack, delete button, and status bar. Live-syncs changes to the selected object without modal dialogs. Deselects on click-away. Auto-deactivates tool after object creation. Ctrl+Z undo via creation history stack, Ctrl+↑/↓ resize in edit mode (150ms debounce)
 
 **AI Tank Build Flow (SETUP view):**
 1. User searches/selects a tank → `stats_ai.py:StatsAI._on_tank_select`
@@ -106,18 +106,19 @@
 4. Application can download published schemes via `firebase_drawings.download_drawing()` → GET from RTDB
 
 **Localization Flow:**
-1. On startup → `language_module.setup()` detects game language from `game_info.xml` → rebuilds dictionaries if language changed or cache missing
-2. `LanguageModule.build_all_dictionaries()` parses all `.mo` files from `res/text/lc_messages/` into per-category JSON caches under `config.USER_DATA_DIR/localization/<lang>/` (accepts all 11 game client languages, no hardcoded list)
+1. On startup → `language_module.setup()` detects game language from `game_info.xml` → rebuilds dictionaries only if language changed or cache missing. On rebuild, also regenerates `game_entities_english.json` and `extracted_maps/map_dictionary.json` from the parsed `.mo` data
+2. `LanguageModule.build_all_dictionaries()` parses all `.mo` files from `res/text/lc_messages/` into per-category JSON caches under `config.USER_DATA_DIR/localization/<lang>/` (accepts all 11 game client languages, no hardcoded list). After building, `setup()` stores a global `_lang_module` reference via `get_lang_module()` for lazy access by other modules (battle mode names, map names, TTH labels)
 3. `LanguageModule.export_locale_json()` exports combined locale JSON to `public/locale/<lang>.json` for website consumption and pushes to Firebase RTDB via `firebase_reporter.push_locale()`
-4. `LocaleManager.t_ui()` provides dynamic UI translation:
+4. `regenerate_map_dictionary(lm)` (`language_module.py:385`) regenerates `extracted_maps/map_dictionary.json` from `arenas.mo` parsed data — filters valid entries (excludes empty/placeholder), preserves existing keys not found in current `.mo`. Called only on language change during `setup()`
+5. `LocaleManager.t_ui()` provides dynamic UI translation:
    - English `translations.py` is the authoritative source
    - On-demand Google Translate via `ui_translator.py` with caching in `locales.json`
    - Rejects ASCII-only cached translations (prevents bad translations like "BATLE MODE")
    - Protects placeholders (`{path}`) and symbols (`->`) from translation
-5. `LocaleManager.t_map` resolves map names through: `custom_names.json` → `extractor_names` (from `map_dictionary.json`) → `locales.json` → `config.TECH_MAPS_STAGING`
-6. `ui_translator.py` translates app-specific UI text at runtime using Google Translate with placeholder shielding for keyboard shortcuts (F1-F24, Ctrl, Alt, Shift, LMB/RMB, arrows, etc.), symbols, and numbers; caches translations per-language in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
-7. On game version change → `map_manager.py:check_game_version` calls `language_module.check_for_language_change()` to rebuild if game language shifted
-8. Splash screen displays detected language (e.g., "Language: DE", "Language: UK", "Language: EN")
+6. `LocaleManager.t_map` resolves map names through: `custom_names.json` → `extractor_names` (from `map_dictionary.json`) → `locales.json` → `config.TECH_MAPS_STAGING`
+7. `ui_translator.py` translates app-specific UI text at runtime using Google Translate with placeholder shielding for keyboard shortcuts (F1-F24, Ctrl, Alt, Shift, LMB/RMB, arrows, etc.), symbols, and numbers; caches translations per-language in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
+8. On game version change → `map_manager.py:check_game_version` calls `language_module.check_for_language_change()` to rebuild if game language shifted
+9. Splash screen displays detected language (e.g., "Language: DE", "Language: UK", "Language: EN")
 
 **Memory to Persistence (Cross-Session):**
 1. Tactical drawings → save on every edit → `data_manager.py:save_drawings` → `map_drawings.json`
@@ -187,7 +188,8 @@
 
 **Website (Firebase Hosting):**
 - Location: `public/` directory — served by Firebase Hosting at `sm-wot-assistant.web.app`
-- Pages: `index.html` (landing page with UA/EN toggle, download button, features, schemes promo, releases list from RTDB), `schemes.html` (community tactical schemes browser with map filter, invite-code groups, PIN-based auth), `drawings.html` (drawing gallery), `admin.html` (admin dashboard with stats, schemes management, version management), `404.html`
+- Pages: `index.html` (English-only landing page with logo (2x), download button linking to GitHub releases at `github.com/nkcgml-boop/SM-WoT-Assistant/releases`, features grid, community schemes promo, releases table from RTDB), `schemes.html` (community tactical schemes browser with map filter, invite-code groups, PIN-based auth), `drawings.html` (drawing gallery), `admin.html` (admin dashboard with stats, schemes management, version management), `404.html`
+- Language: All pages use `lang="en"` with no UA/EN toggle — browser language auto-detection only; class labels (LT/MT/HT/TD/SPG) remain English
 - Data source: All dynamic data (schemes, versions, releases) read from Firebase RTDB via REST API with API key auth
 - Triggers: User visits website URL; `build.py` publishes version info on release
 
@@ -205,7 +207,7 @@
 ## Cross-Cutting Concerns
 
 **Version System:**
-- `VERSION` file at project root contains a plaintext semver string (e.g., `1.0.0`)
+- `VERSION` file at project root contains a plaintext semver string (e.g., `1.0.2`)
 - `config.load_version()` reads it with `"0.0.0"` fallback — all window titles use this function
 - Version displayed in: main window (`main.py:1107`), splash (`main.py:1045`), editor watermark (`map_renderer.py:249`), help dialog (`help_system.py:49`), AI WebView (`ai_webview_gui.py:28`)
 - `config.BASE_DIR` resolves to `sys.executable` directory when frozen (PyInstaller), or `__file__` directory in dev — all file paths are constructed relative to `BASE_DIR`
@@ -230,7 +232,7 @@
 **Caching:**
 - `ai_builds_cache.json` — AI tank builds, 30-day expiry, fail_count tracking (`stats_ai.py`)
 - `popular_tanks_cache.json` — Popular tanks list (tiers 8-11), 30-day expiry via shared `_is_cache_expired(updated, max_days=30)`, fail_count tracking; saves top 30 tanks (`stats_ai.py`)
-- `ukrainian_map_names_cache.json` — Map name translations (`map_extractor.py`)
+- `ukrainian_map_names_cache.json` — Map name translations (`map_extractor.py`); map dictionary also regenerated from `arenas.mo` on language change via `language_module.regenerate_map_dictionary()`
 - `locales.json` — Dynamic UI translation cache per language (Google Translate results, rejects ASCII-only entries)
 - `config.USER_DATA_DIR/localization/<lang>/ui_cache.json` — Per-language UI translation cache from `ui_translator.py`
 - `config.USER_DATA_DIR/localization/<lang>/` — Per-language `.mo` parsed dictionaries from `language_module.py`
@@ -241,5 +243,5 @@
 **Localization:** `translations.py` provides English-only authoritative source for all UI text (100+ keys). `LocaleManager` (`locale_manager.py`) resolves translations dynamically:
 - `t_ui(key)` — on-demand Google Translate via `ui_translator.py` with caching in `locales.json`; rejects ASCII-only cached values; protects placeholders (`{path}`) and symbols (`->`)
 - `t_map(eng)` — resolves map names through: `custom_names.json` → `extractor_names` (from `map_dictionary.json`) → `locales.json` → `config.TECH_MAPS_STAGING`
-- `LanguageModule` (`language_module.py`) parses WoT client `.mo` files (gettext binary format) on startup or game version change, detects language via `game_info.xml` (accepts all 11 client languages, no hardcoded list), builds per-category JSON caches in `config.USER_DATA_DIR/localization/<lang>/`, exports `public/locale/<lang>.json` for the website, and pushes locale to Firebase RTDB
+- `LanguageModule` (`language_module.py`) parses WoT client `.mo` files (gettext binary format) on startup or game version change, detects language via `game_info.xml` (accepts all 11 client languages, no hardcoded list), builds per-category JSON caches in `config.USER_DATA_DIR/localization/<lang>/`, exports `public/locale/<lang>.json` for the website, and pushes locale to Firebase RTDB. Maintains a module-level global `_lang_module` set by `setup()` and accessed via `get_lang_module()` for lazy lookups (battle mode names, map names, TTH labels) from other modules
 - `UITranslator` (`ui_translator.py`) translates app UI text at runtime via Google Translate (`deep_translator`), shielding keyboard shortcuts (F1-F24, Ctrl, Alt, Shift, LMB/RMB, arrows, etc.), symbols, and numbers from translation; caches per-language in `config.USER_DATA_DIR/localization/<lang>/ui_cache.json`
