@@ -356,8 +356,7 @@ def create_portable_zip(version):
 # ═══════════════════════════════════════════════════════════════════
 
 _CRITICAL_JSON = [
-    "crew_builds.json", "tank_db.json", "tank_tth.json", "locales.json",
-    "settings.json", "ai_builds_cache.json", "popular_tanks_cache.json",
+    "crew_builds.json", "tank_db.json", "tank_tth.json",
     "game_entities_english.json", "game_entities.json", "tank_slots_full.json",
 ]
 
