@@ -493,12 +493,12 @@ def create_github_release(version):
 #  Main
 # ═══════════════════════════════════════════════════════════════════
 
-def write_version_to_rtdb(version):
+def write_version_to_rtdb(version, release_date=None):
     import urllib.request
     RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
     API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
-    today = time.strftime("%Y-%m-%d")
+    today = release_date or time.strftime("%Y-%m-%d")
     installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
     installer_size = ""
     if os.path.exists(installer_path):
@@ -528,10 +528,13 @@ def write_version_to_rtdb(version):
 def main():
     new_version = None
     do_release = False
+    release_date = None
 
     for a in sys.argv[1:]:
         if a == "--release":
             do_release = True
+        elif a.startswith("--date="):
+            release_date = a.split("=", 1)[1]
         else:
             new_version = a
 
@@ -583,7 +586,7 @@ def main():
         create_github_release(version)
 
     # Write version to RTDB so website shows latest release
-    write_version_to_rtdb(version)
+    write_version_to_rtdb(version, release_date)
 
     print(f"[BUILD] Done: v{version}")
 
