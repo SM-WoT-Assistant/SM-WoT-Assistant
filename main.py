@@ -990,14 +990,21 @@ class WotAssistantHQ:
                     status_var.set(self.t('ui', 'dialog_update_installing'))
                 ))
 
-                subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+                if result.returncode != 0:
+                    raise RuntimeError(f"Installer exit code {result.returncode}")
 
-                old_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
-                if os.path.exists(old_exe):
-                    try:
-                        os.remove(old_exe)
-                    except Exception:
-                        pass
+                for f in os.listdir(install_dir):
+                    if f.startswith("SM WoT Assistant") and f.endswith(".exe"):
+                        fp = os.path.join(install_dir, f)
+                        try:
+                            if os.path.abspath(fp) != os.path.abspath(sys.executable):
+                                os.remove(fp)
+                        except Exception:
+                            pass
+
+                if not os.path.exists(install_exe):
+                    raise RuntimeError(f"EXE not found: {install_exe}")
 
                 pw.after(0, lambda: status_var.set(self.t('ui', 'dialog_update_starting')))
                 try:
@@ -1156,14 +1163,21 @@ class WotAssistantHQ:
             self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_installing'), "#ffaa00", ("Arial", 11, "bold")))
 
-            subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+            result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+            if result.returncode != 0:
+                raise RuntimeError(f"Installer exit code {result.returncode}")
 
-            old_exe = os.path.join(install_dir, "SM WoT Assistant.exe")
-            if os.path.exists(old_exe):
-                try:
-                    os.remove(old_exe)
-                except Exception:
-                    pass
+            for f in os.listdir(install_dir):
+                if f.startswith("SM WoT Assistant") and f.endswith(".exe"):
+                    fp = os.path.join(install_dir, f)
+                    try:
+                        if os.path.abspath(fp) != os.path.abspath(sys.executable):
+                            os.remove(fp)
+                    except Exception:
+                        pass
+
+            if not os.path.exists(install_exe):
+                raise RuntimeError(f"EXE not found: {install_exe}")
 
             self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold")))

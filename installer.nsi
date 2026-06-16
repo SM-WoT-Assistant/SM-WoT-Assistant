@@ -30,8 +30,10 @@ Section "Install"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
-    CreateShortCut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
+    Delete "$DESKTOP\SM WoT Assistant.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk"
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
+    CreateShortCut "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME} ${PRODUCT_VERSION}"
@@ -49,7 +51,8 @@ SectionEnd
 
 Section "Uninstall"
     RMDir /r "$INSTDIR"
-    Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+    Delete "$DESKTOP\SM WoT Assistant.lnk"
+    Delete "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
     RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"

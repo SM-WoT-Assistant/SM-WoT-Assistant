@@ -53,20 +53,22 @@
 **Firebase / Cloud Layer:**
 - Purpose: Local identity (nickname + 4-digit PIN), error reporting, usage pings, auto-update checks, drawing publication/sync via Firebase Realtime Database REST API
 - Location: `firebase_identity.py`, `firebase_reporter.py`, `firebase_drawings.py`, `public/` (Firebase Hosting static website), `firebase.json`, `.firebaserc`, `database.rules.json`
-- Contains: Local identity system (nickname + 4-digit PIN stored as SHA-256 hash in `identity.json` under `config.USER_DATA_DIR`), RTDB REST API client (PUT/POST with Firebase API key auth), error reporting with stack traces, version ping/check via `versions/` node, drawing publish/load/delete via `schemes/` node, auto-update dialog in `main.py`
+- Contains: Local identity system (nickname + 4-digit PIN stored as SHA-256 hash in `identity.json` under `config.USER_DATA_DIR`), RTDB REST API client (PUT/POST with Firebase API key auth), error reporting with stack traces, version ping/check via `versions/` node with `_pick_latest()` sorting by release_date then semver, drawing publish/load/delete via `schemes/` node, auto-update dialog in `main.py`
 - Depends on: `requests`, Firebase RTDB (`europe-west1`), Firebase Hosting, `config.USER_DATA_DIR`
 - Used by: Application Logic Layer (`main.py` startup, quit, auto-update), Presentation Layer (`ui_manager.py` identity display, identity registration dialog)
 
 ## Data Flow
 
 **Startup Flow:**
-1. Load settings from `settings.json` — `data_manager.py`
-2. Auto-detect WoT path and python.log — `main.py:_auto_detect_log_path`, `map_manager.py:auto_detect_wot_path`
-3. Detect game language via `language_module.setup()` — reads `game_info.xml`, parses `.mo` files, rebuilds locale caches if language changed
-4. Check game version, extract/update maps and tank data — `map_manager.py:check_game_version` → `map_extractor.py:MapExtractor`, `tank_extractor.py:TankExtractor`
-5. Start log watcher for battle detection — `log_reader.py:LogWatcher.start`
-6. Load map list for current view — `map_manager.py:load_map_list`
-7. If needed, launch AI browser to refresh tank build data — `stats_ai.py:StatsAI.launch_ai_browser`
+1. Single-instance check via `CreateMutexW("SM_WoT_Assistant_SingleInstance")` — exits if another instance is running
+2. Load settings from `settings.json` — `data_manager.py`
+3. Auto-detect WoT path and python.log — `main.py:_auto_detect_log_path`, `map_manager.py:auto_detect_wot_path`
+4. Detect game language via `language_module.setup()` — reads `game_info.xml`, parses `.mo` files, rebuilds locale caches if language changed
+5. Check game version, extract/update maps and tank data — `map_manager.py:check_game_version` → `map_extractor.py:MapExtractor`, `tank_extractor.py:TankExtractor`
+6. Start log watcher for battle detection — `log_reader.py:LogWatcher.start`
+7. Load map list for current view — `map_manager.py:load_map_list`
+8. If needed, launch AI browser to refresh tank build data — `stats_ai.py:StatsAI.launch_ai_browser`
+9. **Update check preemption:** During splash display (step 3-5), a synchronous update check may preempt the normal startup flow — the splash displays update buttons instead of proceeding to the main UI (see Auto-Update Flow)
 
 **Battle Detection Flow:**
 1. `log_reader.py:LogWatcher._run` tails `python.log` with regex patterns (`arena_re`, `battle_space_re`, `vehicle_re`, etc.)
@@ -94,10 +96,10 @@
 
 **Auto-Update Flow:**
 1. On startup → `firebase_reporter.ping_version_async()` sends current version to RTDB (`installations/` node)
-2. On startup → `main.py:_check_for_app_updates()` calls `firebase_reporter.check_for_updates()`
-3. Reads latest release from RTDB `versions/` node → compares via `firebase_reporter.compare_versions()`
-4. If newer version available → shows status label update + optional auto-update dialog → opens download URL in browser
-5. On release build → `build.py:write_version_to_rtdb()` publishes version metadata (version, release_date, download_url, build_size) to RTDB `versions/` node
+2. **Splash-screen path:** During splash display, `_start_startup_checks()` calls `firebase_reporter.check_for_updates_sync()` synchronously. If a newer version is found, `_show_splash_update()` renders "New version vX.Y.Z available!" with "UPDATE NOW" / "LATER" buttons directly on the splash canvas. Clicking "UPDATE NOW" triggers `_splash_download_thread()` which downloads the setup to `%TEMP%`, runs NSIS installer silently (`/S /NCRC`), releases the single-instance mutex (`_update_mutex`), spawns the new versioned EXE (`SM WoT Assistant vX.Y.Z.exe` from `$LOCALAPPDATA\\SM WoT Assistant`), and exits the old process — all while the splash remains visible (no dead time). Clicking "LATER" dismisses splash and continues to main UI
+3. **Main-UI path:** If no update was found during splash (or splash is disabled), `_check_for_app_updates()` calls `firebase_reporter.check_for_updates()` asynchronously after the main UI is shown. A modal update dialog with download progress bar is presented; the download-and-install flow is identical to the splash path
+4. Latest version is determined via `_pick_latest()` which selects the version with the highest `release_date` from the RTDB `versions/` node, using semver as tiebreaker when dates match. The `versions/latest` pointer (with `release_date: "9999-12-31"`) always points to the canonical latest. `compare_versions()` compares semver tuples to decide if update is needed
+5. On release build → `build.py:write_version_to_rtdb()` publishes version metadata (version, release_date, download_url, build_size) to RTDB `versions/{version}/` node and updates the `versions/latest` pointer. The `--date=YYYY-MM-DD` flag allows overriding the release_date
 
 **Drawing Publish/Download Flow:**
 1. User clicks publish (TACTIC mode with identity registered) → `firebase_drawings.publish_drawing()` serializes drawing elements, map info, author identity → PUT to RTDB `schemes/{drawing_id}`
@@ -188,9 +190,9 @@
 
 **Website (Firebase Hosting):**
 - Location: `public/` directory — served by Firebase Hosting at `sm-wot-assistant.web.app`
-- Pages: `index.html` (English-only landing page with logo (2x), download button linking to GitHub releases at `github.com/nkcgml-boop/SM-WoT-Assistant/releases`, features grid, community schemes promo, releases table from RTDB), `schemes.html` (community tactical schemes browser with map filter, invite-code groups, PIN-based auth), `drawings.html` (drawing gallery), `admin.html` (admin dashboard with stats, schemes management, version management), `404.html`
-- Language: All pages use `lang="en"` with no UA/EN toggle — browser language auto-detection only; class labels (LT/MT/HT/TD/SPG) remain English
-- Data source: All dynamic data (schemes, versions, releases) read from Firebase RTDB via REST API with API key auth
+- Pages: `index.html` (English-only landing page with logo (2x), download button linking to the latest versioned GitHub release at `github.com/nkcgml-boop/SM-WoT-Assistant/releases`, features grid, community schemes promo, releases table from RTDB sorted by release_date → version), `schemes.html` (community tactical schemes browser with map filter, invite-code groups, PIN-based auth), `drawings.html` (drawing gallery), `admin.html` (admin dashboard with stats, schemes management, version management), `404.html`
+- Language: All pages use `lang="en"` with no UA/EN toggle — browser language auto-detection only; class labels (LT/MT/HT/TD/SPG) remain English; `public/locale/uk.json` exists for locale export
+- Data source: All dynamic data (schemes, versions, releases) read from Firebase RTDB via REST API with API key auth. Releases sorted server-side by `release_date` descending, with semver as tiebreaker
 - Triggers: User visits website URL; `build.py` publishes version info on release
 
 ## Error Handling
@@ -215,17 +217,19 @@
 - `installer.nsi` version auto-synced via `build.py:update_nsi_version()` using regex on `!define PRODUCT_VERSION`
 
 **Build &amp; Packaging:**
-- `build.py` — 7-phase release pipeline: (1) Pre-flight validation (semver, Python 3.12+PyInstaller, NSIS, gh CLI, critical source files, git status), (2) Clean dist/build, (3) PyInstaller onedir + manual `copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug — data files from Analysis not propagated to COLLECT), (4) NSIS installer via makensis, (5) Rename onedir to versioned directory (`dist/SM WoT Assistant vX.Y.Z/`), (6) Build verification (EXE, critical JSONs, VERSION, fonts, directory counts), (7) Build manifest (`dist/build_manifest_vX.Y.Z.txt`)
-- `wot_assistant.spec` — PyInstaller spec with fixed `runtime_jsons` list (13 critical JSONs), fonts (`.ttf`), `.mo` localization files, `logo.png`, `maps/` subdirectories, `extracted_maps/` (excluding caches), `extracted_icons/` (all 8 subdirectories), `extracted_data/common/post_progression/` (field mod data). EXE name: `SM WoT Assistant`. Includes `COLLECT` step for onedir output
+- `build.py` — 7-phase release pipeline: (1) Pre-flight validation (semver, Python 3.12+PyInstaller, NSIS, gh CLI, critical source files, git status), (2) Clean dist/build, (3) PyInstaller onedir + manual `copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug — data files from Analysis not propagated to COLLECT), (4) NSIS installer via makensis, (5) Rename onedir to versioned directory (`dist/SM WoT Assistant vX.Y.Z/`) + rename generic EXE to versioned `SM WoT Assistant vX.Y.Z.exe`, (6) Build verification (versioned EXE, 6 critical JSONs, VERSION, fonts, directory counts), (7) Build manifest (`dist/build_manifest_vX.Y.Z.txt`)
+- `build.py` accepts optional `--date=YYYY-MM-DD` flag to override the `release_date` field when publishing to RTDB
+- `wot_assistant.spec` — PyInstaller spec with `_CRITICAL_JSON` list (6 core JSONs: `crew_builds.json`, `tank_db.json`, `tank_tth.json`, `game_entities_english.json`, `game_entities.json`, `tank_slots_full.json` — runtime caches excluded), fonts (`.ttf`), `.mo` localization files, `logo.png`, `maps/` subdirectories, `extracted_maps/` (excluding caches), `extracted_icons/` (all 8 subdirectories), `extracted_data/common/post_progression/` (field mod data). EXE name: `SM WoT Assistant`. Includes `COLLECT` step for onedir output
 - `build.py:copy_data_files()` — manual file copy workaround for PyInstaller 6.x DATA TOC bug (data from Analysis not propagated to COLLECT). Uses exclusion-based glob: all root `*.json` except debug/temp/tomato/manifest files (`opencode.json`, `magic-context.jsonc`, `tomato_*.json`, `vehicle_slots_*.json`, etc.); also copies fonts, `.mo` files, `logo.png`, `maps/`, `extracted_maps/`, `extracted_icons/`, `extracted_data/common/post_progression/`. New JSON files automatically included without list updates
 - Hidden imports: `keyboard`, `PIL._tkinter_finder`
 - `console=False`, `upx=True`, icon from `logo.png`
-- Output artifacts: `dist/SM WoT Assistant vX.Y.Z/` (versioned onedir, ~5795 files, ~750 MB), `dist/SM_WoT_Assistant_Setup_vX.Y.Z.exe` (NSIS installer, ~320 MB, lzma 42.4%), `dist/SM_WoT_Assistant_Portable_vX.Y.Z.zip` (portable ZIP, ~390 MB), `dist/build_manifest_vX.Y.Z.txt` (full file manifest)
+- Output artifacts: `dist/SM WoT Assistant vX.Y.Z/` (versioned onedir containing `SM WoT Assistant vX.Y.Z.exe`, ~5795 files, ~750 MB), `dist/SM_WoT_Assistant_Setup_vX.Y.Z.exe` (NSIS installer, ~320 MB, lzma 42.4%), `dist/SM_WoT_Assistant_Portable_vX.Y.Z.zip` (portable ZIP, ~390 MB), `dist/build_manifest_vX.Y.Z.txt` (full file manifest)
 - Python 3.12 (C:\\Users\\PRO\\AppData\\Local\\Programs\\Python\\Python312) with PyInstaller 6.20.0 preferred — Python 3.14 has known DATA TOC bug
-- NSIS: `C:\\Program Files (x86)\\NSIS\\makensis.exe` (auto-detected by `build.py:find_nsis()`)
+- NSIS: `C:\\Program Files (x86)\\NSIS\\makensis.exe` (auto-detected by `build.py:find_nsis()`). Installer uses `InstallDir "$LOCALAPPDATA\\SM WoT Assistant"` and `RequestExecutionLevel user` (no admin privileges required)
+- Single-instance enforcement: `CreateMutexW("SM_WoT_Assistant_SingleInstance")` at startup (line 49 of `main.py`); if error 183 (already exists), the process exits immediately. The mutex is released before launching a new version after update
 - `config.DEFAULT_FILES` seeds 6 files to AppData on first launch: settings.json, locales.json, map_drawings.json, service_messages.json, popular_tanks_cache.json, ai_builds_cache.json
-- `build.py:write_version_to_rtdb()` — publishes version metadata (version, release_date, download_url, build_size) to Firebase RTDB `versions/{version}/` via REST API PUT after successful build; consumed by `main.py` auto-update check and `public/index.html` releases list
-- Firebase Hosting: `public/` directory deployed via `firebase deploy --only hosting` (manual); serves static website with RTDB-backed dynamic content
+- `build.py:write_version_to_rtdb()` — publishes version metadata (version, release_date, download_url, build_size) to Firebase RTDB `versions/{version}/` via REST API PUT after successful build; also writes `versions/latest` pointer with `release_date: "9999-12-31"` as sentinel; consumed by `main.py` auto-update check and `public/index.html` releases list
+- Firebase Hosting: `public/` directory deployed via `firebase deploy --only hosting` (manual); serves English-only (`lang="en"`) static website with RTDB-backed dynamic content. Website releases are sorted by `release_date` descending with version as tiebreaker
 
 **Logging:** Print-based console output with bracketed tags (`[INIT]`, `[SYNC]`, `[AI Tank Build]`, `[SERVICE]`, `[BUILD]`). No structured logging framework.
 
