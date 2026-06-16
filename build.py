@@ -513,16 +513,34 @@ def write_version_to_rtdb(version, release_date=None):
         "changelog": f"Release v{version}",
     }).encode("utf-8")
 
+    # Write versioned entry: versions/X_Y_Z
     url = f"{RTDB_URL}/versions/{version.replace('.', '_')}.json?auth={API_KEY}"
     req = urllib.request.Request(url, data=data, method="PUT")
     req.add_header("Content-Type", "application/json")
     try:
         resp = urllib.request.urlopen(req, timeout=10)
         print(f"[BUILD] Version {version} published to RTDB (HTTP {resp.status})")
-        return True
     except Exception as e:
         print(f"[BUILD] RTDB publish warning: {e}")
         return False
+
+    # Write latest pointer: versions/latest (release_date far future)
+    latest_data = json.dumps({
+        "version": version,
+        "release_date": "9999-12-31",
+        "build_size": installer_size,
+        "download_url": f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Setup_v{version}.exe",
+        "changelog": f"Release v{version}",
+    }).encode("utf-8")
+    url_latest = f"{RTDB_URL}/versions/latest.json?auth={API_KEY}"
+    req_latest = urllib.request.Request(url_latest, data=latest_data, method="PUT")
+    req_latest.add_header("Content-Type", "application/json")
+    try:
+        resp_latest = urllib.request.urlopen(req_latest, timeout=10)
+        print(f"[BUILD] Latest pointer updated (HTTP {resp_latest.status})")
+    except Exception as e:
+        print(f"[BUILD] Latest pointer warning: {e}")
+    return True
 
 
 def main():

@@ -91,6 +91,7 @@ class MapManager:
                 saved_v = self.app.settings.get("game_version", "")
                 if not current_v:
                     emit(100, "failed_read_version", "orange")
+                    finish()
                     return
 
                 real_version_changed = current_v != saved_v
