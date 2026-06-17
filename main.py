@@ -1018,13 +1018,16 @@ class WotAssistantHQ:
                 if not os.path.exists(install_exe):
                     raise RuntimeError(f"EXE not found: {install_exe}")
 
-                pw.after(0, lambda: status_var.set(self.t('ui', 'dialog_update_starting')))
-                try:
-                    ctypes.windll.kernel32.CloseHandle(self._update_mutex)
-                except Exception:
-                    pass
-                subprocess.Popen([install_exe], creationflags=0x08000000)
-                pw.after(800, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
+                pw.after(0, lambda: status_var.set(f"Updated to v{latest_ver}"))
+                def _finish():
+                    status_var.set(self.t('ui', 'dialog_update_starting'))
+                    try:
+                        ctypes.windll.kernel32.CloseHandle(self._update_mutex)
+                    except Exception:
+                        pass
+                    subprocess.Popen([install_exe], creationflags=0x08000000)
+                    pw.after(200, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
+                pw.after(3000, _finish)
 
             except Exception as e:
                 print(f"[UPDATE] Error: {e}")
@@ -1197,13 +1200,17 @@ class WotAssistantHQ:
                 raise RuntimeError(f"EXE not found: {install_exe}")
 
             self.root.after(0, lambda: self._splash_status_safe(
-                self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold")))
-            try:
-                ctypes.windll.kernel32.CloseHandle(self._update_mutex)
-            except Exception:
-                pass
-            subprocess.Popen([install_exe], creationflags=0x08000000)
-            self.root.after(200, self._quit_app_for_update)
+                f"Updated to v{latest_ver}", "#22cc44", ("Arial", 13, "bold")))
+            def _finish():
+                self._splash_status_safe(
+                    self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold"))
+                try:
+                    ctypes.windll.kernel32.CloseHandle(self._update_mutex)
+                except Exception:
+                    pass
+                subprocess.Popen([install_exe], creationflags=0x08000000)
+                self.root.after(200, self._quit_app_for_update)
+            self.root.after(3000, _finish)
 
         except Exception as e:
             print(f"[UPDATE] Error: {e}")
