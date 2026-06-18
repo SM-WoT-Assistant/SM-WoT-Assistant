@@ -266,15 +266,28 @@ class UIManager:
             else:
                 status_var.set(msg)
 
+        def do_login():
+            nick = nick_var.get().strip()
+            pin = pin_var.get().strip()
+            ok, msg = firebase_identity.login(nick, pin)
+            if ok:
+                dlg.destroy()
+                self._refresh_identity_bar()
+            else:
+                status_var.set(msg)
+
+        tk.Button(bf, text=self.app.t('ui', 'login'), bg="#334455", fg="#99ccff", bd=0,
+                  font=("Arial", 10, "bold"), padx=15, pady=6,
+                  command=do_login).pack(side="left", padx=5)
         tk.Button(bf, text=self.app.t('ui', 'register'), bg="#335533", fg="#99cc99", bd=0,
                   font=("Arial", 10, "bold"), padx=15, pady=6,
-                  command=do_register).pack(side="left", padx=10)
+                  command=do_register).pack(side="left", padx=5)
 
         def skip_registration():
             dlg.destroy()
         tk.Button(bf, text=self.app.t('ui', 'skip'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=15, pady=6,
-                  command=skip_registration).pack(side="left", padx=10)
+                  command=skip_registration).pack(side="left", padx=5)
 
         nick_entry.bind("<Return>", lambda e: pin_entry.focus_set())
         pin_entry.bind("<Return>", lambda e: do_register())

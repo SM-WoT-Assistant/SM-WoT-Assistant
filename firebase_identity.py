@@ -8,9 +8,32 @@ import json
 import uuid
 import hashlib
 import time
+import requests
 import config
 
 _IDENTITY_FILE = os.path.join(config.USER_DATA_DIR, "identity.json")
+
+_FIREBASE_API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+_RTDB_BASE = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
+
+def _rtdb_url(path):
+    return f"{_RTDB_BASE}/{path}.json?auth={_FIREBASE_API_KEY}"
+
+def _rtdb_put(path, data):
+    try:
+        r = requests.put(_rtdb_url(path), json=data, timeout=8)
+        return 200 <= r.status_code < 300
+    except Exception:
+        return False
+
+def _rtdb_get(path):
+    try:
+        r = requests.get(_rtdb_url(path), timeout=8)
+        if r.status_code == 200:
+            return r.json()
+    except Exception:
+        pass
+    return None
 
 
 def _load():
@@ -70,10 +93,49 @@ def register(nickname, pin):
     data["pin_text"] = pin
     data["pin_hash"] = hash_pin(pin)
     data["created_at"] = time.strftime("%Y-%m-%dT%H:%M:%S")
-    data["synced_to_firestore"] = False
 
     _save(data)
+    _rtdb_put(f"users/{data['user_id']}", {
+        "nickname": nickname,
+        "nickname_lower": nickname.lower(),
+        "pin_hash": data["pin_hash"],
+        "created_at": data["created_at"],
+    })
     return True, data["user_id"]
+
+
+def login(nickname, pin):
+    try:
+        nickname = nickname.strip()
+        pin = pin.strip()
+        if not nickname or not pin:
+            return False, "Nickname and PIN are required."
+        if not pin.isdigit() or len(pin) != 4:
+            return False, "PIN must be 4 digits."
+
+        data = _rtdb_get(f'users?orderBy="nickname"&equalTo="{nickname}"')
+        if not data:
+            return False, "User not found. Check your nickname."
+
+        entries = [v for v in data.values() if isinstance(v, dict)]
+        if not entries:
+            return False, "User not found."
+
+        entry = entries[0]
+        if entry.get("pin_hash") != hash_pin(pin):
+            return False, "Wrong PIN."
+
+        local = {
+            "user_id": list(data.keys())[0],
+            "nickname": entry["nickname"],
+            "pin_text": pin,
+            "pin_hash": entry["pin_hash"],
+            "created_at": entry.get("created_at", ""),
+        }
+        _save(local)
+        return True, entry["nickname"]
+    except Exception as e:
+        return False, str(e)
 
 
 def verify_pin(pin):

@@ -25,6 +25,7 @@ TRANSLATIONS = {
             "log_waiting": "Game found at {path}. Log will appear after first battle.",
             "game_not_found": "Game not found. Set path in Settings -> WoT",
             "publish": "Publish",
+            "login": "LOG IN",
             "logout": "Logout",
             "register": "Register",
             "not_registered": "Not registered",

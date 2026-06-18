@@ -61,6 +61,7 @@ class WotAssistantHQ:
         
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
+        self._dot_anim_active = False
         self.map_mgr = map_manager.MapManager(self)
         self.map_mgr.auto_detect_wot_path()
         self.custom_names = self.data_mgr.load_json(config.CUSTOM_NAMES_FILE)
@@ -1231,8 +1232,27 @@ class WotAssistantHQ:
             self.splash_canvas.itemconfigure(self.splash_percent_text, text="100%")
             self.splash_canvas.itemconfigure(self.splash_status_text,
                 text=self.t('ui', 'dialog_update_installing'))
+            self._dot_anim_step = 0
+            self._dot_anim_active = True
+            self._splash_animate_dots()
         except Exception:
             pass
+
+    def _splash_animate_dots(self):
+        try:
+            if not self._dot_anim_active:
+                return
+            if not hasattr(self, 'splash') or not self.splash.winfo_exists():
+                self._dot_anim_active = False
+                return
+            dots = [".  ", ".. ", "...", "   "]
+            self._dot_anim_step = (self._dot_anim_step + 1) % len(dots)
+            base = self.t('ui', 'dialog_update_installing')
+            self.splash_canvas.itemconfigure(self.splash_status_text,
+                text=base + dots[self._dot_anim_step])
+            self.root.after(500, self._splash_animate_dots)
+        except Exception:
+            self._dot_anim_active = False
 
     def _splash_status_safe(self, text, fill="#ffaa00", font=("Arial", 11, "bold")):
         try:
@@ -1437,6 +1457,7 @@ class WotAssistantHQ:
 
     def finish_startup_splash(self):
         """Знищує splash та показує головне вікно."""
+        self._dot_anim_active = False
         shown_at = getattr(self, "_splash_shown_at", 0.0)
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
         min_visible_ms = 2000  # Принаймні 2 секунди
@@ -1495,22 +1516,22 @@ class WotAssistantHQ:
         if self.logo_splash:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
         version = config.load_version()
-        self.splash_canvas.create_text(sw//2, sh - 62, text=version, fill="white", font=("Verdana", 12, "bold"))
+        self.splash_canvas.create_text(sw//2, sh - 60, text=version, fill="white", font=("Arial", 10, "bold"))
         lang_text = self.t('ui', 'language_label').format(lang=self.lang.upper())
-        self.splash_canvas.create_text(sw//2, sh - 82, text=lang_text, fill="#888888", font=("Arial", 8))
+        self.splash_canvas.create_text(sw//2, sh - 48, text=lang_text, fill="#888888", font=("Arial", 8))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
-            sh - 46,
+            sh - 38,
             text=self.t('ui', 'checking_updates'),
             fill="#bbbbbb",
-            font=("Arial", 9),
+            font=("Arial", 8),
         )
         self.splash_percent_text = self.splash_canvas.create_text(
             sw - 34,
             sh - 18,
             text="0%",
             fill="#dddddd",
-            font=("Arial", 9, "bold"),
+            font=("Arial", 8, "bold"),
         )
         self.pbar = self.splash_canvas.create_rectangle(0, sh-8, 0, sh, fill="#ff4500", outline="")
         self.update_startup_progress(3, self.t('ui', 'preparing_check'))
