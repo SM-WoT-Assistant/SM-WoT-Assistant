@@ -147,18 +147,18 @@ function loadReleases() {
                 return;
             }
 
-            const { latest, ...versions } = data;
+            const { latest: _, ...versions } = data;
             const items = Object.values(versions).sort((a, b) => {
                 const dateCmp = (b.release_date || '').localeCompare(a.release_date || '');
                 if (dateCmp !== 0) return dateCmp;
                 return compareVersions(b.version || '0.0.0', a.version || '0.0.0');
             });
 
-            const latest = items[0];
-            if (latest) {
-                dlBtn.href = latest.download_url || (GITHUB_RELEASES + "/tag/v" + latest.version);
-                dlBtn.textContent = "Download v" + (latest.version || "");
-                latestSpan.textContent = (latest.build_size || "") + " · Windows 10/11 · " + (latest.release_date || "").slice(0, 10);
+            const topItem = items[0];
+            if (topItem) {
+                dlBtn.href = topItem.download_url || (GITHUB_RELEASES + "/tag/v" + topItem.version);
+                dlBtn.textContent = "Download v" + (topItem.version || "");
+                latestSpan.textContent = (topItem.build_size || "") + " · Windows 10/11 · " + (topItem.release_date || "").slice(0, 10);
             }
 
             container.innerHTML = '<table><tr><th>Version</th><th>Date</th><th>Size</th><th></th></tr>' +

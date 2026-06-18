@@ -52,18 +52,6 @@ class WotAssistantHQ:
             sys.exit(0)
         self._update_mutex = mutex
 
-        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
-        if os.path.isdir(install_dir):
-            current = os.path.abspath(sys.executable)
-            for f in os.listdir(install_dir):
-                if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
-                    fp = os.path.join(install_dir, f)
-                    if os.path.abspath(fp) != current:
-                        try:
-                            os.remove(fp)
-                        except Exception:
-                            pass
-
         self.mode = "edit" 
         self.map_mode = 1 
         self.dialog_open = False 

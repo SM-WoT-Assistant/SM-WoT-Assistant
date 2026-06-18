@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.14"
+!define PRODUCT_VERSION "1.0.15"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant v${PRODUCT_VERSION}.exe"
