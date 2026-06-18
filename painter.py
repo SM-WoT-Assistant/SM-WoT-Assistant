@@ -58,7 +58,7 @@ class MapPainter:
         self.active_tool = tool
         palette = getattr(self.app, 'drawing_palette', None)
         if not palette or not palette.is_in_edit_mode():
-            self.app.status_label.config(text=f"ІНСТРУМЕНТ: {tool.upper() if tool else 'ВИМКНЕНО'}")
+            pass
         
     def clear_all(self):
         if not self.app.current_map_eng: return
@@ -512,7 +512,6 @@ class MapPainter:
         palette.exit_edit_mode()
         self._editing_idx = idx
         label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
-        self.app.status_label.config(text=self.app.t('ui', 'editing_label').format(label=label), fg="#ffff00")
         palette.load_object(obj)
         palette._lift_self()
         if needs_show:
@@ -532,8 +531,6 @@ class MapPainter:
         del objects[idx]
         self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
         self._editing_idx = -1
-        if hasattr(self.app, 'status_label'):
-            self.app.status_label.config(text="")
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             palette._edit_obj = None
@@ -604,7 +601,7 @@ class MapPainter:
             
         req_classes = obj.get("classes", [])
         if req_classes:
-            req_en = [_UKR_TO_EN.get(c, c) for c in req_classes]
+            req_en = [self._UKR_TO_EN.get(c, c) for c in req_classes]
             if not any(cls in active_classes for cls in req_en):
                 return False
                 

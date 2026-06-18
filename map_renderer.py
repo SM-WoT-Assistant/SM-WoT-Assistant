@@ -230,7 +230,6 @@ class MapRenderer:
                 else:
                     app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map, tags="map")
                 map_drawn = True
-                app.status_label.config(text=f"КАРТА: {app.translate_map_name(app.current_map_eng)}", fg="lime")
                 
                 self.draw_frame(cw, ch)
                 if app.btn_mode_maps_2.cget("bg") == "#ff4500":
@@ -241,7 +240,7 @@ class MapRenderer:
                 msg = app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
                 app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
                 map_drawn = True 
-                app.status_label.config(text=app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found'), fg="red")
+
                 
         if not map_drawn:
             if app.mode == "edit":

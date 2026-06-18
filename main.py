@@ -42,9 +42,10 @@ except ImportError:
     map_extractor = None
 
 class WotAssistantHQ:
-    def __init__(self, root):
+    def __init__(self, root, splash_geometry=None):
         self.root = root
         self.root.withdraw()
+        self._splash_geometry = splash_geometry
 
         mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
@@ -178,7 +179,10 @@ class WotAssistantHQ:
             self._start_startup_checks()
         else:
             self.show_small_loading_splash()
-            self.root.after(120, self._start_startup_checks)
+            if self._splash_geometry:
+                self.root.after(120, self._start_startup_checks_continue)
+            else:
+                self.root.after(120, self._start_startup_checks)
 
     def _start_startup_checks(self):
         if self.auto_update_var.get() and hasattr(self, 'splash'):
@@ -389,11 +393,9 @@ class WotAssistantHQ:
             self.save_settings()
             
             if os.path.exists(log_path):
-                self.status_label.config(text=self.t('ui', 'status_log_saved').format(path=path), fg="lime")
                 print(f"[CONFIG] log_path встановлено: {log_path}")
                 self.log_watcher.update_path(log_path)
             else:
-                self.status_label.config(text=self.t('ui', 'status_log_not_found').format(path=log_path), fg="orange")
                 print(f"[CONFIG] ПОМИЛКА: log_path не існує: {log_path}")
             
             if self.btn_mode_maps_2.cget("bg") == "#ff4500":
@@ -437,8 +439,6 @@ class WotAssistantHQ:
             self.save_settings()
             if hasattr(self, "ai_stats") and self.ai_stats:
                 self.ai_stats.configure(self.settings["ai_key"])
-            self.status_label.config(text=self.t('ui', 'status_ai_key_updated'), fg="lime")
-
 
         self._last_mode_hotkey_ts = 0
 
@@ -447,8 +447,6 @@ class WotAssistantHQ:
 
         if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
             msg = self.t('ui', 'status_auto_mode_unavailable')
-            if hasattr(self, "status_label"):
-                self.status_label.config(text=msg, fg="#ffb347")
             print(msg)
             return
 
@@ -485,12 +483,10 @@ class WotAssistantHQ:
         if self.active_view == "maps":
             self.status_label.pack_forget()
             if self.mode == "edit":
-                if self.map_mode == 2:
-                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
-                    self.filter_panel.pack(side="bottom", fill="x")
-                elif self.map_mode == 1:
-                    self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+                self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+                self.filter_panel.pack(side="bottom", fill="x")
                 self.status_label.pack(side="bottom", fill="x")
+                self.status_label.config(height=2, bg="#1a1a1a")
             self.canvas.pack(side="top", fill="both", expand=True)
             self.painter.redraw()
         elif self.active_view == "stats":
@@ -570,9 +566,8 @@ class WotAssistantHQ:
             self._redrawing = False
 
     def refresh_mode_indicator(self):
-        mode_text = self.t('ui', 'mode_edit') if self.mode == "edit" else self.t('ui', 'mode_battle')
         fmt_text = "ON" if self.win_mgr.format_mode_enabled else "OFF"
-        text = f"{self.t('ui', 'mode_label')} {mode_text} | {self.t('ui', 'format_label')} {fmt_text}"
+        text = f"[{self.t('ui', 'format_label')}] {fmt_text}"
         fg = "cyan" if self.mode == "edit" else "#bbbbbb"
         if hasattr(self, "status_label"):
             self.status_label.config(text=text, fg=fg)
@@ -696,10 +691,7 @@ class WotAssistantHQ:
             self.drawing_palette.exit_edit_mode()
 
     def toggle_palette(self):
-        if self.active_view != "maps" or self.map_mode != 2:
-            msg = "[РЕЖИМ] Малювання доступне тільки в MAPS режимi."
-            if hasattr(self, "status_label"):
-                self.status_label.config(text=msg, fg="#ffb347")
+        if self.active_view != "maps":
             return
         if self.drawing_palette.state() != 'withdrawn':
             self.drawing_palette._close()
@@ -729,6 +721,17 @@ class WotAssistantHQ:
             self.translate_map_name(self.current_map_eng),
             self.painter.drawings,
             on_success
+        )
+
+    def export_all_tactics(self):
+        tactics_manager.export_all_tactics(self.root, self.painter.drawings)
+
+    def import_all_tactics(self):
+        def on_success():
+            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.redraw()
+        tactics_manager.import_all_tactics(
+            self.root, self.painter.drawings, on_success
         )
 
     def on_minimap_appeared(self, map_id, mode):
@@ -807,7 +810,6 @@ class WotAssistantHQ:
 
     def safe_battle_sync(self, map_id, ui_mode):
         if not self.settings.get("log_path", ""):
-            self.status_label.config(text=self.t('ui', 'status_auto_error_log_path'), fg="red")
             return
 
         self.switch_to_maps(2)
@@ -824,24 +826,19 @@ class WotAssistantHQ:
         if target_name in tmaps:
             self.map_var.set(target_name)
             self.on_map_select()
-            self.status_label.config(text=self.t('ui', 'status_auto_detected').format(name=target_name), fg="lime")
             return
             
         for t in tmaps:
             if t.lower() == target_name.lower():
                 self.map_var.set(t)
                 self.on_map_select()
-                self.status_label.config(text=self.t('ui', 'status_auto_detected_case').format(name=t, map_id=map_id), fg="lime")
                 return
             
         for t in tmaps:
             if target_name in t or t.lower() in target_name.lower():
                 self.map_var.set(t)
                 self.on_map_select()
-                self.status_label.config(text=self.t('ui', 'status_auto_detected_similar').format(name=t, map_id=map_id), fg="yellow")
                 return
-            
-        self.status_label.config(text=self.t('ui', 'status_auto_map_not_in_list').format(map_id=map_id, name=target_name), fg="red")
 
     def setup_ui(self):
         pass
@@ -881,8 +878,6 @@ class WotAssistantHQ:
             msg = self.t('ui', 'status_update_available').format(latest=latest_ver, current=current_ver)
             print(msg)
             def _show():
-                if hasattr(self, "status_label"):
-                    self.status_label.config(text=msg, fg="lime")
                 if self.auto_update_var.get():
                     self._show_update_dialog(latest_ver, current_ver, dl)
             self.root.after(0, _show)
@@ -1500,7 +1495,10 @@ class WotAssistantHQ:
         self._startup_ready_at = 0.0
         self._startup_status_text = self.t('ui', 'checking_updates')
         sw, sh = 450, 300
-        self.splash.geometry(f"{sw}x{sh}+{int((self.root.winfo_screenwidth()/2)-(sw/2))}+{int((self.root.winfo_screenheight()/2)-(sh/2))}")
+        if self._splash_geometry:
+            self.splash.geometry(self._splash_geometry)
+        else:
+            self.splash.geometry(f"{sw}x{sh}+{int((self.root.winfo_screenwidth()/2)-(sw/2))}+{int((self.root.winfo_screenheight()/2)-(sh/2))}")
         self.splash.overrideredirect(True)
         self.splash.attributes("-topmost", True)
         self.splash.configure(bg="black")
@@ -1572,7 +1570,12 @@ if __name__ == "__main__":
         from ai_webview_gui import main as webview_main
         webview_main()
         sys.exit(0)
+    splash_geometry = None
+    for arg in sys.argv[1:]:
+        if arg.startswith("--splash-geometry="):
+            splash_geometry = arg.split("=", 1)[1]
+            break
     root = tk.Tk()
     root.title(f"SM WoT Assistant v{config.load_version()}")
-    app = WotAssistantHQ(root)
+    app = WotAssistantHQ(root, splash_geometry=splash_geometry)
     root.mainloop()

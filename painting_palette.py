@@ -194,7 +194,14 @@ class DrawingPalette(tk.Toplevel):
         tk.Button(bf, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
+                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
+
+        bf2 = tk.Frame(self, bg=bg)
+        bf2.pack(fill="x", padx=8, pady=(0, 6))
+        tk.Button(bf2, text=self.app.t('ui', 'all_export').upper(), bg="#444", fg="#aaccff", bd=0,
+                   font=("Arial", 8), command=self._export_all).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf2, text=self.app.t('ui', 'all_import').upper(), bg="#444", fg="#aaccff", bd=0,
+                   font=("Arial", 8), command=self._import_all).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
@@ -312,6 +319,14 @@ class DrawingPalette(tk.Toplevel):
     def _import(self):
         self._lift_self()
         self.app.import_external_tactic()
+
+    def _export_all(self):
+        self._lift_self()
+        self.app.export_all_tactics()
+
+    def _import_all(self):
+        self._lift_self()
+        self.app.import_all_tactics()
 
     def _close(self):
         self.exit_edit_mode()
@@ -433,8 +448,6 @@ class DrawingPalette(tk.Toplevel):
         self._update_toolbar_buttons()
         self.painter.set_tool(None)
         self._del_frame.pack_forget()
-        if hasattr(self.app, 'status_label'):
-            self.app.status_label.config(text="")
         self._status_lbl.config(text="")
 
     def _write_to_object(self, obj):

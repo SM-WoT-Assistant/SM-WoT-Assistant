@@ -474,7 +474,6 @@ class WindowManager:
             return
         
         if not app.tomato.proc.is_alive():
-            app.status_label.config(text="[СТАТ] Помилка: Браузер закрився несподівано", fg="red")
             return
 
         hwnd = ctypes.windll.user32.FindWindowW(None, "WoT_Tomato_Hidden_Window")
@@ -495,14 +494,11 @@ class WindowManager:
             self._last_tomato_size = None
             self.resize_tomato_window()
             SetWindowPos(hwnd, None, 0, 0, app.browser_frame.winfo_width(), app.browser_frame.winfo_height(), SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED)
-            app.status_label.config(text="[СТАТ] Tomato.gg завантажено", fg="lime")
             app.root.after(700, self.tomato_watcher)
         else:
             if attempt > 100:
-                app.status_label.config(text="[СТАТ] Помилка: Час очікування браузера вичерпано", fg="red")
                 return
                 
-            app.status_label.config(text=f"[СТАТ] Пошук вікна браузера... ({attempt//10}с)", fg="yellow")
             app.root.after(100, lambda: self.dock_tomato_window(attempt + 1))
 
     def tomato_watcher(self):

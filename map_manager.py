@@ -66,8 +66,7 @@ class MapManager:
             text = self.app.t('ui', text_key).format(**fmt) if fmt else self.app.t('ui', text_key)
             if progress_cb:
                 self.app.safe_execute(lambda: progress_cb(percent, text))
-            if hasattr(self.app, "status_label"):
-                self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg=fg))
+            pass
 
         def finish():
             if done_cb:
@@ -312,41 +311,34 @@ class MapManager:
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
             try: import map_updater
             except ImportError:
-                self.app.status_label.config(text=self.app.t('ui', 'map_updater_missing'), fg="red")
                 return
-            self.app.status_label.config(text=self.app.t('ui', 'maps1_launching_browser'), fg="yellow")
             def update_thread():
-                def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg="yellow"))
+                def status_cb(text): pass
                 success = False
                 try: success = map_updater.sync_all(callback_status=status_cb)
                 except Exception as e: print(f"[MAP_MGR] Updater error: {e}")
                 def on_finish():
                     if success:
-                        self.app.status_label.config(text=self.app.t('ui', 'maps1_done'), fg="lime")
                         self.load_map_list()
                     else:
-                        self.app.status_label.config(text=self.app.t('ui', 'maps1_failed'), fg="red")
+                        pass
                 self.app.safe_execute(on_finish)
             threading.Thread(target=update_thread, daemon=True).start()
         else:
             if not map_extractor:
-                self.app.status_label.config(text=self.app.t('ui', 'map_extractor_missing'), fg="red")
                 return
             if not self._try_begin_update():
-                self.app.status_label.config(text=self.app.t('ui', 'update_already_running_short'), fg="yellow")
                 return
-            self.app.status_label.config(text=self.app.t('ui', 'maps2_extracting'), fg="yellow")
             def update_thread():
                 try:
                     ext = map_extractor.MapExtractor()
-                    def status_cb(text): self.app.safe_execute(lambda: self.app.status_label.config(text=f"[UPDATE] {text}", fg="yellow"))
+                    def status_cb(text): pass
                     success = ext.extract(callback_status=status_cb)
                     def on_finish():
                         if success:
-                            self.app.status_label.config(text=self.app.t('ui', 'maps2_done'), fg="lime")
                             self.load_map_list()
                         else:
-                            self.app.status_label.config(text=self.app.t('ui', 'maps2_extractor_error'), fg="red")
+                            pass
                     self.app.safe_execute(on_finish)
                 finally:
                     self._end_update()
@@ -415,8 +407,6 @@ class MapManager:
         else:
             self.app.current_map_eng = None
             self.app.map_var.set("")
-            if is_tactic:
-                self.app.status_label.config(text=self.app.t('ui', 'tactic_no_maps'), fg="red")
             self.app.map_renderer.show_main_splash()
 
 

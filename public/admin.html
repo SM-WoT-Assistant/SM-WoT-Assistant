@@ -341,6 +341,7 @@ function loadAdminReleases() {
                 return;
             }
             allAdminReleases = Object.entries(data)
+                .filter(([key]) => key !== 'latest')
                 .map(([key, val]) => ({ ...val, _key: key }))
                 .filter(r => r.version);
             allAdminReleases.sort((a, b) => {

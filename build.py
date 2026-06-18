@@ -299,6 +299,59 @@ def copy_data_files():
     return total
 
 
+def build_launcher():
+    """Build launcher as onefile directly into the onedir output."""
+    print("[BUILD] Building launcher (onefile)...")
+    launcher_py = os.path.join(BASE_DIR, "launcher.py")
+    if not os.path.exists(launcher_py):
+        print("[BUILD] FATAL: launcher.py not found")
+        sys.exit(1)
+
+    logo = os.path.join(BASE_DIR, "logo.png")
+    ver = os.path.join(BASE_DIR, "VERSION")
+    sep = os.pathsep
+
+    result = subprocess.run([
+        PYTHON_EXE, "-m", "PyInstaller",
+        "--onefile", "--windowed",
+        "--add-data", f"{logo}{sep}.",
+        "--add-data", f"{ver}{sep}.",
+        "--icon", os.path.join(BASE_DIR, "icon.ico"),
+        "--name", "SM WoT Assistant Launcher",
+        "--distpath", FIXED_ONEDIR,
+        "--workpath", os.path.join(BASE_DIR, "build", "launcher"),
+        "--specpath", os.path.join(BASE_DIR, "build"),
+        "--clean",
+        launcher_py,
+    ], cwd=BASE_DIR)
+
+    if result.returncode != 0:
+        print("[BUILD] Launcher build FAILED")
+        sys.exit(1)
+
+    launcher_exe = os.path.join(FIXED_ONEDIR, "SM WoT Assistant Launcher.exe")
+    if not os.path.exists(launcher_exe):
+        print(f"[BUILD] FATAL: Launcher EXE not found: {launcher_exe}")
+        sys.exit(1)
+
+    size_mb = os.path.getsize(launcher_exe) / (1024 * 1024)
+    print(f"[BUILD] Launcher: {size_mb:.1f} MB")
+    return launcher_exe
+
+    if result.returncode != 0:
+        print("[BUILD] Launcher build FAILED")
+        sys.exit(1)
+
+    launcher_exe = os.path.join(FIXED_ONEDIR, "SM WoT Assistant Launcher.exe")
+    if not os.path.exists(launcher_exe):
+        print(f"[BUILD] FATAL: Launcher EXE not found: {launcher_exe}")
+        sys.exit(1)
+
+    size_mb = os.path.getsize(launcher_exe) / (1024 * 1024)
+    print(f"[BUILD] Launcher: {size_mb:.1f} MB")
+    return launcher_exe
+
+
 def run_nsis(version, makensis_exe):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
@@ -377,6 +430,12 @@ def verify_build(version):
         errors.append("EXE not found")
     else:
         print(f"  EXE:               {os.path.getsize(exe)/(1024*1024):.1f} MB  OK")
+
+    launcher_exe = os.path.join(onedir, "SM WoT Assistant Launcher.exe")
+    if not os.path.exists(launcher_exe):
+        errors.append("Launcher EXE not found")
+    else:
+        print(f"  Launcher:          {os.path.getsize(launcher_exe)/(1024*1024):.1f} MB  OK")
 
     for j in _CRITICAL_JSON:
         if not os.path.exists(os.path.join(internal, j)):
@@ -573,6 +632,7 @@ def main():
     update_nsi_version(version)
     run_pyinstaller()
     data_count = copy_data_files()
+    build_launcher()
 
     # Rename EXE to include version
     exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")

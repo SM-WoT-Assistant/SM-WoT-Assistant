@@ -631,10 +631,7 @@ class StatsAI:
         return None
 
     def update_status_bar(self, text="", fg="#aaaaaa"):
-        try:
-            self.main_app.status_label.config(text=text, fg=fg)
-        except Exception:
-            pass
+        pass
 
     def _on_detail_canvas_resize(self, event):
         self.detail_canvas.itemconfig(self.detail_canvas_win, width=event.width)
@@ -2182,7 +2179,6 @@ class StatsAI:
                                 equip_body_2, cons_body_2, ammo_body_2, loading_labels, data, crew_rows, fm_pairs)
 
         tank_name = data.get('name', tag)
-        self.update_status_bar(f"⚡ {self.main_app.t('ui', 'status_ai_build_fetching').format(name=tank_name)}", "#ffaa00")
         tag_copy = tag
         name_copy = tank_name
         self.root.after(100, lambda t=tag_copy, n=name_copy: self._launch_ai_tank_build(t, n))
@@ -2580,7 +2576,6 @@ class StatsAI:
         self._reflow_detail_layout()
         
         tank_name = data.get('name', 'Unknown')
-        self.update_status_bar(f"✓ Завантажено: {tank_name}", "#00cc00")
         
         self.detail_canvas.yview_moveto(0)
         
@@ -2764,11 +2759,9 @@ class StatsAI:
             builds, updated, _ = _load_ai_build_cache()
             if tag in builds:
                 if tag in updated and not _is_cache_expired(updated[tag], max_days=30):
-                    self.update_status_bar(f"📦 Build для {tank_name}", "#00cc00")
                     print(f"[AI Tank Build] Свіжий кеш для {tag} — скіп, вже відрендерено")
                     return
                 # Stale cache: show stale data while AI updates
-                self.update_status_bar(f"📦 Build для {tank_name} (застарілий)", "#00cc00")
                 self.root.after(0, lambda bd=builds[tag]: self._update_ai_setup_ui(
                     bd, *self._current_bodies
                 ) if hasattr(self, '_current_bodies') else None)
@@ -2880,7 +2873,6 @@ class StatsAI:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
                 _save_ai_build_cache(tag, build_data, fail_count=0)
-        self.update_status_bar("✅ AI build завантажено", "#00cc00")
 
     def _handle_ai_failure(self):
         """Called on main thread when AI fetch failed. Increments fail_count and logs on 3rd failure."""
@@ -2930,7 +2922,6 @@ class StatsAI:
             print("[AI Browser] fetch in progress, returning")
             return
         self._ai_fetch_in_progress = True
-        self.update_status_bar(self.locale_manager.t_ui('data_updating'), "#ffaa00")
 
         if prompt:
             ai_prompt = prompt
@@ -2999,7 +2990,7 @@ class StatsAI:
                     if progress_cb:
                         progress_cb(95, self.locale_manager.t_ui('ready'))
                 else:
-                    self.root.after(0, lambda: self.update_status_bar("❌ AI не повернув назв танків", "red"))
+                    pass
 
                 try:
                     proc.terminate()
@@ -3009,7 +3000,6 @@ class StatsAI:
 
             except Exception as e:
                 print(f"[AI Browser] ERROR: {e}")
-                self.root.after(0, lambda: self.update_status_bar(f"❌ {str(e)[:50]}", "red"))
             finally:
                 proc = getattr(self, '_ai_browser_process', None)
                 if proc:
@@ -3096,12 +3086,11 @@ class StatsAI:
                         json.dump(cache_data, f, ensure_ascii=False, indent=2)
                 self.popular_tanks = [t['tag'] for t in tanks]
                 self.refresh_ai_view()
-                self.update_status_bar(f"✅ Знайдено {len(tanks)} танків", "#00cc00")
+                pass
             else:
-                self.update_status_bar("❌ Не знайдено назв танків", "red")
+                pass
             self._re_enable_ui()
         except Exception as e:
             import traceback
             traceback.print_exc()
-            self.update_status_bar(f"❌ {str(e)}", "red")
             self._re_enable_ui()

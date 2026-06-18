@@ -85,6 +85,7 @@ if os.path.exists(ed_pp):
 hiddenimports = [
     "keyboard",
     "PIL._tkinter_finder",
+    "deep_translator",
 ]
 
 # ===========================================================================

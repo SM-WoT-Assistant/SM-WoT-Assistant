@@ -116,6 +116,12 @@ class HelpManager:
         row("Status row", self.app.t('ui', 'help_palette_status'))
         row("Click empty", self.app.t('ui', 'help_palette_click_empty'))
 
+        section(self.app.t('ui', 'help_section_io'))
+        row(self.app.t('ui', 'save_btn'), self.app.t('ui', 'help_export'))
+        row(self.app.t('ui', 'load_btn'), self.app.t('ui', 'help_import'))
+        row("ALL EXPORT", self.app.t('ui', 'help_all_export'))
+        row("ALL IMPORT", self.app.t('ui', 'help_all_import'))
+
         section(self.app.t('ui', 'help_section_filters'))
         row(self.app.t('ui', 'battle_mode_label'), self.app.t('ui', 'help_filter_mode'))
         row(self.app.t('ui', 'vehicle_class_label'), self.app.t('ui', 'help_filter_class'))

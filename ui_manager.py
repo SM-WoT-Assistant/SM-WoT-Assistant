@@ -208,8 +208,7 @@ class UIManager:
             dlg.destroy()
             os.remove(os.path.join(config.USER_DATA_DIR, "identity.json"))
             self._refresh_identity_bar()
-            self.app.status_label.config(text=self.app.t('ui', 'logged_out_msg'), fg="#ffb347")
-            self.app.root.after(3000, lambda: self.app.status_label.config(text=self.app.t('ui', 'hangar_status'), fg="gray"))
+            pass
         tk.Button(bf, text=self.app.t('ui', 'yes'), bg="#553333", fg="white", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
         tk.Button(bf, text=self.app.t('ui', 'no'), bg="#444", fg="#aaa", bd=0,
@@ -263,8 +262,7 @@ class UIManager:
             if ok:
                 dlg.destroy()
                 self._refresh_identity_bar()
-                self.app.status_label.config(text=self.app.t('ui', 'welcome_msg').format(nick=nick), fg="lime")
-                self.app.root.after(3000, lambda: self.app.status_label.config(text=self.app.t('ui', 'hangar_status'), fg="gray"))
+                pass
             else:
                 status_var.set(msg)
 
@@ -321,15 +319,12 @@ class UIManager:
             self.app.map_mode = mode
             if mode == 1:
                 self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
-                self.app.battle_status_top.pack(side="top", fill="x")
-                self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
-                self.app.status_label.pack(side="bottom", fill="x")
             else:
                 self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
-                self.app.filter_panel.pack(side="bottom", fill="x")
-                self.app.status_label.pack(side="bottom", fill="x")
-                self.app.status_label.config(height=2, bg="#1a1a1a")
-                self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+            self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+            self.app.filter_panel.pack(side="bottom", fill="x")
+            self.app.status_label.pack(side="bottom", fill="x")
+            self.app.status_label.config(height=2, bg="#1a1a1a")
             self.app.canvas.pack(side="top", fill="both", expand=True)
 
             self.app.map_mgr.load_map_list()
@@ -347,7 +342,6 @@ class UIManager:
                 self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
-            self.app.status_label.config(text=self.app.t('ui', 'stats_loading'), fg="yellow", height=1, bg="#222")
             self.app.status_label.pack(side="bottom", fill="x")
             self.app.browser_frame.pack(side="top", fill="both", expand=True)
             
@@ -366,7 +360,6 @@ class UIManager:
                 self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
-            self.app.status_label.config(text=self.app.t('ui', 'ai_stats_select'), fg="cyan", height=1, bg="#222")
             self.app.status_label.pack(side="bottom", fill="x")
             if hasattr(self.app, 'stats_ai_module'): self.app.stats_ai_module.refresh_ai_view()
 

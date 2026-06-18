@@ -84,8 +84,8 @@ class LocaleManager:
         for key, en_val in en_ui.items():
             cached = curr_ui.get(key)
             stored_en = en_snapshot.get(key)
-            # Re-translate if: no cache, OR EN source changed since last translation
-            if cached is None or stored_en != en_val:
+            # Re-translate if: no cache, value is still English, OR EN source changed
+            if cached is None or cached == en_val or stored_en != en_val:
                 missing[key] = en_val
 
         if not missing:

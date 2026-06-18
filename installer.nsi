@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.12"
+!define PRODUCT_VERSION "1.0.14"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant v${PRODUCT_VERSION}.exe"
@@ -32,8 +32,10 @@ Section "Install"
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     Delete "$DESKTOP\SM WoT Assistant.lnk"
     Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
-    CreateShortCut "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe" "" "$INSTDIR\_internal\icon.ico"
+    Delete "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
+    CreateShortCut "$DESKTOP\SM WoT Assistant.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME} ${PRODUCT_VERSION}"
@@ -50,9 +52,16 @@ Section "Install"
 SectionEnd
 
 Section "Uninstall"
+    MessageBox MB_YESNO|MB_ICONQUESTION \
+        "Delete tactical schemes, settings, and cached data?$\n$\nClick YES to remove all user data. Click NO to keep your schemes for future reinstall." \
+        IDNO skip_data
+    RMDir /r "$APPDATA\SM WoT Assistant"
+    skip_data:
     RMDir /r "$INSTDIR"
     Delete "$DESKTOP\SM WoT Assistant.lnk"
     Delete "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
     RMDir /r "$SMPROGRAMS\${PRODUCT_NAME}"
     DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
     DeleteRegKey HKCU "${PRODUCT_DIR_REGKEY}"

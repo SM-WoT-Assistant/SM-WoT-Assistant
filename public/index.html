@@ -147,7 +147,8 @@ function loadReleases() {
                 return;
             }
 
-            const items = Object.values(data).sort((a, b) => {
+            const { latest, ...versions } = data;
+            const items = Object.values(versions).sort((a, b) => {
                 const dateCmp = (b.release_date || '').localeCompare(a.release_date || '');
                 if (dateCmp !== 0) return dateCmp;
                 return compareVersions(b.version || '0.0.0', a.version || '0.0.0');
