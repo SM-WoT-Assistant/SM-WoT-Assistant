@@ -27,13 +27,14 @@ UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
+    Delete "$INSTDIR\SM WoT Assistant v*.exe"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     Delete "$DESKTOP\SM WoT Assistant.lnk"
     Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk"
-    Delete "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
-    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
+    Delete "$DESKTOP\SM WoT Assistant v*.lnk"
+    Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v*.lnk"
     CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
     CreateShortCut "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
 

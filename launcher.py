@@ -57,11 +57,13 @@ def compare_versions(current, latest):
     except Exception:
         return False
 
-SPLASH_W, SPLASH_H = 450, 300
+SPLASH_W, SPLASH_H = 450, 350
 
 
 class Launcher:
     def __init__(self):
+        self.skip_splash = "--skip-splash" in sys.argv
+
         self.mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
             sys.exit(0)
@@ -69,6 +71,7 @@ class Launcher:
         self.version = load_version()
         self.install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
         self.installed_version = self._detect_installed_version()
+        self._dot_animating = False
 
     def _detect_installed_version(self):
         """Визначає встановлену версію з імен EXE-файлів у директорії інсталяції."""
@@ -86,6 +89,18 @@ class Launcher:
             return self.version
         candidates.sort(key=lambda x: x[0])
         return candidates[-1][1]
+
+    def _find_main_exe(self):
+        """Знайти встановлений головний EXE."""
+        exe_name = f"SM WoT Assistant v{self.installed_version}.exe"
+        main_exe = os.path.join(self.install_dir, exe_name)
+        if os.path.exists(main_exe):
+            return main_exe
+        if os.path.isdir(self.install_dir):
+            for f in os.listdir(self.install_dir):
+                if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
+                    return os.path.join(self.install_dir, f)
+        return None
 
     def _center_geometry(self):
         sw = self.splash.winfo_screenwidth()
@@ -113,24 +128,33 @@ class Launcher:
         except Exception:
             self._logo_img = None
 
-        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 62, text=f"v{self.installed_version}",
-                                 fill="white", font=("Verdana", 12, "bold"))
+        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 100, text=f"v{self.installed_version}",
+                                 fill="white", font=("Verdana", 11))
 
         self.status_text = self.canvas.create_text(
-            SPLASH_W // 2, SPLASH_H - 46,
+            SPLASH_W // 2, SPLASH_H - 84,
             text="Checking for updates...", fill="#bbbbbb", font=("Arial", 9))
 
         self.pct_text = self.canvas.create_text(
-            SPLASH_W - 34, SPLASH_H - 18,
-            text="0%", fill="#dddddd", font=("Arial", 9, "bold"))
+            SPLASH_W - 34, SPLASH_H - 20,
+            text="0%", fill="#dddddd", font=("Arial", 9))
 
         self.pbar = self.canvas.create_rectangle(
-            0, SPLASH_H - 8, 0, SPLASH_H, fill="#ff4500", outline="")
+            0, SPLASH_H - 10, 0, SPLASH_H, fill="#ff4500", outline="")
 
         self.splash.deiconify()
         self.splash.update()
 
     def run(self):
+        if self.skip_splash:
+            exe = self._find_main_exe()
+            if exe:
+                try:
+                    ctypes.windll.kernel32.CloseHandle(self.mutex)
+                except Exception:
+                    pass
+                subprocess.Popen([exe], creationflags=0x08000000)
+            return
         self._show_splash()
         self.splash.after(100, self._check_and_proceed)
         self.splash.mainloop()
@@ -150,9 +174,30 @@ class Launcher:
 
     def _set_progress(self, pct, fill="#ff4500"):
         try:
-            self.canvas.coords(self.pbar, 0, SPLASH_H - 8, pct * SPLASH_W // 100, SPLASH_H)
+            self.canvas.coords(self.pbar, 0, SPLASH_H - 10, pct * SPLASH_W // 100, SPLASH_H)
             self.canvas.itemconfigure(self.pbar, fill=fill)
             self.canvas.itemconfigure(self.pct_text, text=f"{pct}%")
+        except Exception:
+            pass
+
+    def _start_dot_animation(self):
+        self._dot_animating = True
+        self._dot_state = 0
+        self._animate_dots()
+
+    def _stop_dot_animation(self):
+        self._dot_animating = False
+
+    def _animate_dots(self):
+        if not self._dot_animating:
+            return
+        try:
+            text = self.canvas.itemcget(self.status_text, "text")
+            base = text.rstrip(".")
+            self._dot_state = (self._dot_state + 1) % 3
+            dots = "." * (self._dot_state + 1)
+            self.canvas.itemconfigure(self.status_text, text=base + dots)
+            self.splash.after(500, self._animate_dots)
         except Exception:
             pass
 
@@ -163,13 +208,13 @@ class Launcher:
         self.canvas.itemconfigure(self.pct_text, text="")
         self.canvas.coords(self.pbar, 0, 0, 0, 0)
 
-        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 92,
+        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 64,
                                  text=f"You have v{self.installed_version}", fill="#aaa", font=("Arial", 9))
 
         btn_w, btn_h = 140, 36
         lx = SPLASH_W // 2 - btn_w - 14
         rx = SPLASH_W // 2 + 14
-        by = SPLASH_H - 68
+        by = SPLASH_H - 58
 
         self.canvas.create_rectangle(lx, by, lx + btn_w, by + btn_h,
                                       fill="#335533", outline="#66aa66", tags="btn")
@@ -201,9 +246,9 @@ class Launcher:
 
         self.canvas.delete("btn")
 
-        self._set_status(f"Downloading v{latest_ver}...", "#ffaa00", ("Arial", 11, "bold"))
+        self._set_status(f"Downloading v{latest_ver}...", "#ffaa00", ("Arial", 11))
         self.canvas.itemconfigure(self.pct_text, text="0%")
-        self.canvas.coords(self.pbar, 0, SPLASH_H - 8, 0, SPLASH_H)
+        self.canvas.coords(self.pbar, 0, SPLASH_H - 10, 0, SPLASH_H)
         self.canvas.itemconfigure(self.pbar, fill="#ff4500")
 
         def _download():
@@ -233,7 +278,8 @@ class Launcher:
 
                 self.splash.after(0, lambda: (
                     self._set_progress(100, "#22cc44"),
-                    self._set_status("Installing...", "#ffaa00", ("Arial", 11, "bold"))
+                    self._set_status("Installing...", "#ffaa00", ("Arial", 11)),
+                    self._start_dot_animation()
                 ))
 
                 result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
@@ -259,16 +305,19 @@ class Launcher:
                 except Exception:
                     pass
 
-                self.splash.after(0, lambda: self._set_status(
-                    f"Updated to v{latest_ver}", "#22cc44", ("Arial", 13, "bold")))
+                self.splash.after(0, lambda: (
+                    self._stop_dot_animation(),
+                    self._set_status(f"Updated to v{latest_ver}", "#22cc44", ("Arial", 13, "bold"))
+                ))
 
                 def _finish():
-                    self._set_status("Starting...", "#22cc44", ("Arial", 12, "bold"))
+                    self._set_status("Starting...", "#22cc44", ("Arial", 12))
                     try:
                         ctypes.windll.kernel32.CloseHandle(self.mutex)
                     except Exception:
                         pass
-                    subprocess.Popen([install_exe], creationflags=0x08000000)
+                    launcher_exe = os.path.join(self.install_dir, "SM WoT Assistant Launcher.exe")
+                    subprocess.Popen([launcher_exe, "--skip-splash"], creationflags=0x08000000)
                     self.splash.after(200, lambda: (self.splash.destroy(), sys.exit(0)))
 
                 self.splash.after(3000, _finish)
@@ -281,7 +330,8 @@ class Launcher:
                     except Exception:
                         pass
                 self.splash.after(0, lambda: (
-                    self._set_status(f"Error: {str(e)[:80]}", "#ff4444", ("Arial", 10, "bold")),
+                    self._stop_dot_animation(),
+                    self._set_status(f"Error: {str(e)[:80]}", "#ff4444", ("Arial", 10)),
                     self.canvas.itemconfigure(self.pct_text, text="")
                 ))
 
@@ -289,17 +339,10 @@ class Launcher:
         t.start()
 
     def _launch_main(self):
-        exe_name = f"SM WoT Assistant v{self.installed_version}.exe"
-        main_exe = os.path.join(self.install_dir, exe_name)
+        main_exe = self._find_main_exe()
 
-        if not os.path.exists(main_exe):
-            for f in os.listdir(self.install_dir):
-                if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
-                    main_exe = os.path.join(self.install_dir, f)
-                    break
-
-        if not os.path.exists(main_exe):
-            self._set_status(f"Program not installed. Run setup first.", "#ff4444", ("Arial", 10))
+        if not main_exe or not os.path.exists(main_exe):
+            self._set_status("Program not installed. Run setup first.", "#ff4444", ("Arial", 10))
             return
 
         geo = self.splash.geometry()

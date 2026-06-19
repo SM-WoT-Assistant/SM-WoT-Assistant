@@ -1534,7 +1534,7 @@ class WotAssistantHQ:
         self._startup_display_percent = 0
         self._startup_ready_at = 0.0
         self._startup_status_text = self.t('ui', 'checking_updates')
-        sw, sh = 450, 300
+        sw, sh = 450, 350
         if self._splash_geometry:
             self.splash.geometry(self._splash_geometry)
         else:
@@ -1546,25 +1546,25 @@ class WotAssistantHQ:
         self.splash_canvas.pack()
         if self.logo_splash:
             self.splash_canvas.create_image(sw//2, sh//2 - 20, image=self.logo_splash)
-        version = config.load_version()
-        self.splash_canvas.create_text(sw//2, sh - 60, text=version, fill="white", font=("Arial", 10, "bold"))
+        version = "v" + config.load_version()
+        self.splash_canvas.create_text(sw//2, sh - 100, text=version, fill="white", font=("Verdana", 11))
         lang_text = self.t('ui', 'language_label').format(lang=self.lang.upper())
-        self.splash_canvas.create_text(sw//2, sh - 48, text=lang_text, fill="#888888", font=("Arial", 8))
+        self.splash_canvas.create_text(sw//2, sh - 87, text=lang_text, fill="#888888", font=("Arial", 9))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
-            sh - 38,
+            sh - 74,
             text=self.t('ui', 'checking_updates'),
             fill="#bbbbbb",
-            font=("Arial", 8),
+            font=("Arial", 9),
         )
         self.splash_percent_text = self.splash_canvas.create_text(
             sw - 34,
-            sh - 18,
+            sh - 20,
             text="0%",
             fill="#dddddd",
-            font=("Arial", 8, "bold"),
+            font=("Arial", 9),
         )
-        self.pbar = self.splash_canvas.create_rectangle(0, sh-8, 0, sh, fill="#ff4500", outline="")
+        self.pbar = self.splash_canvas.create_rectangle(0, sh-10, 0, sh, fill="#ff4500", outline="")
         self.update_startup_progress(3, self.t('ui', 'preparing_check'))
         self._animate_startup_progress()
         self.splash.deiconify()
