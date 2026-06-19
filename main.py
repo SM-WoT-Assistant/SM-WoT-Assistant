@@ -131,18 +131,38 @@ class WotAssistantHQ:
         
         game_exists = wot_path and os.path.exists(os.path.join(wot_path, "WorldOfTanks.exe"))
         
+        if not (log_path and os.path.exists(log_path)):
+            self._auto_detect_log_path()
+            new_log = self.settings.get("log_path", "")
+            if new_log:
+                log_path = os.path.normpath(new_log)
+                self.settings["log_path"] = log_path
+            elif game_exists:
+                # Вивести шлях із wot_path, якщо common_logs не знайшли
+                for suffix in ["python.log", os.path.join("logs", "python.log")]:
+                    p = os.path.normpath(os.path.join(wot_path, suffix))
+                    log_path = p
+                    self.settings["log_path"] = p
+                    break
+        
+        # Якщо шлях відомий, але файлу немає — створюємо пустий
+        if log_path and not os.path.exists(log_path):
+            try:
+                d = os.path.dirname(log_path)
+                if d and not os.path.exists(d):
+                    os.makedirs(d, exist_ok=True)
+                with open(log_path, "w", encoding="utf-8") as _:
+                    pass
+                print(f"[INIT] Created empty log at: {log_path}")
+            except Exception as e:
+                print(f"[INIT] Cannot create log at {log_path}: {e}")
+        
         if log_path and os.path.exists(log_path):
             print(f"[INIT] {self.t('ui', 'log_found').format(path=log_path)}")
         elif game_exists:
             print(f"[INIT] {self.t('ui', 'log_waiting').format(path=wot_path)}")
-            self._auto_detect_log_path()
-            log_path = self.settings.get("log_path", "")
-            if log_path:
-                log_path = os.path.normpath(log_path)
-                self.settings["log_path"] = log_path
         else:
             print(f"[INIT] {self.t('ui', 'game_not_found')}")
-            self._auto_detect_log_path()
         
         self.last_battle_map = None
         self.last_battle_mode = None
@@ -748,6 +768,7 @@ class WotAssistantHQ:
         self.root.after(0, apply_class_filter)
 
     def on_battle_countdown_started(self, map_id, arena_type):
+        print(f"[BATTLE] countdown_started: map={map_id}, arena_type={arena_type}, auto_battle={self.auto_battle_var.get()}, mode={self.mode}")
         if not self.auto_battle_var.get():
             return
         if self.mode != "norm":
@@ -757,6 +778,7 @@ class WotAssistantHQ:
         self.last_battle_map = map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
+        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}")
         
         if not self.auto_sync_var.get():
             return
@@ -772,6 +794,7 @@ class WotAssistantHQ:
 
     def on_battle_ended(self):
         self.save_settings()
+        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}")
         
         if not self.last_battle_map or not self.auto_battle_var.get():
             return
@@ -798,7 +821,9 @@ class WotAssistantHQ:
         self.safe_battle_sync(map_id, ui_mode)
 
     def safe_battle_sync(self, map_id, ui_mode):
+        print(f"[BATTLE] safe_battle_sync: map={map_id}, ui_mode={ui_mode}, log_path={self.settings.get('log_path','')}")
         if not self.settings.get("log_path", ""):
+            print(f"[BATTLE] EARLY EXIT: log_path empty")
             return
 
         self.switch_to_maps(2)
@@ -1302,15 +1327,23 @@ class WotAssistantHQ:
         detected = None
         common_logs = [
             os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks", "logs", "python.log"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks EU", "logs", "python.log"),
             os.path.join(os.path.expanduser("~"), "AppData", "Local", "Wargaming.net", "World of Tanks", "logs", "python.log"),
-            os.path.join("C:", "Games", "World_of_Tanks", "logs", "python.log"),
-            os.path.join("D:", "Games", "World_of_Tanks", "logs", "python.log"),
-            os.path.join("C:", "Games", "World_of_Tanks_EU", "python.log"),
-            os.path.join("C:", "Games", "World_of_Tanks_EU", "logs", "python.log"),
-            os.path.join("D:", "Games", "World_of_Tanks_EU", "python.log"),
-            os.path.join("D:", "Games", "World_of_Tanks_EU", "logs", "python.log"),
+            os.path.join("C:\\", "Games", "World_of_Tanks", "logs", "python.log"),
+            os.path.join("D:\\", "Games", "World_of_Tanks", "logs", "python.log"),
+            os.path.join("C:\\", "Games", "World_of_Tanks_EU", "python.log"),
+            os.path.join("C:\\", "Games", "World_of_Tanks_EU", "logs", "python.log"),
+            os.path.join("D:\\", "Games", "World_of_Tanks_EU", "python.log"),
+            os.path.join("D:\\", "Games", "World_of_Tanks_EU", "logs", "python.log"),
             os.path.join(os.getcwd(), "logs", "python.log"),
         ]
+        # Також спробуємо вивести з wot_path
+        wot_path = self.settings.get("wot_path", "")
+        if wot_path:
+            for suffix in ["python.log", os.path.join("logs", "python.log")]:
+                p = os.path.normpath(os.path.join(wot_path, suffix))
+                if p not in common_logs:
+                    common_logs.append(p)
         for p in common_logs:
             if os.path.exists(p):
                 detected = p
@@ -1319,8 +1352,6 @@ class WotAssistantHQ:
             self.settings["log_path"] = detected
             self.save_settings()
             print(f"[INIT] Автоматично визначено log_path: {detected}")
-        else:
-            print("[INIT] Не вдалося автоматично знайти лог. Вкажіть шлях у ⚙ -> WoT")
 
     def _on_startup_progress(self, percent, text):
         self.update_startup_progress(percent, text)

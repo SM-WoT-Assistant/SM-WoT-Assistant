@@ -40,6 +40,9 @@ class LogWatcher:
         # Починаємо з кінця файлу, щоб не перемикатися на старі бої при запуску
         if os.path.exists(self.log_path):
             self._last_size = os.path.getsize(self.log_path)
+            print(f"[LOGWATCHER] Started with log_path={self.log_path}, size={self._last_size}")
+        else:
+            print(f"[LOGWATCHER] Started with log_path={self.log_path} (NOT FOUND)")
             
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
@@ -128,6 +131,7 @@ class LogWatcher:
                                         4: "comp7"     # Onslaught
                                     }
                                     mode = type_to_mode.get(self.last_type, "ctf")
+                                    print(f"[LOGWATCHER] Arena detected: map={map_id}, mode={mode}, last_type={self.last_type}")
                                     if self.callback:
                                         self.callback(map_id, mode)
                 

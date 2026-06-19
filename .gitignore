@@ -89,3 +89,7 @@ Tactik_Shemi/
 
 # Large temp archives
 temp_scripts.zip
+
+# Process output capture (generated during test runs)
+*_err.txt
+*_out.txt

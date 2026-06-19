@@ -5,7 +5,7 @@ Built as --onefile (PyInstaller). All DLLs extracted to %TEMP%,
 so running setup.exe does NOT conflict with locked files in the install dir.
 """
 
-import os, sys, tempfile, threading, subprocess, ctypes, time
+import os, sys, tempfile, threading, subprocess, ctypes, time, re
 import tkinter as tk
 from PIL import Image, ImageTk, ImageOps
 import requests
@@ -68,6 +68,24 @@ class Launcher:
 
         self.version = load_version()
         self.install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+        self.installed_version = self._detect_installed_version()
+
+    def _detect_installed_version(self):
+        """Визначає встановлену версію з імен EXE-файлів у директорії інсталяції."""
+        if not os.path.isdir(self.install_dir):
+            return self.version
+        candidates = []
+        try:
+            for f in os.listdir(self.install_dir):
+                m = re.match(r"SM WoT Assistant v(\d+\.\d+\.\d+)\.exe", f)
+                if m:
+                    candidates.append((tuple(int(n) for n in m.group(1).split(".")), m.group(1)))
+        except Exception:
+            return self.version
+        if not candidates:
+            return self.version
+        candidates.sort(key=lambda x: x[0])
+        return candidates[-1][1]
 
     def _center_geometry(self):
         sw = self.splash.winfo_screenwidth()
@@ -95,7 +113,7 @@ class Launcher:
         except Exception:
             self._logo_img = None
 
-        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 62, text=self.version,
+        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 62, text=f"v{self.installed_version}",
                                  fill="white", font=("Verdana", 12, "bold"))
 
         self.status_text = self.canvas.create_text(
@@ -119,7 +137,7 @@ class Launcher:
 
     def _check_and_proceed(self):
         latest = check_for_updates_sync()
-        if latest and compare_versions(self.version, latest.get("version", "0.0.0")):
+        if latest and compare_versions(self.installed_version, latest.get("version", "0.0.0")):
             self._show_update_prompt(latest)
         else:
             self._launch_main()
@@ -146,7 +164,7 @@ class Launcher:
         self.canvas.coords(self.pbar, 0, 0, 0, 0)
 
         self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 92,
-                                 text=f"You have v{self.version}", fill="#aaa", font=("Arial", 9))
+                                 text=f"You have v{self.installed_version}", fill="#aaa", font=("Arial", 9))
 
         btn_w, btn_h = 140, 36
         lx = SPLASH_W // 2 - btn_w - 14
@@ -271,7 +289,7 @@ class Launcher:
         t.start()
 
     def _launch_main(self):
-        exe_name = f"SM WoT Assistant v{self.version}.exe"
+        exe_name = f"SM WoT Assistant v{self.installed_version}.exe"
         main_exe = os.path.join(self.install_dir, exe_name)
 
         if not os.path.exists(main_exe):

@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.15"
+!define PRODUCT_VERSION "1.0.16"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant v${PRODUCT_VERSION}.exe"
@@ -34,8 +34,8 @@ Section "Install"
     Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk"
     Delete "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
     Delete "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk"
-    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
-    CreateShortCut "$DESKTOP\SM WoT Assistant.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
+    CreateShortCut "$SMPROGRAMS\${PRODUCT_NAME}\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
+    CreateShortCut "$DESKTOP\SM WoT Assistant v${PRODUCT_VERSION}.lnk" "$INSTDIR\SM WoT Assistant Launcher.exe" "" "$INSTDIR\_internal\icon.ico"
 
     WriteRegStr HKCU "${PRODUCT_DIR_REGKEY}" "" "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe"
     WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME} ${PRODUCT_VERSION}"
