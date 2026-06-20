@@ -283,7 +283,6 @@ class WotAssistantHQ:
                 self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
             except Exception:
                 pass
-            self._po_win.lift()
 
     def _on_root_hide(self, event=None):
         self._stop_po_sync_timer()
@@ -294,6 +293,7 @@ class WotAssistantHQ:
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.deiconify()
             self._sync_po_pos()
+            self._po_win.lift()
             self._start_po_sync_timer()
 
     def _start_po_sync_timer(self):
@@ -614,6 +614,7 @@ class WotAssistantHQ:
             if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
                 self._po_win.deiconify()
                 self._sync_po_pos()
+                self._po_win.lift()
                 self._start_po_sync_timer()
         else:
             self._stop_po_sync_timer()
@@ -671,6 +672,7 @@ class WotAssistantHQ:
             self.root.update_idletasks()
             self._sync_po_pos()
             self._po_win.deiconify()
+            self._po_win.lift()
             self._start_po_sync_timer()
 
     def _handle_ctrl_up(self):

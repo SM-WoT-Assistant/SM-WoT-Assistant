@@ -11,7 +11,6 @@ class DrawingPalette(tk.Toplevel):
         self.app = app
 
         self.overrideredirect(True)
-        self.attributes("-topmost", True)
         self.configure(bg="#222")
         self.resizable(False, False)
 
@@ -255,10 +254,7 @@ class DrawingPalette(tk.Toplevel):
 
     def _lift_self(self):
         try:
-            self.master.lift()
-            self.master.attributes("-topmost", True)
-            self.lift()
-            self.attributes("-topmost", True)
+            self.lift(aboveThis=self.master)
         except:
             pass
 
@@ -336,12 +332,12 @@ class DrawingPalette(tk.Toplevel):
 
     def show(self):
         self.deiconify()
-        self.lift()
+        self.lift(aboveThis=self.app.root)
+        self.transient(self.app.root)
         self.focus_force()
         self.update_idletasks()
         if self._saved_pos:
             self.geometry(self._saved_pos)
-        self.attributes("-topmost", True)
         self._sync_tool_state()
         self.after(100, self._lift_self)
 
