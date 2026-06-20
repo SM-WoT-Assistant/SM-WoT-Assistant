@@ -314,6 +314,7 @@ def build_launcher():
     result = subprocess.run([
         PYTHON_EXE, "-m", "PyInstaller",
         "--onefile", "--windowed",
+        "--hidden-import", "unicodedata",
         "--add-data", f"{logo}{sep}.",
         "--add-data", f"{ver}{sep}.",
         "--icon", os.path.join(BASE_DIR, "icon.ico"),
