@@ -34,6 +34,9 @@ def publish_drawing(map_name, map_id, elements_data, title="", comment="", on_do
     if isinstance(elements_data, list):
         elements_str = json.dumps(elements_data, ensure_ascii=False)
         element_count = len(elements_data)
+    elif isinstance(elements_data, dict):
+        elements_str = json.dumps(elements_data, ensure_ascii=False)
+        element_count = sum(len(v) for v in elements_data.values() if isinstance(v, list))
     elif isinstance(elements_data, str):
         elements_str = elements_data
         try:

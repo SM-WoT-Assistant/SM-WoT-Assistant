@@ -74,8 +74,8 @@
         <div class="card">
             <h2>Releases (RTDB versions/)</h2>
             <div style="margin-bottom:10px;">
-                <button class="btn btn-danger" onclick="deleteOldReleases()">Delete all except latest</button>
-                <span style="color:#888;font-size:12px;margin-left:10px;" id="release-count"></span>
+                <button class="btn btn-danger" onclick="deleteSelectedReleases()" id="delete-releases-btn">Delete selected (0)</button>
+                <span style="color:#888;font-size:12px;" id="release-count"></span>
             </div>
             <div id="releases-container"><div class="empty">Loading...</div></div>
         </div>
@@ -83,8 +83,8 @@
         <div class="card">
             <h2>Schemes (RTDB schemes/)</h2>
             <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button class="btn btn-danger" onclick="deleteAllLegacySchemes()">Delete all legacy (no PIN)</button>
-                <span style="color:#888;font-size:12px;margin-left:10px;" id="scheme-count"></span>
+                <button class="btn btn-danger" onclick="deleteSelectedSchemes()" id="delete-schemes-btn">Delete selected (0)</button>
+                <span style="color:#888;font-size:12px;" id="scheme-count"></span>
             </div>
             <div id="schemes-container"><div class="empty">Loading...</div></div>
         </div>
@@ -250,7 +250,7 @@ function loadAdminSchemes() {
             allAdminSchemes = Object.entries(data).map(([key, val]) => ({ ...val, _key: key }));
             allAdminSchemes.sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
             document.getElementById("scheme-count").textContent =
-                `Total: ${allAdminSchemes.length} | Legacy: ${allAdminSchemes.filter(s => !s.pin_hash).length}`;
+                `Total: ${allAdminSchemes.length}`;
             renderAdminSchemes();
         })
         .catch(() => {
@@ -264,56 +264,66 @@ function renderAdminSchemes() {
         container.innerHTML = '<div class="empty">No schemes</div>';
         return;
     }
-    let html = '<table><tr><th>Map ID</th><th>Map Name</th><th>Author</th><th>Scheme Name</th><th>Date</th><th>PIN?</th><th></th></tr>';
+    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'scheme-check\', \'delete-schemes-btn\')" title="Select all"></th><th>Map ID</th><th>Map Name</th><th>Author</th><th>Scheme Name</th><th>Date</th><th>PIN?</th></tr>';
     allAdminSchemes.forEach(s => {
         const hasPin = s.pin_hash ? "✅" : "❌";
         html += `<tr>
+            <td><input type="checkbox" class="scheme-check" value="${s._key}" onchange="updateDeleteCount('scheme-check', 'delete-schemes-btn')"></td>
             <td style="font-family:monospace;font-size:11px;color:#888">${s.map_id || ''}</td>
             <td style="color:#ffaa00">${mapLabel(s.map_id) || (s.map_name || '')}</td>
             <td>${s.author_nickname || '—'}</td>
             <td style="max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s.title || '—'}</td>
             <td>${(s.created_at || '').slice(0,16)}</td>
             <td>${hasPin}</td>
-            <td><button class="btn btn-danger" onclick="deleteAdminScheme('${s._key}')">Delete</button></td>
         </tr>`;
     });
     html += '</table>';
     container.innerHTML = html;
 }
 
-function deleteAdminScheme(key) {
-    if (!confirm("Delete scheme " + key + "?")) return;
-    db.ref("schemes/" + key).remove()
-        .then(() => {
-            loadAdminSchemes();
-        })
-        .catch(() => alert("Delete error"));
+function toggleSelectAll(master, cls, btnId) {
+    document.querySelectorAll("." + cls).forEach(cb => cb.checked = master.checked);
+    updateDeleteCount(cls, btnId);
+}
+function updateDeleteCount(cls, btnId) {
+    const count = document.querySelectorAll("." + cls + ":checked").length;
+    document.getElementById(btnId).textContent = "Delete selected (" + count + ")";
+}
+function getSelectedKeys(cls) {
+    return Array.from(document.querySelectorAll("." + cls + ":checked")).map(cb => cb.value);
 }
 
-function deleteAllLegacySchemes() {
-    const legacy = allAdminSchemes.filter(s => !s.pin_hash);
-    if (!legacy.length) { alert("No legacy schemes to delete."); return; }
-    if (!confirm(`Delete ALL ${legacy.length} legacy schemes (no PIN)?\nThis action cannot be undone!`)) return;
+function deleteSelectedSchemes() {
+    const keys = getSelectedKeys("scheme-check");
+    if (!keys.length) { alert("No schemes selected."); return; }
+    if (!confirm(`Delete ${keys.length} selected scheme(s)?\nThis action cannot be undone!`)) return;
 
-    let done = 0;
-    let failed = 0;
-    const total = legacy.length;
-
-    legacy.forEach(s => {
-        db.ref("schemes/" + s._key).remove()
-            .then(() => {
-                done++;
-                if (done + failed >= total) finish();
-            })
-            .catch(() => {
-                failed++;
-                if (done + failed >= total) finish();
-            });
+    let done = 0, failed = 0, total = keys.length;
+    keys.forEach(key => {
+        db.ref("schemes/" + key).remove()
+            .then(() => { done++; if (done + failed >= total) finish(); })
+            .catch(() => { failed++; if (done + failed >= total) finish(); });
     });
-
     function finish() {
         alert(`Deleted: ${done}, failed: ${failed}`);
         loadAdminSchemes();
+    }
+}
+
+function deleteSelectedReleases() {
+    const keys = getSelectedKeys("release-check");
+    if (!keys.length) { alert("No releases selected."); return; }
+    if (!confirm(`Delete ${keys.length} selected release(s)?\nThis action cannot be undone!`)) return;
+
+    let done = 0, failed = 0, total = keys.length;
+    keys.forEach(key => {
+        db.ref("versions/" + key).remove()
+            .then(() => { done++; if (done + failed >= total) finish(); })
+            .catch(() => { failed++; if (done + failed >= total) finish(); });
+    });
+    function finish() {
+        alert(`Deleted: ${done}, failed: ${failed}`);
+        loadAdminReleases();
     }
 }
 
@@ -363,43 +373,21 @@ function renderAdminReleases() {
         container.innerHTML = '<div class="empty">No releases</div>';
         return;
     }
-    let html = '<table><tr><th>Version</th><th>Date</th><th>Size</th><th>URL</th><th></th></tr>';
+    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'release-check\', \'delete-releases-btn\')" title="Select all"></th><th>Version</th><th>Date</th><th>Size</th><th>URL</th></tr>';
     allAdminReleases.forEach(r => {
         html += `<tr>
+            <td><input type="checkbox" class="release-check" value="${r._key}" onchange="updateDeleteCount('release-check', 'delete-releases-btn')"></td>
             <td style="color:#ff4500;font-weight:bold">v${r.version || ''}</td>
             <td>${(r.release_date || '').slice(0,10)}</td>
             <td>${r.build_size || '—'}</td>
             <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px">${r.download_url || '—'}</td>
-            <td><button class="btn btn-danger" onclick="deleteAdminRelease('${r._key}')">Delete</button></td>
         </tr>`;
     });
     html += '</table>';
     container.innerHTML = html;
 }
 
-function deleteAdminRelease(key) {
-    if (!confirm("Delete release " + key.replace(/_/g, '.') + "?")) return;
-    db.ref("versions/" + key).remove()
-        .then(() => loadAdminReleases())
-        .catch(() => alert("Delete error"));
-}
 
-function deleteOldReleases() {
-    if (allAdminReleases.length <= 1) { alert("No old releases to delete."); return; }
-    const toDelete = allAdminReleases.slice(1); // all except latest
-    if (!confirm(`Delete ${toDelete.length} old releases, keeping v${allAdminReleases[0].version}?`)) return;
-
-    let done = 0, failed = 0;
-    toDelete.forEach(r => {
-        db.ref("versions/" + r._key).remove()
-            .then(() => { done++; if (done + failed >= toDelete.length) finishR(); })
-            .catch(() => { failed++; if (done + failed >= toDelete.length) finishR(); });
-    });
-    function finishR() {
-        alert(`Deleted: ${done}, failed: ${failed}`);
-        loadAdminReleases();
-    }
-}
 </script>
 
 </body>

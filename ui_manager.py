@@ -78,13 +78,6 @@ class UIManager:
             font=("Arial", 8)
         )
         self.app.identity_pin_label.pack(side="left", padx=(2, 15), pady=4)
-        self.app.identity_publish_btn = tk.Button(
-            self.app.identity_bar, text=self.app.t('ui', 'publish'), bg="#335555", fg="#ccc", bd=0,
-            font=("Arial", 8), padx=8,
-            command=self._open_publish_site
-        )
-        self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
-
         self.app.identity_action_btn = tk.Button(
             self.app.identity_bar, text="", bg="#333", fg="#ccc", bd=0,
             font=("Arial", 8), padx=8,
@@ -101,30 +94,16 @@ class UIManager:
             self.app.identity_nick_label.config(text=f"  {nick}")
             self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#888888")
             self.app.identity_action_btn.config(text=self.app.t('ui', 'logout'), bg="#553333", fg="#cc9999")
-            if self.app.active_view == "maps" and self.app.map_mode == 2:
-                self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
-            else:
-                self.app.identity_publish_btn.pack_forget()
         else:
             self.app.identity_nick_label.config(text="  " + self.app.t('ui', 'not_registered'))
             self.app.identity_pin_label.config(text="")
             self.app.identity_action_btn.config(text=self.app.t('ui', 'register'), bg="#335533", fg="#99cc99")
-            self.app.identity_publish_btn.pack_forget()
 
     def _identity_action(self):
         if firebase_identity.is_registered():
             self._confirm_logout()
         else:
             self._show_registration_dialog()
-
-    def _open_publish_site(self):
-        import os
-        nick = firebase_identity.get_nickname()
-        url = "https://sm-wot-assistant.web.app/schemes.html"
-        if nick:
-            from urllib.parse import quote
-            url += f"?nick={quote(nick)}"
-        os.startfile(url)
 
     def _show_settings_menu(self):
         if hasattr(self, '_settings_win') and self._settings_win and self._settings_win.winfo_exists():
@@ -321,11 +300,6 @@ class UIManager:
         self.app.identity_bar.pack_forget()
         self.app.top_bar.pack(side="top", fill="x")
         self.app.identity_bar.pack(side="top", fill="x")
-
-        if view_name == "maps" and kwargs.get('mode', 1) == 2 and firebase_identity.is_registered():
-            self.app.identity_publish_btn.pack(side="right", padx=3, pady=3)
-        else:
-            self.app.identity_publish_btn.pack_forget()
 
         if view_name == "maps":
             mode = kwargs.get('mode', 1)

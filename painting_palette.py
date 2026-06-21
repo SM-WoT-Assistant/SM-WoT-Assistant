@@ -1,6 +1,8 @@
 import tkinter as tk
-from tkinter import colorchooser
+from tkinter import colorchooser, messagebox
 import language_module
+import firebase_identity
+import firebase_drawings
 
 FONT_AWE = "FontAwesome"
 
@@ -186,21 +188,29 @@ class DrawingPalette(tk.Toplevel):
         sep5 = tk.Frame(self, bg="#333", height=1)
         sep5.pack(fill="x", padx=6, pady=2)
 
+        cf = tk.Frame(self, bg=bg)
+        cf.pack(fill="x", padx=8, pady=(2, 2))
+        tk.Button(cf, text=self.app.t('ui', 'clear').upper(), bg="#444", fg="white", bd=0,
+                  font=("Arial", 8), command=self._clear_all).pack(fill="x", expand=True, padx=1)
+
+        sep6 = tk.Frame(self, bg="#333", height=1)
+        sep6.pack(fill="x", padx=6, pady=2)
+
         bf = tk.Frame(self, bg=bg)
-        bf.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Button(bf, text=self.app.t('ui', 'clear').upper(), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._clear_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
-                   font=("Arial", 8), command=self._import).pack(side="left", fill="x", expand=True, padx=1)
+        bf.pack(fill="x", padx=8, pady=(2, 2))
+        tk.Button(bf, text=self.app.t('ui', 'publish_map').upper(), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 8), command=self._publish).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf, text=self.app.t('ui', 'publish_all').upper(), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 8), command=self._publish_all).pack(side="left", fill="x", expand=True, padx=1)
 
         bf2 = tk.Frame(self, bg=bg)
         bf2.pack(fill="x", padx=8, pady=(0, 6))
+        tk.Button(bf2, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
+                  font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf2, text=self.app.t('ui', 'all_export').upper(), bg="#444", fg="#aaccff", bd=0,
                    font=("Arial", 8), command=self._export_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf2, text=self.app.t('ui', 'all_import').upper(), bg="#444", fg="#aaccff", bd=0,
-                   font=("Arial", 8), command=self._import_all).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf2, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
+                   font=("Arial", 8), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
@@ -312,17 +322,255 @@ class DrawingPalette(tk.Toplevel):
         self._lift_self()
         self.app.export_current_tactic()
 
-    def _import(self):
-        self._lift_self()
-        self.app.import_external_tactic()
-
     def _export_all(self):
         self._lift_self()
         self.app.export_all_tactics()
 
-    def _import_all(self):
+    def _import_unified(self):
         self._lift_self()
-        self.app.import_all_tactics()
+        self.app.import_tactic_unified()
+
+    def _fetch_existing_comments(self, map_ids):
+        try:
+            import firebase_reporter
+            import requests
+            url = firebase_reporter._rtdb_url("schemes.json")
+            r = requests.get(url, timeout=10)
+            if r.status_code != 200:
+                return set()
+            data = r.json()
+            if not data or not isinstance(data, dict):
+                return set()
+            existing = set()
+            for item in data.values():
+                if not isinstance(item, dict):
+                    continue
+                mid = item.get("map_id", "")
+                com = item.get("comment", "")
+                if mid in map_ids:
+                    existing.add((mid, com))
+            return existing
+        except Exception:
+            return set()
+
+    def _publish(self):
+        self._lift_self()
+        if not firebase_identity.is_registered():
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                self.app.t('ui', 'publish_register_first'))
+            return
+        if not self.app.current_map_eng:
+            return
+        drawings = self.painter.drawings.get(self.app.current_map_eng, [])
+        if not drawings:
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                self.app.t('ui', 'publish_no_drawings'))
+            return
+
+        import config
+        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
+        existing = self._fetch_existing_comments({self.app.current_map_eng})
+        desc = self._ask_publish_description(
+            map_name, existing_comments=existing,
+            map_id=self.app.current_map_eng)
+        if desc is None:
+            return
+        desc_en = self._translate_to_english(desc)
+
+        def on_done(ok, msg):
+            if ok:
+                self.after(0, lambda: self._show_custom_message(
+                    self.app.t('ui', 'publish_map'),
+                    self.app.t('ui', 'publish_done')))
+            else:
+                self.after(0, lambda: self._show_custom_message(
+                    self.app.t('ui', 'publish_map'),
+                    self.app.t('ui', 'publish_error').format(msg=msg),
+                    is_error=True))
+
+        firebase_drawings.publish_drawing(
+            map_name=map_name, map_id=self.app.current_map_eng,
+            elements_data=drawings, title=map_name,
+            comment=desc_en, on_done=on_done)
+
+    def _publish_all(self):
+        import config
+        self._lift_self()
+        if not firebase_identity.is_registered():
+            self._show_custom_message(
+                self.app.t('ui', 'publish_all'),
+                self.app.t('ui', 'publish_register_first'))
+            return
+
+        maps_with = {k: v for k, v in self.painter.drawings.items()
+                     if isinstance(v, list) and len(v) > 0}
+        if not maps_with:
+            self._show_custom_message(
+                self.app.t('ui', 'publish_all'),
+                self.app.t('ui', 'publish_no_drawings_all'))
+            return
+
+        existing = self._fetch_existing_comments({"all_maps"})
+        desc = self._ask_publish_description(
+            "All Maps", count=len(maps_with),
+            existing_comments=existing, map_ids={"all_maps"})
+        if desc is None:
+            return
+        desc_en = self._translate_to_english(desc)
+
+        bundle = {
+            "type": "all_maps",
+            "drawings": {k: v for k, v in maps_with.items()},
+            "map_names": {k: config.MAP_NAMES_EN.get(k, k) for k in maps_with},
+            "version": config.load_version(),
+            "total_maps": len(maps_with),
+            "total_elements": sum(len(v) for v in maps_with.values()),
+        }
+
+        def on_done(ok, msg):
+            self.after(0, lambda: self._show_publish_all_result(
+                {"ok": 1 if ok else 0, "errors": 0 if ok else 1, "total": 1}))
+
+        firebase_drawings.publish_drawing(
+            map_name="All Maps", map_id="all_maps",
+            elements_data=bundle, title="All Maps",
+            comment=desc_en, on_done=on_done)
+
+    def _ask_publish_description(self, name, count=0, existing_comments=None,
+                                  map_id=None, map_ids=None):
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title(self.app.t('ui', 'publish_map') if count == 0 else self.app.t('ui', 'publish_all'))
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        dlg.lift()
+        dlg.focus_force()
+
+        if count:
+            lbl_text = self.app.t('ui', 'publish_publishing_all').format(count=count)
+        else:
+            lbl_text = self.app.t('ui', 'publish_publishing').format(name=name)
+        tk.Label(dlg, text=lbl_text, bg="#222", fg="#ffaa00",
+                 font=("Arial", 9, "bold")).pack(padx=16, pady=(12, 6))
+
+        tk.Label(dlg, text=self.app.t('ui', 'publish_desc_hint'),
+                 bg="#222", fg="#888", font=("Arial", 8),
+                 anchor="w").pack(fill="x", padx=16)
+
+        err_lbl = tk.Label(dlg, text="", bg="#222", fg="#ff6666",
+                           font=("Arial", 8), anchor="w", wraplength=360)
+        err_lbl.pack(fill="x", padx=16)
+        err_lbl.pack_forget()
+
+        text_w = tk.Text(dlg, height=3, width=40, bg="#111", fg="white",
+                          insertbackground="white", bd=1, relief="solid",
+                          wrap="word", font=("Arial", 9))
+        text_w.pack(padx=16, pady=(2, 8))
+
+        def clear_error():
+            text_w.config(bg="#111")
+            err_lbl.pack_forget()
+
+        text_w.bind("<KeyRelease>", lambda e: clear_error())
+
+        result = [None]
+
+        def on_ok():
+            desc = text_w.get("1.0", "end-1c").strip()
+            if not desc:
+                text_w.config(bg="#331111")
+                err_lbl.config(text=self.app.t('ui', 'publish_desc_required'))
+                err_lbl.pack(fill="x", padx=16)
+                return
+            desc_en = self._translate_to_english(desc)
+
+            if existing_comments is not None:
+                check_ids = [map_id] if map_id else (map_ids or set())
+                for mid in check_ids:
+                    if (mid, desc_en) in existing_comments:
+                        text_w.config(bg="#331111")
+                        err_lbl.config(text="Same map with this description already exists. Change description to publish.")
+                        err_lbl.pack(fill="x", padx=16)
+                        return
+
+            result[0] = desc
+            dlg.destroy()
+
+        def on_cancel():
+            result[0] = None
+            dlg.destroy()
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 12))
+        tk.Button(bf, text=self.app.t('ui', 'publish_cancel'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'publish_confirm'), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=12, pady=4, command=on_ok).pack(side="left", padx=4)
+
+        self._center_on_root(dlg)
+        self.wait_window(dlg)
+        return result[0]
+
+    def _translate_to_english(self, text):
+        if not text:
+            return ""
+        try:
+            from deep_translator import GoogleTranslator
+            return GoogleTranslator(source='auto', target='en').translate(text)
+        except Exception:
+            return text
+
+    def _center_on_root(self, dlg):
+        self.app.root.update_idletasks()
+        rx = self.app.root.winfo_x()
+        ry = self.app.root.winfo_y()
+        rw = self.app.root.winfo_width()
+        rh = self.app.root.winfo_height()
+        dlg.update_idletasks()
+        dw = dlg.winfo_reqwidth()
+        dh = dlg.winfo_reqheight()
+        x = rx + max(0, (rw - dw) // 2)
+        y = ry + max(0, (rh - dh) // 2)
+        dlg.geometry(f"+{x}+{y}")
+
+    def _show_custom_message(self, title, message, is_error=False):
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title(title)
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        dlg.lift()
+        dlg.focus_force()
+        tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
+                 font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
+        tk.Label(dlg, text=message, bg="#222",
+                 fg="#ff6666" if is_error else "#cccccc",
+                 font=("Arial", 9), wraplength=360, justify="left").pack(padx=20, pady=(4, 12))
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 12))
+        result = [False]
+        def on_ok():
+            result[0] = True
+            dlg.destroy()
+        tk.Button(bf, text="OK", bg="#446644" if not is_error else "#664444",
+                  fg="#cfc" if not is_error else "#fcc", bd=0,
+                  font=("Arial", 9, "bold"), padx=20, pady=4, command=on_ok).pack()
+        self._center_on_root(dlg)
+        self.wait_window(dlg)
+        return result[0]
+
+    def _show_publish_all_result(self, results):
+        msg = self.app.t('ui', 'publish_all_result').format(
+            ok=results["ok"], errors=results["errors"])
+        self._show_custom_message(
+            self.app.t('ui', 'publish_all'), msg,
+            is_error=results["errors"] > 0)
 
     def _close(self):
         self.exit_edit_mode()
@@ -386,8 +634,8 @@ class DrawingPalette(tk.Toplevel):
             if saved_colors and isinstance(saved_colors, list) and len(saved_colors) == 5:
                 self._custom_colors = saved_colors
                 self._update_color_buttons()
-            self.geometry(f"500x420+{px}+{py}")
-            self._saved_pos = f"500x420+{px}+{py}"
+            self.geometry(f"500x480+{px}+{py}")
+            self._saved_pos = f"500x480+{px}+{py}"
         except Exception:
             self.geometry("+100+100")
 

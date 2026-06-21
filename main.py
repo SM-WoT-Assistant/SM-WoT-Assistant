@@ -340,9 +340,15 @@ class WotAssistantHQ:
 
 
     def save_settings(self):
-        cx, cy = self.root.winfo_x(), self.root.winfo_y()
+        try:
+            cx, cy = self.root.winfo_x(), self.root.winfo_y()
+        except tk.TclError:
+            return
         if cx < -5000: return
-        if self.root.winfo_width() < 100: return
+        try:
+            if self.root.winfo_width() < 100: return
+        except tk.TclError:
+            return
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
@@ -743,6 +749,16 @@ class WotAssistantHQ:
             self.painter.redraw()
         tactics_manager.import_all_tactics(
             self.root, self.painter.drawings, on_success
+        )
+
+    def import_tactic_unified(self):
+        def on_success():
+            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.redraw()
+        tactics_manager.import_unified(
+            self.root, self.current_map_eng,
+            self.translate_map_name(self.current_map_eng) if self.current_map_eng else "",
+            self.painter.drawings, on_success
         )
 
     def on_minimap_appeared(self, map_id, mode):

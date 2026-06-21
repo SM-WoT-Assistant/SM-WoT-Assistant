@@ -57,7 +57,6 @@
 <header>
     <h1><a href="index.html">SM WoT Assistant</a> — Tactical Schemes</h1>
     <nav>
-        <button class="btn btn-green" onclick="openUpload()">Publish scheme</button>
         <button class="btn btn-blue" onclick="openHelp()" title="Help">?</button>
         <a href="index.html" class="btn">Home</a>
     </nav>
@@ -79,59 +78,19 @@
     </div>
 </main>
 
-<!-- Upload Modal -->
-<div id="upload-modal" class="modal-overlay">
-    <div class="modal">
-        <h3>Publish Tactical Scheme</h3>
-        <label>Nickname</label>
-        <input type="text" id="upload-nick" placeholder="Your nickname" maxlength="20">
-        <label>PIN (4 digits) <span title="Find your PIN in the app — top bar, next to your nickname" style="cursor:help;color:#ffaa00;font-size:13px;">&#9432;</span></label>
-        <input type="password" id="upload-pin" placeholder="Your PIN" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
-        <div style="color:#888;font-size:11px;margin-top:2px;margin-bottom:4px;">Find your PIN in the app — top bar, next to your nickname</div>
-        <label>Scheme title</label>
-        <input type="text" id="upload-title" placeholder="e.g. Heavies left flank" maxlength="60">
-        <label>Description (optional)</label>
-        <textarea id="upload-comment" placeholder="Describe the tactic..." maxlength="500" rows="3" style="width:100%;background:#111;color:#ccc;border:1px solid #333;padding:8px;border-radius:4px;font-size:13px;resize:vertical;"></textarea>
-        <label>JSON file (one or more)</label>
-        <input type="file" id="upload-file" accept=".json" multiple onchange="updateUploadCount()" style="display:none">
-        <div style="display:flex;align-items:center;gap:10px;">
-            <button type="button" class="btn" onclick="document.getElementById('upload-file').click()">Choose Files</button>
-            <span id="upload-count" style="color:#888;font-size:14px;">No files chosen</span>
-        </div>
-        <div class="actions">
-            <button class="btn" onclick="closeUpload()">Cancel</button>
-            <button class="btn btn-primary" onclick="doUpload()">Publish</button>
-        </div>
-    </div>
-</div>
-
 <!-- Help Modal -->
 <div id="help-modal" class="modal-overlay">
     <div class="modal">
         <h3>Website Help</h3>
         <div style="line-height:1.7;font-size:13px;color:#ccc;">
             <p style="color:#ffaa00;margin-bottom:8px;"><strong>What is this page?</strong></p>
-            <p style="margin-bottom:12px;">Here you can <strong>publish</strong> your tactical schemes from the SM WoT Assistant app and <strong>download</strong> schemes shared by other players.</p>
-
-            <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to publish a scheme:</strong></p>
-            <ol style="padding-left:20px;margin-bottom:12px;">
-                <li>Open SM WoT Assistant app → TACTIC mode</li>
-                <li>Draw your tactics on the map</li>
-                <li>Click the Publish button in the app's top bar</li>
-                <li>The JSON file saves to your Tactik_Shemi folder</li>
-                <li>On this page, click <strong>"Publish scheme"</strong></li>
-                <li>Fill in your <strong>Nickname</strong> and <strong>PIN</strong></li>
-                <li>Select the JSON file and click <strong>Publish</strong></li>
-            </ol>
+            <p style="margin-bottom:12px;">Here you can browse tactical schemes published by the community.</p>
 
             <p style="color:#ffaa00;margin-bottom:8px;"><strong>Where to find your PIN?</strong></p>
             <p style="margin-bottom:12px;">Your 4-digit PIN is displayed in the app — <strong>top bar</strong>, next to your nickname. You set it when you first registered in the app. Example: <span style="color:#ffaa00;font-family:monospace;">PRO [4825]</span></p>
 
-            <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to register?</strong></p>
-            <p style="margin-bottom:12px;">In the app, click the top bar area with your nickname → <strong>Register identity</strong> → enter nickname + 4-digit PIN.</p>
-
             <p style="color:#ffaa00;margin-bottom:8px;"><strong>How to download:</strong></p>
-            <p style="margin-bottom:4px;">Click <strong>Download</strong> on any scheme row → a JSON file saves to your computer. Open it in the app via TACTIC → Import.</p>
+            <p style="margin-bottom:4px;">Click <strong>Download</strong> on any scheme row → a JSON file saves to your computer. Import it in the app via TACTIC mode → Import button in the Drawing Palette.</p>
         </div>
         <div class="actions">
             <button class="btn btn-primary" onclick="closeHelp()">Got it</button>
@@ -186,7 +145,7 @@ const MAP_NAMES = {
 function initLang() {
     const mapSel = document.getElementById("map-filter");
     if (mapSel) {
-        mapSel.innerHTML = '<option value="">All maps</option>';
+        mapSel.innerHTML = '<option value="">All maps</option><option value="all_maps">All Maps</option>';
         const mapKeys = Object.keys(MAP_NAMES);
         mapKeys.sort().forEach(id => {
             mapSel.innerHTML += `<option value="${id}">${mapLabel(id)}</option>`;
@@ -202,11 +161,6 @@ let allAuthors = new Set();
 let allMaps = new Set();
 
 function init() {
-    const params = new URLSearchParams(window.location.search);
-    const nickParam = params.get("nick");
-    if (nickParam) {
-        document.getElementById("upload-nick").value = decodeURIComponent(nickParam);
-    }
     initLang();
     loadSchemes();
 }
@@ -244,16 +198,15 @@ function loadSchemes() {
 function renderSchemes(schemes) {
     const container = document.getElementById("schemes-table");
     if (!schemes.length) {
-        container.innerHTML = '<div class="empty">No published schemes. <a href="#" onclick="openUpload()" style="color:#ffaa00">Publish the first!</a></div>';
+        container.innerHTML = '<div class="empty">No published schemes yet.</div>';
         return;
     }
-    let html = '<table><tr><th>Map</th><th>Title</th><th>Description</th><th>Author</th><th>Date</th><th>Elem.</th><th></th></tr>';
+    let html = '<table><tr><th>Map</th><th>Description</th><th>Author</th><th>Date</th><th>Elem.</th><th></th></tr>';
     schemes.forEach(s => {
         const desc = (s.comment || '').slice(0, 60);
         html += `<tr>
-            <td class="scheme-map" title="${(s.map_id || '')}">${mapLabel(s.map_id) || s.map_name || ''}</td>
-            <td style="color:#ffaa00;font-size:12px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.title || '').replace(/"/g, '&quot;')}">${s.title || '—'}</td>
-            <td style="color:#999;font-size:11px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.comment || '').replace(/"/g, '&quot;')}">${desc || '—'}</td>
+            <td class="scheme-map" title="${(s.map_id || '')}">${s.map_id === "all_maps" ? "All Maps" : (mapLabel(s.map_id) || s.map_name || '')}</td>
+            <td style="color:#999;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.comment || '').replace(/"/g, '&quot;')}">${desc || '—'}</td>
             <td class="scheme-author">${s.author_nickname || '—'}</td>
             <td class="scheme-date">${(s.created_at || '').slice(0, 16)}</td>
             <td class="scheme-count">${s.element_count || 0}</td>
@@ -294,15 +247,23 @@ function downloadJSON(data, filename) {
 function downloadScheme(drawingId) {
     const s = allSchemes.find(x => x.drawing_id === drawingId);
     if (!s) { toast("Scheme not found", true); return; }
+    if (s.map_id === "all_maps") {
+        const bundle = typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || {});
+        if (bundle && bundle.type === "all_maps") {
+            bundle.comment = s.comment || "";
+            bundle.author = s.author_nickname;
+            downloadJSON(bundle, `All_Maps_${s.author_nickname || "anon"}.json`);
+            return;
+        }
+    }
     const data = {
         map_id: s.map_id,
-        map_name: s.map_name || mapLabel(s.map_id),
-        title: s.title || "",
+        map_name: mapLabel(s.map_id) || s.map_name,
         comment: s.comment || "",
         author: s.author_nickname,
         elements: typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || [])
     };
-    downloadJSON(data, `${mapLabel(s.map_id)}_${s.author_nickname || "anon"}.json`);
+    downloadJSON(data, `${(mapLabel(s.map_id) || s.map_name || "scheme")}_${s.author_nickname || "anon"}.json`);
 }
 
 function downloadAuthorSchemes(nickname) {
@@ -313,106 +274,12 @@ function downloadAuthorSchemes(nickname) {
         scheme_count: schemes.length,
         schemes: schemes.map(s => ({
             map_id: s.map_id,
-            map_name: s.map_name || mapLabel(s.map_id),
+            map_name: mapLabel(s.map_id) || s.map_name,
             elements: typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || []),
             created_at: s.created_at
         }))
     };
     downloadJSON(data, `schemes_by_${nickname}.json`);
-}
-
-// ═══ Upload ═══
-
-function openUpload() { document.getElementById("upload-modal").classList.add("active"); }
-function closeUpload() {
-    document.getElementById("upload-modal").classList.remove("active");
-    document.getElementById("upload-file").value = "";
-    document.getElementById("upload-count").textContent = "No files chosen";
-}
-function updateUploadCount() {
-    const f = document.getElementById("upload-file");
-    if (!f.files.length) {
-        document.getElementById("upload-count").textContent = "No files chosen";
-        return;
-    }
-    const names = Array.from(f.files).map(x => x.name).join(", ");
-    document.getElementById("upload-count").textContent = names;
-}
-
-async function doUpload() {
-    const nick = document.getElementById("upload-nick").value.trim();
-    const pin = document.getElementById("upload-pin").value.trim();
-    const title = document.getElementById("upload-title").value.trim();
-    const comment = document.getElementById("upload-comment").value.trim();
-    const files = document.getElementById("upload-file").files;
-
-    if (!nick) { toast("Enter nickname", true); return; }
-    if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN must be exactly 4 digits", true); return; }
-    if (!title) { toast("Enter scheme title", true); return; }
-    if (!files.length) { toast("Select JSON file(s)", true); return; }
-
-    let pinHash;
-    try { pinHash = await hashPin(pin); } catch (e) { toast("PIN hash error", true); return; }
-
-    let uploaded = 0;
-    let errors = 0;
-
-    const processNext = (idx) => {
-        if (idx >= files.length) {
-            if (uploaded) {
-                let msg = `Published: ${uploaded} scheme(s)`;
-                if (errors) msg += `, errors: ${errors}`;
-                toast(msg);
-                closeUpload();
-                setTimeout(loadSchemes, 1000);
-            }
-            return;
-        }
-
-        const file = files[idx];
-        const reader = new FileReader();
-        reader.onload = () => {
-            try {
-                const data = JSON.parse(reader.result);
-                const mapId = data.map_id;
-                if (!mapId) {
-                    errors++;
-                    processNext(idx + 1);
-                    return;
-                }
-                let elements = data.drawings || data.elements || data;
-                if (Array.isArray(elements)) {
-                    // ok
-                } else if (Array.isArray(data.drawings)) {
-                    elements = data.drawings;
-                } else {
-                    throw new Error("No elements array found");
-                }
-                const drawingId = "web_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
-                const scheme = {
-                    drawing_id: drawingId,
-                    map_id: mapId,
-                    map_name: mapLabel(mapId),
-                    author_nickname: nick,
-                    pin_hash: pinHash,
-                    title: title,
-                    comment: comment,
-                    elements: JSON.stringify(elements),
-                    element_count: elements.length,
-                    created_at: new Date().toISOString().replace("T", " ").slice(0, 19)
-                };
-                db.ref("schemes/" + drawingId).set(scheme)
-                    .then(() => { uploaded++; processNext(idx + 1); })
-                    .catch(() => { errors++; processNext(idx + 1); });
-            } catch (e) {
-                errors++;
-                processNext(idx + 1);
-            }
-        };
-        reader.readAsText(file);
-    };
-
-    processNext(0);
 }
 
 // ═══ SHA256 Hash ═══
@@ -427,7 +294,8 @@ async function deleteScheme(drawingId) {
     const s = allSchemes.find(x => x.drawing_id === drawingId);
     if (!s) { toast("Scheme not found", true); return; }
 
-    const pin = prompt("Enter your PIN (4 digits) to delete scheme:\n\nMap: " + mapLabel(s.map_id) + "\nTitle: " + (s.title || "—"));
+    const delLabel = s.map_id === "all_maps" ? "All Maps" : (mapLabel(s.map_id) || s.map_name || "—");
+    const pin = prompt("Enter your PIN (4 digits) to delete scheme:\n\nMap: " + delLabel);
     if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) { toast("PIN must be 4 digits", true); return; }
 
     let pinHash;

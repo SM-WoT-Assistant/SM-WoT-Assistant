@@ -138,20 +138,21 @@ def export_all_tactics(parent, drawings, map_names=None):
         title="Експорт усіх тактик",
         defaultextension=".json",
         filetypes=[("JSON files", "*.json")],
-        initialfile="all_tactics.json"
+        initialfile="all_maps.json"
     )
     if not file_path:
         return
 
     count = sum(len(v) for v in drawings.values())
     export_data = {
+        "type": "all_maps",
         "app": "SM WoT Assistant",
         "version": config.load_version(),
         "export_date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "total_maps": len(drawings),
         "total_drawings": count,
         "drawings": dict(drawings),
-        "map_names": map_names or {},
+        "map_names": {k: config.MAP_NAMES_EN.get(k, k) for k in drawings} if map_names is None else map_names,
     }
     try:
         with open(file_path, "w", encoding="utf-8") as f:
@@ -215,3 +216,111 @@ def import_all_tactics(parent, drawings, on_success):
 
     except Exception as e:
         messagebox.showerror("Помилка", f"Не вдалося прочитати файл: {e}", parent=parent)
+
+
+def import_unified(parent, current_map_id, current_map_name, drawings, on_success):
+    """Auto-detect single-map or all-maps format and import."""
+    file_path = filedialog.askopenfilename(
+        parent=parent,
+        title="Import tactic",
+        filetypes=[("JSON files", "*.json")]
+    )
+    if not file_path:
+        return
+
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        if not isinstance(data, dict):
+            messagebox.showerror("Error", "Invalid file format.", parent=parent)
+            return
+
+        # Detect all_maps type: has "type":"all_maps" OR "drawings" is a dict
+        is_all_maps = data.get("type") == "all_maps" or \
+                      ("drawings" in data and isinstance(data["drawings"], dict))
+
+        if is_all_maps:
+            src = data.get("drawings", data)
+            if not isinstance(src, dict):
+                src = {}
+            src_maps = len(src)
+            src_items = sum(len(v) for v in src.values() if isinstance(v, list))
+            dst_maps = len(drawings)
+            dst_items = sum(len(v) for v in drawings.values() if isinstance(v, list))
+
+            info = (
+                f"File contains {src_maps} maps ({src_items} objects).\n"
+                f"Current project has {dst_maps} maps ({dst_items} objects).\n\n"
+            )
+            choice = _choice_dialog(parent, "Import",
+                info + "Replace all drawings or Merge with current?")
+            if choice is None:
+                return
+
+            if choice:
+                drawings.clear()
+                drawings.update(src)
+            else:
+                for map_id, items in src.items():
+                    if map_id not in drawings:
+                        drawings[map_id] = []
+                    if isinstance(items, list):
+                        drawings[map_id].extend(items)
+
+            on_success()
+            new_total = sum(len(v) for v in drawings.values() if isinstance(v, list))
+            messagebox.showinfo("Import",
+                f"Imported {src_maps} maps. Total: {len(drawings)} maps ({new_total} objects).",
+                parent=parent)
+        else:
+            # Single-map import
+            if "drawings" not in data or not isinstance(data["drawings"], list):
+                messagebox.showerror("Error",
+                    "Invalid tactic file format.\nExpected a 'drawings' array.",
+                    parent=parent)
+                return
+
+            import_map_id = data.get("map_id")
+            if import_map_id and import_map_id != current_map_id:
+                dlg = tk.Toplevel(parent)
+                dlg.title("Warning")
+                dlg.configure(bg="#222")
+                dlg.resizable(False, False)
+                dlg.attributes("-topmost", True)
+                dlg.grab_set()
+                confirm = [False]
+                msg = (f"This tactic was created for map '{data.get('map_name', import_map_id)}'.\n"
+                       f"Import to current map '{current_map_name}'?")
+                tk.Label(dlg, text=msg, bg="#222", fg="#ccc",
+                         font=("Arial", 9), wraplength=380).pack(padx=20, pady=(15, 10))
+                bf = tk.Frame(dlg, bg="#222")
+                bf.pack(pady=(0, 12))
+                tk.Button(bf, text="YES", bg="#553333", fg="#ff6666", bd=0,
+                          font=("Arial", 9, "bold"), padx=12, pady=4,
+                          command=lambda: [confirm.__setitem__(0, True), dlg.destroy()]).pack(side="left", padx=4)
+                tk.Button(bf, text="NO", bg="#444", fg="#aaa", bd=0,
+                          font=("Arial", 9), padx=12, pady=4,
+                          command=dlg.destroy).pack(side="left", padx=4)
+                parent.wait_window(dlg)
+                if not confirm[0]:
+                    return
+
+            choice = _choice_dialog(parent, "Import",
+                "Replace existing drawings or Merge with current?")
+            if choice is None:
+                return
+
+            if current_map_id not in drawings:
+                drawings[current_map_id] = []
+
+            if choice:
+                drawings[current_map_id] = data["drawings"]
+            else:
+                drawings[current_map_id].extend(data["drawings"])
+
+            on_success()
+            messagebox.showinfo("Import", "Tactic imported successfully!", parent=parent)
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to read file: {e}", parent=parent)
