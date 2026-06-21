@@ -258,6 +258,7 @@ class Launcher:
                 print(f"[LAUNCHER] Downloading: {dl_url}")
 
                 r = requests.get(dl_url, stream=True, headers=HEADERS, timeout=120)
+                r.raise_for_status()
                 total = int(r.headers.get("content-length", 0))
                 downloaded = 0
                 last_pct = -1

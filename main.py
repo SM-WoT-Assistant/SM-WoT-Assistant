@@ -995,6 +995,7 @@ class WotAssistantHQ:
                 print(f"[UPDATE] Downloading: {url}")
 
                 r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
+                r.raise_for_status()
                 total = int(r.headers.get("content-length", 0))
                 downloaded = 0
                 last_pct = -1
@@ -1183,6 +1184,7 @@ class WotAssistantHQ:
             print(f"[UPDATE] Downloading: {url}")
 
             r = requests.get(url, stream=True, headers=config.HEADERS, timeout=120)
+            r.raise_for_status()
             total = int(r.headers.get("content-length", 0))
             downloaded = 0
             last_pct = -1

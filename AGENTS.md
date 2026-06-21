@@ -77,9 +77,10 @@
 ## Релізний механізм (09.06.2026)
 
 ### Створення релізу
-1. `python build.py` — білд з поточною VERSION
-2. `python build.py 1.0.2` — оновити VERSION → білд
-3. `python build.py 1.0.2 --release` — білд + GitHub release (gh)
+Кожен білд автоматично створює GitHub release + публікує в RTDB.
+1. `python build.py` — білд + GitHub release + RTDB (поточна VERSION)
+2. `python build.py 1.0.2` — оновити VERSION → білд + GitHub release + RTDB
+3. `python build.py 1.0.2 --date=2026-06-21` — білд з кастомною датою релізу
 
 ### Фази білду (build.py)
 1. **Pre-flight** — валідація semver (X.Y.Z), Python 3.12+PyInstaller, NSIS (makensis.exe), gh CLI, критичні файли (main.py, VERSION, wot_assistant.spec, logo.png), git status
@@ -99,7 +100,7 @@
 ### Інструменти для білду
 - Python: Python 3.12 (PyInstaller 6.20.0) — Python 3.14 має баг DATA TOC
 - NSIS: `C:\Program Files (x86)\NSIS\makensis.exe` (build.py:find_nsis auto-detect)
-- GitHub CLI: `gh` (опціонально, для --release)
+- GitHub CLI: `gh` (обов'язково)
 - `PyInstaller 6.x` баг: DATA entries з Analysis не потрапляють у COLLECT → обхід: `copy_data_files()` копіює дані вручну після PyInstaller
 
 ### Включення файлів у бандл (copy_data_files)
@@ -120,10 +121,8 @@
 - `main.py:1093-1101` — копіює з `config.BUNDLE_DIR` в `config.USER_DATA_DIR` якщо файл ще не існує
 
 ### Порядок дій для нового релізу
-1. `python build.py X.Y.Z` — білд з новою версією
-2. Перевірити `dist/` артефакти (Verify phase перевіряє автоматично)
-3. Запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test
-4. Якщо все OK: `python build.py X.Y.Z --release` для GitHub release (або вручну через `gh`)
+`python build.py X.Y.Z` робить все: білд + GitHub release + RTDB. Verify phase перевіряє автоматично.
+Після білду запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test.
 
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.

@@ -181,7 +181,7 @@
 
 **Build Entry:**
 - Location: `build.py`
-- Triggers: `python build.py [version] [--release]`
+- Triggers: `python build.py [version]`
 - Responsibilities: Update `VERSION` file if version arg given, run PyInstaller via `wot_assistant.spec` producing a onedir output (~5795 files, ~750 MB total), manually copy data files via `build.py:copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug), run NSIS to produce installer (~320 MB), create portable ZIP (~390 MB), optionally create GitHub release via `gh` CLI
 
 **Map List Loading:**

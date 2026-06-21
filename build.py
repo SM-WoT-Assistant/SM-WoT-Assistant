@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Build script for SM WoT Assistant — PyInstaller onedir + NSIS installer + GitHub release.
-Each release goes into its own versioned directory (dist/SM WoT Assistant vX.Y.Z/).
+Each build is a release — creates GitHub release + publishes to RTDB automatically.
 
 Usage:
-    python build.py                    # build with current VERSION
-    python build.py 1.0.1              # update VERSION, then build
-    python build.py 1.0.1 --release    # build + create GitHub release
-    python build.py --release          # create GitHub release from existing build
+    python build.py                    # build + GitHub release + RTDB (current VERSION)
+    python build.py 1.0.1              # update VERSION, then build + release + RTDB
+    python build.py 1.0.1 --date=YYYY-MM-DD  # custom release date
 """
 
 import os, sys, subprocess, shutil, re, time, json
@@ -126,10 +125,14 @@ def preflight(version):
     print(f"  Python:       {PYTHON_EXE}")
 
     nsis = find_nsis()
-    print(f"  NSIS:         {nsis if nsis else 'NOT FOUND — installer will be skipped'}")
+    if not nsis:
+        errors.append("NSIS not found (makensis.exe) — installer required")
+    print(f"  NSIS:         {nsis if nsis else 'NOT FOUND'}")
 
     gh = shutil.which("gh")
-    print(f"  GitHub CLI:   {gh if gh else 'not found — --release will be skipped'}")
+    if not gh:
+        errors.append("GitHub CLI (gh) not found — release required")
+    print(f"  GitHub CLI:   {gh if gh else 'NOT FOUND'}")
 
     critical = ["main.py", VERSION_FILE, SPEC_FILE, "logo.png"]
     for f in critical:
@@ -531,12 +534,7 @@ def create_github_release(version):
 
     if not assets:
         print("[BUILD] ERROR: No release artifacts found.")
-        return
-
-    if shutil.which("gh") is None:
-        print("[BUILD] GitHub CLI not found. Skipping release.")
-        print(f"[BUILD] Manual: gh release create v{version} {' '.join(assets)}")
-        return
+        return False
 
     tag = f"v{version}"
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
@@ -547,8 +545,10 @@ def create_github_release(version):
     result = subprocess.run(cmd, cwd=BASE_DIR)
     if result.returncode == 0:
         print(f"[BUILD] GitHub release {tag} created")
+        return True
     else:
         print(f"[BUILD] GitHub release FAILED (exit code {result.returncode})")
+        return False
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -607,13 +607,10 @@ def write_version_to_rtdb(version, release_date=None):
 
 def main():
     new_version = None
-    do_release = False
     release_date = None
 
     for a in sys.argv[1:]:
-        if a == "--release":
-            do_release = True
-        elif a.startswith("--date="):
+        if a.startswith("--date="):
             release_date = a.split("=", 1)[1]
         else:
             new_version = a
@@ -672,11 +669,10 @@ def main():
     print(f"  Output dir:     {DIST_DIR}")
     print()
 
-    if do_release:
-        create_github_release(version)
-
-    # Write version to RTDB so website shows latest release
-    write_version_to_rtdb(version, release_date)
+    # Always create GitHub release (required for auto-update download URL)
+    if create_github_release(version):
+        # Write version to RTDB only after successful GitHub release
+        write_version_to_rtdb(version, release_date)
 
     print(f"[BUILD] Done: v{version}")
 
