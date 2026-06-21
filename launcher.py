@@ -8,6 +8,7 @@ so running setup.exe does NOT conflict with locked files in the install dir.
 import os, sys, tempfile, threading, subprocess, ctypes, time, re
 import tkinter as tk
 from PIL import Image, ImageTk, ImageOps
+import unicodedata  # force PyInstaller to bundle C extension for idna/requests
 import requests
 
 if getattr(sys, 'frozen', False):
