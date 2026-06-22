@@ -1599,6 +1599,8 @@ class WotAssistantHQ:
     def _periodic_flush_service_messages(self):
         firebase_reporter.try_flush_service_messages(self)
         self._service_flush_timer = self.root.after(300000, self._periodic_flush_service_messages)
+
+    def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
         self._splash_shown_at = time.time()
         self._startup_target_percent = 0
