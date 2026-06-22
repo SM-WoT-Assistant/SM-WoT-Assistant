@@ -679,6 +679,36 @@ class WotAssistantHQ:
             self.edit_focus_lock = False
             self.win_mgr.focus_game_window()
 
+    def _combo_postcommand(self):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.withdraw()
+        self.root.after(400, self._check_dropdown_closed)
+
+    def _combo_focus_out_restore(self, event=None):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() == "withdrawn":
+            self._restore_overlay_now()
+
+    def _check_dropdown_closed(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        popdown_path = self.map_selector._w + '.popdown'
+        popup_exists = self.root.tk.eval('winfo exists ' + popdown_path) == '1'
+        if popup_exists:
+            return
+        self._restore_overlay_now()
+
+    def _restore_overlay_now(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        self.root.update_idletasks()
+        self._po_win.deiconify()
+        self._sync_po_pos()
+        self._po_win.lift()
+
     def on_map_select(self, event=None):
         self.root.focus_set()
         selected_ua = self.map_var.get()
@@ -689,19 +719,13 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
-        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            if self._po_win.state() == "withdrawn":
+                self.root.update_idletasks()
+                self._po_win.deiconify()
+                self._sync_po_pos()
             self._po_win.lift()
         self.painter.redraw()
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            self._po_win.attributes("-topmost", True)
-
-    def _on_combo_press(self, event=None):
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            self._po_win.attributes("-topmost", False)
-
-    def _on_combo_focus_out(self, event=None):
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            self._po_win.attributes("-topmost", True)
 
     def _handle_ctrl_up(self):
         import time
