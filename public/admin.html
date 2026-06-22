@@ -72,6 +72,11 @@
         </div>
 
         <div class="card">
+            <h2>Service Events (recent)</h2>
+            <div id="service-events-container"><div class="empty">Loading...</div></div>
+        </div>
+
+        <div class="card">
             <h2>Releases (RTDB versions/)</h2>
             <div style="margin-bottom:10px;">
                 <button class="btn btn-danger" onclick="deleteSelectedReleases()" id="delete-releases-btn">Delete selected (0)</button>
@@ -165,6 +170,7 @@ function loadDashboard() {
     loadStats();
     loadErrors();
     loadInstallations();
+    loadServiceEvents();
     loadAdminSchemes();
     loadAdminReleases();
 }
@@ -227,6 +233,33 @@ function loadInstallations() {
                     <td>${d.version || ''}</td>
                     <td>${(d.last_seen || '').slice(0,19)}</td>
                     <td>${d.os || ''}</td>
+                </tr>`;
+            });
+            html += '</table>';
+            container.innerHTML = html;
+        });
+}
+
+function loadServiceEvents() {
+    db.ref("service_events").orderByChild("timestamp").limitToLast(50).once("value")
+        .then(snap => {
+            const container = document.getElementById("service-events-container");
+            const data = snap.val();
+            if (!data) {
+                container.innerHTML = '<div class="empty">No service events</div>';
+                return;
+            }
+            const items = Object.values(data).reverse();
+            let html = '<table><tr><th>Date</th><th>Category</th><th>Level</th><th>Message</th><th>Version</th></tr>';
+            items.forEach(d => {
+                const levelClass = d.level === 'error' ? 'badge-error' :
+                    d.level === 'warning' ? 'badge-warning' : 'badge-info';
+                html += `<tr>
+                    <td>${(d.timestamp || '').slice(0,19)}</td>
+                    <td style="font-family:monospace;font-size:11px;color:#888">${d.category || ''}</td>
+                    <td><span class="badge ${levelClass}">${d.level || ''}</span></td>
+                    <td style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.message || ''}</td>
+                    <td>${d.version || ''}</td>
                 </tr>`;
             });
             html += '</table>';

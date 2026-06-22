@@ -209,6 +209,8 @@ class WotAssistantHQ:
                         return
             except Exception as e:
                 print(f"[INIT] Update check error: {e}")
+                import service_messages
+                service_messages.log_event("startup", f"update check error: {e}", level="warning")
         elif self.auto_update_var.get():
             self._check_for_app_updates()
 
@@ -1588,8 +1590,15 @@ class WotAssistantHQ:
             self._stop_po_sync_timer()
             self._po_win.withdraw()
         self._startup_complete = True
+        self.root.after(2000, self._startup_flush_service)
 
-    def show_small_loading_splash(self):
+    def _startup_flush_service(self):
+        firebase_reporter.try_flush_service_messages(self)
+        self._periodic_flush_service_messages()
+
+    def _periodic_flush_service_messages(self):
+        firebase_reporter.try_flush_service_messages(self)
+        self._service_flush_timer = self.root.after(300000, self._periodic_flush_service_messages)
         self.splash = tk.Toplevel(self.root)
         self._splash_shown_at = time.time()
         self._startup_target_percent = 0

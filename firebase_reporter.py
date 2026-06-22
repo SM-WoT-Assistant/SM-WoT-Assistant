@@ -112,8 +112,6 @@ def send_service_events(events_batch):
         }
         if _post("service_events", payload):
             delivered_ids.append(evt.get("id"))
-        else:
-            break
     return delivered_ids
 
 

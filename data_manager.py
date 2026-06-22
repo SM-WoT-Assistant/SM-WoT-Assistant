@@ -154,4 +154,6 @@ class DataManager:
                     return rough_db
         except Exception as e:
             print(f"[DB] load_tank_db error: {e}")
+            import service_messages
+            service_messages.log_event("data_update", f"load_tank_db failed: {e}", level="error")
         return {}

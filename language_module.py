@@ -234,12 +234,6 @@ class LanguageModule:
             with open(output_path, "w", encoding="utf-8") as f:
                 json.dump(result, f, ensure_ascii=False, indent=2)
 
-        try:
-            import firebase_reporter
-            firebase_reporter.push_locale(self.language, result)
-        except Exception:
-            pass
-
         return result
 
     def get_all_names(self):
@@ -361,12 +355,6 @@ def setup(wot_path, settings, save_callback):
         except Exception as e:
             print(f"[LANG SETUP] settings save error: {e}")
         reset_lang_module()
-        try:
-            import firebase_reporter
-            firebase_reporter.set_app_language(lang)
-            print(f"[LANG SETUP] RTDB lang={lang}")
-        except Exception:
-            pass
     else:
         print("[LANG SETUP] no change, skipping rebuild")
 

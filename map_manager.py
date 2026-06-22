@@ -2,6 +2,7 @@ import os
 import json
 import threading
 import config
+import service_messages
 
 try:
     import map_extractor
@@ -269,6 +270,7 @@ class MapManager:
                         emit(86, "crew_update_done")
                     except Exception as e:
                         print(f"[WARN] crew_builds update failed: {e}")
+                        service_messages.log_event("data_update", f"crew_builds update failed: {e}", level="warning")
 
                     try:
                         wot_path = getattr(ext, 'wot_path', None) if ext else None
@@ -279,6 +281,7 @@ class MapManager:
                             emit(87, "equipment_update_done")
                     except Exception as e:
                         print(f"[WARN] equipment_loadouts update failed: {e}")
+                        service_messages.log_event("data_update", f"equipment_loadouts update failed: {e}", level="warning")
 
                 if maps_ok and tanks_ok:
                     if version_changed:
@@ -301,6 +304,7 @@ class MapManager:
             except Exception as e:
                 import traceback
                 print(f"[MAP_MGR] Background update error: {e}")
+                service_messages.log_event("data_update", f"background update error: {e}", level="error")
                 traceback.print_exc()
             finally:
                 self._end_update()
@@ -316,7 +320,9 @@ class MapManager:
                 def status_cb(text): pass
                 success = False
                 try: success = map_updater.sync_all(callback_status=status_cb)
-                except Exception as e: print(f"[MAP_MGR] Updater error: {e}")
+                except Exception as e:
+                    print(f"[MAP_MGR] Updater error: {e}")
+                    service_messages.log_event("data_update", f"map updater error: {e}", level="warning")
                 def on_finish():
                     if success:
                         self.load_map_list()
