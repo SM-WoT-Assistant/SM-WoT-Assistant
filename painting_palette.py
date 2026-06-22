@@ -1,6 +1,6 @@
 import tkinter as tk
-from tkinter import colorchooser, messagebox
 import language_module
+import dialog_utils
 import firebase_identity
 import firebase_drawings
 
@@ -21,8 +21,11 @@ class DrawingPalette(tk.Toplevel):
         self._saved_pos = None
 
         self.current_color = "#ffaa00"
-        self._default_colors = ["#ff0000", "#00ff00", "#00bbff", "#ffff00", "#ffaa00"]
-        self._custom_colors = list(self._default_colors)
+        self._default_colors = [
+            "#ff0000", "#ff5500", "#ffaa00", "#ffff00",
+            "#aaff00", "#00ff00", "#00ffaa", "#00ffff",
+            "#0088ff", "#0000ff", "#8800ff", "#ff00ff",
+        ]
         self._color_buttons = []
 
         self._active_tool_code = None
@@ -175,13 +178,11 @@ class DrawingPalette(tk.Toplevel):
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
         clf = tk.Frame(self, bg=bg)
         clf.pack(fill="x", padx=8)
-        for i, hex_code in enumerate(self._custom_colors):
-            btn = tk.Button(clf, bg=hex_code, width=2, bd=0,
-                            command=lambda idx=i: self._set_color(self._custom_colors[idx]))
+        for i, hex_code in enumerate(self._default_colors):
+            btn = tk.Button(clf, bg=hex_code, width=2, bd=1, relief="raised",
+                            command=lambda c=hex_code: self._set_color(c))
             btn.pack(side="left", padx=1, pady=3)
             self._color_buttons.append(btn)
-        tk.Button(clf, text=self.app.t('ui', 'other_color'), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._pick_color).pack(side="left", padx=4)
         self._color_preview = tk.Label(clf, text=" \u25a0 ", bg=bg, fg=self.current_color, font=("Arial", 14))
         self._color_preview.pack(side="left", padx=3)
 
@@ -233,6 +234,7 @@ class DrawingPalette(tk.Toplevel):
         self.painter.set_tool("marker" if code == "marker" else "text")
         self.current_color = "#ffaa00" if code == "marker" else "#00ff00"
         self._color_preview.config(fg=self.current_color)
+        self._update_color_buttons()
 
     def _deactivate_tool(self):
         self._active_tool_code = None
@@ -280,29 +282,17 @@ class DrawingPalette(tk.Toplevel):
     def _set_color(self, c):
         self.current_color = c
         self._color_preview.config(fg=c)
-        if c in self._custom_colors:
-            self._custom_colors.remove(c)
-        self._custom_colors.insert(0, c)
-        self._custom_colors = self._custom_colors[:5]
         self._update_color_buttons()
         self._on_any_change()
 
     def _update_color_buttons(self):
         for i, btn in enumerate(self._color_buttons):
-            if i < len(self._custom_colors):
-                btn.config(bg=self._custom_colors[i])
-
-    def _pick_color(self):
-        self.attributes("-topmost", False)
-        self.master.attributes("-topmost", False)
-        self.master.update_idletasks()
-        c = colorchooser.askcolor(color=self.current_color, parent=self)[1]
-        self.master.lift()
-        self.master.attributes("-topmost", True)
-        self.lift()
-        self.attributes("-topmost", True)
-        if c:
-            self._set_color(c)
+            if i < len(self._default_colors):
+                bg = self._default_colors[i]
+                is_active = (bg == self.current_color)
+                btn.config(bg=bg,
+                           bd=2 if is_active else 1,
+                           relief="sunken" if is_active else "raised")
 
     def _delete_selected(self):
         if self._edit_obj is not None:
@@ -446,6 +436,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -544,6 +535,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -621,7 +613,6 @@ class DrawingPalette(tk.Toplevel):
                 px, py = int(m.group(3)), int(m.group(4))
                 self.app.settings["palette_x"] = px
                 self.app.settings["palette_y"] = py
-                self.app.settings["palette_custom_colors"] = self._custom_colors
                 self.app.save_settings()
         except Exception:
             pass
@@ -630,10 +621,6 @@ class DrawingPalette(tk.Toplevel):
         try:
             px = self.app.settings.get("palette_x", 100)
             py = self.app.settings.get("palette_y", 100)
-            saved_colors = self.app.settings.get("palette_custom_colors", None)
-            if saved_colors and isinstance(saved_colors, list) and len(saved_colors) == 5:
-                self._custom_colors = saved_colors
-                self._update_color_buttons()
             self.geometry(f"500x480+{px}+{py}")
             self._saved_pos = f"500x480+{px}+{py}"
         except Exception:
@@ -650,12 +637,13 @@ class DrawingPalette(tk.Toplevel):
             for k, v in self.mode_vars.items():
                 v.set(k in obj.get("modes", []))
             raw_classes = obj.get("classes", [])
-            en_classes = {_UKR_TO_EN_CLASS.get(c, c) for c in raw_classes}
+            en_classes = {self._UKR_TO_EN_CLASS.get(c, c) for c in raw_classes}
             for k, v in self.class_vars.items():
                 v.set(k in en_classes)
             self.text_var.set(obj.get("text", ""))
             self.current_color = obj.get("color", "#ffaa00")
             self._color_preview.config(fg=self.current_color)
+            self._update_color_buttons()
 
             if obj["type"] == "text":
                 poi_data = obj.get("poi", [])

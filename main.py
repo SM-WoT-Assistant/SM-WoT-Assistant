@@ -32,6 +32,7 @@ import locale_manager
 import map_manager
 import data_manager
 import ui_manager
+import dialog_utils
 import firebase_identity
 import firebase_reporter
 import firebase_drawings
@@ -58,6 +59,7 @@ class WotAssistantHQ:
         self.edit_focus_lock = False
         self._last_mode_hotkey_ts = 0.0
         self.active_view = "maps" # "maps", "stats", "ai_stats"
+        self._startup_complete = False
         
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
@@ -265,6 +267,7 @@ class WotAssistantHQ:
         self.root.bind("<Unmap>", self._on_root_hide, "+")
         self.root.bind("<Map>", self._on_root_show, "+")
         self._po_sync_timer = None
+        self.root.bind("<FocusIn>", self._on_root_focus_in, add="+")
 
     def _sync_po_pos(self, event=None):
         palette = getattr(self, 'drawing_palette', None)
@@ -284,6 +287,13 @@ class WotAssistantHQ:
             except Exception:
                 pass
 
+    def _lift_overlay(self):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.lift()
+
+    def _on_root_focus_in(self, event=None):
+        self.root.after_idle(self._lift_overlay)
+
     def _on_root_hide(self, event=None):
         self._stop_po_sync_timer()
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
@@ -291,6 +301,12 @@ class WotAssistantHQ:
 
     def _on_root_show(self, event=None):
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            if not getattr(self, '_startup_complete', False):
+                return
+            if self._po_win.state() == "withdrawn":
+                return
+            if not self.current_map_eng:
+                return
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
@@ -423,6 +439,7 @@ class WotAssistantHQ:
         dlg.resizable(False, False)
         dlg.minsize(300, 120)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
@@ -447,8 +464,7 @@ class WotAssistantHQ:
         on_done(result["ok"])
 
     def ask_ai_key(self):
-        from tkinter import simpledialog
-        new_key = simpledialog.askstring(self.t('ui', 'ai_key_title'), self.t('ui', 'ai_key_prompt'), initialvalue=self.settings.get("ai_key", ""), parent=self.root)
+        new_key = dialog_utils.dark_promptbox(self.root, self.t('ui', 'ai_key_title'), self.t('ui', 'ai_key_prompt'), initialvalue=self.settings.get("ai_key", ""))
         if new_key is not None:
             self.settings["ai_key"] = new_key.strip()
             self.save_settings()
@@ -673,13 +689,9 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
-        self.painter.redraw()
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            self.root.update_idletasks()
-            self._sync_po_pos()
-            self._po_win.deiconify()
             self._po_win.lift()
-            self._start_po_sync_timer()
+        self.painter.redraw()
 
     def _handle_ctrl_up(self):
         import time
@@ -921,6 +933,7 @@ class WotAssistantHQ:
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
@@ -960,6 +973,7 @@ class WotAssistantHQ:
         pw.configure(bg="#222")
         pw.resizable(False, False)
         pw.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(pw)
 
         sw, sh = 380, 160
         cx = self.root.winfo_screenwidth() // 2 - sw // 2
@@ -1546,6 +1560,7 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._stop_po_sync_timer()
             self._po_win.withdraw()
+        self._startup_complete = True
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)

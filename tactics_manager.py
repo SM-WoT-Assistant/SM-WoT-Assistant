@@ -1,6 +1,7 @@
 import json
 import tkinter as tk
-from tkinter import filedialog, messagebox
+from tkinter import filedialog
+import dialog_utils
 
 def _choice_dialog(parent, title, text):
     dlg = tk.Toplevel(parent)
@@ -8,6 +9,7 @@ def _choice_dialog(parent, title, text):
     dlg.configure(bg="#222")
     dlg.resizable(False, False)
     dlg.attributes("-topmost", True)
+    dialog_utils._set_dark_title_bar(dlg)
     dlg.grab_set()
     result = None
     tk.Label(dlg, text=text, bg="#222", fg="#ccc",
@@ -31,7 +33,7 @@ def _choice_dialog(parent, title, text):
 
 def export_tactic(parent, map_id, map_name, drawings):
     if not map_id or map_id not in drawings or not drawings[map_id]:
-        messagebox.showinfo("Експорт", "На цій карті немає малюнків для експорту.", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Експорт", "На цій карті немає малюнків для експорту.")
         return
     
     file_path = filedialog.asksaveasfilename(
@@ -53,9 +55,9 @@ def export_tactic(parent, map_id, map_name, drawings):
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
-            messagebox.showinfo("Експорт", "Тактику успішно експортовано!", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Експорт", "Тактику успішно експортовано!")
         except Exception as e:
-            messagebox.showerror("Помилка", f"Не вдалося зберегти файл: {e}", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося зберегти файл: {e}", is_error=True)
 
 def import_tactic(parent, current_map_id, current_map_name, drawings, on_success):
     file_path = filedialog.askopenfilename(
@@ -70,38 +72,20 @@ def import_tactic(parent, current_map_id, current_map_name, drawings, on_success
                 data = json.load(f)
             
             if not isinstance(data, dict) or "drawings" not in data:
-                messagebox.showerror("Помилка", "Некоректний формат файлу тактики.", parent=parent)
+                dialog_utils.dark_messagebox(parent, "Помилка", "Некоректний формат файлу тактики.", is_error=True)
                 return
 
             if not isinstance(data["drawings"], list):
-                messagebox.showerror("Помилка",
+                dialog_utils.dark_messagebox(parent, "Помилка",
                     "Це файл усіх тактик (містить кілька мап).\nВикористайте ALL IMPORT.",
-                    parent=parent)
+                    is_error=True)
                 return
 
             import_map_id = data.get("map_id")
             if import_map_id and import_map_id != current_map_id:
-                dlg = tk.Toplevel(parent)
-                dlg.title("Попередження")
-                dlg.configure(bg="#222")
-                dlg.resizable(False, False)
-                dlg.attributes("-topmost", True)
-                dlg.grab_set()
-                confirm = [False]
                 msg = (f"Ця тактика була створена для мапи '{data.get('map_name', import_map_id)}'.\n"
                        f"Імпортувати на поточну мапу '{current_map_name}'?")
-                tk.Label(dlg, text=msg, bg="#222", fg="#ccc",
-                         font=("Arial", 9), wraplength=380).pack(padx=20, pady=(15, 10))
-                bf = tk.Frame(dlg, bg="#222")
-                bf.pack(pady=(0, 12))
-                tk.Button(bf, text="ТАК", bg="#553333", fg="#ff6666", bd=0,
-                          font=("Arial", 9, "bold"), padx=12, pady=4,
-                          command=lambda: [confirm.__setitem__(0, True), dlg.destroy()]).pack(side="left", padx=4)
-                tk.Button(bf, text="НІ", bg="#444", fg="#aaa", bd=0,
-                          font=("Arial", 9), padx=12, pady=4,
-                          command=dlg.destroy).pack(side="left", padx=4)
-                parent.wait_window(dlg)
-                if not confirm[0]:
+                if not dialog_utils.dark_confirmbox(parent, "Попередження", msg, yes_text="ТАК", no_text="НІ"):
                     return
 
             choice = _choice_dialog(parent, "Імпорт",
@@ -119,15 +103,15 @@ def import_tactic(parent, current_map_id, current_map_name, drawings, on_success
                 drawings[current_map_id].extend(data["drawings"])
             
             on_success()
-            messagebox.showinfo("Імпорт", "Тактику успішно імпортовано!", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Імпорт", "Тактику успішно імпортовано!")
             
         except Exception as e:
-            messagebox.showerror("Помилка", f"Не вдалося прочитати файл: {e}", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося прочитати файл: {e}", is_error=True)
 
 
 def export_all_tactics(parent, drawings, map_names=None):
     if not drawings:
-        messagebox.showinfo("Експорт", "Немає малюнків для експорту.", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Експорт", "Немає малюнків для експорту.")
         return
 
     from datetime import datetime
@@ -157,10 +141,10 @@ def export_all_tactics(parent, drawings, map_names=None):
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
-        messagebox.showinfo("Експорт",
-            f"Експортовано {len(drawings)} мап ({count} об'єктів).", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Експорт",
+            f"Експортовано {len(drawings)} мап ({count} об'єктів).")
     except Exception as e:
-        messagebox.showerror("Помилка", f"Не вдалося зберегти файл: {e}", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося зберегти файл: {e}", is_error=True)
 
 
 def import_all_tactics(parent, drawings, on_success):
@@ -177,7 +161,7 @@ def import_all_tactics(parent, drawings, on_success):
             data = json.load(f)
 
         if not isinstance(data, dict):
-            messagebox.showerror("Помилка", "Некоректний формат файлу тактик.", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Помилка", "Некоректний формат файлу тактик.", is_error=True)
             return
 
         if "drawings" not in data:
@@ -210,12 +194,11 @@ def import_all_tactics(parent, drawings, on_success):
 
         on_success()
         new_total = sum(len(v) for v in drawings.values())
-        messagebox.showinfo("Імпорт",
-            f"Імпортовано {src_maps} мап. Всього: {len(drawings)} мап ({new_total} об'єктів).",
-            parent=parent)
+        dialog_utils.dark_messagebox(parent, "Імпорт",
+            f"Імпортовано {src_maps} мап. Всього: {len(drawings)} мап ({new_total} об'єктів).")
 
     except Exception as e:
-        messagebox.showerror("Помилка", f"Не вдалося прочитати файл: {e}", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося прочитати файл: {e}", is_error=True)
 
 
 def import_unified(parent, current_map_id, current_map_name, drawings, on_success):
@@ -233,7 +216,7 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
             data = json.load(f)
 
         if not isinstance(data, dict):
-            messagebox.showerror("Error", "Invalid file format.", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Error", "Invalid file format.", is_error=True)
             return
 
         # Detect all_maps type: has "type":"all_maps" OR "drawings" is a dict
@@ -270,40 +253,21 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
 
             on_success()
             new_total = sum(len(v) for v in drawings.values() if isinstance(v, list))
-            messagebox.showinfo("Import",
-                f"Imported {src_maps} maps. Total: {len(drawings)} maps ({new_total} objects).",
-                parent=parent)
+            dialog_utils.dark_messagebox(parent, "Import",
+                f"Imported {src_maps} maps. Total: {len(drawings)} maps ({new_total} objects).")
         else:
             # Single-map import
             if "drawings" not in data or not isinstance(data["drawings"], list):
-                messagebox.showerror("Error",
+                dialog_utils.dark_messagebox(parent, "Error",
                     "Invalid tactic file format.\nExpected a 'drawings' array.",
-                    parent=parent)
+                    is_error=True)
                 return
 
             import_map_id = data.get("map_id")
             if import_map_id and import_map_id != current_map_id:
-                dlg = tk.Toplevel(parent)
-                dlg.title("Warning")
-                dlg.configure(bg="#222")
-                dlg.resizable(False, False)
-                dlg.attributes("-topmost", True)
-                dlg.grab_set()
-                confirm = [False]
                 msg = (f"This tactic was created for map '{data.get('map_name', import_map_id)}'.\n"
                        f"Import to current map '{current_map_name}'?")
-                tk.Label(dlg, text=msg, bg="#222", fg="#ccc",
-                         font=("Arial", 9), wraplength=380).pack(padx=20, pady=(15, 10))
-                bf = tk.Frame(dlg, bg="#222")
-                bf.pack(pady=(0, 12))
-                tk.Button(bf, text="YES", bg="#553333", fg="#ff6666", bd=0,
-                          font=("Arial", 9, "bold"), padx=12, pady=4,
-                          command=lambda: [confirm.__setitem__(0, True), dlg.destroy()]).pack(side="left", padx=4)
-                tk.Button(bf, text="NO", bg="#444", fg="#aaa", bd=0,
-                          font=("Arial", 9), padx=12, pady=4,
-                          command=dlg.destroy).pack(side="left", padx=4)
-                parent.wait_window(dlg)
-                if not confirm[0]:
+                if not dialog_utils.dark_confirmbox(parent, "Warning", msg, yes_text="YES", no_text="NO"):
                     return
 
             choice = _choice_dialog(parent, "Import",
@@ -320,7 +284,7 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
                 drawings[current_map_id].extend(data["drawings"])
 
             on_success()
-            messagebox.showinfo("Import", "Tactic imported successfully!", parent=parent)
+            dialog_utils.dark_messagebox(parent, "Import", "Tactic imported successfully!")
 
     except Exception as e:
-        messagebox.showerror("Error", f"Failed to read file: {e}", parent=parent)
+        dialog_utils.dark_messagebox(parent, "Error", f"Failed to read file: {e}", is_error=True)

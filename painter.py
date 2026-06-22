@@ -3,6 +3,7 @@ import os, json, math
 import tkinter as tk
 import config
 import ctypes
+import dialog_utils
 
 font_path = os.path.join(config.BASE_DIR, "xvmsymbol.ttf")
 if os.path.exists(font_path):
@@ -118,6 +119,8 @@ class MapPainter:
 
     def on_press(self, event):
         if not self.app.current_map_eng or self.app.mode != "edit": return
+        if event.state & 0x0004:
+            return
 
         palette = getattr(self.app, 'drawing_palette', None)
         palette_visible = palette and palette.state() != 'withdrawn'
@@ -544,6 +547,7 @@ class MapPainter:
         dlg.resizable(False, False)
         dlg.minsize(300, 120)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
 
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 150
@@ -714,3 +718,5 @@ class MapPainter:
                 if obj.get("text"):
                     ty = y + int(15 * sc) if poi_data else y
                     self.canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
+
+        self.app._lift_overlay()

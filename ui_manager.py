@@ -5,6 +5,7 @@ import config
 import stats_ai
 import firebase_identity
 import language_module
+import dialog_utils
 
 class UIManager:
     def __init__(self, app):
@@ -173,6 +174,7 @@ class UIManager:
         dlg.resizable(False, False)
         dlg.minsize(260, 100)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 130
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 50
@@ -200,6 +202,7 @@ class UIManager:
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
 
         tk.Label(dlg, text="SM WoT Assistant", font=("Arial", 14, "bold"),
@@ -317,9 +320,11 @@ class UIManager:
             self.app.map_mgr.load_map_list()
 
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists():
+                self.app._po_win.withdraw()
                 self.app.root.update_idletasks()
                 self.app._po_win.deiconify()
                 self.app._sync_po_pos()
+                self.app.root.update_idletasks()
                 self.app.painter.redraw()
                 self.app._start_po_sync_timer()
 
