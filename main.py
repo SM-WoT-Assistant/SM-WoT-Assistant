@@ -60,6 +60,7 @@ class WotAssistantHQ:
         self._last_mode_hotkey_ts = 0.0
         self.active_view = "maps" # "maps", "stats", "ai_stats"
         self._startup_complete = False
+        self._combolbox_hwnd = None
         
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
@@ -679,35 +680,32 @@ class WotAssistantHQ:
             self.edit_focus_lock = False
             self.win_mgr.focus_game_window()
 
+    def _prefind_combolbox(self):
+        try:
+            user32 = ctypes.windll.user32
+            EWP = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            GetClassNameW = user32.GetClassNameW
+            found = []
+            def enum_cb(hwnd, _):
+                cls = ctypes.create_unicode_buffer(64)
+                GetClassNameW(hwnd, cls, 64)
+                if cls.value == 'ComboLBox':
+                    found.append(hwnd)
+                return True
+            user32.EnumWindows(EWP(enum_cb), 0)
+            if found:
+                self._combolbox_hwnd = found[0]
+                user32.SetWindowPos(found[0], -1, 0, 0, 0, 0, 0x0001 | 0x0002)
+        except Exception:
+            pass
+
     def _combo_postcommand(self):
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
-            self._po_win.withdraw()
-        self.root.after(400, self._check_dropdown_closed)
-
-    def _combo_focus_out_restore(self, event=None):
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() == "withdrawn":
-            self._restore_overlay_now()
-
-    def _check_dropdown_closed(self):
-        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
-            return
-        if self._po_win.state() != "withdrawn":
-            return
-        popdown_path = self.map_selector._w + '.popdown'
-        popup_exists = self.root.tk.eval('winfo exists ' + popdown_path) == '1'
-        if popup_exists:
-            return
-        self._restore_overlay_now()
-
-    def _restore_overlay_now(self):
-        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
-            return
-        if self._po_win.state() != "withdrawn":
-            return
-        self.root.update_idletasks()
-        self._po_win.deiconify()
-        self._sync_po_pos()
-        self._po_win.lift()
+        hwnd = self._combolbox_hwnd
+        if hwnd is not None:
+            try:
+                ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
+            except Exception:
+                pass
 
     def on_map_select(self, event=None):
         self.root.focus_set()
