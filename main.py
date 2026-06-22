@@ -680,27 +680,44 @@ class WotAssistantHQ:
             self.edit_focus_lock = False
             self.win_mgr.focus_game_window()
 
-    def _prefind_combolbox(self):
+    def _find_combolbox(self):
         try:
             user32 = ctypes.windll.user32
+            combobox_hwnd = int(self.root.tk.eval('winfo id ' + self.map_selector._w), 16)
             EWP = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
             GetClassNameW = user32.GetClassNameW
-            found = []
+            GetWindow = user32.GetWindow
+            GW_OWNER = 4
+            found = None
             def enum_cb(hwnd, _):
+                nonlocal found
                 cls = ctypes.create_unicode_buffer(64)
                 GetClassNameW(hwnd, cls, 64)
-                if cls.value == 'ComboLBox':
-                    found.append(hwnd)
+                if cls.value == 'ComboLBox' and GetWindow(hwnd, GW_OWNER) == combobox_hwnd:
+                    found = hwnd
                 return True
             user32.EnumWindows(EWP(enum_cb), 0)
-            if found:
-                self._combolbox_hwnd = found[0]
-                user32.SetWindowPos(found[0], -1, 0, 0, 0, 0, 0x0001 | 0x0002)
+            return found
         except Exception:
-            pass
+            return None
+
+    def _prefind_combolbox(self):
+        hwnd = self._find_combolbox()
+        if hwnd is not None:
+            self._combolbox_hwnd = hwnd
+            try:
+                ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
+            except Exception:
+                pass
+        else:
+            self.root.after(200, self._prefind_combolbox)
 
     def _combo_postcommand(self):
         hwnd = self._combolbox_hwnd
+        if hwnd is None:
+            hwnd = self._find_combolbox()
+            if hwnd is not None:
+                self._combolbox_hwnd = hwnd
         if hwnd is not None:
             try:
                 ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
