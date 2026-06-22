@@ -46,6 +46,8 @@ class UIManager:
         self.app.map_var = tk.StringVar()
         self.app.map_selector = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.map_var, state="readonly", width=15)
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
+        self.app.map_selector.bind("<ButtonPress-1>", self.app._on_combo_press, "+")
+        self.app.map_selector.bind("<FocusOut>", self.app._on_combo_focus_out, "+")
         self.app.map_selector.pack(side="left", padx=5, pady=2)
         
         self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw').upper(), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)

@@ -692,6 +692,16 @@ class WotAssistantHQ:
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.lift()
         self.painter.redraw()
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.attributes("-topmost", True)
+
+    def _on_combo_press(self, event=None):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.attributes("-topmost", False)
+
+    def _on_combo_focus_out(self, event=None):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.attributes("-topmost", True)
 
     def _handle_ctrl_up(self):
         import time
