@@ -680,6 +680,38 @@ class WotAssistantHQ:
             self.win_mgr.focus_game_window()
 
     def _combo_postcommand(self):
+        if not self._raise_combolbox():
+            self._withdraw_overlay_fallback()
+
+    def _raise_combolbox(self):
+        try:
+            user32 = ctypes.windll.user32
+            combo_hwnd = int(self.root.tk.eval('winfo id ' + self.map_selector._w), 16)
+            EWP = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
+            GetClassNameW = user32.GetClassNameW
+            GetWindow = user32.GetWindow
+            GW_OWNER = 4
+            found = None
+            def enum_cb(hwnd, _):
+                nonlocal found
+                cls = ctypes.create_unicode_buffer(64)
+                GetClassNameW(hwnd, cls, 64)
+                if cls.value == 'ComboLBox' and GetWindow(hwnd, GW_OWNER) == combo_hwnd:
+                    found = hwnd
+                return True
+            user32.EnumWindows(EWP(enum_cb), 0)
+            if found:
+                SWP_NOSIZE = 0x0001
+                SWP_NOMOVE = 0x0002
+                SWP_NOACTIVATE = 0x0010
+                user32.SetWindowPos(found, -1, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+                user32.SetWindowPos(found, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
+                return True
+        except Exception:
+            pass
+        return False
+
+    def _withdraw_overlay_fallback(self):
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.withdraw()
             self.root.update()
