@@ -48,7 +48,6 @@ class UIManager:
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
         self.app.map_selector.configure(postcommand=self.app._combo_postcommand)
         self.app.map_selector.pack(side="left", padx=5, pady=2)
-        self.app.root.after_idle(self.app._prefind_combolbox)
         
         self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw').upper(), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
         self.app.draw_btn.pack(side="left", padx=5, pady=2)

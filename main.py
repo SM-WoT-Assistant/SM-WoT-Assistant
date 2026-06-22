@@ -60,8 +60,7 @@ class WotAssistantHQ:
         self._last_mode_hotkey_ts = 0.0
         self.active_view = "maps" # "maps", "stats", "ai_stats"
         self._startup_complete = False
-        self._combolbox_hwnd = None
-        
+
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
         self._dot_anim_active = False
@@ -680,54 +679,33 @@ class WotAssistantHQ:
             self.edit_focus_lock = False
             self.win_mgr.focus_game_window()
 
-    def _find_combolbox(self):
-        try:
-            user32 = ctypes.windll.user32
-            combobox_hwnd = int(self.root.tk.eval('winfo id ' + self.map_selector._w), 16)
-            EWP = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_int, ctypes.c_int)
-            GetClassNameW = user32.GetClassNameW
-            GetWindow = user32.GetWindow
-            GW_OWNER = 4
-            found = None
-            def enum_cb(hwnd, _):
-                nonlocal found
-                cls = ctypes.create_unicode_buffer(64)
-                GetClassNameW(hwnd, cls, 64)
-                if cls.value == 'ComboLBox' and GetWindow(hwnd, GW_OWNER) == combobox_hwnd:
-                    found = hwnd
-                return True
-            user32.EnumWindows(EWP(enum_cb), 0)
-            return found
-        except Exception:
-            return None
-
-    def _prefind_combolbox(self):
-        hwnd = self._find_combolbox()
-        if hwnd is not None:
-            self._combolbox_hwnd = hwnd
-            try:
-                ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
-            except Exception:
-                pass
-        else:
-            self.root.after(200, self._prefind_combolbox)
-
     def _combo_postcommand(self):
-        hwnd = self._combolbox_hwnd
-        if hwnd is None:
-            hwnd = self._find_combolbox()
-            if hwnd is not None:
-                self._combolbox_hwnd = hwnd
-        if hwnd is not None:
-            try:
-                user32 = ctypes.windll.user32
-                SWP_NOSIZE = 0x0001
-                SWP_NOMOVE = 0x0002
-                SWP_NOACTIVATE = 0x0010
-                user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
-                user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
-            except Exception:
-                pass
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.withdraw()
+            self.root.update()
+        self.root.after(100, self._poll_dropdown_closed)
+
+    def _poll_dropdown_closed(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        lb = self.map_selector._w + '.popdown.f.l'
+        mapped = self.root.tk.eval('winfo ismapped ' + lb) == '1'
+        if mapped:
+            self.root.after(100, self._poll_dropdown_closed)
+            return
+        self._restore_overlay_state()
+
+    def _restore_overlay_state(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        self.root.update_idletasks()
+        self._po_win.deiconify()
+        self._sync_po_pos()
+        self._po_win.lift()
 
     def on_map_select(self, event=None):
         self.root.focus_set()
@@ -739,12 +717,7 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
-        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            if self._po_win.state() == "withdrawn":
-                self.root.update_idletasks()
-                self._po_win.deiconify()
-                self._sync_po_pos()
-            self._po_win.lift()
+        self._restore_overlay_state()
         self.painter.redraw()
 
     def _handle_ctrl_up(self):
