@@ -1,4 +1,6 @@
 import tkinter as tk
+from tkinter import ttk
+import os
 import language_module
 import dialog_utils
 import firebase_identity
@@ -212,6 +214,8 @@ class DrawingPalette(tk.Toplevel):
                    font=("Arial", 8), command=self._export_all).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf2, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
                    font=("Arial", 8), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf2, text=self.app.t('ui', 'download_btn').upper(), bg="#446688", fg="white", bd=0,
+                   font=("Arial", 8), command=self._show_download_dialog).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
@@ -725,6 +729,365 @@ class DrawingPalette(tk.Toplevel):
                     (coords[0] + coords[2]) / 2,
                     (coords[1] + coords[3]) / 2 - int(10 * sc) / max(ch, 1),
                 ]
+
+    # --- Download Community Schemes ---
+
+    def _show_download_dialog(self):
+        self._lift_self()
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title(self.app.t('ui', 'download_title'))
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
+        dlg.lift()
+        dlg.focus_force()
+
+        bg = "#222"
+
+        status_lbl = tk.Label(dlg, text=self.app.t('ui', 'download_loading'),
+                              bg=bg, fg="#888", font=("Arial", 9))
+        status_lbl.pack(padx=10, pady=10)
+
+        def _populate():
+            try:
+                schemes = firebase_drawings.get_all_schemes()
+            except Exception:
+                schemes = {}
+            self.after(0, lambda: _build_dialog(schemes))
+
+        def _build_dialog(schemes):
+            for w in dlg.winfo_children():
+                w.destroy()
+
+            if not schemes:
+                status_lbl = tk.Label(dlg, text=self.app.t('ui', 'download_no_schemes'),
+                                      bg=bg, fg="#ff6666", font=("Arial", 9))
+                status_lbl.pack(padx=20, pady=20)
+                tk.Button(dlg, text="OK", bg="#444", fg="white", bd=0,
+                          font=("Arial", 9), command=dlg.destroy).pack(pady=(0, 12))
+                return
+
+            # Build data list
+            items = []
+            for sid, data in schemes.items():
+                map_id = data.get("map_id", "")
+                map_name = data.get("map_name", "")
+                author = data.get("author_nickname", "")
+                created = (data.get("created_at") or "")[:10]
+                el_count = data.get("element_count", 0)
+                items.append({
+                    "scheme_id": sid,
+                    "map_id": map_id,
+                    "map_name": map_name,
+                    "author": author,
+                    "created": created,
+                    "el_count": el_count,
+                    "elements": data.get("elements", []),
+                })
+
+            items.sort(key=lambda x: x.get("created", ""), reverse=True)
+
+            # Collect unique map names and authors for filters
+            unique_maps = sorted(set(it["map_name"] for it in items if it["map_name"]))
+            unique_authors = sorted(set(it["author"] for it in items if it["author"]))
+
+            all_label = self.app.t('ui', 'download_filter_all')
+
+            # Filter frame
+            ff = tk.Frame(dlg, bg=bg)
+            ff.pack(fill="x", padx=8, pady=(6, 2))
+
+            tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
+            map_filter_var = tk.StringVar(value=all_label)
+            map_filter_cb = tk.ttk.Combobox(ff, textvariable=map_filter_var,
+                                             values=[all_label] + unique_maps,
+                                             state="readonly", width=18, font=("Arial", 8))
+            map_filter_cb.pack(side="left", padx=4)
+
+            tk.Label(ff, text="Author:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
+            author_filter_var = tk.StringVar(value=all_label)
+            author_filter_cb = tk.ttk.Combobox(ff, textvariable=author_filter_var,
+                                                 values=[all_label] + unique_authors,
+                                                 state="readonly", width=14, font=("Arial", 8))
+            author_filter_cb.pack(side="left", padx=4)
+
+            # Tree frame
+            tf = tk.Frame(dlg, bg=bg)
+            tf.pack(fill="both", expand=True, padx=8, pady=4)
+
+            columns = ("map", "author", "date", "preview")
+            tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
+                                    height=12, selectmode="browse")
+            tree.heading("map", text="Map Name")
+            tree.heading("author", text="Author")
+            tree.heading("date", text="Date")
+            tree.heading("preview", text="Preview")
+            tree.column("map", width=140)
+            tree.column("author", width=100)
+            tree.column("date", width=80)
+            tree.column("preview", width=60, anchor="center")
+
+            vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
+            tree.configure(yscrollcommand=vsb.set)
+            tree.pack(side="left", fill="both", expand=True)
+            vsb.pack(side="right", fill="y")
+
+            # Preview button for each row
+            def make_preview_cmd(scheme_item):
+                return lambda: self._preview_scheme(scheme_item, dlg)
+
+            def _do_filter(*args):
+                mf = map_filter_var.get()
+                af = author_filter_var.get()
+                tree.delete(*tree.get_children())
+                for it in items:
+                    if mf != all_label and it["map_name"] != mf:
+                        continue
+                    if af != all_label and it["author"] != af:
+                        continue
+                    has_preview = it["map_id"] != "all_maps"
+                    tree.insert("", "end",
+                                values=(it["map_name"], it["author"], it["created"],
+                                        "Preview" if has_preview else ""),
+                                iid=it["scheme_id"])
+                    if has_preview:
+                        tree.set(it["scheme_id"], "preview", "Preview")
+
+            map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
+            author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
+
+            # Click on tree item for preview
+            def on_tree_click(event):
+                region = tree.identify_region(event.x, event.y)
+                if region == "cell":
+                    col = tree.identify_column(event.x)
+                    if col == "#4":
+                        sel = tree.selection()
+                        if sel:
+                            sid = sel[0]
+                            for it in items:
+                                if it["scheme_id"] == sid and it["map_id"] != "all_maps":
+                                    self._preview_scheme(it, dlg)
+                                    return
+
+            tree.bind("<ButtonRelease-1>", on_tree_click)
+
+            # Bottom buttons
+            bf = tk.Frame(dlg, bg=bg)
+            bf.pack(fill="x", padx=8, pady=(0, 8))
+
+            result = [None]
+
+            def on_download():
+                sel = tree.selection()
+                if not sel:
+                    return
+                sid = sel[0]
+                for it in items:
+                    if it["scheme_id"] == sid:
+                        result[0] = it
+                        dlg.destroy()
+                        return
+
+            def on_cancel():
+                result[0] = None
+                dlg.destroy()
+
+            tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+                      font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="right", padx=2)
+            tk.Button(bf, text="Download", bg="#446688", fg="white", bd=0,
+                      font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
+
+            # Populate tree initially
+            _do_filter()
+
+        dlg.geometry("560x380")
+        self._center_on_root(dlg)
+
+        import threading
+        self._download_result = None
+        t = threading.Thread(target=_populate, daemon=True)
+        t.start()
+        self.wait_window(dlg)
+
+        if self._download_result is not None:
+            self._handle_download_result(self._download_result)
+
+    def _handle_download_result(self, item):
+        """Called when user selects a scheme to download. Shows choice dialog."""
+        painter = self.painter
+        map_id = item["map_id"]
+        elements = item["elements"]
+        if not isinstance(elements, list):
+            elements = []
+
+        import config
+        is_all_maps = (map_id == "all_maps")
+        if is_all_maps and isinstance(elements, dict):
+            map_name = "All Maps"
+        else:
+            map_name = config.MAP_NAMES_EN.get(map_id, item.get("map_name", map_id))
+
+        choice = self._choose_download_action(map_name, is_all_maps)
+        if choice is None:
+            return
+
+        if choice == "replace":
+            if is_all_maps and isinstance(elements, dict):
+                drawings = elements.get("drawings", {})
+                for kid, kdrawings in drawings.items():
+                    if isinstance(kdrawings, list):
+                        painter.drawings[kid] = kdrawings
+            else:
+                painter.drawings[map_id] = elements
+            painter._creation_history.clear()
+            painter._editing_idx = -1
+            self.exit_edit_mode()
+
+        elif choice == "add":
+            if is_all_maps and isinstance(elements, dict):
+                drawings = elements.get("drawings", {})
+                for kid, kdrawings in drawings.items():
+                    if not isinstance(kdrawings, list):
+                        continue
+                    existing = painter.drawings.get(kid, [])
+                    painter.drawings[kid] = existing + kdrawings
+            else:
+                existing = painter.drawings.get(map_id, [])
+                painter.drawings[map_id] = existing + elements
+
+        elif choice == "save_pc":
+            import json
+            from tkinter import filedialog
+            default_name = f"{map_name}_scheme.json"
+            fp = filedialog.asksaveasfilename(
+                parent=self,
+                title=self.app.t('ui', 'download_save_pc'),
+                defaultextension=".json",
+                initialfile=default_name,
+                filetypes=[("JSON", "*.json")],
+            )
+            if fp:
+                data = item.get("elements", []) if not is_all_maps else item.get("elements", {})
+                with open(fp, "w", encoding="utf-8") as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+            return
+
+        painter.data_mgr.save_drawings(painter.drawings)
+        painter.redraw()
+
+    def _choose_download_action(self, map_name, is_all_maps):
+        """Show choice dialog for download action. Returns 'replace', 'add', 'save_pc' or None."""
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title(self.app.t('ui', 'download_confirm_title'))
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
+        dlg.grab_set()
+        dlg.lift()
+        dlg.focus_force()
+
+        tk.Label(dlg, text=self.app.t('ui', 'download_confirm_title'),
+                 bg="#222", fg="#ffaa00", font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
+        tk.Label(dlg, text=f" {map_name}",
+                 bg="#222", fg="#cccccc", font=("Arial", 9)).pack(padx=20, pady=(0, 4))
+        tk.Label(dlg, text=" ", bg="#222", fg="#888", font=("Arial", 8)).pack(padx=20, pady=(0, 4))
+
+        result = [None]
+
+        def on_replace():
+            result[0] = "replace"
+            dlg.destroy()
+
+        def on_add():
+            result[0] = "add"
+            dlg.destroy()
+
+        def on_save():
+            result[0] = "save_pc"
+            dlg.destroy()
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 12))
+        tk.Button(bf, text=self.app.t('ui', 'download_replace'), bg="#556677", fg="white", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_replace).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'download_add'), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_add).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'download_save_pc'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_save).pack(side="left", padx=4)
+
+        self._center_on_root(dlg)
+        self.wait_window(dlg)
+        return result[0]
+
+    def _preview_scheme(self, item, parent_dlg):
+        if item["map_id"] == "all_maps":
+            return
+        map_id = item["map_id"]
+        elements = item["elements"]
+        if not elements:
+            return
+
+        # Find map image
+        import config
+        img_path = os.path.join(config.BASE_DIR, "extracted_maps", f"{map_id}.png")
+        if not os.path.exists(img_path):
+            img_path = os.path.join(config.BASE_DIR, "maps", map_id.replace(" ", "_"), "map.webp")
+            if not os.path.exists(img_path):
+                dialog_utils.dark_messagebox(
+                    parent_dlg,
+                    self.app.t('ui', 'download_preview'),
+                    self.app.t('ui', 'download_preview_no_image'))
+                return
+
+        from PIL import Image, ImageTk
+
+        pw, ph = 600, 500
+        pv = tk.Toplevel(parent_dlg)
+        pv.title(f"Preview: {item['map_name']}")
+        pv.configure(bg="#111")
+        pv.resizable(False, False)
+        pv.transient(parent_dlg)
+        pv.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(pv)
+        pv.lift()
+        pv.focus_force()
+
+        canvas = tk.Canvas(pv, width=pw, height=ph, bg="#111", highlightthickness=0)
+        canvas.pack()
+
+        try:
+            img = Image.open(img_path)
+            img_w, img_h = img.size
+            scale = min(pw / img_w, ph / img_h, 1.0)
+            new_w = int(img_w * scale)
+            new_h = int(img_h * scale)
+            if scale < 1.0:
+                img = img.resize((new_w, new_h), Image.LANCZOS)
+            pv._photo = ImageTk.PhotoImage(img)
+            cx, cy = (pw - new_w) // 2, (ph - new_h) // 2
+            canvas.create_image(cx, cy, anchor="nw", image=pv._photo)
+            canvas.image = pv._photo
+        except Exception:
+            dialog_utils.dark_messagebox(pv, "Preview Error", "Could not load map image")
+            pv.destroy()
+            return
+
+        # Render elements on preview canvas
+        if isinstance(elements, list):
+            map_id_cur = self.app.current_map_eng
+            painter = self.app.painter
+            if painter:
+                painter._render_elements(canvas, elements, pw, ph)
+
+        tk.Button(pv, text="Close", bg="#444", fg="white", bd=0,
+                  font=("Arial", 9), command=pv.destroy).pack(pady=4)
+
+        self._center_on_root(pv)
 
     def is_in_edit_mode(self):
         return self._edit_obj is not None

@@ -163,3 +163,34 @@ def download_drawing(drawing_id, on_done=None):
 
     t = threading.Thread(target=_fetch, daemon=True)
     t.start()
+
+
+def get_all_schemes():
+    """GET schemes.json -> dict {scheme_id: {map_id, author_nickname, elements, ...}}.
+    Synchronous — returns dict on success, empty dict on failure."""
+    if not firebase_reporter._is_configured():
+        return {}
+    try:
+        url = firebase_reporter._rtdb_url("schemes")
+        r = requests.get(url, headers=config.HEADERS, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            if not data or not isinstance(data, dict):
+                return {}
+            result = {}
+            for key, item in data.items():
+                if not item or not isinstance(item, dict):
+                    continue
+                if not item.get("elements"):
+                    continue
+                try:
+                    if isinstance(item.get("elements"), str):
+                        item["elements"] = json.loads(item["elements"])
+                except Exception:
+                    continue
+                if isinstance(item["elements"], (list, dict)):
+                    result[key] = item
+            return result
+    except Exception:
+        pass
+    return {}

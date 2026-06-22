@@ -392,7 +392,7 @@ class MapPainter:
         self.data_mgr.save_drawings(self.drawings)
         return "break"
 
-    def _draw_class_icons(self, x, y, class_list, color, sc=1.0):
+    def _draw_class_icons(self, canvas, x, y, class_list, color, sc=1.0):
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
         ordered_classes = [cls for cls in ("LT", "MT", "HT", "TD", "SPG")
                            if cls in class_list and cls in active_classes]
@@ -414,8 +414,8 @@ class MapPainter:
                 continue
             sz = int(sizes[idx])
             g = int(gaps[idx])
-            self.canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz), fill="black", tags=("painter_obj", "class_icon_bg"))
-            self.canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz - 4), fill=color, tags=("painter_obj", "class_icon_fg"))
+            canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz), fill="black", tags=("painter_obj", "class_icon_bg"))
+            canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz - 4), fill=color, tags=("painter_obj", "class_icon_fg"))
             curr_x += g
             
     def on_drag(self, event):
@@ -611,22 +611,14 @@ class MapPainter:
                 
         return True
 
-    def redraw(self, cw=None, ch=None):
-        if not self.app.current_map_eng: return
-        map_id = self.app.current_map_eng
-        
-        if cw is None or ch is None:
-            cw = self.canvas.winfo_width()
-            ch = self.canvas.winfo_height()
-        if cw < 10 or ch < 10: return
-
-        self.canvas.delete("painter_obj")
-        if map_id not in self.drawings: return
+    def _render_elements(self, canvas, elements, cw, ch):
+        """Render elements on a given canvas. No visibility filtering — renders all."""
+        canvas.delete("painter_obj")
+        if not elements:
+            return
         sc = min(cw, ch) / 800.0
-        
-        for obj in self.drawings[map_id]:
-            if not self.is_visible(obj): continue
 
+        for obj in elements:
             obj_sc = obj.get("scale", 1.0)
             sc_eff = sc * obj_sc
             r12 = max(3, int(12 * sc_eff))
@@ -635,32 +627,32 @@ class MapPainter:
             mt_sz = max(6, int(9 * sc_eff))
             poi_base = max(12, int(48 * sc_eff))
             tt_sz = max(6, int(10 * sc_eff))
-            
+
             c = obj["color"]
             coords = obj["coords"]
-            
+
             if obj["type"] == "marker":
-                if len(coords) < 4: continue 
+                if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw, coords[1]*ch
                 x2, y2 = coords[2]*cw, coords[3]*ch
-                self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
-                
-                self.canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
-                self.canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
+                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
+
+                canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
+                canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
 
                 if obj.get("classes"):
                     icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
-                    self._draw_class_icons(icon_x, icon_y, obj["classes"], c, sc)
-                
+                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
+
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
                     if mx is not None:
-                        self.canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
-                    
+                        canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
+
             elif obj["type"] == "text":
-                if len(coords) < 2: continue 
+                if len(coords) < 2: continue
                 x, y = coords[0]*cw, coords[1]*ch
-                
+
                 poi_data = obj.get("poi", [])
                 if isinstance(poi_data, str):
                     if poi_data.startswith("xvm_"):
@@ -694,29 +686,45 @@ class MapPainter:
                             total_w += sz + int(4 * sc)
                             continue
                         sz = int(base_sz * XVM_SCALE.get(code, 1.0))
-                        
-                        t = self.canvas.create_text(0, 0, text=chr(code), font=("XVMSymbol", sz), state="hidden")
-                        bbox = self.canvas.bbox(t)
+
+                        t = canvas.create_text(0, 0, text=chr(code), font=("XVMSymbol", sz), state="hidden")
+                        bbox = canvas.bbox(t)
                         w = bbox[2] - bbox[0] + int(4 * sc) if bbox else sz * 0.8
-                        self.canvas.delete(t)
+                        canvas.delete(t)
                         items.append({"code": code, "sz": sz, "w": w})
                         total_w += w
-                        
+
                     curr_x = x - total_w / 2
                     poi_oy = int(24 * sc)
                     for it in items:
                         cx = curr_x + it["w"] / 2
                         if it.get("tree"):
-                            self.canvas.create_text(cx, y-poi_oy, text=chr(0xF18C),
-                                                    font=("FontAwesome", it["sz"]), fill=c,
-                                                    tags="painter_obj")
+                            canvas.create_text(cx, y-poi_oy, text=chr(0xF18C),
+                                                font=("FontAwesome", it["sz"]), fill=c,
+                                                tags="painter_obj")
                         else:
-                            self.canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]), fill="black", tags=("painter_obj", "xvm_bg"))
-                            self.canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]-max(2, int(4*sc))), fill=c, tags=("painter_obj", "xvm_fg"))
+                            canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]), fill="black", tags=("painter_obj", "xvm_bg"))
+                            canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]-max(2, int(4*sc))), fill=c, tags=("painter_obj", "xvm_fg"))
                         curr_x += it["w"]
-                
+
                 if obj.get("text"):
                     ty = y + int(15 * sc) if poi_data else y
-                    self.canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
+                    canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
 
+    def redraw(self, cw=None, ch=None):
+        if not self.app.current_map_eng: return
+        map_id = self.app.current_map_eng
+
+        if cw is None or ch is None:
+            cw = self.canvas.winfo_width()
+            ch = self.canvas.winfo_height()
+        if cw < 10 or ch < 10: return
+
+        self.canvas.delete("painter_obj")
+        if map_id not in self.drawings:
+            self.app._lift_overlay()
+            return
+
+        visible = [obj for obj in self.drawings[map_id] if self.is_visible(obj)]
+        self._render_elements(self.canvas, visible, cw, ch)
         self.app._lift_overlay()
