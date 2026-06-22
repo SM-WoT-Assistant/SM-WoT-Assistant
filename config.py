@@ -49,7 +49,7 @@ TECH_MAPS_STAGING = {
     "29_el_halluf": "El Halluf", "29_el_hallouf": "El Halluf", "31_airfield": "Airfield", 
     "33_fjords": "Fjords", "33_fjord": "Fjords",
     "34_redshire": "Redshire", "35_steppes": "Steppes", "36_fishing_bay": "Fishermans Bay",
-    "37_caucasus": "Cliff", "38_mannerheim_line": "Mannerheim Line", "44_north_america": "Live Oaks",
+    "37_caucasus": "Mountain Pass", "38_mannerheim_line": "Mannerheim Line", "44_north_america": "Live Oaks",
     "45_north_america": "Highway", "47_canada_a": "Serene Coast", "59_asia_great_wall": "Empire's Border",
     "60_asia_mundra": "Mountain Pass", "60_asia_miao": "Pearl River", "63_tundra": "Tundra", 
     "83_kharkiv": "Kharkov", "92_stalingrad": "Fiery Salient", "95_lost_city_ctf": "Ghost Town", 
