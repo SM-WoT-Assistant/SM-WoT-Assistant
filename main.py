@@ -720,7 +720,12 @@ class WotAssistantHQ:
                 self._combolbox_hwnd = hwnd
         if hwnd is not None:
             try:
-                ctypes.windll.user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, 0x0001 | 0x0002)
+                user32 = ctypes.windll.user32
+                SWP_NOSIZE = 0x0001
+                SWP_NOMOVE = 0x0002
+                SWP_NOACTIVATE = 0x0010
+                user32.SetWindowPos(hwnd, -1, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE)
+                user32.SetWindowPos(hwnd, 0, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE)
             except Exception:
                 pass
 
