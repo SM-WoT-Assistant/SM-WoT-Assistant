@@ -201,22 +201,15 @@ class DrawingPalette(tk.Toplevel):
         sep6.pack(fill="x", padx=6, pady=2)
 
         bf = tk.Frame(self, bg=bg)
-        bf.pack(fill="x", padx=8, pady=(2, 2))
-        tk.Button(bf, text=self.app.t('ui', 'publish_map').upper(), bg="#446644", fg="#cfc", bd=0,
-                  font=("Arial", 8), command=self._publish).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'publish_all').upper(), bg="#446644", fg="#cfc", bd=0,
-                  font=("Arial", 8), command=self._publish_all).pack(side="left", fill="x", expand=True, padx=1)
-
-        bf2 = tk.Frame(self, bg=bg)
-        bf2.pack(fill="x", padx=8, pady=(0, 6))
-        tk.Button(bf2, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._export).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf2, text=self.app.t('ui', 'all_export').upper(), bg="#444", fg="#aaccff", bd=0,
-                   font=("Arial", 8), command=self._export_all).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf2, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
-                   font=("Arial", 8), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf2, text=self.app.t('ui', 'download_btn').upper(), bg="#446688", fg="white", bd=0,
-                   font=("Arial", 8), command=self._show_download_dialog).pack(side="left", fill="x", expand=True, padx=1)
+        bf.pack(fill="x", padx=8, pady=(2, 6))
+        tk.Button(bf, text="PUBLISH", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 8, "bold"), command=self._choose_publish_action).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf, text="SAVE", bg="#444", fg="white", bd=0,
+                  font=("Arial", 8, "bold"), command=self._choose_save_action).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
+                   font=("Arial", 8, "bold"), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf, text=self.app.t('ui', 'download_btn').upper(), bg="#446688", fg="white", bd=0,
+                   font=("Arial", 8, "bold"), command=self._show_download_dialog).pack(side="left", fill="x", expand=True, padx=1)
 
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
@@ -324,6 +317,75 @@ class DrawingPalette(tk.Toplevel):
     def _import_unified(self):
         self._lift_self()
         self.app.import_tactic_unified()
+
+    def _choose_publish_action(self):
+        self._lift_self()
+        if not firebase_identity.is_registered():
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                self.app.t('ui', 'publish_register_first'))
+            return
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title("PUBLISH")
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
+        tk.Label(dlg, text="Publish what?", bg="#222", fg="#ccc",
+                 font=("Arial", 10)).pack(padx=30, pady=(15, 10))
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 15))
+        def on_map():
+            dlg.destroy()
+            self._publish()
+        def on_all():
+            dlg.destroy()
+            self._publish_all()
+        def on_cancel():
+            dlg.destroy()
+        tk.Button(bf, text="Current Map", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
+        tk.Button(bf, text="All Maps", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
+        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
+        self._center_on_root(dlg)
+        self.app.root.wait_window(dlg)
+
+    def _choose_save_action(self):
+        self._lift_self()
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title("SAVE")
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.grab_set()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
+        tk.Label(dlg, text="Save what?", bg="#222", fg="#ccc",
+                 font=("Arial", 10)).pack(padx=30, pady=(15, 10))
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 15))
+        def on_map():
+            dlg.destroy()
+            self._export()
+        def on_all():
+            dlg.destroy()
+            self._export_all()
+        def on_cancel():
+            dlg.destroy()
+        tk.Button(bf, text="Current Map", bg="#444", fg="white", bd=0,
+                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
+        tk.Button(bf, text="All Maps", bg="#444", fg="#aaccff", bd=0,
+                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
+        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
+        self._center_on_root(dlg)
+        self.app.root.wait_window(dlg)
 
     def _fetch_existing_comments(self, map_ids):
         try:
@@ -745,8 +807,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dlg.lift()
         dlg.focus_force()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         bg = "#222"
 
@@ -781,12 +841,14 @@ class DrawingPalette(tk.Toplevel):
                 author = data.get("author_nickname", "")
                 created = (data.get("created_at") or "")[:10]
                 el_count = data.get("element_count", 0)
+                comment = (data.get("comment") or "")[:40]
                 items.append({
                     "scheme_id": sid,
                     "map_id": map_id,
                     "map_name": map_name,
                     "author": author,
                     "created": created,
+                    "comment": comment,
                     "el_count": el_count,
                     "elements": data.get("elements", []),
                 })
@@ -810,6 +872,9 @@ class DrawingPalette(tk.Toplevel):
                             fieldbackground="#1a1a1a", arrowcolor="#888")
             style.map("TCombobox", fieldbackground=[("readonly", "#1a1a1a")],
                       foreground=[("readonly", "#cccccc")])
+            style.configure("Vertical.TScrollbar", background="#444", troughcolor="#222",
+                            gripcount=0, arrowsize=12, relief="flat", borderwidth=0)
+            style.map("Vertical.TScrollbar", background=[("active", "#555")])
 
             all_label = self.app.t('ui', 'download_filter_all')
 
@@ -835,17 +900,19 @@ class DrawingPalette(tk.Toplevel):
             tf = tk.Frame(dlg, bg=bg)
             tf.pack(fill="both", expand=True, padx=8, pady=4)
 
-            columns = ("map", "author", "date", "preview")
+            columns = ("map", "author", "date", "comment", "preview")
             tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
                                     height=12, selectmode="browse")
             tree.heading("map", text="Map Name")
             tree.heading("author", text="Author")
             tree.heading("date", text="Date")
-            tree.heading("preview", text="Preview")
-            tree.column("map", width=140)
-            tree.column("author", width=100)
-            tree.column("date", width=80)
-            tree.column("preview", width=60, anchor="center")
+            tree.heading("comment", text="Description")
+            tree.heading("preview", text="")
+            tree.column("map", width=120)
+            tree.column("author", width=90)
+            tree.column("date", width=75)
+            tree.column("comment", width=150)
+            tree.column("preview", width=50, anchor="center")
 
             vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
             tree.configure(yscrollcommand=vsb.set)
@@ -868,10 +935,8 @@ class DrawingPalette(tk.Toplevel):
                     has_preview = it["map_id"] != "all_maps"
                     tree.insert("", "end",
                                 values=(it["map_name"], it["author"], it["created"],
-                                        "Preview" if has_preview else ""),
+                                        it["comment"], "Preview" if has_preview else ""),
                                 iid=it["scheme_id"])
-                    if has_preview:
-                        tree.set(it["scheme_id"], "preview", "Preview")
 
             map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
             author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
@@ -881,7 +946,7 @@ class DrawingPalette(tk.Toplevel):
                 region = tree.identify_region(event.x, event.y)
                 if region == "cell":
                     col = tree.identify_column(event.x)
-                    if col == "#4":
+                    if col == "#5":
                         sel = tree.selection()
                         if sel:
                             sid = sel[0]
