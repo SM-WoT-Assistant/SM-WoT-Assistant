@@ -329,7 +329,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.title(self.app.t('ui', 'publish_map'))
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
-        dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
@@ -361,7 +360,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.title(self.app.t('ui', 'save_btn'))
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
-        dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
@@ -382,7 +380,7 @@ class DrawingPalette(tk.Toplevel):
             self._export_all()
         tk.Button(bf, text=map_name, bg="#444", fg="white", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#444", fg="#aaccff", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'all_maps'), bg="#444", fg="#aaccff", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
         self._center_on_root(dlg)
         self.app.root.wait_window(dlg)

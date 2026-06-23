@@ -259,7 +259,8 @@ TRANSLATIONS = {
             "editing_label": "EDITING: {label}",
             "publish_what": "Publish what?",
             "save_what": "Save what?",
-            "btn_cancel": "Cancel"
+            "btn_cancel": "Cancel",
+            "all_maps": "All Maps"
         }
     }
 }
