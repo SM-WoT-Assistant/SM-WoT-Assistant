@@ -333,6 +333,9 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
+        dlg.lift()
+        dlg.focus_force()
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
         tk.Label(dlg, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
                  font=("Arial", 10)).pack(padx=30, pady=(15, 10))
         import config
@@ -345,14 +348,10 @@ class DrawingPalette(tk.Toplevel):
         def on_all():
             dlg.destroy()
             self._publish_all()
-        def on_cancel():
-            dlg.destroy()
         tk.Button(bf, text=map_name, bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
-                  font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
         self._center_on_root(dlg)
         self.app.root.wait_window(dlg)
 
@@ -366,6 +365,9 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
+        dlg.lift()
+        dlg.focus_force()
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
         tk.Label(dlg, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
@@ -378,14 +380,10 @@ class DrawingPalette(tk.Toplevel):
         def on_all():
             dlg.destroy()
             self._export_all()
-        def on_cancel():
-            dlg.destroy()
         tk.Button(bf, text=map_name, bg="#444", fg="white", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'all_export'), bg="#444", fg="#aaccff", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#444", fg="#aaccff", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
-                  font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
         self._center_on_root(dlg)
         self.app.root.wait_window(dlg)
 
