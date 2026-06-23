@@ -326,21 +326,39 @@ class DrawingPalette(tk.Toplevel):
                 self.app.t('ui', 'publish_register_first'))
             return
         dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'publish_map'))
+        dlg.overrideredirect(True)
         dlg.configure(bg="#222")
-        dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.lift()
         dlg.focus_force()
         dlg.bind("<Escape>", lambda e: dlg.destroy())
-        tk.Label(dlg, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
-                 font=("Arial", 10)).pack(padx=30, pady=(15, 10))
+
+        hdr_bg = "#2a2a2a"
+        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=f"  {self.app.t('ui', 'publish_map')}", bg=hdr_bg, fg="#ffaa00",
+                 font=("Arial", 9, "bold")).pack(side="left")
+        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
+                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
+        _drag = {"x": 0, "y": 0}
+        def drag_start(e):
+            _drag["x"] = e.x
+            _drag["y"] = e.y
+        def drag_move(e):
+            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
+        hdr.bind("<Button-1>", drag_start)
+        hdr.bind("<B1-Motion>", drag_move)
+        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
+
+        body = tk.Frame(dlg, bg="#222")
+        body.pack(fill="both", expand=True, padx=10, pady=(10, 10))
+        tk.Label(body, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
+                 font=("Arial", 10)).pack(pady=(0, 10))
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        bf = tk.Frame(dlg, bg="#222")
-        bf.pack(pady=(0, 15))
+        bf = tk.Frame(body, bg="#222")
+        bf.pack()
         def on_map():
             dlg.destroy()
             self._publish()
@@ -357,21 +375,39 @@ class DrawingPalette(tk.Toplevel):
     def _choose_save_action(self):
         self._lift_self()
         dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'save_btn'))
+        dlg.overrideredirect(True)
         dlg.configure(bg="#222")
-        dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.lift()
         dlg.focus_force()
         dlg.bind("<Escape>", lambda e: dlg.destroy())
+
+        hdr_bg = "#2a2a2a"
+        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=f"  {self.app.t('ui', 'save_btn')}", bg=hdr_bg, fg="#ffaa00",
+                 font=("Arial", 9, "bold")).pack(side="left")
+        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
+                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
+        _drag = {"x": 0, "y": 0}
+        def drag_start(e):
+            _drag["x"] = e.x
+            _drag["y"] = e.y
+        def drag_move(e):
+            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
+        hdr.bind("<Button-1>", drag_start)
+        hdr.bind("<B1-Motion>", drag_move)
+        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
+
+        body = tk.Frame(dlg, bg="#222")
+        body.pack(fill="both", expand=True, padx=10, pady=(10, 10))
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        tk.Label(dlg, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
-                 font=("Arial", 10)).pack(padx=30, pady=(15, 10))
-        bf = tk.Frame(dlg, bg="#222")
-        bf.pack(pady=(0, 15))
+        tk.Label(body, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
+                 font=("Arial", 10)).pack(pady=(0, 10))
+        bf = tk.Frame(body, bg="#222")
+        bf.pack()
         def on_map():
             dlg.destroy()
             self._export()
