@@ -547,6 +547,7 @@ class MapPainter:
         dlg.resizable(False, False)
         dlg.minsize(300, 120)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.update_idletasks()
         dialog_utils._set_dark_title_bar(dlg)

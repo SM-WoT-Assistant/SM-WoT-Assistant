@@ -202,9 +202,9 @@ class DrawingPalette(tk.Toplevel):
 
         bf = tk.Frame(self, bg=bg)
         bf.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Button(bf, text="PUBLISH", bg="#446644", fg="#cfc", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'publish_map').upper(), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 8, "bold"), command=self._choose_publish_action).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text="SAVE", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8, "bold"), command=self._choose_save_action).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
                    font=("Arial", 8, "bold"), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
@@ -326,15 +326,16 @@ class DrawingPalette(tk.Toplevel):
                 self.app.t('ui', 'publish_register_first'))
             return
         dlg = tk.Toplevel(self.app.root)
-        dlg.title("PUBLISH")
+        dlg.title(self.app.t('ui', 'publish_map'))
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.update_idletasks()
         dialog_utils._set_dark_title_bar(dlg)
-        tk.Label(dlg, text="Publish what?", bg="#222", fg="#ccc",
+        tk.Label(dlg, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
                  font=("Arial", 10)).pack(padx=30, pady=(15, 10))
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 15))
@@ -346,11 +347,11 @@ class DrawingPalette(tk.Toplevel):
             self._publish_all()
         def on_cancel():
             dlg.destroy()
-        tk.Button(bf, text="Current Map", bg="#446644", fg="#cfc", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'current_map'), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text="All Maps", bg="#446644", fg="#cfc", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
         self._center_on_root(dlg)
         self.app.root.wait_window(dlg)
@@ -358,15 +359,16 @@ class DrawingPalette(tk.Toplevel):
     def _choose_save_action(self):
         self._lift_self()
         dlg = tk.Toplevel(self.app.root)
-        dlg.title("SAVE")
+        dlg.title(self.app.t('ui', 'save_btn'))
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.update_idletasks()
         dialog_utils._set_dark_title_bar(dlg)
-        tk.Label(dlg, text="Save what?", bg="#222", fg="#ccc",
+        tk.Label(dlg, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
                  font=("Arial", 10)).pack(padx=30, pady=(15, 10))
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 15))
@@ -378,11 +380,11 @@ class DrawingPalette(tk.Toplevel):
             self._export_all()
         def on_cancel():
             dlg.destroy()
-        tk.Button(bf, text="Current Map", bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'current_map'), bg="#444", fg="white", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text="All Maps", bg="#444", fg="#aaccff", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'all_export'), bg="#444", fg="#aaccff", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=12, pady=5, command=on_cancel).pack(side="left", padx=4)
         self._center_on_root(dlg)
         self.app.root.wait_window(dlg)
@@ -503,6 +505,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -603,6 +606,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -807,6 +811,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dlg.lift()
         dlg.focus_force()
+        dialog_utils._set_dark_title_bar(dlg)
 
         bg = "#222"
 
@@ -900,18 +905,18 @@ class DrawingPalette(tk.Toplevel):
             tf = tk.Frame(dlg, bg=bg)
             tf.pack(fill="both", expand=True, padx=8, pady=4)
 
-            columns = ("map", "author", "date", "comment", "preview")
+            columns = ("map", "comment", "author", "date", "preview")
             tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
                                     height=12, selectmode="browse")
             tree.heading("map", text="Map Name")
+            tree.heading("comment", text="Description")
             tree.heading("author", text="Author")
             tree.heading("date", text="Date")
-            tree.heading("comment", text="Description")
             tree.heading("preview", text="")
             tree.column("map", width=120)
+            tree.column("comment", width=150)
             tree.column("author", width=90)
             tree.column("date", width=75)
-            tree.column("comment", width=150)
             tree.column("preview", width=50, anchor="center")
 
             vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
@@ -934,8 +939,8 @@ class DrawingPalette(tk.Toplevel):
                         continue
                     has_preview = it["map_id"] != "all_maps"
                     tree.insert("", "end",
-                                values=(it["map_name"], it["author"], it["created"],
-                                        it["comment"], "Preview" if has_preview else ""),
+                                values=(it["map_name"], it["comment"], it["author"], it["created"],
+                                        "Preview" if has_preview else ""),
                                 iid=it["scheme_id"])
 
             map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
@@ -987,7 +992,7 @@ class DrawingPalette(tk.Toplevel):
             dlg.update_idletasks()
             dialog_utils._set_dark_title_bar(dlg)
 
-        dlg.geometry("560x380")
+        dlg.geometry("600x380")
         self._center_on_root(dlg)
 
         import threading
@@ -1070,6 +1075,7 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -1138,6 +1144,7 @@ class DrawingPalette(tk.Toplevel):
         pv.resizable(False, False)
         pv.transient(parent_dlg)
         pv.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(pv)
         pv.lift()
         pv.focus_force()
         pv.update_idletasks()

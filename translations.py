@@ -256,7 +256,11 @@ TRANSLATIONS = {
             "confirm_delete_msg": "Delete {label}?",
             "marker_type": "Marker",
             "text_type": "Text/Sign",
-            "editing_label": "EDITING: {label}"
+            "editing_label": "EDITING: {label}",
+            "publish_what": "Publish what?",
+            "save_what": "Save what?",
+            "current_map": "Current map",
+            "btn_cancel": "Cancel"
         }
     }
 }

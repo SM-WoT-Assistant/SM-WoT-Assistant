@@ -35,9 +35,11 @@ def dark_messagebox(parent, title, message, is_error=False):
     dlg.resizable(False, False)
     dlg.transient(parent)
     dlg.attributes("-topmost", True)
+    _set_dark_title_bar(dlg)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
+    dlg.update_idletasks()
     _set_dark_title_bar(dlg)
 
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
@@ -63,9 +65,11 @@ def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
     dlg.resizable(False, False)
     dlg.transient(parent)
     dlg.attributes("-topmost", True)
+    _set_dark_title_bar(dlg)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
+    dlg.update_idletasks()
     _set_dark_title_bar(dlg)
 
     result = [False]
@@ -100,9 +104,11 @@ def dark_promptbox(parent, title, prompt, initialvalue=""):
     dlg.resizable(False, False)
     dlg.transient(parent)
     dlg.attributes("-topmost", True)
+    _set_dark_title_bar(dlg)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
+    dlg.update_idletasks()
     _set_dark_title_bar(dlg)
 
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",

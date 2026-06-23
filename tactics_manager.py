@@ -9,6 +9,7 @@ def _choice_dialog(parent, title, text):
     dlg.configure(bg="#222")
     dlg.resizable(False, False)
     dlg.attributes("-topmost", True)
+    dialog_utils._set_dark_title_bar(dlg)
     dlg.grab_set()
     dlg.update_idletasks()
     dialog_utils._set_dark_title_bar(dlg)
