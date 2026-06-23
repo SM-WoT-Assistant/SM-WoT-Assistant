@@ -793,6 +793,20 @@ class DrawingPalette(tk.Toplevel):
             unique_maps = sorted(set(it["map_name"] for it in items if it["map_name"]))
             unique_authors = sorted(set(it["author"] for it in items if it["author"]))
 
+            # Dark ttk theme
+            style = ttk.Style()
+            style.theme_use("default")
+            style.configure("Treeview", background="#1a1a1a", foreground="#cccccc",
+                            fieldbackground="#1a1a1a", bordercolor="#333", arrowcolor="#888")
+            style.configure("Treeview.Heading", background="#333", foreground="#aaa",
+                            fieldbackground="#333")
+            style.map("Treeview", background=[("selected", "#444")],
+                      foreground=[("selected", "white")])
+            style.configure("TCombobox", background="#1a1a1a", foreground="#cccccc",
+                            fieldbackground="#1a1a1a", arrowcolor="#888")
+            style.map("TCombobox", fieldbackground=[("readonly", "#1a1a1a")],
+                      foreground=[("readonly", "#cccccc")])
+
             all_label = self.app.t('ui', 'download_filter_all')
 
             # Filter frame
@@ -878,8 +892,6 @@ class DrawingPalette(tk.Toplevel):
             bf = tk.Frame(dlg, bg=bg)
             bf.pack(fill="x", padx=8, pady=(0, 8))
 
-            result = [None]
-
             def on_download():
                 sel = tree.selection()
                 if not sel:
@@ -887,12 +899,12 @@ class DrawingPalette(tk.Toplevel):
                 sid = sel[0]
                 for it in items:
                     if it["scheme_id"] == sid:
-                        result[0] = it
+                        self._download_result = it
                         dlg.destroy()
                         return
 
             def on_cancel():
-                result[0] = None
+                self._download_result = None
                 dlg.destroy()
 
             tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
