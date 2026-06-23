@@ -217,6 +217,8 @@ class DrawingPalette(tk.Toplevel):
         self._choice_frame.pack(fill="x", padx=6, pady=4)
         self._choice_frame.pack_forget()
 
+        self._download_frame = tk.Frame(self, bg="#222")
+
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
         self._status_lbl.pack(fill="x", padx=8, pady=(2, 2))
@@ -642,6 +644,7 @@ class DrawingPalette(tk.Toplevel):
         active = self.painter.active_tool
         if not active:
             self._active_tool_code = None
+            self._palette_compact_geo = None
         elif active == "marker":
             self._active_tool_code = "marker"
         elif active == "text":
@@ -787,220 +790,189 @@ class DrawingPalette(tk.Toplevel):
 
     def _show_download_dialog(self):
         self._lift_self()
-        dlg = tk.Toplevel(self.app.root)
-        dlg.overrideredirect(True)
-        dlg.configure(bg="#222")
-        dlg.attributes("-topmost", True)
-        dlg.grab_set()
-        dlg.focus_force()
-        dlg.bind("<Escape>", lambda e: dlg.destroy())
-
-        hdr_bg = "#2a2a2a"
-        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text=f"  {self.app.t('ui', 'download_title')}", bg=hdr_bg, fg="#ffaa00",
-                 font=("Arial", 9, "bold")).pack(side="left")
-        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
-                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
-        _drag = {"x": 0, "y": 0}
-        def drag_start(e):
-            _drag["x"] = e.x
-            _drag["y"] = e.y
-        def drag_move(e):
-            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
-        hdr.bind("<Button-1>", drag_start)
-        hdr.bind("<B1-Motion>", drag_move)
-        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
-
-        bg = "#222"
-
-        status_lbl = tk.Label(dlg, text=self.app.t('ui', 'download_loading'),
-                              bg=bg, fg="#888", font=("Arial", 9))
-        status_lbl.pack(padx=10, pady=10)
-
-        def _populate():
-            try:
-                schemes = firebase_drawings.get_all_schemes()
-            except Exception:
-                schemes = {}
-            self.after(0, lambda: _build_dialog(schemes))
-
-        def _build_dialog(schemes):
-            for w in dlg.winfo_children():
-                w.destroy()
-
-            if not schemes:
-                status_lbl = tk.Label(dlg, text=self.app.t('ui', 'download_no_schemes'),
-                                      bg=bg, fg="#ff6666", font=("Arial", 9))
-                status_lbl.pack(padx=20, pady=20)
-                tk.Button(dlg, text="OK", bg="#444", fg="white", bd=0,
-                          font=("Arial", 9), command=dlg.destroy).pack(pady=(0, 12))
-                return
-
-            # Build data list
-            items = []
-            for sid, data in schemes.items():
-                map_id = data.get("map_id", "")
-                map_name = data.get("map_name", "")
-                author = data.get("author_nickname", "")
-                created = (data.get("created_at") or "")[:10]
-                el_count = data.get("element_count", 0)
-                comment = (data.get("comment") or "")[:40]
-                items.append({
-                    "scheme_id": sid,
-                    "map_id": map_id,
-                    "map_name": map_name,
-                    "author": author,
-                    "created": created,
-                    "comment": comment,
-                    "el_count": el_count,
-                    "elements": data.get("elements", []),
-                })
-
-            items.sort(key=lambda x: x.get("created", ""), reverse=True)
-
-            # Collect unique map names and authors for filters
-            unique_maps = sorted(set(it["map_name"] for it in items if it["map_name"]))
-            unique_authors = sorted(set(it["author"] for it in items if it["author"]))
-
-            # Dark ttk theme
-            style = ttk.Style()
-            style.theme_use("default")
-            style.configure("Treeview", background="#1a1a1a", foreground="#cccccc",
-                            fieldbackground="#1a1a1a", bordercolor="#333", arrowcolor="#888")
-            style.configure("Treeview.Heading", background="#333", foreground="#aaa",
-                            fieldbackground="#333")
-            style.map("Treeview", background=[("selected", "#444")],
-                      foreground=[("selected", "white")])
-            style.configure("TCombobox", background="#1a1a1a", foreground="#cccccc",
-                            fieldbackground="#1a1a1a", arrowcolor="#888")
-            style.map("TCombobox", fieldbackground=[("readonly", "#1a1a1a")],
-                      foreground=[("readonly", "#cccccc")])
-            style.configure("Vertical.TScrollbar", background="#444", troughcolor="#222",
-                            gripcount=0, arrowsize=12, relief="flat", borderwidth=0)
-            style.map("Vertical.TScrollbar", background=[("active", "#555")])
-
-            all_label = self.app.t('ui', 'download_filter_all')
-
-            # Filter frame
-            ff = tk.Frame(dlg, bg=bg)
-            ff.pack(fill="x", padx=8, pady=(6, 2))
-
-            tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
-            map_filter_var = tk.StringVar(value=all_label)
-            map_filter_cb = tk.ttk.Combobox(ff, textvariable=map_filter_var,
-                                             values=[all_label] + unique_maps,
-                                             state="readonly", width=18, font=("Arial", 8))
-            map_filter_cb.pack(side="left", padx=4)
-
-            tk.Label(ff, text="Author:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
-            author_filter_var = tk.StringVar(value=all_label)
-            author_filter_cb = tk.ttk.Combobox(ff, textvariable=author_filter_var,
-                                                 values=[all_label] + unique_authors,
-                                                 state="readonly", width=14, font=("Arial", 8))
-            author_filter_cb.pack(side="left", padx=4)
-
-            # Tree frame
-            tf = tk.Frame(dlg, bg=bg)
-            tf.pack(fill="both", expand=True, padx=8, pady=4)
-
-            columns = ("map", "comment", "author", "date", "preview")
-            tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
-                                    height=12, selectmode="browse")
-            tree.heading("map", text="Map Name")
-            tree.heading("comment", text="Description")
-            tree.heading("author", text="Author")
-            tree.heading("date", text="Date")
-            tree.heading("preview", text="")
-            tree.column("map", width=120)
-            tree.column("comment", width=150)
-            tree.column("author", width=90)
-            tree.column("date", width=75)
-            tree.column("preview", width=50, anchor="center")
-
-            vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
-            tree.configure(yscrollcommand=vsb.set)
-            tree.pack(side="left", fill="both", expand=True)
-            vsb.pack(side="right", fill="y")
-
-            # Preview button for each row
-            def make_preview_cmd(scheme_item):
-                return lambda: self._preview_scheme(scheme_item, dlg)
-
-            def _do_filter(*args):
-                mf = map_filter_var.get()
-                af = author_filter_var.get()
-                tree.delete(*tree.get_children())
-                for it in items:
-                    if mf != all_label and it["map_name"] != mf:
-                        continue
-                    if af != all_label and it["author"] != af:
-                        continue
-                    has_preview = it["map_id"] != "all_maps"
-                    tree.insert("", "end",
-                                values=(it["map_name"], it["comment"], it["author"], it["created"],
-                                        "Preview" if has_preview else ""),
-                                iid=it["scheme_id"])
-
-            map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
-            author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
-
-            # Click on tree item for preview
-            def on_tree_click(event):
-                region = tree.identify_region(event.x, event.y)
-                if region == "cell":
-                    col = tree.identify_column(event.x)
-                    if col == "#5":
-                        sel = tree.selection()
-                        if sel:
-                            sid = sel[0]
-                            for it in items:
-                                if it["scheme_id"] == sid and it["map_id"] != "all_maps":
-                                    self._preview_scheme(it, dlg)
-                                    return
-
-            tree.bind("<ButtonRelease-1>", on_tree_click)
-
-            # Bottom buttons
-            bf = tk.Frame(dlg, bg=bg)
-            bf.pack(fill="x", padx=8, pady=(0, 8))
-
-            def on_download():
-                sel = tree.selection()
-                if not sel:
-                    return
-                sid = sel[0]
-                for it in items:
-                    if it["scheme_id"] == sid:
-                        self._download_result = it
-                        dlg.destroy()
-                        return
-
-            def on_cancel():
-                self._download_result = None
-                dlg.destroy()
-
-            tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
-                      font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="right", padx=2)
-            tk.Button(bf, text="Download", bg="#446688", fg="white", bd=0,
-                      font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
-
-            # Populate tree initially
-            _do_filter()
-            dlg.update_idletasks()
-
-        dlg.geometry("600x380")
-        self._center_on_root(dlg)
-
-        import threading
+        self._hide_choice_inline()
         self._download_result = None
-        t = threading.Thread(target=_populate, daemon=True)
+        for w in self._download_frame.winfo_children():
+            w.destroy()
+        self._download_frame.pack(fill="both", expand=True, padx=6, pady=4, before=self._status_lbl)
+        try:
+            self._palette_compact_geo = self.geometry()
+        except Exception:
+            self._palette_compact_geo = None
+        self.geometry("500x720")
+        bg = "#222"
+        tk.Label(self._download_frame, text=self.app.t('ui', 'download_loading'),
+                 bg=bg, fg="#888", font=("Arial", 9)).pack(padx=10, pady=10)
+        import threading
+        t = threading.Thread(target=self._download_populate, daemon=True)
         t.start()
-        self.wait_window(dlg)
 
-        if self._download_result is not None:
-            self._handle_download_result(self._download_result)
+    def _hide_download_inline(self):
+        self._download_frame.pack_forget()
+        if self._palette_compact_geo:
+            try:
+                self.geometry(self._palette_compact_geo)
+            except Exception:
+                pass
+
+    def _download_populate(self):
+        try:
+            schemes = firebase_drawings.get_all_schemes()
+        except Exception:
+            schemes = {}
+        self.after(0, lambda: self._build_download_ui(schemes))
+
+    def _build_download_ui(self, schemes):
+        bg = "#222"
+        for w in self._download_frame.winfo_children():
+            w.destroy()
+
+        if not schemes:
+            tk.Label(self._download_frame, text=self.app.t('ui', 'download_no_schemes'),
+                     bg=bg, fg="#ff6666", font=("Arial", 9)).pack(padx=20, pady=20)
+            tk.Button(self._download_frame, text="OK", bg="#444", fg="white", bd=0,
+                      font=("Arial", 9), command=self._hide_download_inline).pack(pady=(0, 12))
+            return
+
+        items = []
+        for sid, data in schemes.items():
+            map_id = data.get("map_id", "")
+            map_name = data.get("map_name", "")
+            author = data.get("author_nickname", "")
+            created = (data.get("created_at") or "")[:10]
+            el_count = data.get("element_count", 0)
+            comment = (data.get("comment") or "")[:40]
+            items.append({
+                "scheme_id": sid,
+                "map_id": map_id,
+                "map_name": map_name,
+                "author": author,
+                "created": created,
+                "comment": comment,
+                "el_count": el_count,
+                "elements": data.get("elements", []),
+            })
+
+        items.sort(key=lambda x: x.get("created", ""), reverse=True)
+
+        unique_maps = sorted(set(it["map_name"] for it in items if it["map_name"]))
+        unique_authors = sorted(set(it["author"] for it in items if it["author"]))
+
+        style = ttk.Style()
+        style.theme_use("default")
+        style.configure("Treeview", background="#1a1a1a", foreground="#cccccc",
+                        fieldbackground="#1a1a1a", bordercolor="#333", arrowcolor="#888")
+        style.configure("Treeview.Heading", background="#333", foreground="#aaa",
+                        fieldbackground="#333")
+        style.map("Treeview", background=[("selected", "#444")],
+                  foreground=[("selected", "white")])
+        style.configure("TCombobox", background="#1a1a1a", foreground="#cccccc",
+                        fieldbackground="#1a1a1a", arrowcolor="#888")
+        style.map("TCombobox", fieldbackground=[("readonly", "#1a1a1a")],
+                  foreground=[("readonly", "#cccccc")])
+        style.configure("Vertical.TScrollbar", background="#444", troughcolor="#222",
+                        gripcount=0, arrowsize=12, relief="flat", borderwidth=0)
+        style.map("Vertical.TScrollbar", background=[("active", "#555")])
+
+        all_label = self.app.t('ui', 'download_filter_all')
+
+        ff = tk.Frame(self._download_frame, bg=bg)
+        ff.pack(fill="x", padx=8, pady=(6, 2))
+
+        tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
+        map_filter_var = tk.StringVar(value=all_label)
+        map_filter_cb = tk.ttk.Combobox(ff, textvariable=map_filter_var,
+                                         values=[all_label] + unique_maps,
+                                         state="readonly", width=18, font=("Arial", 8))
+        map_filter_cb.pack(side="left", padx=4)
+
+        tk.Label(ff, text="Author:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
+        author_filter_var = tk.StringVar(value=all_label)
+        author_filter_cb = tk.ttk.Combobox(ff, textvariable=author_filter_var,
+                                             values=[all_label] + unique_authors,
+                                             state="readonly", width=14, font=("Arial", 8))
+        author_filter_cb.pack(side="left", padx=4)
+
+        tf = tk.Frame(self._download_frame, bg=bg)
+        tf.pack(fill="both", expand=True, padx=8, pady=4)
+
+        columns = ("map", "comment", "author", "date", "preview")
+        tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
+                                height=7, selectmode="browse")
+        tree.heading("map", text="Map Name")
+        tree.heading("comment", text="Description")
+        tree.heading("author", text="Author")
+        tree.heading("date", text="Date")
+        tree.heading("preview", text="")
+        tree.column("map", width=120)
+        tree.column("comment", width=150)
+        tree.column("author", width=90)
+        tree.column("date", width=75)
+        tree.column("preview", width=50, anchor="center")
+
+        vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+
+        def _do_filter(*args):
+            mf = map_filter_var.get()
+            af = author_filter_var.get()
+            tree.delete(*tree.get_children())
+            for it in items:
+                if mf != all_label and it["map_name"] != mf:
+                    continue
+                if af != all_label and it["author"] != af:
+                    continue
+                has_preview = it["map_id"] != "all_maps"
+                tree.insert("", "end",
+                            values=(it["map_name"], it["comment"], it["author"], it["created"],
+                                    "Preview" if has_preview else ""),
+                            iid=it["scheme_id"])
+
+        map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
+        author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
+
+        def on_tree_click(event):
+            region = tree.identify_region(event.x, event.y)
+            if region == "cell":
+                col = tree.identify_column(event.x)
+                if col == "#5":
+                    sel = tree.selection()
+                    if sel:
+                        sid = sel[0]
+                        for it in items:
+                            if it["scheme_id"] == sid and it["map_id"] != "all_maps":
+                                self._preview_scheme(it, self._download_frame)
+                                return
+
+        tree.bind("<ButtonRelease-1>", on_tree_click)
+
+        bf = tk.Frame(self._download_frame, bg=bg)
+        bf.pack(fill="x", padx=8, pady=(0, 8))
+
+        def on_download():
+            sel = tree.selection()
+            if not sel:
+                return
+            sid = sel[0]
+            for it in items:
+                if it["scheme_id"] == sid:
+                    self._download_result = it
+                    self._hide_download_inline()
+                    self._handle_download_result(it)
+                    return
+
+        def on_cancel():
+            self._download_result = None
+            self._hide_download_inline()
+
+        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="right", padx=2)
+        tk.Button(bf, text="Download", bg="#446688", fg="white", bd=0,
+                  font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
+
+        _do_filter()
 
     def _handle_download_result(self, item):
         """Called when user selects a scheme to download. Shows choice dialog."""
