@@ -549,8 +549,6 @@ class MapPainter:
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 150
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 60

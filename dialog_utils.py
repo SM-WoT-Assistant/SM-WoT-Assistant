@@ -39,8 +39,6 @@ def dark_messagebox(parent, title, message, is_error=False):
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
-    dlg.update_idletasks()
-    _set_dark_title_bar(dlg)
 
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
              font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
@@ -69,8 +67,6 @@ def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
-    dlg.update_idletasks()
-    _set_dark_title_bar(dlg)
 
     result = [False]
     def on_yes():
@@ -108,8 +104,6 @@ def dark_promptbox(parent, title, prompt, initialvalue=""):
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
-    dlg.update_idletasks()
-    _set_dark_title_bar(dlg)
 
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
              font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4))

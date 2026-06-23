@@ -441,8 +441,6 @@ class WotAssistantHQ:
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
         cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 60
@@ -965,8 +963,6 @@ class WotAssistantHQ:
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
         cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 80

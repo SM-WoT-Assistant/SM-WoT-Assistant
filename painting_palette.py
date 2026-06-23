@@ -333,10 +333,10 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
         tk.Label(dlg, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
                  font=("Arial", 10)).pack(padx=30, pady=(15, 10))
+        import config
+        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 15))
         def on_map():
@@ -347,7 +347,7 @@ class DrawingPalette(tk.Toplevel):
             self._publish_all()
         def on_cancel():
             dlg.destroy()
-        tk.Button(bf, text=self.app.t('ui', 'current_map'), bg="#446644", fg="#cfc", bd=0,
+        tk.Button(bf, text=map_name, bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
@@ -366,8 +366,8 @@ class DrawingPalette(tk.Toplevel):
         dlg.attributes("-topmost", True)
         dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
+        import config
+        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
         tk.Label(dlg, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
                  font=("Arial", 10)).pack(padx=30, pady=(15, 10))
         bf = tk.Frame(dlg, bg="#222")
@@ -380,7 +380,7 @@ class DrawingPalette(tk.Toplevel):
             self._export_all()
         def on_cancel():
             dlg.destroy()
-        tk.Button(bf, text=self.app.t('ui', 'current_map'), bg="#444", fg="white", bd=0,
+        tk.Button(bf, text=map_name, bg="#444", fg="white", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'all_export'), bg="#444", fg="#aaccff", bd=0,
                   font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
@@ -509,8 +509,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         if count:
             lbl_text = self.app.t('ui', 'publish_publishing_all').format(count=count)
@@ -610,8 +608,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
         tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
                  font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
         tk.Label(dlg, text=message, bg="#222",
@@ -988,9 +984,7 @@ class DrawingPalette(tk.Toplevel):
 
             # Populate tree initially
             _do_filter()
-
             dlg.update_idletasks()
-            dialog_utils._set_dark_title_bar(dlg)
 
         dlg.geometry("600x380")
         self._center_on_root(dlg)
@@ -1079,8 +1073,6 @@ class DrawingPalette(tk.Toplevel):
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
-        dlg.update_idletasks()
-        dialog_utils._set_dark_title_bar(dlg)
 
         tk.Label(dlg, text=self.app.t('ui', 'download_confirm_title'),
                  bg="#222", fg="#ffaa00", font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
@@ -1144,7 +1136,6 @@ class DrawingPalette(tk.Toplevel):
         pv.resizable(False, False)
         pv.transient(parent_dlg)
         pv.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(pv)
         pv.lift()
         pv.focus_force()
         pv.update_idletasks()
