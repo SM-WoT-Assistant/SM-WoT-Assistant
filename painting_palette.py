@@ -211,6 +211,12 @@ class DrawingPalette(tk.Toplevel):
         tk.Button(bf, text=self.app.t('ui', 'download_btn').upper(), bg="#446688", fg="white", bd=0,
                    font=("Arial", 8, "bold"), command=self._show_download_dialog).pack(side="left", fill="x", expand=True, padx=1)
 
+        self._choice_frame = tk.Frame(self, bg="#333")
+        tk.Label(self._choice_frame, text="", font=("Arial", 8), bg="#333", fg="#ccc",
+                 height=1).pack(fill="x", padx=6, pady=(4, 2))
+        self._choice_frame.pack(fill="x", padx=6, pady=4)
+        self._choice_frame.pack_forget()
+
         self._status_lbl = tk.Label(self, text="", font=("Arial", 8), bg=bg, fg="#ffaa00",
                                      height=1, anchor="w")
         self._status_lbl.pack(fill="x", padx=8, pady=(2, 2))
@@ -325,101 +331,51 @@ class DrawingPalette(tk.Toplevel):
                 self.app.t('ui', 'publish_map'),
                 self.app.t('ui', 'publish_register_first'))
             return
-        dlg = tk.Toplevel(self.app.root)
-        dlg.overrideredirect(True)
-        dlg.configure(bg="#222")
-        dlg.attributes("-topmost", True)
-        dlg.grab_set()
-        dlg.focus_force()
-        dlg.bind("<Escape>", lambda e: dlg.destroy())
-
-        hdr_bg = "#2a2a2a"
-        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text=f"  {self.app.t('ui', 'publish_map')}", bg=hdr_bg, fg="#ffaa00",
-                 font=("Arial", 9, "bold")).pack(side="left")
-        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
-                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
-        _drag = {"x": 0, "y": 0}
-        def drag_start(e):
-            _drag["x"] = e.x
-            _drag["y"] = e.y
-        def drag_move(e):
-            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
-        hdr.bind("<Button-1>", drag_start)
-        hdr.bind("<B1-Motion>", drag_move)
-        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
-
-        body = tk.Frame(dlg, bg="#222")
-        body.pack(fill="both", expand=True, padx=10, pady=(10, 10))
-        tk.Label(body, text=self.app.t('ui', 'publish_what'), bg="#222", fg="#ccc",
-                 font=("Arial", 10)).pack(pady=(0, 10))
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        bf = tk.Frame(body, bg="#222")
-        bf.pack()
         def on_map():
-            dlg.destroy()
+            self._hide_choice_inline()
             self._publish()
         def on_all():
-            dlg.destroy()
+            self._hide_choice_inline()
             self._publish_all()
-        tk.Button(bf, text=map_name, bg="#446644", fg="#cfc", bd=0,
-                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'publish_all'), bg="#446644", fg="#cfc", bd=0,
-                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        self._center_on_root(dlg)
-        self.app.root.wait_window(dlg)
+        self._show_choice_inline(
+            self.app.t('ui', 'publish_what'),
+            map_name, on_map,
+            self.app.t('ui', 'publish_all'), on_all)
 
     def _choose_save_action(self):
         self._lift_self()
-        dlg = tk.Toplevel(self.app.root)
-        dlg.overrideredirect(True)
-        dlg.configure(bg="#222")
-        dlg.attributes("-topmost", True)
-        dlg.grab_set()
-        dlg.focus_force()
-        dlg.bind("<Escape>", lambda e: dlg.destroy())
-
-        hdr_bg = "#2a2a2a"
-        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
-        hdr.pack(fill="x")
-        hdr.pack_propagate(False)
-        tk.Label(hdr, text=f"  {self.app.t('ui', 'save_btn')}", bg=hdr_bg, fg="#ffaa00",
-                 font=("Arial", 9, "bold")).pack(side="left")
-        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
-                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
-        _drag = {"x": 0, "y": 0}
-        def drag_start(e):
-            _drag["x"] = e.x
-            _drag["y"] = e.y
-        def drag_move(e):
-            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
-        hdr.bind("<Button-1>", drag_start)
-        hdr.bind("<B1-Motion>", drag_move)
-        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
-
-        body = tk.Frame(dlg, bg="#222")
-        body.pack(fill="both", expand=True, padx=10, pady=(10, 10))
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        tk.Label(body, text=self.app.t('ui', 'save_what'), bg="#222", fg="#ccc",
-                 font=("Arial", 10)).pack(pady=(0, 10))
-        bf = tk.Frame(body, bg="#222")
-        bf.pack()
         def on_map():
-            dlg.destroy()
+            self._hide_choice_inline()
             self._export()
         def on_all():
-            dlg.destroy()
+            self._hide_choice_inline()
             self._export_all()
-        tk.Button(bf, text=map_name, bg="#444", fg="white", bd=0,
-                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_map).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'all_maps'), bg="#444", fg="#aaccff", bd=0,
-                  font=("Arial", 9, "bold"), padx=15, pady=5, command=on_all).pack(side="left", padx=4)
-        self._center_on_root(dlg)
-        self.app.root.wait_window(dlg)
+        self._show_choice_inline(
+            self.app.t('ui', 'save_what'),
+            map_name, on_map,
+            self.app.t('ui', 'all_maps'), on_all)
+
+    def _show_choice_inline(self, title, btn1_text, btn1_cmd, btn2_text, btn2_cmd):
+        for w in self._choice_frame.winfo_children():
+            w.destroy()
+        tk.Label(self._choice_frame, text=title, bg="#333", fg="#ccc",
+                 font=("Arial", 8)).pack(fill="x", padx=6, pady=(4, 2))
+        bf = tk.Frame(self._choice_frame, bg="#333")
+        bf.pack(pady=(0, 4))
+        tk.Button(bf, text=btn1_text, bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 8, "bold"), padx=10, pady=3, command=btn1_cmd).pack(side="left", padx=2)
+        tk.Button(bf, text=btn2_text, bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 8, "bold"), padx=10, pady=3, command=btn2_cmd).pack(side="left", padx=2)
+        tk.Button(bf, text="✕", bg="#333", fg="#888", bd=0,
+                  font=("Arial", 8), command=self._hide_choice_inline).pack(side="left", padx=6)
+        self._choice_frame.pack(fill="x", padx=6, pady=4, before=self._status_lbl)
+
+    def _hide_choice_inline(self):
+        self._choice_frame.pack_forget()
 
     def _fetch_existing_comments(self, map_ids):
         try:
@@ -832,14 +788,30 @@ class DrawingPalette(tk.Toplevel):
     def _show_download_dialog(self):
         self._lift_self()
         dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'download_title'))
+        dlg.overrideredirect(True)
         dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
-        dlg.lift()
+        dlg.grab_set()
         dlg.focus_force()
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg.bind("<Escape>", lambda e: dlg.destroy())
+
+        hdr_bg = "#2a2a2a"
+        hdr = tk.Frame(dlg, bg=hdr_bg, height=28)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=f"  {self.app.t('ui', 'download_title')}", bg=hdr_bg, fg="#ffaa00",
+                 font=("Arial", 9, "bold")).pack(side="left")
+        tk.Button(hdr, text="✕", bg=hdr_bg, fg="#aaa", bd=0,
+                  font=("Arial", 8), command=dlg.destroy).pack(side="right", padx=4)
+        _drag = {"x": 0, "y": 0}
+        def drag_start(e):
+            _drag["x"] = e.x
+            _drag["y"] = e.y
+        def drag_move(e):
+            dlg.geometry(f"+{dlg.winfo_x() + e.x - _drag['x']}+{dlg.winfo_y() + e.y - _drag['y']}")
+        hdr.bind("<Button-1>", drag_start)
+        hdr.bind("<B1-Motion>", drag_move)
+        hdr.bind("<Enter>", lambda e: hdr.config(cursor="fleur"))
 
         bg = "#222"
 
