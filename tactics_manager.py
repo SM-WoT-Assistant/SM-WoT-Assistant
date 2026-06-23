@@ -9,8 +9,9 @@ def _choice_dialog(parent, title, text):
     dlg.configure(bg="#222")
     dlg.resizable(False, False)
     dlg.attributes("-topmost", True)
-    dialog_utils._set_dark_title_bar(dlg)
     dlg.grab_set()
+    dlg.update_idletasks()
+    dialog_utils._set_dark_title_bar(dlg)
     result = None
     tk.Label(dlg, text=text, bg="#222", fg="#ccc",
              font=("Arial", 9), wraplength=380, justify="left").pack(padx=20, pady=(15, 15))

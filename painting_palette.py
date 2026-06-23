@@ -440,10 +440,11 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
 
         if count:
             lbl_text = self.app.t('ui', 'publish_publishing_all').format(count=count)
@@ -539,10 +540,11 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
         tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
                  font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
         tk.Label(dlg, text=message, bg="#222",
@@ -740,9 +742,10 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.lift()
         dlg.focus_force()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
 
         bg = "#222"
 
@@ -915,6 +918,9 @@ class DrawingPalette(tk.Toplevel):
             # Populate tree initially
             _do_filter()
 
+            dlg.update_idletasks()
+            dialog_utils._set_dark_title_bar(dlg)
+
         dlg.geometry("560x380")
         self._center_on_root(dlg)
 
@@ -998,10 +1004,11 @@ class DrawingPalette(tk.Toplevel):
         dlg.resizable(False, False)
         dlg.transient(self.app.root)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
 
         tk.Label(dlg, text=self.app.t('ui', 'download_confirm_title'),
                  bg="#222", fg="#ffaa00", font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
@@ -1065,9 +1072,10 @@ class DrawingPalette(tk.Toplevel):
         pv.resizable(False, False)
         pv.transient(parent_dlg)
         pv.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(pv)
         pv.lift()
         pv.focus_force()
+        pv.update_idletasks()
+        dialog_utils._set_dark_title_bar(pv)
 
         canvas = tk.Canvas(pv, width=pw, height=ph, bg="#111", highlightthickness=0)
         canvas.pack()

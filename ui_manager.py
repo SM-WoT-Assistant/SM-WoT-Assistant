@@ -175,8 +175,9 @@ class UIManager:
         dlg.resizable(False, False)
         dlg.minsize(260, 100)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 130
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 50
         dlg.geometry(f"+{cx}+{cy}")
@@ -203,8 +204,9 @@ class UIManager:
         dlg.configure(bg="#222")
         dlg.resizable(False, False)
         dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
         dlg.grab_set()
+        dlg.update_idletasks()
+        dialog_utils._set_dark_title_bar(dlg)
 
         tk.Label(dlg, text="SM WoT Assistant", font=("Arial", 14, "bold"),
                  bg="#222", fg="#ff4500").pack(pady=(15, 5))
