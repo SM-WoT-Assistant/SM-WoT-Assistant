@@ -15,16 +15,16 @@
 
 **Presentation Layer:**
 - Purpose: Render maps, UI controls, drawing overlays, AI build results
-- Location: `main.py`, `ui_manager.py`, `painter.py`, `painting_palette.py`, `map_renderer.py`, `help_system.py`, `ai_webview_gui.py`
-- Contains: tkinter widgets, Canvas drawing, floating tool palettes, help overlay (Toplevel grid of Label widgets, not canvas text)
+- Location: `main.py`, `ui_manager.py`, `painter.py`, `painting_palette.py`, `dialog_utils.py`, `map_renderer.py`, `help_system.py`, `ai_webview_gui.py`
+- Contains: tkinter widgets, Canvas drawing, floating tool palettes, dark-themed dialog utilities (`dialog_utils.dark_messagebox`, `dark_confirmbox`, `dark_promptbox`), help overlay (Toplevel grid of Label widgets, not canvas text)
 - All UI text uses translation keys via `app.t('ui', key)` — fully translated for any game client language (11 supported)
 - Depends on: Data Layer, tkinter, Pillow (PIL), custom TTF fonts (`xvmsymbol.ttf`, `fontawesome-webfont.ttf`)
 - Used by: End user
 
 **Application Logic Layer:**
 - Purpose: Orchestrate views, handle hotkeys, coordinate battle detection, manage AI flows
-- Location: `main.py` (class `WotAssistantHQ`), `window_manager.py`, `log_reader.py`, `tactics_manager.py`
-- Contains: WotAssistantHQ, WindowManager, LogWatcher, tactic import/export
+- Location: `main.py` (class `WotAssistantHQ`), `window_manager.py`, `log_reader.py`, `tactics_manager.py`, `service_messages.py`
+- Contains: WotAssistantHQ, WindowManager, LogWatcher, tactic import/export (`import_unified` auto-detects single-map vs all-maps format), service messages periodic flush every 300s via `_periodic_flush_service_messages()`
 - Integrates `language_module.setup()` at startup for game language detection and `LocaleManager` for runtime translation
 - Depends on: Presentation Layer managers, Data Layer, `keyboard` library, WinAPI via `ctypes`
 - Used by: Presentation Layer
@@ -45,17 +45,17 @@
 
 **External Integration Layer:**
 - Purpose: Interact with the World of Tanks game client and its files, package the application for distribution, provide a standalone launcher for auto-update
-- Location: `log_reader.py` (python.log tailing), `window_manager.py` (WinAPI window manipulation), `map_extractor.py` (client .pkg extraction), `tank_extractor.py` (client XML reading), `build_crew_builds.py`, `extract_equipment_loadouts.py`, `build.py` (PyInstaller packaging), `launcher.py` (standalone update-checker built as `--onefile`), `wot_assistant.spec` (PyInstaller spec for main app)
+- Location: `log_reader.py` (python.log tailing), `window_manager.py` (WinAPI window manipulation), `map_extractor.py` (client .pkg extraction), `tank_extractor.py` (client XML reading), `build_crew_builds.py`, `extract_equipment_loadouts.py`, `build.py` (PyInstaller packaging, always creates GitHub release — no `--release` flag, `gh` CLI required), `launcher.py` (standalone update-checker built as `--onefile`, uses `import unicodedata` for PyInstaller compatibility), `wot_assistant.spec` (PyInstaller spec for main app)
 - Contains: LogWatcher, WinAPI wrappers, game client decoders, PyInstaller build pipeline, `Launcher` class with splash UI that checks RTDB for updates and launches main app
-- Depends on: World of Tanks game client, `ctypes`, `keyboard`, `mouse`, PyInstaller, GitHub CLI (`gh`)
+- Depends on: World of Tanks game client, `ctypes`, `keyboard`, `mouse`, PyInstaller, GitHub CLI (`gh`) — required, NSIS (`makensis.exe`) — required
 - Used by: Application Logic Layer (launcher runs before main)
 
 **Firebase / Cloud Layer:**
-- Purpose: Local identity (nickname + 4-digit PIN with RTDB-synced login), error reporting, usage pings, auto-update checks, drawing publication/sync via Firebase Realtime Database REST API
+- Purpose: Local identity (nickname + 4-digit PIN with RTDB-synced login), error reporting, usage pings, auto-update checks, drawing publication/sync via Firebase Realtime Database REST API, community scheme download in-app
 - Location: `firebase_identity.py`, `firebase_reporter.py`, `firebase_drawings.py`, `public/` (Firebase Hosting static website), `firebase.json`, `.firebaserc`, `database.rules.json`
-- Contains: Local identity system (nickname + 4-digit PIN stored as SHA-256 hash in `identity.json` under `config.USER_DATA_DIR`), `login()` function with RTDB-backed credential verification against `users/{user_id}` node, `register()` which creates a local identity and immediately syncs to RTDB, RTDB REST API client (PUT/POST/GET with Firebase API key auth and `_rtdb_url()` path builder), error reporting with stack traces, version ping/check via `versions/` node with `_pick_latest()` sorting by release_date then semver, drawing publish/load/delete via `schemes/` node, auto-update dialog in `main.py` and `launcher.py`
+- Contains: Local identity system (nickname + 4-digit PIN stored as SHA-256 hash in `identity.json` under `config.USER_DATA_DIR`), `login()` function with RTDB-backed credential verification against `users/{user_id}` node, `register()` which creates a local identity and immediately syncs to RTDB, RTDB REST API client (PUT/POST/GET with Firebase API key auth and `_rtdb_url()` path builder), error reporting with stack traces, version ping/check via `versions/` node with `_pick_latest()` sorting by release_date then semver, drawing publish/load/delete via `schemes/` node, `get_all_schemes()` synchronous fetch for in-app community scheme browser, auto-update dialog in `main.py` and `launcher.py`
 - Depends on: `requests`, Firebase RTDB (`europe-west1`), Firebase Hosting, `config.USER_DATA_DIR`
-- Used by: Application Logic Layer (`main.py` startup, quit, auto-update), External Integration Layer (`launcher.py` pre-startup update check), Presentation Layer (`ui_manager.py` identity display, identity registration dialog with LOG IN button)
+- Used by: Application Logic Layer (`main.py` startup, quit, auto-update), External Integration Layer (`launcher.py` pre-startup update check), Presentation Layer (`ui_manager.py` identity display, identity registration dialog with LOG IN button, `painting_palette.py` download community schemes dialog)
 
 ## Data Flow
 
@@ -71,6 +71,7 @@
 9. Load map list for current view — `map_manager.py:load_map_list`
 10. If needed, launch AI browser to refresh tank build data — `stats_ai.py:StatsAI.launch_ai_browser`
 11. **Update check preemption:** During splash display (step 4-6), a synchronous update check may preempt the normal startup flow — the splash displays update buttons instead of proceeding to the main UI (see Auto-Update Flow)
+12. **Startup service flush:** 2 seconds after startup completes, `_startup_flush_service()` calls `firebase_reporter.try_flush_service_messages()`, then starts `_periodic_flush_service_messages()` every 300 seconds (5 min) for periodic delivery of queued service events
 
 **Battle Detection Flow:**
 1. `log_reader.py:LogWatcher._run` tails `python.log` with regex patterns (`arena_re`, `battle_space_re`, `vehicle_re`, etc.)
@@ -85,8 +86,8 @@
 3. `map_renderer.py:MapRenderer.draw_grid` overlays 10×10 coordinate grid with A-J/0-9 labels; `draw_frame()` renders a 20px dark border around the map
 4. `map_renderer.py:MapRenderer.draw_arena_bases` renders spawn/base areas from `map_data.json` boundingBox
 5. `painter.py:MapPainter.redraw` renders user drawings (markers, arrows, text, tree icons) on separate overlay canvas (`_po_canvas` in a dedicated `_po_win` Toplevel), with scale-aware rendering and edit-mode selection rectangle. Class icons (`_draw_class_icons`) are filtered against active checkbox state (`app.selected_classes`) — only checked classes render. Battle mode filter labels (Standard/Encounter/Assault/Onslaught) are resolved from game client `.mo` files via `language_module.get_lang_module()`, with Google Translate fallback via `app.t('ui', ...)` when `.mo` lookup fails
-6. Overlay canvas (`_po_canvas`) uses `-transparentcolor=#010101` for independent opacity control; events bound to both main canvas and overlay via `painter.py:bind_events_to()`. Overlay windowed via separate `_po_win` Toplevel with `.transient()`, `Unmap`/`Map` bindings for ghost-window prevention, and `_po_sync_timer` (500ms interval) for position-only sync (no `lift()` on timer — `lift()` only on explicit show/deiconify: `_on_root_show()`, `_handle_tab_switch()`, `_handle_root_focus_in()`)
-7. Property editing flows through `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar (marker + XVMSymbol icons + tree `chr(0xF18C)` FontAwesome), two button rows: first row has Save (export) / Load (import single tactic), second row has "ALL EXPORT" / "ALL IMPORT" for bulk operations via `tactics_manager.py:export_all_tactics()` / `import_all_tactics()`. Mode checkboxes with names from game client `.mo` (Standard/Encounter/Assault/Onslaught, Google fallback via `app.t()`), class checkboxes (LT/MT/HT/TD/SPG — always English), text entry, 5-color history color picker with `_custom_colors` stack, delete button, and status bar. Live-syncs changes to the selected object without modal dialogs. Deselects on click-away. Auto-deactivates tool after object creation. Ctrl+Z undo via creation history stack, Ctrl+↑/↓ resize in edit mode (150ms debounce). Uses `transient(self.app.root)` + `lift(aboveThis=...)` for stacking (no `-topmost`)
+6. Overlay canvas (`_po_canvas`) uses `-transparentcolor=#010101` for independent opacity control; events bound to both main canvas and overlay via `painter.py:bind_events_to()`. Overlay windowed via separate `_po_win` Toplevel with `.transient()`, `Unmap`/`Map` bindings for ghost-window prevention, and `_po_sync_timer` (500ms interval) for position-only sync. `_on_root_show()` guards against premature overlay show via `_startup_complete` flag — only shows after startup finishes. ComboLBox dropdown visibility preserved via two-step `SetWindowPos` (HWND_TOPMOST → HWND_TOP) + withdraw approach in `postcommand`, with HWND caching and pre-find at startup (`main.py`). `lift()` only on explicit show/deiconify: `_on_root_show()`, `_handle_tab_switch()`, `_handle_root_focus_in()`
+7. Property editing flows through `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar (marker + XVMSymbol icons + tree `chr(0xF18C)` FontAwesome), two publish rows (Publish/Publish All), two save/import rows (Save/Save All/Import/Download), mode checkboxes with names from game client `.mo` (Standard/Encounter/Assault/Onslaught, Google fallback via `app.t()`), class checkboxes (LT/MT/HT/TD/SPG — always English), text entry, 12-color history color picker with `_default_colors` array, delete button, and status bar. Live-syncs changes to the selected object without modal dialogs. Deselects on click-away. Auto-deactivates tool after object creation. Ctrl+Z undo via creation history stack, Ctrl+↑/↓ resize in edit mode (150ms debounce). Uses `transient(self.app.root)` + `lift(aboveThis=...)` for stacking (no `-topmost`). Communicates with `dialog_utils` (`dark_messagebox`, `dark_confirmbox`, `dark_promptbox`) for all dialogs. Community scheme download via `_show_download_dialog()` with map/author filters and preview
 
 **AI Tank Build Flow (SETUP view):**
 1. User searches/selects a tank → `stats_ai.py:StatsAI._on_tank_select`
@@ -102,13 +103,13 @@
 3. **Splash-screen path:** During splash display, `_start_startup_checks()` calls `firebase_reporter.check_for_updates_sync()` synchronously. If a newer version is found, `_show_splash_update()` renders "New version vX.Y.Z available!" with "UPDATE NOW" / "LATER" buttons directly on the splash canvas. Clicking "UPDATE NOW" triggers `_splash_download_thread()` which downloads the setup to `%TEMP%`, runs NSIS installer silently (`/S /NCRC`), releases the single-instance mutex (`_update_mutex`), spawns the new versioned EXE (`SM WoT Assistant vX.Y.Z.exe` from `$LOCALAPPDATA\\SM WoT Assistant`), and exits the old process — all while the splash remains visible with animated dots (`_splash_animate_dots`, 500ms interval). Clicking "LATER" dismisses splash and continues to main UI
 4. **Main-UI path:** If no update was found during splash (or splash is disabled), `_check_for_app_updates()` calls `firebase_reporter.check_for_updates()` asynchronously after the main UI is shown. A modal update dialog with download progress bar is presented; the download-and-install flow is identical to the splash path
 5. Latest version is determined via `_pick_latest()` which selects the version with the highest `release_date` from the RTDB `versions/` node, using semver as tiebreaker when dates match. The `versions/latest` pointer (with `release_date: "9999-12-31"`) always points to the canonical latest. `compare_versions()` compares semver tuples to decide if update is needed
-6. On release build → `build.py:write_version_to_rtdb()` publishes version metadata (version, release_date, download_url, build_size) to RTDB `versions/{version}/` node and updates the `versions/latest` pointer. The `--date=YYYY-MM-DD` flag allows overriding the release_date
+6. On build → `build.py:write_version_to_rtdb()` publishes version metadata (version, release_date, download_url, build_size) to RTDB `versions/{version}/` node and updates the `versions/latest` pointer. The `--date=YYYY-MM-DD` flag allows overriding the release_date. Every build is a release — `--release` flag removed, `gh` CLI required, and RTDB publish only happens after a successful GitHub release
 
 **Drawing Publish/Download Flow:**
-1. User clicks publish (TACTIC mode with identity registered) → `firebase_drawings.publish_drawing()` serializes drawing elements, map info, author identity → PUT to RTDB `schemes/{drawing_id}`
-2. `public/schemes.html` (Firebase Hosting) reads from RTDB `schemes/` node, renders community schemes table with filters
+1. User clicks Publish (single map) or Publish All (all maps with drawings) from `DrawingPalette` → `painting_palette._publish()` or `_publish_all()` → `firebase_drawings.publish_drawing()` serializes drawing elements, map info, author identity → PUT to RTDB `schemes/{drawing_id}`. Publish uses English map names via `config.MAP_NAMES_EN`. Description is auto-translated to English via `deep_translator` before upload. Duplicate detection prevents publishing the same map+comment combination
+2. `public/schemes.html` (Firebase Hosting) reads from RTDB `schemes/` node, renders community schemes table with map/author filters. Upload modal removed — publishing is now app-only. Help text updated to reflect in-app flow. Shows "All Maps" as a special entry
 3. `public/drawings.html` renders gallery with download links
-4. Application can download published schemes via `firebase_drawings.download_drawing()` → GET from RTDB
+4. Application can download published schemes in-app: `DrawingPalette._show_download_dialog()` → `firebase_drawings.get_all_schemes()` (synchronous fetch) → filtered Treeview with map/author filters → `_handle_download_result()` with Replace/Add/Save-to-PC choice → `_preview_scheme()` renders elements on a map preview Toplevel
 
 **Localization Flow:**
 1. On startup → `language_module.setup()` detects game language from `game_info.xml` → rebuilds dictionaries only if language changed or cache missing. On rebuild, also regenerates `game_entities_english.json` and `extracted_maps/map_dictionary.json` from the parsed `.mo` data
@@ -127,7 +128,7 @@
 9. Splash screen displays detected language (e.g., "Language: DE", "Language: UK", "Language: EN")
 
 **Memory to Persistence (Cross-Session):**
-1. Tactical drawings → save on every edit → `data_manager.py:save_drawings` → `map_drawings.json`; bulk export/import via `tactics_manager.py:export_all_tactics()` / `import_all_tactics()` with Replace/Merge choice dialog
+1. Tactical drawings → save on every edit → `data_manager.py:save_drawings` → `map_drawings.json`; bulk export/import via `tactics_manager.py:export_all_tactics()` / `import_all_tactics()` with Replace/Merge choice dialog; unified import via `tactics_manager.import_unified()` auto-detects single-map vs all-maps format
 2. AI build cache → save after each successful AI response → `ai_builds_cache.json`
 3. Settings → save on window changes/close → `settings.json`
 4. Identity → save on registration/PIN change → `identity.json` in `config.USER_DATA_DIR`; `register()` also syncs to RTDB `users/{user_id}`; `login()` verifies credentials against RTDB
@@ -144,8 +145,8 @@
 
 **Manager Pattern:**
 - Purpose: Encapsulate subsystem responsibilities behind a single class receiving `app` reference
-- Location: `window_manager.py`, `ui_manager.py`, `data_manager.py`, `locale_manager.py`, `map_manager.py`, `map_renderer.py`, `help_system.py`
-- Pattern: Each Manager receives `app` (WotAssistantHQ) in constructor, accesses shared state through `self.app.*`, and exposes domain-specific methods
+- Location: `window_manager.py`, `ui_manager.py`, `data_manager.py`, `locale_manager.py`, `map_manager.py`, `map_renderer.py`, `help_system.py`, `dialog_utils.py`
+- Pattern: Each Manager receives `app` (WotAssistantHQ) in constructor, accesses shared state through `self.app.*`, and exposes domain-specific methods. `dialog_utils.py` provides stateless dark-themed dialog utilities (`dark_messagebox`, `dark_confirmbox`, `dark_promptbox`, `_set_dark_title_bar`, `_center_on_root`) used by multiple managers
 
 **LogWatcher:**
 - Purpose: Background thread that tails WoT's `python.log` and fires callbacks on battle events
@@ -155,7 +156,7 @@
 **MapPainter:**
 - Purpose: Canvas-based drawing system for tactical markers, arrows, text, and tree icons
 - Location: `painter.py`
-- Pattern: Stateful drawing list persisted via `DataManager`, creation history stack for Ctrl+Z undo, per-map/per-mode filtering. All painting renders on a dedicated overlay canvas (`_po_canvas`) inside a separate `_po_win` Toplevel for independent opacity control. Binds events to multiple canvases via `bind_events_to()`. Supports right-click context menu for edit/delete with confirmation dialog. Edit mode renders a yellow dashed selection rectangle around the edited element. Resize of selected elements via `resize_selected()` with keyboard hooks (Ctrl+↑/↓, 150ms debounce). Class icons rendered by `_draw_class_icons` are filtered against active checkboxes (`app.selected_classes`). Delegates property editing to `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar, mode/class checkboxes, text entry, color picker, delete button, and status bar showing editing type
+- Pattern: Stateful drawing list persisted via `DataManager`, creation history stack for Ctrl+Z undo, per-map/per-mode filtering. All painting renders on a dedicated overlay canvas (`_po_canvas`) inside a separate `_po_win` Toplevel for independent opacity control. Binds events to multiple canvases via `bind_events_to()`. Supports right-click context menu for edit/delete with confirmation dialog (`dialog_utils.dark_confirmbox`). Edit mode renders a yellow dashed selection rectangle around the edited element. Resize of selected elements via `resize_selected()` with keyboard hooks (Ctrl+↑/↓, 150ms debounce). Class icons rendered by `_draw_class_icons` are filtered against active checkboxes (`app.selected_classes`). Delegates property editing to `DrawingPalette` (`painting_palette.py`) — a floating non-modal palette with toolbar, mode/class checkboxes, text entry, 12-color picker, Publish/Publish All/Save/Save All/Import/Download buttons, delete button, and status bar showing editing type. Community scheme browser with map/author filters and preview dialog
 
 **StatsAI:**
 - Purpose: AI-powered tank build browser with search, filtering, composite icon rendering, and Gemini integration
@@ -228,8 +229,8 @@
 - `installer.nsi` version auto-synced via `build.py:update_nsi_version()` using regex on `!define PRODUCT_VERSION`
 
 **Build &amp; Packaging:**
-- `build.py` — 7-phase release pipeline: (1) Pre-flight validation (semver, Python 3.12+PyInstaller, NSIS, gh CLI, critical source files, git status), (2) Clean dist/build, (3) PyInstaller onedir + manual `copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug — data files from Analysis not propagated to COLLECT), (4) NSIS installer via makensis, (5) Rename onedir to versioned directory (`dist/SM WoT Assistant vX.Y.Z/`) + rename generic EXE to versioned `SM WoT Assistant vX.Y.Z.exe`, (6) Build verification (versioned EXE, 6 critical JSONs, VERSION, fonts, directory counts), (7) Build manifest (`dist/build_manifest_vX.Y.Z.txt`)
-- `build.py` accepts optional `--date=YYYY-MM-DD` flag to override the `release_date` field when publishing to RTDB
+- `build.py` — 7-phase pipeline: (1) Pre-flight validation (semver, Python 3.12+PyInstaller, NSIS, gh CLI, critical source files, git status), (2) Clean dist/build, (3) PyInstaller onedir + manual `copy_data_files()` (workaround for PyInstaller 6.x DATA TOC bug — data files from Analysis not propagated to COLLECT), (4) NSIS installer via makensis, (5) Rename onedir to versioned directory (`dist/SM WoT Assistant vX.Y.Z/`) + rename generic EXE to versioned `SM WoT Assistant vX.Y.Z.exe`, (6) Build verification (versioned EXE, 6 critical JSONs, VERSION, fonts, directory counts), (7) Build manifest (`dist/build_manifest_vX.Y.Z.txt`)
+- Every build is a release — `--release` flag removed. `gh` CLI and NSIS are required (pre-flight fails if missing). RTDB version publish only happens after successful GitHub release. `create_github_release()` returns `bool`
 - `wot_assistant.spec` — PyInstaller spec with `_CRITICAL_JSON` list (6 core JSONs: `crew_builds.json`, `tank_db.json`, `tank_tth.json`, `game_entities_english.json`, `game_entities.json`, `tank_slots_full.json` — runtime caches excluded), fonts (`.ttf`), `.mo` localization files, `logo.png`, `maps/` subdirectories, `extracted_maps/` (excluding caches), `extracted_icons/` (all 8 subdirectories), `extracted_data/common/post_progression/` (field mod data). EXE name: `SM WoT Assistant`. Includes `COLLECT` step for onedir output
 - `build.py:copy_data_files()` — manual file copy workaround for PyInstaller 6.x DATA TOC bug (data from Analysis not propagated to COLLECT). Uses exclusion-based glob: all root `*.json` except debug/temp/tomato/manifest files (`opencode.json`, `magic-context.jsonc`, `tomato_*.json`, `vehicle_slots_*.json`, etc.); also copies fonts, `.mo` files, `logo.png`, `maps/`, `extracted_maps/`, `extracted_icons/`, `extracted_data/common/post_progression/`. New JSON files automatically included without list updates
 - Hidden imports: `keyboard`, `PIL._tkinter_finder`, `deep_translator`
