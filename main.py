@@ -607,6 +607,10 @@ class WotAssistantHQ:
                 self.win_mgr.set_clickthrough(True)
                 self.win_mgr.focus_game_window()
         self.refresh_mode_indicator()
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._sync_po_pos()
+            if self._po_win.state() != "withdrawn":
+                self._po_win.lift()
 
     def toggle_visibility(self):
         """Приховати/Показати вікно (F10)"""
