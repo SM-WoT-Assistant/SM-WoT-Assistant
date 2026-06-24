@@ -76,7 +76,7 @@ class MapPainter:
     def save_drawings(self):
         for k in list(self.drawings.keys()):
             self.drawings[k] = self._strip_duplicates(self.drawings[k])
-        self.save_drawings()
+        self.data_mgr.save_drawings(self.drawings)
         self._editing_idx = -1
 
         self.class_icon_codes = {
