@@ -1344,7 +1344,7 @@ class WotAssistantHQ:
         keyboard.add_hotkey('ctrl+left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
-        keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=False)
+        keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=True)
         self.root.bind_all("<Control-Up>", lambda e: self.safe_execute(self._handle_ctrl_up))
         self.root.bind_all("<Control-Down>", lambda e: self.safe_execute(self._handle_ctrl_down))
         self.win_mgr.bind_controls(self.top_bar, self.canvas)

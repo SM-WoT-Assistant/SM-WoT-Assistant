@@ -25,6 +25,7 @@ class DrawingPalette(tk.Toplevel):
             "#ff0000", "#ff5500", "#ffaa00", "#ffff00",
             "#aaff00", "#00ff00", "#00ffaa", "#00ffff",
             "#0088ff", "#0000ff", "#8800ff", "#ff00ff",
+            "#888888",
         ]
         self._color_buttons = []
 
