@@ -254,10 +254,12 @@ class WotAssistantHQ:
         self._po_win = tk.Toplevel(self.root)
         self._po_win.withdraw()
         self._po_win.overrideredirect(True)
-        self._po_win.attributes("-topmost", True)
         self._po_win.attributes("-transparentcolor", "#010101")
         self._po_win.wm_attributes("-alpha", 1.0)
         self._po_win.transient(self.root)
+        self._set_overlay_owner()
+        self._po_win.attributes("-transparentcolor", "#010101")
+        self._po_win.wm_attributes("-alpha", 1.0)
         self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
         self._po_canvas.pack(fill="both", expand=True)
         self.painter.bind_events_to(self._po_canvas)
@@ -268,6 +270,12 @@ class WotAssistantHQ:
         self.root.bind("<Map>", self._on_root_show, "+")
         self._po_sync_timer = None
         self.root.bind("<FocusIn>", self._on_root_focus_in, add="+")
+
+    def _set_overlay_owner(self):
+        import ctypes
+        hwnd = self._po_win.winfo_id()
+        owner = self.root.winfo_id()
+        ctypes.windll.user32.SetWindowLongPtrW(hwnd, -8, owner)
 
     def _sync_po_pos(self, event=None):
         palette = getattr(self, 'drawing_palette', None)
@@ -303,7 +311,7 @@ class WotAssistantHQ:
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             if not getattr(self, '_startup_complete', False):
                 return
-            if self._po_win.state() == "withdrawn":
+            if self._po_win.state() != "withdrawn":
                 return
             if not self.current_map_eng:
                 return
