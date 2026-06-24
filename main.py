@@ -769,7 +769,7 @@ class WotAssistantHQ:
     def import_external_tactic(self):
         if not self.current_map_eng: return
         def on_success():
-            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.save_drawings()
             self.painter.redraw()
         
         tactics_manager.import_tactic(
@@ -785,7 +785,7 @@ class WotAssistantHQ:
 
     def import_all_tactics(self):
         def on_success():
-            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.save_drawings()
             self.painter.redraw()
         tactics_manager.import_all_tactics(
             self.root, self.painter.drawings, on_success
@@ -793,7 +793,7 @@ class WotAssistantHQ:
 
     def import_tactic_unified(self):
         def on_success():
-            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.save_drawings()
             self.painter.redraw()
         tactics_manager.import_unified(
             self.root, self.current_map_eng,

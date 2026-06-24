@@ -283,7 +283,7 @@ class DrawingPalette(tk.Toplevel):
         if self._edit_obj:
             self._write_to_object(self._edit_obj)
             self.painter.redraw()
-            self.painter.data_mgr.save_drawings(self.painter.drawings)
+            self.painter.save_drawings()
 
     def _set_color(self, c):
         self.current_color = c
@@ -733,7 +733,7 @@ class DrawingPalette(tk.Toplevel):
             return
         self._write_to_object(self._edit_obj)
         self.painter.redraw()
-        self.painter.data_mgr.save_drawings(self.painter.drawings)
+        self.painter.save_drawings()
         self._edit_obj = None
         self.painter._editing_idx = -1
         self._active_tool_code = None
