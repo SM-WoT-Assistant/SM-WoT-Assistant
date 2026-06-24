@@ -303,7 +303,7 @@ class WotAssistantHQ:
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             if not getattr(self, '_startup_complete', False):
                 return
-            if self._po_win.state() == "withdrawn":
+            if self._po_win.state() != "withdrawn":
                 return
             if not self.current_map_eng:
                 return
