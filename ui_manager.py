@@ -326,10 +326,8 @@ class UIManager:
                 self.app._sync_po_pos()
                 self.app.root.update_idletasks()
                 self.app.painter.redraw()
-                self.app._start_po_sync_timer()
 
         elif view_name == "stats":
-            self.app._stop_po_sync_timer()
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
                 self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
@@ -345,7 +343,6 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
-            self.app._stop_po_sync_timer()
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
                 self.app._po_win.withdraw()
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():

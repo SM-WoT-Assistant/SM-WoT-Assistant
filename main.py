@@ -266,7 +266,6 @@ class WotAssistantHQ:
         self.root.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Unmap>", self._on_root_hide, "+")
         self.root.bind("<Map>", self._on_root_show, "+")
-        self._po_sync_timer = None
         self.root.bind("<FocusIn>", self._on_root_focus_in, add="+")
 
     def _sync_po_pos(self, event=None):
@@ -279,6 +278,8 @@ class WotAssistantHQ:
             return
         cx = self.canvas.winfo_rootx()
         cy = self.canvas.winfo_rooty()
+        if cx <= 0 or cy <= 0:
+            return
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
         if cw > 50 and ch > 50:
@@ -295,7 +296,6 @@ class WotAssistantHQ:
         self.root.after_idle(self._lift_overlay)
 
     def _on_root_hide(self, event=None):
-        self._stop_po_sync_timer()
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.withdraw()
 
@@ -310,25 +310,6 @@ class WotAssistantHQ:
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
-            self._start_po_sync_timer()
-
-    def _start_po_sync_timer(self):
-        self._stop_po_sync_timer()
-        if self.active_view != "maps":
-            return
-        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
-
-    def _stop_po_sync_timer(self):
-        if hasattr(self, '_po_sync_timer') and self._po_sync_timer:
-            self.root.after_cancel(self._po_sync_timer)
-            self._po_sync_timer = None
-
-    def _po_sync_tick(self):
-        if self.active_view != "maps":
-            self._po_sync_timer = None
-            return
-        self._sync_po_pos()
-        self._po_sync_timer = self.root.after(500, self._po_sync_tick)
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
@@ -637,9 +618,7 @@ class WotAssistantHQ:
                 self._po_win.deiconify()
                 self._sync_po_pos()
                 self._po_win.lift()
-                self._start_po_sync_timer()
         else:
-            self._stop_po_sync_timer()
             if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
                 self._po_win.withdraw()
             if hasattr(self, 'stats_ai_module'):
@@ -928,7 +907,6 @@ class WotAssistantHQ:
         self.ui_mgr.show_view("ai_stats")
 
     def quit_app(self):
-        self._stop_po_sync_timer()
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
         self.save_settings()
@@ -1293,7 +1271,6 @@ class WotAssistantHQ:
             ))
 
     def _quit_app_for_update(self):
-        self._stop_po_sync_timer()
         try:
             ctypes.windll.kernel32.CloseHandle(self._update_mutex)
         except Exception:
@@ -1586,9 +1563,10 @@ class WotAssistantHQ:
         if hasattr(self, 'painter'):
             self.painter.canvas.delete("painter_obj")
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
-            self._stop_po_sync_timer()
             self._po_win.withdraw()
         self._startup_complete = True
+        if self.active_view == "maps":
+            self._sync_po_pos()
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
