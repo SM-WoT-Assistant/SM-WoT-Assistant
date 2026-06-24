@@ -21,6 +21,8 @@ class MapPainter:
         self.app = app
         self.data_mgr = data_mgr
         self.drawings = self.data_mgr.load_drawings()
+        for map_id in list(self.drawings.keys()):
+            self.drawings[map_id] = self._strip_duplicates(self.drawings[map_id])
         
         self.active_tool = None
         self.default_color = "#ffaa00"
@@ -30,8 +32,51 @@ class MapPainter:
         self.temp_item = None
         self.move_drag = None
         self.move_drag_active = False
-        
+        self._editing_idx = -1
         self._creation_history = []
+
+    def _coords_match(self, c1, c2):
+        if len(c1) != len(c2):
+            return False
+        for a, b in zip(c1, c2):
+            if abs(a - b) >= 0.001:
+                return False
+        return True
+
+    def _is_duplicate(self, obj, others):
+        for existing in others:
+            if obj["type"] != existing.get("type"):
+                continue
+            if obj["color"] != existing.get("color"):
+                continue
+            if not self._coords_match(obj["coords"], existing.get("coords", [])):
+                continue
+            if obj.get("text", "") != existing.get("text", ""):
+                continue
+            if sorted(obj.get("classes", [])) != sorted(existing.get("classes", [])):
+                continue
+            if sorted(obj.get("modes", [])) != sorted(existing.get("modes", [])):
+                continue
+            if sorted(obj.get("poi", [])) != sorted(existing.get("poi", [])):
+                continue
+            if obj.get("scale", 1.0) != existing.get("scale", 1.0):
+                continue
+            return True
+        return False
+
+    def _strip_duplicates(self, items):
+        seen = []
+        result = []
+        for obj in items:
+            if not self._is_duplicate(obj, seen):
+                seen.append(obj)
+                result.append(obj)
+        return result
+
+    def save_drawings(self):
+        for k in list(self.drawings.keys()):
+            self.drawings[k] = self._strip_duplicates(self.drawings[k])
+        self.save_drawings()
         self._editing_idx = -1
 
         self.class_icon_codes = {
@@ -75,7 +120,7 @@ class MapPainter:
             palette = getattr(self.app, 'drawing_palette', None)
             if palette:
                 palette.exit_edit_mode()
-            self.data_mgr.save_drawings(self.drawings)
+            self.save_drawings()
             self.redraw()
 
     def ctrl_z_undo(self):
@@ -88,7 +133,7 @@ class MapPainter:
         map_id = self.app.current_map_eng
         if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
             del self.drawings[map_id][idx]
-            self.data_mgr.save_drawings(self.drawings)
+            self.save_drawings()
             self.redraw()
 
     def resize_selected(self, direction):
@@ -114,7 +159,7 @@ class MapPainter:
             dy = coords[3] - my
             coords[2] = mx + dx * (new_scale / scale)
             coords[3] = my + dy * (new_scale / scale)
-        self.data_mgr.save_drawings(self.drawings)
+        self.save_drawings()
         self.redraw()
 
     def on_press(self, event):
@@ -389,7 +434,7 @@ class MapPainter:
             return
         self.move_drag_active = False
         self.move_drag = None
-        self.data_mgr.save_drawings(self.drawings)
+        self.save_drawings()
         return "break"
 
     def _draw_class_icons(self, canvas, x, y, class_list, color, sc=1.0):
@@ -460,6 +505,10 @@ class MapPainter:
 
         map_id = self.app.current_map_eng
         if map_id not in self.drawings: self.drawings[map_id] = []
+        if self._is_duplicate(new_obj, self.drawings[map_id]):
+            self.canvas.delete("temp_draw")
+            self.temp_item = None
+            return
         self.drawings[map_id].append(new_obj)
 
         palette = getattr(self.app, 'drawing_palette', None)
@@ -473,7 +522,7 @@ class MapPainter:
         palette.apply_to_new_object(new_obj, cw, ch)
         self.default_color = new_obj["color"]
         self._creation_history.append(len(self.drawings[map_id]) - 1)
-        self.data_mgr.save_drawings(self.drawings)
+        self.save_drawings()
         self.redraw()
         self.canvas.delete("temp_draw")
         self.temp_item = None
@@ -537,7 +586,7 @@ class MapPainter:
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             palette._edit_obj = None
-        self.data_mgr.save_drawings(self.drawings)
+        self.save_drawings()
         self.redraw()
 
     def _confirm_delete(self, label):
@@ -591,7 +640,7 @@ class MapPainter:
                     palette.exit_edit_mode()
             elif self._editing_idx > idx:
                 self._editing_idx -= 1
-            self.data_mgr.save_drawings(self.drawings)
+            self.save_drawings()
             self.redraw()
 
     _UKR_TO_EN = {"ЛТ": "LT", "СТ": "MT", "ТТ": "HT", "ПТ": "TD", "САУ": "SPG"}
