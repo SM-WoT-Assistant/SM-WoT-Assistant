@@ -272,7 +272,8 @@ class DrawingPalette(tk.Toplevel):
 
     def _lift_self(self):
         try:
-            self.lift(aboveThis=self.master)
+            po = self.app._po_win if hasattr(self.app, '_po_win') else self.app.root
+            self.lift(aboveThis=po)
         except:
             pass
 
@@ -631,7 +632,8 @@ class DrawingPalette(tk.Toplevel):
 
     def show(self):
         self.deiconify()
-        self.lift(aboveThis=self.app.root)
+        po = self.app._po_win if hasattr(self.app, '_po_win') else self.app.root
+        self.lift(aboveThis=po)
         self.transient(self.app.root)
         self.focus_force()
         self.update_idletasks()
