@@ -34,6 +34,7 @@ class MapPainter:
         self.move_drag_active = False
         self._editing_idx = -1
         self._creation_history = []
+        self._move_history = []
 
     def _coords_match(self, c1, c2):
         if len(c1) != len(c2):
@@ -124,13 +125,28 @@ class MapPainter:
             self.redraw()
 
     def ctrl_z_undo(self):
-        if not self._creation_history or not self.app.current_map_eng:
+        if not self.app.current_map_eng:
             return
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             palette.exit_edit_mode()
-        idx = self._creation_history.pop()
         map_id = self.app.current_map_eng
+        if self._move_history:
+            idx, original = self._move_history.pop()
+            if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
+                obj = self.drawings[map_id][idx]
+                if original["coords"]:
+                    obj["coords"] = original["coords"]
+                if original["class_icon_coords"]:
+                    obj["class_icon_coords"] = original["class_icon_coords"]
+                if original["text_coords"]:
+                    obj["text_coords"] = original["text_coords"]
+                self.save_drawings()
+                self.redraw()
+            return
+        if not self._creation_history:
+            return
+        idx = self._creation_history.pop()
         if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
             del self.drawings[map_id][idx]
             self.save_drawings()
@@ -433,6 +449,13 @@ class MapPainter:
         if not self.move_drag_active:
             return
         self.move_drag_active = False
+        idx = self.move_drag["index"]
+        original = {
+            "coords": self.move_drag.get("original_coords", []),
+            "class_icon_coords": self.move_drag.get("original_class_icon_coords", []),
+            "text_coords": self.move_drag.get("original_text_coords", []),
+        }
+        self._move_history.append((idx, original))
         self.move_drag = None
         self.save_drawings()
         return "break"
