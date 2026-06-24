@@ -693,6 +693,34 @@ class WotAssistantHQ:
             self._po_win.lift()
         self.painter.redraw()
 
+    def _combo_postcommand(self):
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.withdraw()
+            self.root.update()
+        self.root.after(100, self._poll_dropdown_closed)
+
+    def _poll_dropdown_closed(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        lb = self.map_selector._w + '.popdown.f.l'
+        mapped = self.root.tk.eval('winfo ismapped ' + lb) == '1'
+        if mapped:
+            self.root.after(100, self._poll_dropdown_closed)
+            return
+        self._restore_overlay_state()
+
+    def _restore_overlay_state(self):
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        if self._po_win.state() != "withdrawn":
+            return
+        self.root.update_idletasks()
+        self._po_win.deiconify()
+        self._sync_po_pos()
+        self._po_win.lift()
+
     def _handle_ctrl_up(self):
         import time
         now = time.time()

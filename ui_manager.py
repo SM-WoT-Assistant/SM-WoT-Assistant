@@ -44,7 +44,7 @@ class UIManager:
 
         self.app.map_toolbar = tk.Frame(self.app.top_bar, bg="#222")
         self.app.map_var = tk.StringVar()
-        self.app.map_selector = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.map_var, state="readonly", width=15)
+        self.app.map_selector = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.map_var, state="readonly", width=15, postcommand=self.app._combo_postcommand)
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
         self.app.map_selector.pack(side="left", padx=5, pady=2)
         
