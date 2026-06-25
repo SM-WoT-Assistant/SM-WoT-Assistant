@@ -313,6 +313,7 @@ class WotAssistantHQ:
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
+        # Всі віджети мають існувати до виклику (initialize_window більше його не використовує)
         if not hasattr(self, "top_bar"):
             return 130
 
@@ -349,6 +350,7 @@ class WotAssistantHQ:
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
+        self.settings[f"{prefix}h"] = self.h
         if self.mode == "edit":
             aw = self.root.winfo_width()
             ah = self.root.winfo_height()
@@ -1561,6 +1563,11 @@ class WotAssistantHQ:
             self.root.focus_force()
         except Exception as e:
             print(f"[INIT] Помилка показу головного вікна: {e}")
+        # geometry після deiconify — Windows приймає зміну розміру
+        self.root.update_idletasks()
+        px, py = self.root.winfo_x(), self.root.winfo_y()
+        self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
+        self.root.update_idletasks()
         self.current_map_eng = None
         self.map_var.set("")
         self.map_renderer.show_main_splash()

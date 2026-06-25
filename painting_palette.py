@@ -683,8 +683,8 @@ class DrawingPalette(tk.Toplevel):
         try:
             px = self.app.settings.get("palette_x", 100)
             py = self.app.settings.get("palette_y", 100)
-            self.geometry(f"500x480+{px}+{py}")
-            self._saved_pos = f"500x480+{px}+{py}"
+            self.geometry(f"580x480+{px}+{py}")
+            self._saved_pos = f"580x480+{px}+{py}"
         except Exception:
             self.geometry("+100+100")
 
@@ -801,7 +801,7 @@ class DrawingPalette(tk.Toplevel):
             self._palette_compact_geo = self.geometry()
         except Exception:
             self._palette_compact_geo = None
-        self.geometry("500x720")
+        self.geometry("580x720")
         bg = "#222"
         tk.Label(self._download_frame, text=self.app.t('ui', 'download_loading'),
                  bg=bg, fg="#888", font=("Arial", 9)).pack(padx=10, pady=10)
@@ -1109,17 +1109,39 @@ class DrawingPalette(tk.Toplevel):
 
         pw, ph = 600, 500
         pv = tk.Toplevel(parent_dlg)
-        pv.title(f"Preview: {item['map_name']}")
         pv.configure(bg="#111")
+        pv.overrideredirect(True)
         pv.resizable(False, False)
         pv.transient(parent_dlg)
         pv.attributes("-topmost", True)
         pv.lift()
         pv.focus_force()
-        pv.update_idletasks()
-        dialog_utils._set_dark_title_bar(pv)
 
-        canvas = tk.Canvas(pv, width=pw, height=ph, bg="#111", highlightthickness=0)
+        hdr = tk.Frame(pv, bg="#2a2a2a", height=28)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=f"Preview: {item['map_name']}", bg="#2a2a2a", fg="white",
+                 font=("Arial", 9, "bold")).pack(side="left", padx=8)
+        tk.Button(hdr, text="\u2715", bg="#2a2a2a", fg="#aaa", bd=0,
+                  font=("Arial", 10), activebackground="#c33", activeforeground="white",
+                  command=pv.destroy).pack(side="right", padx=4)
+
+        class _DragHelper:
+            def __init__(self, toplevel, frame):
+                self.tl = toplevel; self.x = 0; self.y = 0
+                frame.bind("<Button-1>", self.start)
+                frame.bind("<B1-Motion>", self.drag)
+            def start(self, e):
+                self.x = e.x_root - self.tl.winfo_rootx()
+                self.y = e.y_root - self.tl.winfo_rooty()
+            def drag(self, e):
+                self.tl.geometry(f"+{e.x_root - self.x}+{e.y_root - self.y}")
+        _DragHelper(pv, hdr)
+
+        pv.update_idletasks()
+        cv_frame = tk.Frame(pv, bg="#111")
+        cv_frame.pack(fill="both", expand=True)
+        canvas = tk.Canvas(cv_frame, width=pw, height=ph, bg="#111", highlightthickness=0)
         canvas.pack()
 
         try:
