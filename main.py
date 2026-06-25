@@ -1344,7 +1344,7 @@ class WotAssistantHQ:
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
         keyboard.add_hotkey('F10', lambda: self.safe_execute(self.toggle_visibility))  # F10: Показати/Приховати вікно
-        keyboard.add_hotkey('e', lambda: self.safe_execute(self.toggle_editor), suppress=False)
+        keyboard.add_hotkey('tab', lambda: self.safe_execute(self.toggle_editor), suppress=False)
         try:
             keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
         except Exception as e:

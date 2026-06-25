@@ -35,6 +35,13 @@ class MapPainter:
         self._editing_idx = -1
         self._creation_history = []
         self._move_history = []
+        self.class_icon_codes = {
+            "LT": 0x3A,
+            "MT": 0x3B,
+            "HT": 0x3F,
+            "TD": 0x2E,
+            "SPG": 0x2D,
+        }
 
     def _coords_match(self, c1, c2):
         if len(c1) != len(c2):
@@ -80,14 +87,6 @@ class MapPainter:
         self.data_mgr.save_drawings(self.drawings)
         self._editing_idx = -1
 
-        self.class_icon_codes = {
-            "LT": 0x3A,
-            "MT": 0x3B,
-            "HT": 0x3F,
-            "TD": 0x2E,
-            "SPG": 0x2D,
-        }
-    
     def bind_events_to(self, target_canvas):
         """Прив'язка подій малювання до конкретного канвасу."""
         for ev, cb in [

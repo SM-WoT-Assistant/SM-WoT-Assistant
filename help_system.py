@@ -83,7 +83,7 @@ class HelpManager:
         _r = [0]
 
         row("F10", self.app.t('ui', 'help_f10'), first=True)
-        row("E", self.app.t('ui', 'help_e'))
+        row("TAB", self.app.t('ui', 'help_e'))
         row("F1", self.app.t('ui', 'help_f1'))
 
         section(self.app.t('ui', 'help_section_editor'))
