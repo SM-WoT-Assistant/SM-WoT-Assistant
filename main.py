@@ -580,13 +580,19 @@ class WotAssistantHQ:
             self._redrawing = False
 
     def refresh_mode_indicator(self):
-        fmt_text = "ON" if self.win_mgr.format_mode_enabled else "OFF"
+        fmt_enabled = self.win_mgr.format_mode_enabled
+        fmt_text = "ON" if fmt_enabled else "OFF"
         text = f"[{self.t('ui', 'format_label')}] {fmt_text}"
         fg = "cyan" if self.mode == "edit" else "#bbbbbb"
         if hasattr(self, "status_label"):
             self.status_label.config(text=text, fg=fg)
         if hasattr(self, "battle_status_label"):
             self.battle_status_label.config(text=text, fg=fg)
+        if hasattr(self, "btn_format_lock"):
+            self.btn_format_lock.config(
+                text=chr(0xF09C) if fmt_enabled else chr(0xF023),
+                fg="#ffaa00" if fmt_enabled else "#bbbbbb"
+            )
 
     def toggle_formatting_mode(self):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""

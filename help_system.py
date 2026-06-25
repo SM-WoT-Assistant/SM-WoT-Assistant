@@ -83,6 +83,7 @@ class HelpManager:
         _r = [0]
 
         row("F10", self.app.t('ui', 'help_f10'), first=True)
+        row("F8", self.app.t('ui', 'help_f8'))
         row("TAB", self.app.t('ui', 'help_e'))
         row("F1", self.app.t('ui', 'help_f1'))
 

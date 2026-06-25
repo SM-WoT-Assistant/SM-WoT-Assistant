@@ -146,9 +146,9 @@ class WindowManager:
 
                 painter_move_active = hasattr(self.app, "painter") and getattr(self.app.painter, "move_drag_active", False)
 
-                # У форматуванні (F8) дозволяємо перетягування ЛКМ без Ctrl.
+                # У форматуванні (F8) дозволяємо перетягування ЛКМ без Ctrl (будь-який режим)
                 drag_ready = lmb_pressed and not painter_move_active and (
-                    (self.format_mode_enabled and self.app.mode == "norm") or
+                    self.format_mode_enabled or
                     (self._is_ctrl_armed() and ctrl_pressed)
                 )
 
