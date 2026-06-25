@@ -19,15 +19,16 @@ class UIManager:
         
         tk.Frame(self.app.top_bar, width=7, bg="#222").pack(side="right")
 
-        tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
-
         self.app.btn_format_lock = tk.Button(self.app.top_bar, text=chr(0xF023),
             font=("FontAwesome", 10), bg="#444", fg="#bbbbbb", bd=0,
             command=self.app.toggle_formatting_mode)
-        self.app.btn_format_lock.pack(side="right", padx=(1,5), pady=7)
+
+        tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
 
         self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self._show_settings_menu)
         self.app.settings_btn.pack(side="right", padx=5, pady=7)
+
+        self.app.btn_format_lock.pack(side="right", padx=(1,5), pady=7)
 
         self._build_identity_bar()
 
