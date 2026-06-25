@@ -21,6 +21,11 @@ class UIManager:
 
         tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
 
+        self.app.btn_format_lock = tk.Button(self.app.top_bar, text=chr(0xF023),
+            font=("FontAwesome", 10), bg="#444", fg="#bbbbbb", bd=0,
+            command=self.app.toggle_formatting_mode)
+        self.app.btn_format_lock.pack(side="right", padx=(1,5), pady=7)
+
         self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self._show_settings_menu)
         self.app.settings_btn.pack(side="right", padx=5, pady=7)
 
@@ -41,11 +46,6 @@ class UIManager:
 
         self.app.btn_mode_maps_1 = tk.Button(self.app.top_bar, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
         self.app.btn_mode_maps_1.pack(side="left", padx=1, pady=7)
-
-        self.app.btn_format_lock = tk.Button(self.app.top_bar, text=chr(0xF023),
-            font=("FontAwesome", 10), bg="#444", fg="#bbbbbb", bd=0,
-            command=self.app.toggle_formatting_mode)
-        self.app.btn_format_lock.pack(side="left", padx=(5,1), pady=7)
 
         self.app.map_toolbar = tk.Frame(self.app.top_bar, bg="#222")
         self.app.map_var = tk.StringVar()
