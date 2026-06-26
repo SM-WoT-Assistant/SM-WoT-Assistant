@@ -1,4 +1,5 @@
 import os
+import webbrowser
 import tkinter as tk
 from tkinter import ttk
 import config
@@ -126,7 +127,7 @@ class UIManager:
 
         x = self.app.settings_btn.winfo_rootx() - 100
         y = self.app.settings_btn.winfo_rooty() + self.app.settings_btn.winfo_height() + 2
-        menu.geometry(f"260x260+{x}+{y}")
+        menu.geometry(f"260x260+{x}+{y}")  # тимчасова висота, буде перерахована після пакування
 
         def make_btn(text, cmd):
             btn = tk.Button(menu, text=text, command=cmd, anchor="w",
@@ -157,10 +158,15 @@ class UIManager:
         sep()
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)
         sep()
+        make_btn(self.app.t('ui', 'help_website'), lambda: webbrowser.open("https://sm-wot-assistant.web.app"))
+        sep()
 
         ver_label = tk.Label(menu, text=f"v{config.load_version()}",
                             bg="#252525", fg="#666666", font=("Arial", 8))
         ver_label.pack(pady=(4, 6))
+
+        menu.update_idletasks()
+        menu.geometry(f"260x{menu.winfo_reqheight()}+{x}+{y}")
 
         def close():
             try:

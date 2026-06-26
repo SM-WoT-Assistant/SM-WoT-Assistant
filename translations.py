@@ -261,7 +261,8 @@ TRANSLATIONS = {
             "publish_what": "Publish what?",
             "save_what": "Save what?",
             "btn_cancel": "Cancel",
-            "all_maps": "All Maps"
+            "all_maps": "All Maps",
+            "help_website": "Website: sm-wot-assistant.web.app"
         }
     }
 }

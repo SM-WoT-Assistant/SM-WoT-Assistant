@@ -83,23 +83,15 @@ class HelpManager:
         _r = [0]
 
         row("F10", self.app.t('ui', 'help_f10'), first=True)
-        row("F8", self.app.t('ui', 'help_f8'))
+        fr = tk.Frame(body, bg=bg)
+        tk.Label(fr, text=chr(0xF023), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
+        tk.Label(fr, text=chr(0xF09C), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
+        tk.Label(fr, text="  F8", font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg, anchor="w", width=17).pack(side="left")
+        fr.grid(row=_r[0], column=0, sticky="w", pady=(6, 0), padx=(0, 8))
+        tk.Label(body, text=self.app.t('ui', 'help_f8'), bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w", width=36).grid(row=_r[0], column=1, sticky="w", pady=(6, 0))
+        _r[0] += 1
         row("TAB", self.app.t('ui', 'help_e'))
         row("F1", self.app.t('ui', 'help_f1'))
-
-        section(self.app.t('ui', 'help_section_editor'))
-        hint(self.app.t('ui', 'help_hint_editor'))
-        row("Ctrl + LMB", self.app.t('ui', 'help_ctrl_lmb'))
-        row("Ctrl + \u2195", self.app.t('ui', 'help_ctrl_updown'))
-        row("Ctrl + \u2194", self.app.t('ui', 'help_ctrl_leftright'))
-        row("Ctrl+Shift + \u2195", self.app.t('ui', 'help_ctrlshift_updown'))
-
-        section(self.app.t('ui', 'help_section_battle'))
-        hint(self.app.t('ui', 'help_hint_battle'))
-        row("Ctrl + LMB", self.app.t('ui', 'help_ctrl_lmb_battle'))
-        row("Ctrl + \u2195", self.app.t('ui', 'help_ctrl_updown'))
-        row("Ctrl + \u2194", self.app.t('ui', 'help_ctrl_leftright'))
-        row("Ctrl+Shift + \u2195", self.app.t('ui', 'help_ctrlshift_updown'))
 
         section(self.app.t('ui', 'help_section_draw'))
         row("LMB + drag", self.app.t('ui', 'help_lmb_drag'))
