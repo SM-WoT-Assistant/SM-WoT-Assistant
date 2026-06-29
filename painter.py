@@ -1,5 +1,5 @@
 # painter.py (відновлено з ARC/painter_1_06.py)
-import os, json, math
+import os, json, math, copy
 import tkinter as tk
 import config
 import ctypes
@@ -35,6 +35,7 @@ class MapPainter:
         self._editing_idx = -1
         self._creation_history = []
         self._move_history = []
+        self._deletion_history = []
         self.class_icon_codes = {
             "LT": 0x3A,
             "MT": 0x3B,
@@ -68,6 +69,10 @@ class MapPainter:
             if sorted(obj.get("poi", [])) != sorted(existing.get("poi", [])):
                 continue
             if obj.get("scale", 1.0) != existing.get("scale", 1.0):
+                continue
+            if obj.get("arrow_start") != existing.get("arrow_start"):
+                continue
+            if obj.get("arrow_end") != existing.get("arrow_end"):
                 continue
             return True
         return False
@@ -143,6 +148,13 @@ class MapPainter:
                 self.save_drawings()
                 self.redraw()
             return
+        if self._deletion_history:
+            d_map_id, d_idx, d_obj = self._deletion_history.pop()
+            if d_map_id in self.drawings:
+                self.drawings[d_map_id].insert(d_idx, d_obj)
+            self.save_drawings()
+            self.redraw()
+            return
         if not self._creation_history:
             return
         idx = self._creation_history.pop()
@@ -167,7 +179,9 @@ class MapPainter:
         obj["scale"] = new_scale
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
-        if obj.get("type") == "marker" and len(obj.get("coords", [])) >= 4:
+        if obj.get("type") == "brush":
+            pass
+        elif obj.get("type") in ("marker", "arrow") and len(obj.get("coords", [])) >= 4:
             coords = obj["coords"]
             mx, my = (coords[0] + coords[2]) / 2, (coords[1] + coords[3]) / 2
             dx = coords[2] - mx
@@ -204,13 +218,13 @@ class MapPainter:
         self.start_x = event.x
         self.start_y = event.y
         
-        if self.active_tool == "marker":
+        if self.active_tool in ("marker", "arrow"):
             map_id = self.app.current_map_eng
             if map_id in self.drawings:
                 min_dist = 15 
                 snap_x, snap_y = self.start_x, self.start_y
                 for obj in self.drawings[map_id]:
-                    if obj["type"] == "marker" and self.is_visible(obj):
+                    if obj["type"] == self.active_tool and self.is_visible(obj):
                         coords = obj["coords"]
                         if len(coords) >= 4:
                             ox, oy = coords[0]*cw, coords[1]*ch
@@ -222,8 +236,12 @@ class MapPainter:
                 self.start_y = snap_y
 
             self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=3, dash=(5, 5), tags="temp_draw")
-            self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=2, tags="temp_draw")
-            self.canvas.create_oval(self.start_x-4, self.start_y-4, self.start_x+4, self.start_y+4, fill="white", outline="white", tags="temp_draw")
+            if self.active_tool == "marker":
+                self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=2, tags="temp_draw")
+                self.canvas.create_oval(self.start_x-4, self.start_y-4, self.start_x+4, self.start_y+4, fill="white", outline="white", tags="temp_draw")
+        elif self.active_tool == "brush":
+            self._brush_points = [(event.x, event.y)]
+            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=3, dash=(5, 5), tags="temp_draw")
         elif self.active_tool == "text":
             self.temp_item = self.canvas.create_text(event.x, event.y, text="📍", fill=self.default_color, font=("Arial", 16), tags="temp_draw")
 
@@ -252,6 +270,11 @@ class MapPainter:
         if isinstance(text_coords, list) and len(text_coords) >= 2:
             return text_coords[0] * cw, text_coords[1] * ch
         coords = obj.get("coords", [])
+        if obj.get("type") == "brush" and len(coords) >= 4:
+            n = len(coords) // 2
+            mx = sum(coords[i*2] for i in range(n)) / n * cw
+            my = sum(coords[i*2+1] for i in range(n)) / n * ch - int(10 * sc)
+            return mx, my
         if len(coords) >= 4:
             mx = (coords[0] + coords[2]) / 2 * cw
             my = (coords[1] + coords[3]) / 2 * ch - int(10 * sc)
@@ -278,6 +301,8 @@ class MapPainter:
         closest_kind = "object"
         min_dist = threshold_norm
 
+        maker_types = ("marker", "arrow", "brush")
+
         for i, obj in enumerate(objects):
             if not self.is_visible(obj):
                 continue
@@ -285,8 +310,10 @@ class MapPainter:
 
             special_kind = None
             special_dist = float('inf')
+            obj_best_dist = float('inf')
+            obj_best_kind = "object"
 
-            if obj.get("type") == "marker" and obj.get("text"):
+            if obj.get("type") in maker_types and obj.get("text"):
                 tx, ty = self._get_marker_text_pos(obj, cw, ch)
                 if tx is not None:
                     d = math.hypot((tx / cw) - click_px, (ty / ch) - click_py)
@@ -294,7 +321,7 @@ class MapPainter:
                         special_dist = d
                         special_kind = "marker_text"
 
-            if obj.get("type") == "marker" and obj.get("classes"):
+            if obj.get("type") in maker_types and obj.get("classes"):
                 icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch)
                 if icon_x is not None:
                     d = math.hypot((icon_x / cw) - click_px, (icon_y / ch) - click_py)
@@ -302,7 +329,7 @@ class MapPainter:
                         special_dist = d
                         special_kind = "class_icons"
 
-            if obj.get("type") == "marker" and len(coords) >= 4:
+            if obj.get("type") in ("marker", "arrow") and len(coords) >= 4:
                 d = math.hypot(coords[2] - click_px, coords[3] - click_py)
                 if d < special_dist:
                     special_dist = d
@@ -313,6 +340,24 @@ class MapPainter:
                     math.hypot(coords[2] - click_px, coords[3] - click_py),
                     self._distance_to_segment(click_px, click_py, coords[0], coords[1], coords[2], coords[3]),
                 )
+
+                if special_kind is not None and special_dist < threshold_norm:
+                    obj_best_kind = special_kind
+                    obj_best_dist = special_dist
+                else:
+                    obj_best_kind = "object"
+                    obj_best_dist = general_dist
+
+            elif obj.get("type") == "brush" and len(coords) >= 4:
+                poly_end_d = min(
+                    math.hypot(coords[0] - click_px, coords[1] - click_py),
+                    math.hypot(coords[-2] - click_px, coords[-1] - click_py),
+                )
+                brush_seg_dist = float('inf')
+                for j in range(0, len(coords)-2, 2):
+                    d = self._distance_to_segment(click_px, click_py, coords[j], coords[j+1], coords[j+2], coords[j+3])
+                    brush_seg_dist = min(brush_seg_dist, d)
+                general_dist = min(poly_end_d, brush_seg_dist)
 
                 if special_kind is not None and special_dist < threshold_norm:
                     obj_best_kind = special_kind
@@ -391,7 +436,7 @@ class MapPainter:
         original = self.move_drag["original_coords"]
         target_kind = self.move_drag.get("target_kind", "object")
 
-        if target_kind == "marker_tip" and obj.get("type") == "marker":
+        if target_kind == "marker_tip" and obj.get("type") in ("marker", "arrow"):
             original = self.move_drag["original_coords"]
             obj["coords"] = [
                 original[0], original[1],
@@ -401,7 +446,7 @@ class MapPainter:
             self.redraw()
             return "break"
 
-        if target_kind == "marker_text" and obj.get("type") == "marker":
+        if target_kind == "marker_text" and obj.get("type") in ("marker", "arrow"):
             orig_tc = self.move_drag.get("original_text_coords", [])
             if not orig_tc or len(orig_tc) < 2:
                 tx, ty = self._get_marker_text_pos(obj, cw, ch)
@@ -413,7 +458,7 @@ class MapPainter:
             self.redraw()
             return "break"
 
-        if target_kind == "class_icons" and obj.get("type") == "marker":
+        if target_kind == "class_icons" and obj.get("type") in ("marker", "arrow"):
             class_anchor = self.move_drag.get("original_class_icon_coords")
             if not class_anchor or len(class_anchor) < 2:
                 icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch)
@@ -425,13 +470,18 @@ class MapPainter:
             self.redraw()
             return "break"
 
-        if obj.get("type") == "marker" and len(original) >= 4:
+        if obj.get("type") in ("marker", "arrow") and len(original) >= 4:
             new_coords = [
                 min(max(original[0] + dx, 0.0), 1.0),
                 min(max(original[1] + dy, 0.0), 1.0),
                 min(max(original[2] + dx, 0.0), 1.0),
                 min(max(original[3] + dy, 0.0), 1.0),
             ]
+        elif obj.get("type") == "brush" and len(original) >= 4:
+            new_coords = []
+            for j in range(0, len(original), 2):
+                new_coords.append(min(max(original[j] + dx, 0.0), 1.0))
+                new_coords.append(min(max(original[j+1] + dy, 0.0), 1.0))
         elif obj.get("type") == "text" and len(original) >= 2:
             new_coords = [
                 min(max(original[0] + dx, 0.0), 1.0),
@@ -487,8 +537,14 @@ class MapPainter:
             
     def on_drag(self, event):
         if not self.temp_item or self.app.mode != "edit": return
-        if self.active_tool == "marker":
+        if self.active_tool in ("marker", "arrow"):
             self.canvas.coords(self.temp_item, self.start_x, self.start_y, event.x, event.y)
+        elif self.active_tool == "brush":
+            last_x, last_y = self._brush_points[-1]
+            if math.hypot(event.x - last_x, event.y - last_y) >= 10:
+                self._brush_points.append((event.x, event.y))
+                flat = [coord for p in self._brush_points for coord in p]
+                self.canvas.coords(self.temp_item, *flat)
         elif self.active_tool == "text":
             self.canvas.coords(self.temp_item, event.x, event.y)
             
@@ -500,7 +556,7 @@ class MapPainter:
         ch = self.canvas.winfo_height()
         if cw < 10 or ch < 10: return
         
-        if self.active_tool == "marker" and self.start_x == event.x and self.start_y == event.y:
+        if self.active_tool in ("marker", "arrow", "brush") and self.start_x == event.x and self.start_y == event.y:
             self.canvas.delete("temp_draw")
             self.temp_item = None
             palette = getattr(self.app, 'drawing_palette', None)
@@ -520,7 +576,13 @@ class MapPainter:
             "poi": [],
             "color": "#00ff00" if self.active_tool == "text" else self.default_color,
         }
-        if self.active_tool == "marker":
+        if self.active_tool == "brush":
+            norm_points = [(x / cw, y / ch) for x, y in self._brush_points]
+            flat = [coord for p in norm_points for coord in p]
+            new_obj["coords"] = flat
+            new_obj["arrow_start"] = False
+            new_obj["arrow_end"] = False
+        elif self.active_tool in ("marker", "arrow"):
             new_obj["coords"] = [px1, py1, px2, py2]
         else:
             new_obj["coords"] = [px2, py2]
@@ -585,7 +647,14 @@ class MapPainter:
         needs_show = palette.state() == 'withdrawn'
         palette.exit_edit_mode()
         self._editing_idx = idx
-        label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
+        if obj["type"] == "brush":
+            label = self.app.t('ui', 'brush_type')
+        elif obj["type"] == "arrow":
+            label = self.app.t('ui', 'arrow_type')
+        elif obj["type"] == "marker":
+            label = self.app.t('ui', 'marker_type')
+        else:
+            label = self.app.t('ui', 'text_type')
         palette.load_object(obj)
         palette._lift_self()
         if needs_show:
@@ -602,12 +671,15 @@ class MapPainter:
         if self._editing_idx < 0 or self._editing_idx >= len(objects):
             return
         idx = self._editing_idx
-        del objects[idx]
+        obj = objects[idx]
+        type_labels = {"brush": "brush_type", "arrow": "arrow_type", "marker": "marker_type"}
+        label = self.app.t('ui', type_labels.get(obj.get("type", ""), "text_type"))
+        if not self._confirm_delete(label):
+            return
+        self._deletion_history.append((map_id, idx, copy.deepcopy(obj)))
         self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
+        del objects[idx]
         self._editing_idx = -1
-        palette = getattr(self.app, 'drawing_palette', None)
-        if palette:
-            palette._edit_obj = None
         self.save_drawings()
         self.redraw()
 
@@ -650,9 +722,17 @@ class MapPainter:
         if idx < 0 or idx >= len(objects):
             return
         obj = objects[idx]
-        label = self.app.t('ui', 'marker_type') if obj["type"] == "marker" else self.app.t('ui', 'text_type')
+        if obj["type"] == "brush":
+            label = self.app.t('ui', 'brush_type')
+        elif obj["type"] == "arrow":
+            label = self.app.t('ui', 'arrow_type')
+        elif obj["type"] == "marker":
+            label = self.app.t('ui', 'marker_type')
+        else:
+            label = self.app.t('ui', 'text_type')
         ok = self._confirm_delete(label)
         if ok:
+            self._deletion_history.append((map_id, idx, copy.deepcopy(obj)))
             del objects[idx]
             self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
             if self._editing_idx == idx:
@@ -710,6 +790,42 @@ class MapPainter:
 
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
                 canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
+
+                if obj.get("classes"):
+                    icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
+                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
+
+                if obj.get("text"):
+                    mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
+                    if mx is not None:
+                        canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
+
+            elif obj["type"] == "arrow":
+                if len(coords) < 4: continue
+                x1, y1 = coords[0]*cw, coords[1]*ch
+                x2, y2 = coords[2]*cw, coords[3]*ch
+                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
+
+                if obj.get("classes"):
+                    icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
+                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
+
+                if obj.get("text"):
+                    mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
+                    if mx is not None:
+                        canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
+
+            elif obj["type"] == "brush":
+                if len(coords) < 4: continue
+                flat_px = [coords[i]*cw if i%2==0 else coords[i]*ch for i in range(len(coords))]
+                arr = tk.NONE
+                if obj.get("arrow_start") and obj.get("arrow_end"):
+                    arr = tk.BOTH
+                elif obj.get("arrow_start"):
+                    arr = tk.FIRST
+                elif obj.get("arrow_end"):
+                    arr = tk.LAST
+                canvas.create_line(*flat_px, arrow=arr, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
 
                 if obj.get("classes"):
                     icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)

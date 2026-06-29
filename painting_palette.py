@@ -84,6 +84,8 @@ class DrawingPalette(tk.Toplevel):
 
         all_tools = [
             ("marker", chr(0xF01B), FONT_AWE),
+            ("arrow", chr(0xF062), FONT_AWE),
+            ("brush", chr(0xF040), FONT_AWE),
             (0x3A, chr(0x3A), "XVMSymbol"),
             (0x3B, chr(0x3B), "XVMSymbol"),
             (0x3F, chr(0x3F), "XVMSymbol"),
@@ -100,7 +102,7 @@ class DrawingPalette(tk.Toplevel):
             (0x2C, chr(0x2C), "XVMSymbol"),
         ]
 
-        mid = 6
+        mid = 8
         rows = [all_tools[:mid], all_tools[mid:]]
 
         for row_items in rows:
@@ -110,7 +112,8 @@ class DrawingPalette(tk.Toplevel):
                 btn_frame = tk.Frame(r, bg="#1a1a1a", width=38, height=38)
                 btn_frame.pack(side="left", padx=1)
                 btn_frame.pack_propagate(False)
-                btn = tk.Button(btn_frame, text=text, font=(font_name, 16), bg="#333", fg="#aaa",
+                fs = 11 if code == "arrow" else 13 if code == "brush" else 16
+                btn = tk.Button(btn_frame, text=text, font=(font_name, fs), bg="#333", fg="#aaa",
                                 bd=0, command=lambda c=code: self._on_toolbar_click(c))
                 btn.pack(expand=True, fill="both")
                 self._toolbar_buttons[code] = btn
@@ -174,8 +177,22 @@ class DrawingPalette(tk.Toplevel):
         self._del_frame.pack(fill="x")
         self._del_frame.pack_forget()
 
-        sep4 = tk.Frame(self, bg="#333", height=1)
-        sep4.pack(fill="x", padx=6, pady=2)
+        self._brush_frame = tk.Frame(self, bg=bg)
+        self._arrow_start_var = tk.BooleanVar(value=False)
+        self._arrow_end_var = tk.BooleanVar(value=False)
+        tk.Label(self._brush_frame, text="Arrow:", bg=bg, fg="#aaa",
+                 font=("Arial", 8, "bold")).pack(anchor="w", padx=8, pady=(2, 0))
+        af = tk.Frame(self._brush_frame, bg=bg)
+        af.pack(fill="x", padx=8)
+        tk.Checkbutton(af, text=self.app.t('ui', 'arrow_start'), variable=self._arrow_start_var,
+                       command=self._on_any_change, **cb_style, font=("Arial", 8)).pack(side="left", padx=1)
+        tk.Checkbutton(af, text=self.app.t('ui', 'arrow_end'), variable=self._arrow_end_var,
+                       command=self._on_any_change, **cb_style, font=("Arial", 8)).pack(side="left", padx=1)
+        self._brush_frame.pack(fill="x")
+        self._brush_frame.pack_forget()
+
+        self._sep4 = tk.Frame(self, bg="#333", height=1)
+        self._sep4.pack(fill="x", padx=6, pady=2)
 
         tk.Label(self, text=self.app.t('ui', 'color_label'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(anchor="w", padx=8, pady=(2, 0))
@@ -237,15 +254,26 @@ class DrawingPalette(tk.Toplevel):
     def _set_tool_from_code(self, code):
         self._active_tool_code = code
         self._update_toolbar_buttons()
-        self.painter.set_tool("marker" if code == "marker" else "text")
-        self.current_color = "#ffaa00" if code == "marker" else "#00ff00"
+        if code in ("arrow", "brush"):
+            self.painter.set_tool(code)
+        elif code == "marker":
+            self.painter.set_tool("marker")
+        else:
+            self.painter.set_tool("text")
+        maker_like = ("marker", "arrow", "brush")
+        self.current_color = "#ffaa00" if code in maker_like else "#00ff00"
         self._color_preview.config(fg=self.current_color)
         self._update_color_buttons()
+        if code == "brush":
+            self._brush_frame.pack(fill="x", before=self._sep4)
+        else:
+            self._brush_frame.pack_forget()
 
     def _deactivate_tool(self):
         self._active_tool_code = None
         self._update_toolbar_buttons()
         self.painter.set_tool(None)
+        self._brush_frame.pack_forget()
 
     def _highlight_toolbar_button(self, code):
         self._active_tool_code = code
@@ -649,6 +677,10 @@ class DrawingPalette(tk.Toplevel):
             self._palette_compact_geo = None
         elif active == "marker":
             self._active_tool_code = "marker"
+        elif active == "arrow":
+            self._active_tool_code = "arrow"
+        elif active == "brush":
+            self._active_tool_code = "brush"
         elif active == "text":
             self._active_tool_code = 0x2B
         self._update_toolbar_buttons()
@@ -721,11 +753,25 @@ class DrawingPalette(tk.Toplevel):
                     self._highlight_toolbar_button(code)
                 else:
                     self._highlight_toolbar_button(0x2B)
+            elif obj["type"] == "arrow":
+                self._highlight_toolbar_button("arrow")
+            elif obj["type"] == "brush":
+                self._highlight_toolbar_button("brush")
             else:
                 self._highlight_toolbar_button("marker")
             self.painter.set_tool(None)
             self._del_frame.pack(fill="x")
-            label = self.app.t('ui', 'status_editing_marker') if obj["type"] == "marker" else self.app.t('ui', 'status_editing_text')
+            if obj["type"] == "marker":
+                label = self.app.t('ui', 'status_editing_marker')
+            elif obj["type"] == "arrow":
+                label = self.app.t('ui', 'status_editing_arrow')
+            elif obj["type"] == "brush":
+                label = self.app.t('ui', 'status_editing_brush')
+                self._arrow_start_var.set(obj.get("arrow_start", False))
+                self._arrow_end_var.set(obj.get("arrow_end", False))
+                self._brush_frame.pack(fill="x", before=self._sep4)
+            else:
+                label = self.app.t('ui', 'status_editing_text')
             self._status_lbl.config(text=f"{label}")
         finally:
             self._loading_obj = False
@@ -742,6 +788,7 @@ class DrawingPalette(tk.Toplevel):
         self._update_toolbar_buttons()
         self.painter.set_tool(None)
         self._del_frame.pack_forget()
+        self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
 
     def _write_to_object(self, obj):
@@ -756,7 +803,10 @@ class DrawingPalette(tk.Toplevel):
                 obj["poi"] = [self._active_tool_code]
             else:
                 obj["poi"] = []
-        elif obj.get("type") == "marker":
+        elif obj.get("type") == "brush":
+            obj["arrow_start"] = self._arrow_start_var.get()
+            obj["arrow_end"] = self._arrow_end_var.get()
+        elif obj.get("type") in ("marker", "arrow"):
             coords = obj.get("coords", [])
             cw = self.painter.canvas.winfo_width()
             ch = self.painter.canvas.winfo_height()
@@ -774,7 +824,9 @@ class DrawingPalette(tk.Toplevel):
 
     def apply_to_new_object(self, obj, cw, ch):
         self._write_to_object(obj)
-        if obj.get("type") == "marker":
+        if obj.get("type") == "brush":
+            pass
+        elif obj.get("type") in ("marker", "arrow"):
             sc = min(cw, ch) / 800.0 if cw >= 10 and ch >= 10 else 1.0
             coords = obj.get("coords", [])
             if obj.get("classes") and not obj.get("class_icon_coords") and len(coords) >= 2:
