@@ -36,6 +36,7 @@ import dialog_utils
 import firebase_identity
 import firebase_reporter
 import firebase_drawings
+import tray_icon
 
 try:
     import map_extractor
@@ -58,8 +59,10 @@ class WotAssistantHQ:
         self.dialog_open = False 
         self.edit_focus_lock = False
         self._last_mode_hotkey_ts = 0.0
-        self.active_view = "maps" # "maps", "stats", "ai_stats"
+        self.active_view = "maps"
         self._startup_complete = False
+        self._tray_icon = None
+        self._hidden_by_f10 = False
         
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
@@ -289,6 +292,8 @@ class WotAssistantHQ:
                 pass
 
     def _lift_overlay(self):
+        if self._hidden_by_f10:
+            return
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.lift()
 
@@ -300,6 +305,8 @@ class WotAssistantHQ:
             self._po_win.withdraw()
 
     def _on_root_show(self, event=None):
+        if self._hidden_by_f10:
+            return
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             if not getattr(self, '_startup_complete', False):
                 return
@@ -621,24 +628,46 @@ class WotAssistantHQ:
                 self._po_win.lift()
 
     def toggle_visibility(self):
-        """Приховати/Показати вікно (F10)"""
+        """Приховати/Показати вікно (F10) — згортання в системний трей"""
         if self.root.state() == "withdrawn":
-            self.root.deiconify()
-            self.root.lift()
-            self.root.focus_force()
-            if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
-                self._po_win.deiconify()
-                self._sync_po_pos()
-                self._po_win.lift()
+            self._restore_from_tray()
         else:
-            if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
-                self._po_win.withdraw()
-            if hasattr(self, 'stats_ai_module'):
-                self.stats_ai_module.stop_browser()
-            self.save_settings()
-            if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn':
-                self.drawing_palette._close()
-            self.root.withdraw()
+            self._minimize_to_tray()
+
+    def _minimize_to_tray(self):
+        """Згорнути програму в системний трей"""
+        self._hidden_by_f10 = True
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._po_win.withdraw()
+        if hasattr(self, 'stats_ai_module'):
+            self.stats_ai_module.stop_browser()
+        self.save_settings()
+        if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn':
+            self.drawing_palette._close()
+        if not self._tray_icon:
+            self._tray_icon = tray_icon.TrayIcon(
+                self.root,
+                on_click=self._on_tray_click
+            )
+        self.root.withdraw()
+
+    def _restore_from_tray(self):
+        """Відновити програму з системного трею"""
+        if self._tray_icon:
+            self._tray_icon.remove()
+            self._tray_icon = None
+        self._hidden_by_f10 = False
+        self.root.deiconify()
+        self.root.lift()
+        self.root.focus_force()
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.deiconify()
+            self._sync_po_pos()
+            self._po_win.lift()
+
+    def _on_tray_click(self):
+        """Колбек при кліку на іконку в треї"""
+        self._restore_from_tray()
 
     def _ensure_edit_focus(self):
         if not self.edit_focus_lock or self.mode != "edit" or self.root.state() == "withdrawn":
@@ -680,7 +709,7 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
-        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10:
             self._po_win.lift()
         self.painter.redraw()
 
@@ -703,6 +732,8 @@ class WotAssistantHQ:
         self._restore_overlay_state()
 
     def _restore_overlay_state(self):
+        if self._hidden_by_f10:
+            return
         if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
             return
         if self._po_win.state() != "withdrawn":
@@ -919,12 +950,15 @@ class WotAssistantHQ:
         self.ui_mgr.show_view("ai_stats")
 
     def quit_app(self):
+        if self._tray_icon:
+            self._tray_icon.remove()
+            self._tray_icon = None
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
         self.save_settings()
         firebase_identity._save(firebase_identity._load())
         firebase_reporter.try_flush_service_messages(self)
-        keyboard.unhook_all() 
+        keyboard.unhook_all()
         self.root.destroy()
         sys.exit(0)
 

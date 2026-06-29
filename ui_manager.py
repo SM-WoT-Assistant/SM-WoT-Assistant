@@ -26,6 +26,8 @@ class UIManager:
 
         tk.Button(self.app.top_bar, text="✕", bg="#800", fg="white", command=self.app.quit_app, bd=0, padx=10).pack(side="right", pady=7)
 
+        tk.Button(self.app.top_bar, text="─", bg="#444", fg="white", command=self.app.toggle_visibility, bd=0, padx=10, font=("Arial", 12, "bold")).pack(side="right", pady=7)
+
         self.app.settings_btn = tk.Button(self.app.top_bar, text="⚙", bg="#333", fg="white", bd=0, command=self._show_settings_menu)
         self.app.settings_btn.pack(side="right", padx=5, pady=7)
 
@@ -334,9 +336,10 @@ class UIManager:
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists():
                 self.app._po_win.withdraw()
                 self.app.root.update_idletasks()
-                self.app._po_win.deiconify()
-                self.app._sync_po_pos()
-                self.app.root.update_idletasks()
+                if not self.app._hidden_by_f10:
+                    self.app._po_win.deiconify()
+                    self.app._sync_po_pos()
+                    self.app.root.update_idletasks()
                 self.app.painter.redraw()
 
         elif view_name == "stats":

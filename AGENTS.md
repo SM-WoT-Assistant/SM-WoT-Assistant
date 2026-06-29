@@ -128,6 +128,22 @@
 `python build.py X.Y.Z` робить все: білд + GitHub release + RTDB. Verify phase перевіряє автоматично.
 Після білду запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test.
 
+## Системний трей (29.06.2026)
+1. **F10 / кнопка `─`** — `toggle_visibility()` (main.py:639) → `_minimize_to_tray()` ховає вікно в системний трей.
+2. **`tray_icon.py`** — чистий ctypes WinAPI (`Shell_NotifyIconW(NIM_ADD/DELETE)`), жодних зовнішніх залежностей.
+3. **Трей-іконка** — `icon.ico` з кореня проєкту, завантажується через `LoadImageW`, розмір системної small icon.
+4. **Message-only window** — `CreateWindowExW` + `HWND_MESSAGE` + кастомний `WNDPROC` через `WINFUNCTYPE`.
+5. **Polling 250ms** — `after()` цикл перевіряє `_click_flag` встановлену WNDPROC при `WM_LBUTTONUP`/`WM_RBUTTONUP`.
+6. **`_hidden_by_f10`** — прапорець-захист, блокує всі шляхи що можуть показати оверлей поки програма в треї:
+   - `_lift_overlay()` (main.py:296)
+   - `_on_root_show()` (main.py:307)
+   - `_restore_overlay_state()` (main.py:733)
+   - `on_map_select()` (main.py:711)
+   - `show_view("maps")` (ui_manager.py:335)
+7. **Кнопка `─`** — в `top_bar` перед ✕ (ui_manager.py:27), стиль: `bg="#444", fg="white", padx=10, font=("Arial", 12, "bold")`.
+8. **Cleanup** — `quit_app()` видаляє трей-іконку (`TrayIcon.remove()` → `Shell_NotifyIconW(NIM_DELETE)` + `DestroyWindow` + `DestroyIcon`).
+9. **Build** — `tray_icon.py` імпортується з `main.py`, автоматично підхоплюється PyInstaller. `icon.ico` вже включено в `copy_data_files()`.
+
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.
 2. **Наприкінці сесії:** зберегти ключові факти в `ctx_memory`:
