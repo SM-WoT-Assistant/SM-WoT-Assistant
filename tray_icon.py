@@ -63,28 +63,68 @@ class WNDCLASSW(ctypes.Structure):
 
 WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
 
+_ACTIVE_TRAY = None
 _CLASS_REGISTERED = False
-_CLASS_ATOM = 0
+_GLOBAL_WNDPROC = None
+
+
+def _global_wndproc_func(hwnd, msg, wparam, lparam):
+    if msg == WM_APP and lparam in (WM_LBUTTONUP, WM_LBUTTONDBLCLK, WM_RBUTTONUP):
+        if _ACTIVE_TRAY is not None:
+            _ACTIVE_TRAY._click_flag = True
+    return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+
+WNDPROC_INSTANCE = WNDPROC(_global_wndproc_func)
+
+
+def _ensure_class_registered():
+    global _CLASS_REGISTERED, _GLOBAL_WNDPROC
+    if _CLASS_REGISTERED:
+        return
+    hinstance = kernel32.GetModuleHandleW(None)
+    _GLOBAL_WNDPROC = ctypes.cast(WNDPROC_INSTANCE, ctypes.c_void_p).value
+    wc = WNDCLASSW()
+    wc.style = 0
+    wc.lpfnWndProc = _GLOBAL_WNDPROC
+    wc.cbClsExtra = 0
+    wc.cbWndExtra = 0
+    wc.hInstance = hinstance
+    wc.hIcon = 0
+    wc.hCursor = 0
+    wc.hbrBackground = 0
+    wc.lpszMenuName = None
+    wc.lpszClassName = "SM_Tray_Message_Window"
+    atom = user32.RegisterClassW(ctypes.byref(wc))
+    if atom:
+        _CLASS_REGISTERED = True
 
 
 class TrayIcon:
     def __init__(self, root, on_click=None):
+        global _ACTIVE_TRAY
         self.root = root
         self.on_click = on_click
         self._click_flag = False
         self._destroyed = False
-        self._wndproc_ref = None
         self._msg_hwnd = None
         self._nid = None
         self._poll_id = None
         self._hicon = None
+
+        _ensure_class_registered()
 
         self._hicon = self._load_icon()
         if not self._hicon:
             print("[TRAY] Failed to load icon.ico")
             return
 
-        self._msg_hwnd = self._create_message_window()
+        hinstance = kernel32.GetModuleHandleW(None)
+        self._msg_hwnd = user32.CreateWindowExW(
+            0, "SM_Tray_Message_Window", "",
+            0, 0, 0, 0, 0,
+            None, None, hinstance, None
+        )
         if not self._msg_hwnd:
             print("[TRAY] Failed to create message window")
             return
@@ -99,6 +139,7 @@ class TrayIcon:
         self._nid.szTip = "SM WoT Assistant v" + config.load_version()
 
         if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(self._nid)):
+            _ACTIVE_TRAY = self
             self._poll_id = root.after(250, self._poll)
         else:
             print("[TRAY] Shell_NotifyIconW NIM_ADD failed")
@@ -117,38 +158,6 @@ class TrayIcon:
         )
         return hicon if hicon else None
 
-    def _create_message_window(self):
-        global _CLASS_REGISTERED, _CLASS_ATOM
-        hinstance = kernel32.GetModuleHandleW(None)
-
-        if not _CLASS_REGISTERED:
-            def _wndproc_func(hwnd, msg, wparam, lparam):
-                if msg == WM_APP and lparam in (WM_LBUTTONUP, WM_LBUTTONDBLCLK, WM_RBUTTONUP):
-                    self._click_flag = True
-                return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
-
-            self._wndproc_ref = WNDPROC(_wndproc_func)
-
-            wc = WNDCLASSW()
-            wc.style = 0
-            wc.lpfnWndProc = ctypes.cast(self._wndproc_ref, ctypes.c_void_p).value
-            wc.cbClsExtra = 0
-            wc.cbWndExtra = 0
-            wc.hInstance = hinstance
-            wc.hIcon = 0
-            wc.hCursor = 0
-            wc.hbrBackground = 0
-            wc.lpszMenuName = None
-            wc.lpszClassName = "SM_Tray_Message_Window"
-            _CLASS_ATOM = user32.RegisterClassW(ctypes.byref(wc))
-            _CLASS_REGISTERED = True
-
-        return user32.CreateWindowExW(
-            0, "SM_Tray_Message_Window", "",
-            0, 0, 0, 0, 0,
-            None, None, hinstance, None
-        )
-
     def _poll(self):
         if self._destroyed:
             return
@@ -163,7 +172,10 @@ class TrayIcon:
             self._poll_id = self.root.after(250, self._poll)
 
     def remove(self):
+        global _ACTIVE_TRAY
         self._destroyed = True
+        if _ACTIVE_TRAY is self:
+            _ACTIVE_TRAY = None
         if self._nid:
             shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(self._nid))
             self._nid = None
