@@ -62,12 +62,15 @@ class HelpManager:
         body = tk.Frame(self._help_win, bg=bg)
         body.pack(fill="both", expand=True, padx=12, pady=(8, 4))
 
-        def row(hotkey, desc, first=False):
+        def row(hotkey, desc, first=False, wrap=0):
             p = (6, 0) if first else (0, 0)
             tk.Label(body, text=hotkey, bg=bg, fg=hotkey_fg, font=("Arial", 9, "bold"),
                      anchor="w").grid(row=_r[0], column=0, sticky="w", pady=p, padx=(0, 8))
-            tk.Label(body, text=desc, bg=bg, fg=desc_fg, font=("Arial", 9),
-                     anchor="w").grid(row=_r[0], column=1, sticky="w", pady=p)
+            kw = {"text": desc, "bg": bg, "fg": desc_fg, "font": ("Arial", 9),
+                   "anchor": "w", "justify": "left"}
+            if wrap:
+                kw["wraplength"] = wrap
+            tk.Label(body, **kw).grid(row=_r[0], column=1, sticky="w", pady=p)
             _r[0] += 1
 
         def section(title):
@@ -124,10 +127,12 @@ class HelpManager:
         row(self.app.t('ui', 'vehicle_class_label'), self.app.t('ui', 'help_filter_class'))
 
         section(self.app.t('ui', 'help_section_groups'))
-        row(self.app.t('ui', 'public'), self.app.t('ui', 'help_group_selector'))
-        row("📋 / 🔒", self.app.t('ui', 'help_group_token'))
-        row(self.app.t('ui', 'group_create'), self.app.t('ui', 'help_group_create_join'))
-        row(self.app.t('ui', 'publish_map'), self.app.t('ui', 'help_group_publish'))
+        row(self.app.t('ui', 'help_group_filter_label'), self.app.t('ui', 'help_group_filter_desc'), wrap=380)
+        row("📋/🔒", self.app.t('ui', 'help_group_token'), wrap=380)
+        row(self.app.t('ui', 'group_create'), self.app.t('ui', 'help_group_create_desc'), wrap=380)
+        row(self.app.t('ui', 'group_join'), self.app.t('ui', 'help_group_join_desc'), wrap=380)
+        row(self.app.t('ui', 'group_manage'), self.app.t('ui', 'help_group_manage_desc'), wrap=380)
+        row(self.app.t('ui', 'publish_map'), self.app.t('ui', 'help_group_publish_desc'), wrap=380)
 
         tk.Frame(body, bg="#333", height=1).grid(row=_r[0], column=0, columnspan=2, sticky="ew", pady=(8, 4))
         _r[0] += 1

@@ -509,7 +509,7 @@ class WotAssistantHQ:
         if self.active_view == "maps":
             self.status_label.pack_forget()
             if self.mode == "edit":
-                self.map_toolbar.pack(side="left", fill="x", expand=True, padx=10)
+                self.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
                 self.filter_panel.pack(side="bottom", fill="x")
                 self.status_label.pack(side="bottom", fill="x")
                 self.status_label.config(height=2, bg="#1a1a1a")
