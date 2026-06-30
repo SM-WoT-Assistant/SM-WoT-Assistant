@@ -94,7 +94,7 @@ class WindowManager:
         
         self.app.w = self.app.settings.get("edit_w", 800)
         self.app.w = max(500, min(int(self.app.w), self.app.max_window_w))
-        self.app.h = self.app.settings.get("edit_h", self.app.w + 130)
+        self.app.h = self.app.settings.get("edit_h", self.app.w + 160)
         self.app.alpha = self.app.settings.get("edit_alpha", 1.0)
         self.app.alpha = max(0.2, min(float(self.app.alpha), 1.0))
         self.app.contrast = self.app.settings.get("edit_contrast", 1.0)

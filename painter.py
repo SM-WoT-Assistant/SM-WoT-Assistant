@@ -44,6 +44,9 @@ class MapPainter:
             "SPG": 0x2D,
         }
 
+        self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
+        self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
+
     def _coords_match(self, c1, c2):
         if len(c1) != len(c2):
             return False
@@ -575,6 +578,7 @@ class MapPainter:
             "text": "",
             "poi": [],
             "color": "#00ff00" if self.active_tool == "text" else self.default_color,
+            "_source": getattr(self.app, "active_group_id", "public") or "public",
         }
         if self.active_tool == "brush":
             norm_points = [(x / cw, y / ch) for x, y in self._brush_points]
@@ -908,10 +912,28 @@ class MapPainter:
         if cw < 10 or ch < 10: return
 
         self.canvas.delete("painter_obj")
-        if map_id not in self.drawings:
+
+        group_scheme_els = []
+        active_group_id = getattr(self.app, "active_group_id", None)
+        for gs in self._group_schemes.values():
+            if gs.get("map_id") == map_id and isinstance(gs.get("elements"), list):
+                if active_group_id and active_group_id != "public" and gs.get("group_id") != active_group_id:
+                    continue
+                for el in gs["elements"]:
+                    if self.is_visible(el):
+                        group_scheme_els.append(el)
+
+        local_els = self.drawings.get(map_id, [])
+        if active_group_id and active_group_id != "public":
+            local_els = [obj for obj in local_els if obj.get("_source") == active_group_id]
+        else:
+            local_els = [obj for obj in local_els if not obj.get("_source") or obj.get("_source") == "public"]
+        visible = [obj for obj in local_els if self.is_visible(obj)]
+        all_visible = visible + group_scheme_els
+
+        if not all_visible:
             self.app._lift_overlay()
             return
 
-        visible = [obj for obj in self.drawings[map_id] if self.is_visible(obj)]
-        self._render_elements(self.canvas, visible, cw, ch)
+        self._render_elements(self.canvas, all_visible, cw, ch)
         self.app._lift_overlay()

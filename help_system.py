@@ -21,9 +21,12 @@ class HelpManager:
         self._drag = {"x": 0, "y": 0}
         self._build_ui()
 
-        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 250
-        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 300
-        self._help_win.geometry(f"+{cx}+{cy}")
+        self._help_win.update_idletasks()
+        w = self._help_win.winfo_reqwidth()
+        h = self._help_win.winfo_reqheight()
+        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - w // 2
+        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - h // 2
+        self._help_win.geometry(f"{w}x{h}+{cx}+{cy}")
         self._help_win.focus_force()
 
     def _drag_start(self, event):
@@ -62,9 +65,9 @@ class HelpManager:
         def row(hotkey, desc, first=False):
             p = (6, 0) if first else (0, 0)
             tk.Label(body, text=hotkey, bg=bg, fg=hotkey_fg, font=("Arial", 9, "bold"),
-                     anchor="w", width=20).grid(row=_r[0], column=0, sticky="w", pady=p, padx=(0, 8))
+                     anchor="w").grid(row=_r[0], column=0, sticky="w", pady=p, padx=(0, 8))
             tk.Label(body, text=desc, bg=bg, fg=desc_fg, font=("Arial", 9),
-                     anchor="w", width=36).grid(row=_r[0], column=1, sticky="w", pady=p)
+                     anchor="w").grid(row=_r[0], column=1, sticky="w", pady=p)
             _r[0] += 1
 
         def section(title):
@@ -86,9 +89,9 @@ class HelpManager:
         fr = tk.Frame(body, bg=bg)
         tk.Label(fr, text=chr(0xF023), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
         tk.Label(fr, text=chr(0xF09C), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
-        tk.Label(fr, text="  F8", font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg, anchor="w", width=17).pack(side="left")
+        tk.Label(fr, text="  F8", font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg, anchor="w").pack(side="left")
         fr.grid(row=_r[0], column=0, sticky="w", pady=(6, 0), padx=(0, 8))
-        tk.Label(body, text=self.app.t('ui', 'help_f8'), bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w", width=36).grid(row=_r[0], column=1, sticky="w", pady=(6, 0))
+        tk.Label(body, text=self.app.t('ui', 'help_f8'), bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w").grid(row=_r[0], column=1, sticky="w", pady=(6, 0))
         _r[0] += 1
         row("TAB", self.app.t('ui', 'help_e'))
         row("F1", self.app.t('ui', 'help_f1'))
@@ -119,6 +122,12 @@ class HelpManager:
         section(self.app.t('ui', 'help_section_filters'))
         row(self.app.t('ui', 'battle_mode_label'), self.app.t('ui', 'help_filter_mode'))
         row(self.app.t('ui', 'vehicle_class_label'), self.app.t('ui', 'help_filter_class'))
+
+        section(self.app.t('ui', 'help_section_groups'))
+        row(self.app.t('ui', 'public'), self.app.t('ui', 'help_group_selector'))
+        row("📋 / 🔒", self.app.t('ui', 'help_group_token'))
+        row(self.app.t('ui', 'group_create'), self.app.t('ui', 'help_group_create_join'))
+        row(self.app.t('ui', 'publish_map'), self.app.t('ui', 'help_group_publish'))
 
         tk.Frame(body, bg="#333", height=1).grid(row=_r[0], column=0, columnspan=2, sticky="ew", pady=(8, 4))
         _r[0] += 1

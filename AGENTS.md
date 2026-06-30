@@ -144,6 +144,37 @@
 8. **Cleanup** — `quit_app()` видаляє трей-іконку (`TrayIcon.remove()` → `Shell_NotifyIconW(NIM_DELETE)` + `DestroyWindow` + `DestroyIcon`).
 9. **Build** — `tray_icon.py` імпортується з `main.py`, автоматично підхоплюється PyInstaller. `icon.ico` вже включено в `copy_data_files()`.
 
+## Система груп та схем (30.06.2026)
+1. **firebase_groups.py** — модуль управління групами в RTDB. Функції: `create_group()`, `join_group()`, `leave_group()`, `get_user_groups()`, `publish_to_group()`, `update_group_scheme()`, `get_group_schemes()`, `get_group_schemes_meta()`, `import_between_groups()`.
+2. **RTDB структура:** `groups/{group_id}/{name, description, invite_code, members/{uid}, schemes/{drawing_id}}`. `user_groups/{uid}/{gid}` — швидкий пошук груп користувача.
+3. **Group selector** (ui_manager.py:setup_ui) — `ttk.Combobox` в `map_toolbar` після `draw_btn`. Показує "Public" та список груп. Другий віджет — `group_token_btn` з інвайт-кодом (officer) або 🔒 (member). Показується тільки для зареєстрованих.
+4. **Фільтр мап:** коли вибрана не-Public група, `load_map_list()` (map_manager.py:400) фільтрує список мап — тільки ті, що мають схеми у вибраній групі.
+5. **Фільтр схем:** `painter.py:redraw()` рендерить тільки схеми з group_id == active_group_id.
+6. **Group management** (painting_palette.py:_build_ui) — секція Groups на дні палітри (після _status_lbl). Кнопки Create/Join/Manage відкривають `overrideredirect(True)` кастомні діалоги (через `dialog_utils._DragHelper`).
+7. **Кастомні діалоги:** всі діалоги груп (Create, Join, Manage) використовують `overrideredirect(True)` + кастомний темний header (`bg="#2a2a2a"`, title + ✕ close button) + `dialog_utils._DragHelper` для перетягування.
+8. **Групова схема** — публікується в `groups/{gid}/schemes/{drawing_id}`, не потрапляє в публічні `schemes/`. Сайт (schemes.html) не бачить групових схем.
+9. **Вибір публікації:** якщо активна група != public → Publish публікує в групу. Якщо public → у публічні schemes/ (як раніше).
+10. **Download діалог** (painting_palette.py:_download_populate, _build_download_ui): завантажує публічні схеми + схеми з груп користувача. Додано колонку Source (Group/Public) та фільтр Source.
+11. **Link (auto-sync)** — групові схеми можна встановити як посилання (painter._group_schemes), вони відображаються разом з локальними малюнками і автоматично оновлюються при зміні на сервері.
+12. **Sync polling 60s** (main.py:_start_group_sync, _sync_cycle): перевіряє updated_at в RTDB кожні 60с. При зміні показує `overrideredirect(True)` сповіщення "Scheme updated by OfficerName. Download now?".
+13. **Кеш групових схем** (config.GROUP_CACHE_FILE = `group_schemes_cache.json` в USER_DATA_DIR): зберігається при завершенні, завантажується при старті.
+14. **database.rules.json** — додано індекси для `groups/` (invite_code, created_at) та `user_groups/`.
+15. **_DragHelper** (dialog_utils.py:17-25) — клас для перетягування `overrideredirect` вікон. Параметри: `toplevel`, `frame`. Використовується в усіх кастомних діалогах.
+16. **Токен групи:** інвайт-код з кнопкою Copy на top_bar поруч з group_selector. Для officer — показує код (#ffaa00) + clipboard copy. Для member — 🔒. Для Public — прихований.
+17. **_show_group_sync_notification** (main.py:1815) — `overrideredirect(True)` + кастомний header + `_DragHelper`.
+
+## Overlay startup fix (29.06.2026, повторюваний баг)
+
+## Overlay startup fix (29.06.2026, повторюваний баг)
+1. `_sync_po_pos()` у `finish_startup_splash()` (main.py:1637-1638) — overlay завжди `withdrawn` після зміни геометрії. **ОБОВ'ЯЗКОВО** викликати `_po_win.deiconify()` перед `_sync_po_pos()`.
+2. `on_map_select()` (main.py:720-721) — `lift()` не працює для withdrawn вікна. **ОБОВ'ЯЗКОВО** перевіряти `state() == "withdrawn"` → `deiconify() + _sync_po_pos()`.
+3. `get_edit_extra_height()` має fallback 130 (main.py:329) — при зміні кількості панелей (додаванні/видаленні) fallback ТРЕБА оновлювати.
+4. `window_manager.py:97` — `settings.get("edit_h", self.app.w + 130)` — 130 в default edit_h.
+5. `finish_startup_splash()` ПОВИНЕН перераховувати `self.h = self.w + get_edit_extra_height()` після створення всіх панелей, щоб перезаписати stale edit_h з settings.
+6. Після `root.deiconify()` → `winfo_rootx/y()` може бути (0,0) поки window manager не поставив вікно. **ОБОВ'ЯЗКОВО** використовувати `root.after(100, ...)` для першого `_sync_po_pos()`.
+7. Ці шість пунктів треба перевіряти при КОЖНІЙ зміні `finish_startup_splash()`, `on_map_select()`, `get_edit_extra_height()`, `initialize_window()` — без винятків.
+8. **`root.minsize(self.w, self.h)`** — обов'язково після зміни геометрії в `finish_startup_splash()`, щоб вікно ніколи не ставало меншим за сумарний розмір всіх елементів.
+
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.
 2. **Наприкінці сесії:** зберегти ключові факти в `ctx_memory`:

@@ -387,6 +387,22 @@ class MapManager:
         if is_tactic:
             self.app.map_list_eng = [m for m in self.app.map_list_eng if self._tactic_image_exists(m)]
 
+        # Filter by active group schemes
+        import firebase_groups
+        active_id = getattr(self.app, "active_group_id", firebase_groups.PUBLIC_GROUP_ID)
+        if active_id != firebase_groups.PUBLIC_GROUP_ID:
+            try:
+                group_schemes = firebase_groups.get_group_schemes(active_id)
+                allowed_maps = set()
+                for sid, sdata in group_schemes.items():
+                    mid = sdata.get("map_id", "")
+                    if mid:
+                        allowed_maps.add(mid)
+                if allowed_maps:
+                    self.app.map_list_eng = [m for m in self.app.map_list_eng if m in allowed_maps]
+            except Exception:
+                pass
+
         unique_maps = []
         seen_names = set()
         for m in self.app.map_list_eng:

@@ -16,6 +16,12 @@
     },
     "versions": {
       ".indexOn": ["release_date"]
+    },
+    "groups": {
+      ".indexOn": ["invite_code", "created_at"]
+    },
+    "user_groups": {
+      ".indexOn": [""]
     }
   }
 }

@@ -5,6 +5,7 @@ import language_module
 import dialog_utils
 import firebase_identity
 import firebase_drawings
+import firebase_groups
 
 FONT_AWE = "FontAwesome"
 
@@ -240,6 +241,290 @@ class DrawingPalette(tk.Toplevel):
                                      height=1, anchor="w")
         self._status_lbl.pack(fill="x", padx=8, pady=(2, 2))
 
+        self._group_mgmt_frame = tk.Frame(self, bg="#1a1a1a")
+        self._group_mgmt_frame.pack(fill="x", padx=6, pady=(0, 4))
+        tk.Label(self._group_mgmt_frame, text=self.app.t('ui', 'group_schemes'), bg="#1a1a1a", fg="#888",
+                 font=("Arial", 8, "bold")).pack(anchor="w", padx=4, pady=(2, 0))
+        mgf = tk.Frame(self._group_mgmt_frame, bg="#1a1a1a")
+        mgf.pack(fill="x", padx=4, pady=2)
+        tk.Button(mgf, text=self.app.t('ui', 'group_create'), bg="#446644", fg="#99cc99",
+                  bd=0, font=("Arial", 8), command=self._show_create_group_dialog
+                  ).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(mgf, text=self.app.t('ui', 'group_join'), bg="#334455", fg="#99ccff",
+                  bd=0, font=("Arial", 8), command=self._show_join_group_dialog
+                  ).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(mgf, text=self.app.t('ui', 'group_manage'), bg="#444", fg="#ccc",
+                  bd=0, font=("Arial", 8), command=self._show_manage_group_dialog
+                  ).pack(side="left", fill="x", expand=True, padx=1)
+
+    def _make_dark_header(self, parent, title):
+        hdr = tk.Frame(parent, bg="#2a2a2a", height=28)
+        hdr.pack(fill="x")
+        hdr.pack_propagate(False)
+        tk.Label(hdr, text=title, bg="#2a2a2a", fg="white",
+                 font=("Arial", 9, "bold")).pack(side="left", padx=8)
+        tk.Button(hdr, text="\u2715", bg="#2a2a2a", fg="#aaa", bd=0,
+                  font=("Arial", 10), activebackground="#c33", activeforeground="white",
+                  command=parent.destroy).pack(side="right", padx=4)
+        return hdr
+
+    def _show_create_group_dialog(self):
+        if not firebase_identity.is_registered():
+            dialog_utils.dark_messagebox(self.app.root, "Groups",
+                                         "Please register first to create groups.")
+            return
+        import firebase_groups
+        dlg = tk.Toplevel(self.app.root)
+        dlg.configure(bg="#222")
+        dlg.overrideredirect(True)
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.lift()
+        dlg.focus_force()
+
+        hdr = self._make_dark_header(dlg, self.app.t('ui', 'group_create_header'))
+        hdr.bind("<Button-1>", lambda e: None)
+        dialog_utils._DragHelper(dlg, hdr)
+
+        f = tk.Frame(dlg, bg="#222")
+        f.pack(padx=24, pady=10)
+        tk.Label(f, text=self.app.t('ui', 'group_create_name_label'), bg="#222", fg="#ccc", font=("Arial", 9),
+                 anchor="e", width=10).grid(row=0, column=0, padx=(0, 8), pady=4, sticky="e")
+        name_var = tk.StringVar()
+        tk.Entry(f, textvariable=name_var, bg="#333", fg="white",
+                 insertbackground="white", width=24, font=("Arial", 10)).grid(row=0, column=1, pady=4)
+        tk.Label(f, text=self.app.t('ui', 'group_create_desc_label'), bg="#222", fg="#ccc", font=("Arial", 9),
+                 anchor="e", width=10).grid(row=1, column=0, padx=(0, 8), pady=4, sticky="ne")
+        desc_text = tk.Text(f, height=3, width=24, bg="#333", fg="white",
+                            insertbackground="white", font=("Arial", 9), wrap="word")
+        desc_text.grid(row=1, column=1, pady=4)
+
+        status_var = tk.StringVar()
+        tk.Label(dlg, textvariable=status_var, bg="#222", fg="#ff6666",
+                 font=("Arial", 9), wraplength=300).pack(pady=(4, 0))
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(10, 14))
+
+        def do_create():
+            name = name_var.get().strip()
+            desc = desc_text.get("1.0", "end-1c").strip()
+            if not name:
+                status_var.set(self.app.t('ui', 'group_name_required'))
+                return
+            gid, code = firebase_groups.create_group(name, desc)
+            if gid:
+                dlg.destroy()
+                if hasattr(self.app, 'ui_mgr'):
+                    self.app.ui_mgr._refresh_group_selector()
+                dialog_utils.dark_messagebox(self.app.root,
+                    self.app.t('ui', 'group_created_title'),
+                    self.app.t('ui', 'group_created_msg').format(name=name, code=code))
+            else:
+                status_var.set(code or self.app.t('ui', 'group_create_error'))
+
+        tk.Button(bf, text=self.app.t('ui', 'btn_create'), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 10, "bold"), padx=16, pady=4, command=do_create).pack(side="left", padx=6)
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 10), padx=16, pady=4, command=dlg.destroy).pack(side="left", padx=6)
+
+        dialog_utils._center_on_root(dlg, self.app.root)
+        dlg.grab_set()
+        self.app.root.wait_window(dlg)
+
+    def _show_join_group_dialog(self):
+        if not firebase_identity.is_registered():
+            dialog_utils.dark_messagebox(self.app.root,
+                self.app.t('ui', 'group_placeholder_title'),
+                self.app.t('ui', 'group_not_registered_msg'))
+            return
+        import firebase_groups
+        dlg = tk.Toplevel(self.app.root)
+        dlg.configure(bg="#222")
+        dlg.overrideredirect(True)
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.lift()
+        dlg.focus_force()
+
+        hdr = self._make_dark_header(dlg, self.app.t('ui', 'group_join_header'))
+        dialog_utils._DragHelper(dlg, hdr)
+
+        tk.Label(dlg, text=self.app.t('ui', 'group_join_code_label'), bg="#222", fg="#ccc",
+                 font=("Arial", 9)).pack(padx=24, pady=(14, 4))
+
+        code_var = tk.StringVar()
+        code_entry = tk.Entry(dlg, textvariable=code_var, bg="#333", fg="white",
+                              insertbackground="white", width=12, font=("Arial", 14, "bold"),
+                              justify="center")
+        code_entry.pack(padx=24, pady=6)
+        code_entry.focus_set()
+
+        status_var = tk.StringVar()
+        tk.Label(dlg, textvariable=status_var, bg="#222", fg="#ff6666",
+                 font=("Arial", 9), wraplength=300).pack(pady=(4, 0))
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(10, 14))
+
+        def do_join():
+            code = code_var.get().strip().upper()
+            if len(code) < 3:
+                status_var.set("Enter a valid invite code")
+                return
+            gid, name = firebase_groups.join_group(code)
+            if gid:
+                dlg.destroy()
+                if hasattr(self.app, 'ui_mgr'):
+                    self.app.ui_mgr._refresh_group_selector()
+                dialog_utils.dark_messagebox(self.app.root,
+                    self.app.t('ui', 'group_joined_title'),
+                    self.app.t('ui', 'group_joined_msg').format(name=name))
+            else:
+                status_var.set(name or self.app.t('ui', 'group_invalid_code_msg'))
+
+        tk.Button(bf, text=self.app.t('ui', 'btn_join'), bg="#446688", fg="white", bd=0,
+                  font=("Arial", 10, "bold"), padx=16, pady=4, command=do_join).pack(side="left", padx=6)
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 10), padx=16, pady=4, command=dlg.destroy).pack(side="left", padx=6)
+
+        code_entry.bind("<Return>", lambda e: do_join())
+        dialog_utils._center_on_root(dlg, self.app.root)
+        dlg.grab_set()
+        self.app.root.wait_window(dlg)
+
+    def _show_manage_group_dialog(self):
+        import firebase_groups
+        if not firebase_identity.is_registered():
+            return
+        identity = firebase_identity.get_identity()
+        if not identity:
+            return
+        uid = identity.get("user_id", "")
+
+        active_id = getattr(self.app, "active_group_id", None)
+        if not active_id or active_id == firebase_groups.PUBLIC_GROUP_ID:
+            dialog_utils.dark_messagebox(self.app.root,
+                self.app.t('ui', 'group_placeholder_title'),
+                self.app.t('ui', 'group_manage_closed_msg'))
+            return
+
+        groups = getattr(self.app, "_cached_groups", {})
+        ginfo = groups.get(active_id, {})
+        my_role = ginfo.get("role", "") if isinstance(ginfo, dict) else ""
+        if my_role != "officer":
+            dialog_utils.dark_messagebox(self.app.root,
+                self.app.t('ui', 'group_placeholder_title'),
+                self.app.t('ui', 'group_manage_officer_msg'))
+            return
+
+        group_data = firebase_groups.get_group_info(active_id)
+        if not group_data:
+            dialog_utils.dark_messagebox(self.app.root,
+                self.app.t('ui', 'group_placeholder_title'),
+                self.app.t('ui', 'group_manage_no_info_msg'))
+            return
+
+        import copy
+        members = copy.deepcopy(group_data.get("members", {}))
+        invite_code = group_data.get("invite_code", "N/A")
+        group_name = group_data.get("name", "?")
+        group_desc = group_data.get("description", "")
+
+        dlg = tk.Toplevel(self.app.root)
+        dlg.configure(bg="#222")
+        dlg.overrideredirect(True)
+        dlg.resizable(False, False)
+        dlg.transient(self.app.root)
+        dlg.attributes("-topmost", True)
+        dlg.lift()
+        dlg.focus_force()
+
+        hdr = self._make_dark_header(dlg, self.app.t('ui', 'group_manage_header').format(name=group_name))
+        dialog_utils._DragHelper(dlg, hdr)
+
+        if group_desc:
+            tk.Label(dlg, text=group_desc, bg="#222", fg="#888",
+                     font=("Arial", 8)).pack(pady=(2, 4))
+
+        icf = tk.Frame(dlg, bg="#222")
+        icf.pack(pady=(2, 4))
+        tk.Label(icf, text=f"{self.app.t('ui', 'group_invite_code_label')} {invite_code}", bg="#222", fg="#ffaa00",
+                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 8))
+        tk.Button(icf, text=self.app.t('ui', 'btn_copy'), bg="#334455", fg="white",
+                  bd=0, font=("Arial", 8), padx=8, pady=2,
+                  command=lambda c=invite_code: (self.app.root.clipboard_clear(),
+                                                self.app.root.clipboard_append(c))
+                  ).pack(side="left")
+
+        tk.Label(dlg, text=self.app.t('ui', 'group_members_label'), bg="#222", fg="#ccc",
+                 font=("Arial", 9, "bold")).pack(anchor="w", padx=20, pady=(8, 2))
+
+        mf = tk.Frame(dlg, bg="#222")
+        mf.pack(padx=20, fill="x")
+
+        for muid, minfo in members.items():
+            if not isinstance(minfo, dict):
+                continue
+            mname = minfo.get("nickname", "?")
+            mrole = minfo.get("role", "member")
+            is_creator = (muid == uid)
+            row = tk.Frame(mf, bg="#1a1a1a")
+            row.pack(fill="x", pady=1)
+            tk.Label(row, text=mname, bg="#1a1a1a", fg="white",
+                     font=("Arial", 9)).pack(side="left", padx=8, pady=3)
+            role_lbl = self.app.t('ui', 'group_officer_label') if mrole == "officer" else ""
+            if role_lbl:
+                tk.Label(row, text=role_lbl, bg="#1a1a1a", fg="#ffaa00",
+                         font=("Arial", 8, "bold")).pack(side="left", padx=4)
+
+            if not is_creator:
+                def on_kick(muid=muid):
+                    firebase_groups.leave_group(active_id, muid)
+                    row.destroy()
+                tk.Button(row, text=self.app.t('ui', 'btn_remove'), bg="#553333", fg="#cc9999",
+                          bd=0, font=("Arial", 7), padx=6,
+                          command=on_kick).pack(side="right", padx=4, pady=2)
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(12, 14))
+
+        def _regenerate_code():
+            import uuid
+            new_code = uuid.uuid4().hex[:6].upper()
+            firebase_groups._put(f"groups/{active_id}/invite_code", new_code)
+            dialog_utils.dark_messagebox(dlg,
+                self.app.t('ui', 'group_code_changed_title'),
+                self.app.t('ui', 'group_code_changed_msg').format(code=new_code))
+
+        def _leave_group():
+            def confirm_leave():
+                firebase_groups.leave_group(active_id, uid)
+                dlg.destroy()
+                if hasattr(self.app, 'ui_mgr'):
+                    self.app.ui_mgr._refresh_group_selector()
+            yes = dialog_utils.dark_confirmbox(dlg,
+                self.app.t('ui', 'group_leave_confirm_title'),
+                self.app.t('ui', 'group_leave_confirm_msg'))
+            if yes:
+                confirm_leave()
+
+        tk.Button(bf, text=self.app.t('ui', 'btn_regenerate_code'), bg="#446688", fg="white",
+                  bd=0, font=("Arial", 9), padx=10, pady=3,
+                  command=_regenerate_code).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'btn_leave_group'), bg="#553333", fg="#cc9999",
+                  bd=0, font=("Arial", 9), padx=10, pady=3,
+                  command=_leave_group).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'btn_close'), bg="#444", fg="#aaa",
+                  bd=0, font=("Arial", 9), padx=10, pady=3,
+                  command=dlg.destroy).pack(side="left", padx=4)
+
+        dialog_utils._center_on_root(dlg, self.app.root)
+        dlg.grab_set()
+        self.app.root.wait_window(dlg)
+
     def _on_toolbar_click(self, code):
         self._lift_self()
         if self._edit_obj:
@@ -363,17 +648,35 @@ class DrawingPalette(tk.Toplevel):
                 self.app.t('ui', 'publish_register_first'))
             return
         import config
-        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        def on_map():
-            self._hide_choice_inline()
-            self._publish()
-        def on_all():
-            self._hide_choice_inline()
-            self._publish_all()
-        self._show_choice_inline(
-            self.app.t('ui', 'publish_what'),
-            map_name, on_map,
-            self.app.t('ui', 'publish_all'), on_all)
+        active_group = getattr(self.app, 'active_group_id', firebase_groups.PUBLIC_GROUP_ID)
+        groups = getattr(self.app, '_cached_groups', {})
+        ginfo = groups.get(active_group, {})
+        group_name = ginfo.get("name", "Public") if isinstance(ginfo, dict) else "Public"
+
+        if active_group == firebase_groups.PUBLIC_GROUP_ID:
+            map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
+            def on_map():
+                self._hide_choice_inline()
+                self._publish()
+            def on_all():
+                self._hide_choice_inline()
+                self._publish_all()
+            self._show_choice_inline(
+                self.app.t('ui', 'publish_what'),
+                map_name, on_map,
+                self.app.t('ui', 'publish_all'), on_all)
+        else:
+            map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
+            def on_map_group():
+                self._hide_choice_inline()
+                self._publish_to_group()
+            def on_all_group():
+                self._hide_choice_inline()
+                self._publish_all_to_group()
+            self._show_choice_inline(
+                f"Publish to group \"{group_name}\":",
+                map_name, on_map_group,
+                self.app.t('ui', 'publish_all'), on_all_group)
 
     def _choose_save_action(self):
         self._lift_self()
@@ -593,6 +896,99 @@ class DrawingPalette(tk.Toplevel):
         self._center_on_root(dlg)
         self.wait_window(dlg)
         return result[0]
+
+    def _publish_to_group(self):
+        """Публікує поточну мапу в активну групу."""
+        self._lift_self()
+        if not firebase_identity.is_registered():
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                self.app.t('ui', 'publish_register_first'))
+            return
+        active_group = getattr(self.app, 'active_group_id', None)
+        if not active_group or active_group == firebase_groups.PUBLIC_GROUP_ID:
+            self._show_custom_message("Publish", "Select a closed group in the group bar first.")
+            return
+        if not self.app.current_map_eng:
+            return
+        drawings = self.painter.drawings.get(self.app.current_map_eng, [])
+        if not drawings:
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                self.app.t('ui', 'publish_no_drawings'))
+            return
+
+        groups = getattr(self.app, '_cached_groups', {})
+        ginfo = groups.get(active_group, {})
+        group_name = ginfo.get("name", "?") if isinstance(ginfo, dict) else "?"
+
+        import config
+        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
+
+        def on_done(drawing_id, ok, msg):
+            if ok:
+                self.after(0, lambda: self._show_custom_message(
+                    "Publish", f"Published to \"{group_name}\"!"))
+            else:
+                self.after(0, lambda: self._show_custom_message(
+                    "Publish Error", msg, is_error=True))
+
+        drawing_id, ok, msg = firebase_groups.publish_to_group(
+            group_id=active_group,
+            map_id=self.app.current_map_eng,
+            map_name=map_name,
+            elements_data=drawings,
+            comment="",
+        )
+        on_done(drawing_id, ok, msg)
+
+    def _publish_all_to_group(self):
+        """Публікує всі мапи з малюнками в активну групу."""
+        self._lift_self()
+        if not firebase_identity.is_registered():
+            self._show_custom_message(
+                self.app.t('ui', 'publish_all'),
+                self.app.t('ui', 'publish_register_first'))
+            return
+        active_group = getattr(self.app, 'active_group_id', None)
+        if not active_group or active_group == firebase_groups.PUBLIC_GROUP_ID:
+            self._show_custom_message("Publish", "Select a closed group first.")
+            return
+
+        maps_with = {k: v for k, v in self.painter.drawings.items()
+                     if isinstance(v, list) and len(v) > 0}
+        if not maps_with:
+            self._show_custom_message(
+                self.app.t('ui', 'publish_all'),
+                self.app.t('ui', 'publish_no_drawings_all'))
+            return
+
+        groups = getattr(self.app, '_cached_groups', {})
+        ginfo = groups.get(active_group, {})
+        group_name = ginfo.get("name", "?") if isinstance(ginfo, dict) else "?"
+
+        import config
+        ok_count = 0
+        err_count = 0
+        for map_id, elements in maps_with.items():
+            map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+            _, ok, _ = firebase_groups.publish_to_group(
+                group_id=active_group,
+                map_id=map_id,
+                map_name=map_name,
+                elements_data=elements,
+                comment="",
+            )
+            if ok:
+                ok_count += 1
+            else:
+                err_count += 1
+
+        self._show_publish_all_result({
+            "ok": ok_count,
+            "errors": err_count,
+            "total": len(maps_with),
+        })
 
     def _translate_to_english(self, text):
         if not text:
@@ -871,8 +1267,22 @@ class DrawingPalette(tk.Toplevel):
 
     def _download_populate(self):
         try:
-            schemes = firebase_drawings.get_all_schemes()
-        except Exception:
+            schemes = {}
+            public = firebase_drawings.get_all_schemes()
+            for sid, sdata in public.items():
+                sdata["_source"] = "public"
+                schemes[sid] = sdata
+
+            user_groups = firebase_groups.get_user_groups()
+            for gid in user_groups:
+                if gid == firebase_groups.PUBLIC_GROUP_ID:
+                    continue
+                group_schemes = firebase_groups.get_group_schemes(gid)
+                for sid, sdata in group_schemes.items():
+                    sdata["_source"] = gid
+                    schemes[f"{gid}__{sid}"] = sdata
+        except Exception as e:
+            print(f"[PALETTE] Download populate error: {e}")
             schemes = {}
         self.after(0, lambda: self._build_download_ui(schemes))
 
@@ -888,6 +1298,14 @@ class DrawingPalette(tk.Toplevel):
                       font=("Arial", 9), command=self._hide_download_inline).pack(pady=(0, 12))
             return
 
+        groups = getattr(self.app, '_cached_groups', {})
+        group_names = {firebase_groups.PUBLIC_GROUP_ID: "Public"}
+        for gid, ginfo in groups.items():
+            if isinstance(ginfo, dict):
+                group_names[gid] = ginfo.get("name", gid)
+            else:
+                group_names[gid] = gid
+
         items = []
         for sid, data in schemes.items():
             map_id = data.get("map_id", "")
@@ -896,6 +1314,8 @@ class DrawingPalette(tk.Toplevel):
             created = (data.get("created_at") or "")[:10]
             el_count = data.get("element_count", 0)
             comment = (data.get("comment") or "")[:40]
+            source = data.get("_source", "public")
+            source_name = group_names.get(source, source)
             items.append({
                 "scheme_id": sid,
                 "map_id": map_id,
@@ -905,12 +1325,18 @@ class DrawingPalette(tk.Toplevel):
                 "comment": comment,
                 "el_count": el_count,
                 "elements": data.get("elements", []),
+                "source": source,
+                "source_name": source_name,
             })
 
         items.sort(key=lambda x: x.get("created", ""), reverse=True)
 
         unique_maps = sorted(set(it["map_name"] for it in items if it["map_name"]))
         unique_authors = sorted(set(it["author"] for it in items if it["author"]))
+        unique_sources = sorted(set(it["source_name"] for it in items if it["source_name"]))
+        pub_label = group_names.get(firebase_groups.PUBLIC_GROUP_ID, "Public")
+        if pub_label not in unique_sources:
+            unique_sources.insert(0, pub_label)
 
         style = ttk.Style()
         style.theme_use("default")
@@ -933,7 +1359,14 @@ class DrawingPalette(tk.Toplevel):
         ff = tk.Frame(self._download_frame, bg=bg)
         ff.pack(fill="x", padx=8, pady=(6, 2))
 
-        tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
+        tk.Label(ff, text="Source:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
+        source_filter_var = tk.StringVar(value=all_label)
+        source_filter_cb = tk.ttk.Combobox(ff, textvariable=source_filter_var,
+                                           values=[all_label] + unique_sources,
+                                           state="readonly", width=14, font=("Arial", 8))
+        source_filter_cb.pack(side="left", padx=4)
+
+        tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
         map_filter_var = tk.StringVar(value=all_label)
         map_filter_cb = tk.ttk.Combobox(ff, textvariable=map_filter_var,
                                          values=[all_label] + unique_maps,
@@ -943,26 +1376,28 @@ class DrawingPalette(tk.Toplevel):
         tk.Label(ff, text="Author:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
         author_filter_var = tk.StringVar(value=all_label)
         author_filter_cb = tk.ttk.Combobox(ff, textvariable=author_filter_var,
-                                             values=[all_label] + unique_authors,
-                                             state="readonly", width=14, font=("Arial", 8))
+                                              values=[all_label] + unique_authors,
+                                              state="readonly", width=14, font=("Arial", 8))
         author_filter_cb.pack(side="left", padx=4)
 
         tf = tk.Frame(self._download_frame, bg=bg)
         tf.pack(fill="both", expand=True, padx=8, pady=4)
 
-        columns = ("map", "comment", "author", "date", "preview")
+        columns = ("map", "source", "comment", "author", "date", "preview")
         tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
                                 height=7, selectmode="browse")
         tree.heading("map", text="Map Name")
+        tree.heading("source", text=self.app.t('ui', 'group_schemes'))
         tree.heading("comment", text="Description")
         tree.heading("author", text="Author")
         tree.heading("date", text="Date")
         tree.heading("preview", text="")
-        tree.column("map", width=120)
-        tree.column("comment", width=150)
-        tree.column("author", width=90)
-        tree.column("date", width=75)
-        tree.column("preview", width=50, anchor="center")
+        tree.column("map", width=105)
+        tree.column("source", width=65)
+        tree.column("comment", width=130)
+        tree.column("author", width=75)
+        tree.column("date", width=65)
+        tree.column("preview", width=40, anchor="center")
 
         vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
         tree.configure(yscrollcommand=vsb.set)
@@ -970,20 +1405,25 @@ class DrawingPalette(tk.Toplevel):
         vsb.pack(side="right", fill="y")
 
         def _do_filter(*args):
+            sf = source_filter_var.get()
             mf = map_filter_var.get()
             af = author_filter_var.get()
             tree.delete(*tree.get_children())
             for it in items:
+                if sf != all_label and it["source_name"] != sf:
+                    continue
                 if mf != all_label and it["map_name"] != mf:
                     continue
                 if af != all_label and it["author"] != af:
                     continue
                 has_preview = it["map_id"] != "all_maps"
                 tree.insert("", "end",
-                            values=(it["map_name"], it["comment"], it["author"], it["created"],
+                            values=(it["map_name"], it["source_name"], it["comment"],
+                                    it["author"], it["created"],
                                     "Preview" if has_preview else ""),
                             iid=it["scheme_id"])
 
+        source_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
         map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
         author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
 
@@ -991,7 +1431,7 @@ class DrawingPalette(tk.Toplevel):
             region = tree.identify_region(event.x, event.y)
             if region == "cell":
                 col = tree.identify_column(event.x)
-                if col == "#5":
+                if col == "#6":
                     sel = tree.selection()
                     if sel:
                         sid = sel[0]
@@ -1043,8 +1483,33 @@ class DrawingPalette(tk.Toplevel):
         else:
             map_name = config.MAP_NAMES_EN.get(map_id, item.get("map_name", map_id))
 
-        choice = self._choose_download_action(map_name, is_all_maps)
+        source = item.get("source", "public")
+        is_group_scheme = (source != "public")
+
+        choice = self._choose_download_action(map_name, is_all_maps, is_group_scheme)
         if choice is None:
+            return
+
+        if choice == "link" and is_group_scheme:
+            drawing_id = item.get("scheme_id", "")
+            if "__" in drawing_id:
+                drawing_id = drawing_id.split("__", 1)[1]
+            group_scheme = {
+                "drawing_id": drawing_id,
+                "group_id": source,
+                "map_id": map_id,
+                "map_name": item.get("map_name", map_id),
+                "elements": elements,
+                "comment": item.get("comment", ""),
+                "updated_at": item.get("updated_at", ""),
+                "_synced_at": item.get("updated_at", ""),
+            }
+            painter._group_schemes[drawing_id] = group_scheme
+            painter._scheme_downloaded_at[drawing_id] = item.get("updated_at", "")
+            self.app._save_group_schemes_to_cache()
+            self._show_custom_message(
+                "Download", f"Scheme linked to group '{item.get('source_name', source)}'.\nIt will auto-sync.")
+            painter.redraw()
             return
 
         if choice == "replace":
@@ -1091,8 +1556,8 @@ class DrawingPalette(tk.Toplevel):
         painter.data_mgr.save_drawings(painter.drawings)
         painter.redraw()
 
-    def _choose_download_action(self, map_name, is_all_maps):
-        """Show choice dialog for download action. Returns 'replace', 'add', 'save_pc' or None."""
+    def _choose_download_action(self, map_name, is_all_maps, is_group_scheme=False):
+        """Show choice dialog for download action. Returns 'replace', 'add', 'save_pc', 'link' or None."""
         dlg = tk.Toplevel(self.app.root)
         dlg.title(self.app.t('ui', 'download_confirm_title'))
         dlg.configure(bg="#222")
@@ -1108,6 +1573,9 @@ class DrawingPalette(tk.Toplevel):
                  bg="#222", fg="#ffaa00", font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
         tk.Label(dlg, text=f" {map_name}",
                  bg="#222", fg="#cccccc", font=("Arial", 9)).pack(padx=20, pady=(0, 4))
+        if is_group_scheme:
+            tk.Label(dlg, text=self.app.t('ui', 'group_scheme_link'),
+                     bg="#222", fg="#ffaa00", font=("Arial", 8)).pack(padx=20, pady=(0, 4))
         tk.Label(dlg, text=" ", bg="#222", fg="#888", font=("Arial", 8)).pack(padx=20, pady=(0, 4))
 
         result = [None]
@@ -1124,10 +1592,17 @@ class DrawingPalette(tk.Toplevel):
             result[0] = "save_pc"
             dlg.destroy()
 
+        def on_link():
+            result[0] = "link"
+            dlg.destroy()
+
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 12))
         tk.Button(bf, text=self.app.t('ui', 'download_replace'), bg="#556677", fg="white", bd=0,
                   font=("Arial", 9), padx=12, pady=4, command=on_replace).pack(side="left", padx=4)
+        if is_group_scheme:
+            tk.Button(bf, text="Link (sync)", bg="#557755", fg="#cfc", bd=0,
+                      font=("Arial", 9, "bold"), padx=12, pady=4, command=on_link).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'download_add'), bg="#446644", fg="#cfc", bd=0,
                   font=("Arial", 9), padx=12, pady=4, command=on_add).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'download_save_pc'), bg="#444", fg="#aaa", bd=0,

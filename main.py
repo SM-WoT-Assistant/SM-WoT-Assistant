@@ -36,6 +36,7 @@ import dialog_utils
 import firebase_identity
 import firebase_reporter
 import firebase_drawings
+import firebase_groups
 import tray_icon
 
 try:
@@ -63,6 +64,10 @@ class WotAssistantHQ:
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
+        self.active_group_id = "public"
+        self._cached_groups = {}
+        self._group_id_map = {}
+        self._sync_running = False
         
         self.data_mgr = data_manager.DataManager()
         self.settings = self.data_mgr.load_json(config.SETTINGS_FILE)
@@ -95,7 +100,7 @@ class WotAssistantHQ:
         }
         
         self.w = self.settings.get("edit_w", 800)
-        self.h = self.w + 130
+        self.h = self.w + 160
         self.alpha = self.settings.get("edit_alpha", 1.0)
         self.contrast = self.settings.get("edit_contrast", 1.0)
         
@@ -322,7 +327,7 @@ class WotAssistantHQ:
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
         # Всі віджети мають існувати до виклику (initialize_window більше його не використовує)
         if not hasattr(self, "top_bar"):
-            return 130
+            return 160
 
         self.root.update_idletasks()
         top_h = self.top_bar.winfo_reqheight()
@@ -637,6 +642,7 @@ class WotAssistantHQ:
     def _minimize_to_tray(self):
         """Згорнути програму в системний трей"""
         self._hidden_by_f10 = True
+        self._stop_group_sync()
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.withdraw()
         if hasattr(self, 'stats_ai_module'):
@@ -657,6 +663,8 @@ class WotAssistantHQ:
             self._tray_icon.remove()
             self._tray_icon = None
         self._hidden_by_f10 = False
+        if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
+            self._start_group_sync()
         self.root.deiconify()
         self.root.lift()
         self.root.focus_force()
@@ -710,7 +718,11 @@ class WotAssistantHQ:
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10:
-            self._po_win.lift()
+            if self._po_win.state() == "withdrawn":
+                self._po_win.deiconify()
+                self._sync_po_pos()
+            else:
+                self._po_win.lift()
         self.painter.redraw()
 
     def _combo_postcommand(self):
@@ -950,11 +962,13 @@ class WotAssistantHQ:
         self.ui_mgr.show_view("ai_stats")
 
     def quit_app(self):
+        self._sync_running = False
         if self._tray_icon:
             self._tray_icon.remove()
             self._tray_icon = None
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
+        self._save_group_schemes_to_cache()
         self.save_settings()
         firebase_identity._save(firebase_identity._load())
         firebase_reporter.try_flush_service_messages(self)
@@ -1610,11 +1624,15 @@ class WotAssistantHQ:
             self.root.focus_force()
         except Exception as e:
             print(f"[INIT] Помилка показу головного вікна: {e}")
+
         # geometry після deiconify — Windows приймає зміну розміру
         self.root.update_idletasks()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.update_idletasks()
+
+        self.root.minsize(self.w, self.h)
+
         self.current_map_eng = None
         self.map_var.set("")
         self.map_renderer.show_main_splash()
@@ -1622,8 +1640,16 @@ class WotAssistantHQ:
             self.painter.canvas.delete("painter_obj")
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.withdraw()
+        self._load_group_schemes_from_cache()
         self._startup_complete = True
-        if self.active_view == "maps":
+        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self.root.after(100, self._finish_startup_overlay)
+
+    def _finish_startup_overlay(self):
+        if self.active_view != "maps" or self._hidden_by_f10:
+            return
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.deiconify()
             self._sync_po_pos()
 
     def show_small_loading_splash(self):
@@ -1689,6 +1715,159 @@ class WotAssistantHQ:
                 print("[INIT] Failsafe: головне вікно примусово показано")
         except Exception as e:
             print(f"[INIT] Failsafe error: {e}")
+
+    # ─── Group cache methods ───
+
+    def _load_group_schemes_from_cache(self):
+        try:
+            if not os.path.exists(config.GROUP_CACHE_FILE):
+                return
+            import json
+            with open(config.GROUP_CACHE_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if hasattr(self, 'painter') and self.painter:
+                self.painter._group_schemes = data.get("schemes", {})
+                self.painter._scheme_downloaded_at = data.get("downloaded_at", {})
+                print(f"[GROUPS] Завантажено {len(self.painter._group_schemes)} групових схем з кешу")
+        except Exception as e:
+            print(f"[GROUPS] Помилка завантаження кешу: {e}")
+
+    def _save_group_schemes_to_cache(self):
+        try:
+            if not hasattr(self, 'painter') or not self.painter:
+                return
+            import json
+            data = {
+                "schemes": getattr(self.painter, '_group_schemes', {}),
+                "downloaded_at": getattr(self.painter, '_scheme_downloaded_at', {}),
+                "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            os.makedirs(os.path.dirname(config.GROUP_CACHE_FILE), exist_ok=True)
+            with open(config.GROUP_CACHE_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"[GROUPS] Помилка збереження кешу: {e}")
+
+    # ─── Group sync methods ───
+
+    def _start_group_sync(self):
+        if self._sync_running:
+            return
+        if self.active_group_id == firebase_groups.PUBLIC_GROUP_ID:
+            return
+        self._sync_running = True
+        self._sync_schedule()
+
+    def _stop_group_sync(self):
+        self._sync_running = False
+
+    def _sync_schedule(self):
+        if not self._sync_running:
+            return
+        self._sync_cycle()
+        self.root.after(60000, self._sync_schedule)
+
+    def _sync_cycle(self):
+        try:
+            gid = self.active_group_id
+            if not gid or gid == firebase_groups.PUBLIC_GROUP_ID:
+                return
+            if not hasattr(self, 'painter') or not self.painter:
+                return
+
+            meta = firebase_groups.get_group_schemes_meta(gid)
+            if not meta:
+                return
+
+            pending = []
+            for drawing_id, remote in meta.items():
+                local = self.painter._group_schemes.get(drawing_id)
+                if local is None:
+                    continue
+                local_synced = local.get("_synced_at", "")
+                remote_updated = remote.get("updated_at", "")
+                if remote_updated > local_synced:
+                    pending.append((drawing_id, remote.get("map_id", ""),
+                                   remote.get("updated_by", "")))
+
+            if pending:
+                self.root.after(0, lambda: self._show_group_sync_notification(pending))
+        except Exception as e:
+            print(f"[GROUPS] Sync error: {e}")
+
+    def _show_group_sync_notification(self, pending):
+        if not pending:
+            return
+        first = pending[0]
+        map_id = first[1]
+        updated_by = first[2]
+        count = len(pending)
+
+        import config
+        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+        msg = f"Scheme{'s' if count > 1 else ''} on {map_name}"
+        if count > 1:
+            msg += f" (+{count - 1} more)"
+        msg += f" updated by {updated_by}. Download now?"
+
+        dlg = tk.Toplevel(self.root)
+        dlg.configure(bg="#222")
+        dlg.overrideredirect(True)
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.attributes("-topmost", True)
+        dlg.lift()
+        dlg.focus_force()
+
+        hdr = tk.Frame(dlg, bg="#2a2a2a", height=28)
+        hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Label(hdr, text="Scheme Update Available",
+                 bg="#2a2a2a", fg="white", font=("Arial", 9, "bold")).pack(side="left", padx=8)
+        tk.Button(hdr, text="\u2715", bg="#2a2a2a", fg="#aaa", bd=0,
+                  font=("Arial", 10), activebackground="#c33", activeforeground="white",
+                  command=dlg.destroy).pack(side="right", padx=4)
+        dialog_utils._DragHelper(dlg, hdr)
+
+        tk.Label(dlg, text=msg, bg="#222", fg="#ccc",
+                 font=("Arial", 9), wraplength=320).pack(padx=20, pady=(20, 12))
+
+        result = [False]
+
+        gid = self.active_group_id
+        def do_update():
+            result[0] = True
+            try:
+                schemes = firebase_groups.get_group_schemes(gid)
+                for drawing_id, _, _ in pending:
+                    remote = schemes.get(drawing_id)
+                    if remote and isinstance(remote.get("elements"), list):
+                        self.painter._group_schemes[drawing_id] = remote
+                        self.painter._group_schemes[drawing_id]["_synced_at"] = \
+                            remote.get("updated_at", "")
+                        self.painter._scheme_downloaded_at[drawing_id] = \
+                            remote.get("updated_at", "")
+                self.painter.redraw()
+                self._save_group_schemes_to_cache()
+            except Exception as e:
+                print(f"[GROUPS] Update error: {e}")
+            dlg.destroy()
+
+        def do_later():
+            result[0] = False
+            dlg.destroy()
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(0, 12))
+        tk.Button(bf, text="Update", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 10, "bold"), padx=14, pady=4,
+                  command=do_update).pack(side="left", padx=6)
+        tk.Button(bf, text="Later", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 10), padx=14, pady=4,
+                  command=do_later).pack(side="left", padx=6)
+
+        dialog_utils._center_on_root(dlg, self.root)
+        dlg.grab_set()
+        self.root.wait_window(dlg)
 
 if __name__ == "__main__":
     import multiprocessing

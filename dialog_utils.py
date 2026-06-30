@@ -13,6 +13,17 @@ def _set_dark_title_bar(window):
     except Exception:
         pass
 
+class _DragHelper:
+    def __init__(self, toplevel, frame):
+        self.tl = toplevel; self.x = 0; self.y = 0
+        frame.bind("<Button-1>", self.start)
+        frame.bind("<B1-Motion>", self.drag)
+    def start(self, e):
+        self.x = e.x_root - self.tl.winfo_rootx()
+        self.y = e.y_root - self.tl.winfo_rooty()
+    def drag(self, e):
+        self.tl.geometry(f"+{e.x_root - self.x}+{e.y_root - self.y}")
+
 def _center_on_root(dlg, parent):
     dlg.update_idletasks()
     try:
