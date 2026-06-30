@@ -358,7 +358,7 @@ class WindowManager:
         max_w = getattr(self.app, "max_window_w", 1000)
         self.app.w = max(self.app.w, min_w)
         self.app.w = min(self.app.w, max_w)
-        self.app.h = self.app.w + (self.app.get_edit_extra_height() if self.app.mode == "edit" else 0)
+        self.app.h = self.app.w + (self.app.get_edit_extra_height() if self.app.mode == "edit" else 18)
         actual_delta = self.app.w - old_w
         self.app.root.geometry(f"{self.app.w}x{self.app.h}+{cur_x - actual_delta}+{cur_y - actual_delta}")
         

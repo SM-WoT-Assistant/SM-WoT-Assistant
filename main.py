@@ -551,8 +551,10 @@ class WotAssistantHQ:
         self.root.attributes("-alpha", 0.0)
         if self.mode == "norm":
             self.root.aspect(1, 1, 1, 1)
+            self.root.minsize(1, 1)
         elif self.mode == "edit":
             self.root.aspect(1, 1, 100, 1)
+            self.root.minsize(500, 500 + self.get_edit_extra_height())
         if not hasattr(self, '_canvas_cfg_bound'):
             self.canvas.bind("<Configure>", self._on_canvas_resize, "+")
             self._canvas_cfg_bound = True
