@@ -46,13 +46,13 @@ class UIManager:
         tk.Frame(btn_frame, width=7, bg="#222").pack(side="left", fill="y")
 
         self.app.btn_mode_ai_stats = tk.Button(btn_frame, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
-        self.app.btn_mode_ai_stats.pack(side="left", padx=(0, 1), pady=2)
+        self.app.btn_mode_ai_stats.pack(side="left", padx=(0, 1), fill="y")
 
         self.app.btn_mode_maps_2 = tk.Button(btn_frame, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
-        self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=2)
+        self.app.btn_mode_maps_2.pack(side="left", padx=1, fill="y")
 
         self.app.btn_mode_maps_1 = tk.Button(btn_frame, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
-        self.app.btn_mode_maps_1.pack(side="left", padx=(1, 0), pady=2)
+        self.app.btn_mode_maps_1.pack(side="left", padx=(1, 0), fill="y")
 
         # Content frame for horizontal space between mode buttons and right buttons
         content_frame = tk.Frame(self.app.top_bar, bg="#222")
