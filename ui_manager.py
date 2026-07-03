@@ -269,6 +269,9 @@ class UIManager:
                 self.app._stop_group_sync()
             # Reload map list with filter
             self.app.map_mgr.load_map_list()
+            # Refresh linked schemes list in palette
+            if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_exists():
+                self.app.drawing_palette._refresh_linked_schemes_list()
             # If current map is filtered out, select first available
             if self.app.map_selector["values"]:
                 if not self.app.map_var.get() or self.app.map_var.get() not in self.app.map_selector["values"]:

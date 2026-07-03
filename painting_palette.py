@@ -62,6 +62,7 @@ class DrawingPalette(tk.Toplevel):
         self._toolbar_buttons = {}
         self._build_ui()
         self._restore_position()
+        self.after(0, self._refresh_linked_schemes_list)
 
     def _build_ui(self):
         bg = "#222"
@@ -319,7 +320,7 @@ class DrawingPalette(tk.Toplevel):
         w, _, rest = m.group(1), m.group(2), m.group(3)
         target_h = self.winfo_reqheight()
         current_h = int(m.group(2))
-        if abs(target_h - current_h) > 20:
+        if abs(target_h - current_h) > 10:
             self.geometry(f"{w}x{target_h}{rest}")
 
     def _make_dark_header(self, parent, title):
@@ -383,6 +384,7 @@ class DrawingPalette(tk.Toplevel):
                 dlg.destroy()
                 if hasattr(self.app, 'ui_mgr'):
                     self.app.ui_mgr._refresh_group_selector()
+                self._refresh_linked_schemes_list()
                 dialog_utils.dark_messagebox(self.app.root,
                     self.app.t('ui', 'group_created_title'),
                     self.app.t('ui', 'group_created_msg').format(name=name, code=code))
@@ -444,6 +446,7 @@ class DrawingPalette(tk.Toplevel):
                 dlg.destroy()
                 if hasattr(self.app, 'ui_mgr'):
                     self.app.ui_mgr._refresh_group_selector()
+                self._refresh_linked_schemes_list()
                 dialog_utils.dark_messagebox(self.app.root,
                     self.app.t('ui', 'group_joined_title'),
                     self.app.t('ui', 'group_joined_msg').format(name=name))
@@ -615,6 +618,7 @@ class DrawingPalette(tk.Toplevel):
                 dlg.destroy()
                 if hasattr(self.app, 'ui_mgr'):
                     self.app.ui_mgr._refresh_group_selector()
+                self._refresh_linked_schemes_list()
             yes = dialog_utils.dark_confirmbox(dlg,
                 self.app.t('ui', 'group_leave_confirm_title'),
                 self.app.t('ui', 'group_leave_confirm_msg'))
@@ -1050,6 +1054,20 @@ class DrawingPalette(tk.Toplevel):
             elements_data=drawings,
             comment="",
         )
+        if ok and drawing_id:
+            import time
+            self.painter._group_schemes[drawing_id] = {
+                "drawing_id": drawing_id,
+                "group_id": active_group,
+                "map_id": self.app.current_map_eng,
+                "map_name": map_name,
+                "elements": list(drawings),
+                "comment": "",
+                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            self.app._save_group_schemes_to_cache()
+            self._refresh_linked_schemes_list()
         on_done(drawing_id, ok, msg)
 
     def _publish_all_to_group(self):
@@ -1080,9 +1098,10 @@ class DrawingPalette(tk.Toplevel):
         import config
         ok_count = 0
         err_count = 0
+        import time
         for map_id, elements in maps_with.items():
             map_name = config.MAP_NAMES_EN.get(map_id, map_id)
-            _, ok, _ = firebase_groups.publish_to_group(
+            drawing_id, ok, _ = firebase_groups.publish_to_group(
                 group_id=active_group,
                 map_id=map_id,
                 map_name=map_name,
@@ -1091,8 +1110,23 @@ class DrawingPalette(tk.Toplevel):
             )
             if ok:
                 ok_count += 1
+                if drawing_id:
+                    self.painter._group_schemes[drawing_id] = {
+                        "drawing_id": drawing_id,
+                        "group_id": active_group,
+                        "map_id": map_id,
+                        "map_name": map_name,
+                        "elements": list(elements),
+                        "comment": "",
+                        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
             else:
                 err_count += 1
+
+        if ok_count > 0:
+            self.app._save_group_schemes_to_cache()
+            self._refresh_linked_schemes_list()
 
         self._show_publish_all_result({
             "ok": ok_count,
