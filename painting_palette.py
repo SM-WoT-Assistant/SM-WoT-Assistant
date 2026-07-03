@@ -270,6 +270,7 @@ class DrawingPalette(tk.Toplevel):
         if not hasattr(painter, '_group_schemes') or not painter._group_schemes:
             tk.Label(self._linked_schemes_frame, text="No linked schemes",
                      bg="#1a1a1a", fg="#555", font=("Arial", 7)).pack(pady=2)
+            self._adapt_palette_height()
             return
         active_group = getattr(self.app, "active_group_id", None)
         hidden = painter._hidden_download_schemes
@@ -304,6 +305,22 @@ class DrawingPalette(tk.Toplevel):
                 label_text += " " + self.app.t('ui', 'hidden_scheme_label')
             tk.Label(row, text=label_text, bg="#1a1a1a", fg="#888" if is_hidden else "#aaa",
                      font=("Arial", 7), anchor="w").pack(side="left", padx=2, fill="x", expand=True)
+
+        self._adapt_palette_height()
+
+    def _adapt_palette_height(self):
+        """Підганяє висоту палітри під поточний вміст."""
+        self.update_idletasks()
+        g = self.geometry()
+        import re
+        m = re.match(r'^(\d+)x(\d+)(.*)', g)
+        if not m:
+            return
+        w, _, rest = m.group(1), m.group(2), m.group(3)
+        target_h = self.winfo_reqheight()
+        current_h = int(m.group(2))
+        if abs(target_h - current_h) > 20:
+            self.geometry(f"{w}x{target_h}{rest}")
 
     def _make_dark_header(self, parent, title):
         hdr = tk.Frame(parent, bg="#2a2a2a", height=28)

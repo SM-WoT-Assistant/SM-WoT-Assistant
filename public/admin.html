@@ -92,6 +92,7 @@
         <div class="card">
             <h2>Users (RTDB users/)</h2>
             <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <button class="btn btn-danger" onclick="deleteSelectedUsers()" id="delete-users-btn">Delete selected (0)</button>
                 <input type="text" id="users-filter" placeholder="Filter by nickname..." oninput="renderUsers()"
                        style="background:#222;color:#ccc;border:1px solid #333;padding:4px 8px;border-radius:3px;font-size:13px;width:180px">
                 <span style="color:#888;font-size:12px;" id="user-count"></span>
@@ -380,34 +381,43 @@ function renderUsers() {
         container.innerHTML = '<div class="empty">No users found</div>';
         return;
     }
-    let html = '<table><tr><th>Nickname</th><th>User ID</th><th>PIN</th><th>Registered</th><th></th></tr>';
+    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'user-check\', \'delete-users-btn\')" title="Select all"></th><th>Nickname</th><th>User ID</th><th>Status</th><th>Registered</th></tr>';
     filtered.forEach(u => {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
-        const nickDisplay = isDup ? `<span style="color:#ff6666">⚠ ${u.nickname || '?'}</span>` : (u.nickname || '?');
-        const hasPin = u.pin_hash ? "✅" : "❌";
+        const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
+        const status = u.pin_hash ? '<span class="badge badge-info">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
         html += `<tr>
+            <td><input type="checkbox" class="user-check" value="${u._key}" onchange="updateDeleteCount('user-check', 'delete-users-btn')"></td>
             <td style="color:#ffaa00">${nickDisplay}</td>
             <td style="font-family:monospace;font-size:11px;color:#888">${uid}</td>
-            <td>${hasPin}</td>
+            <td>${status}</td>
             <td>${date}</td>
-            <td><button class="btn btn-danger" onclick="deleteUser('${u._key}')">Delete</button></td>
         </tr>`;
     });
     html += '</table>';
     container.innerHTML = html;
 }
 
-function deleteUser(uid) {
-    if (!confirm(`Delete user ${uid.slice(0,8)}...?\nThis will also remove from all groups.`)) return;
-    db.ref("users/" + uid).remove()
-        .then(() => db.ref("user_groups/" + uid).remove())
-        .then(() => {
-            alert("User deleted.");
-            loadUsers();
-        })
-        .catch(e => alert("Error: " + e.message));
+function deleteSelectedUsers() {
+    const keys = getSelectedKeys("user-check");
+    if (!keys.length) { alert("No users selected."); return; }
+    if (!confirm(`Delete ${keys.length} selected user(s)?\nThis will also remove them from all groups.\nThis action cannot be undone!`)) return;
+
+    let done = 0, failed = 0, total = keys.length;
+    keys.forEach(key => {
+        Promise.all([
+            db.ref("users/" + key).remove(),
+            db.ref("user_groups/" + key).remove()
+        ])
+            .then(() => { done++; if (done + failed >= total) finish(); })
+            .catch(() => { failed++; if (done + failed >= total) finish(); });
+    });
+    function finish() {
+        alert(`Deleted: ${done}, failed: ${failed}`);
+        loadUsers();
+    }
 }
 
 // ═══ Releases management ═══
