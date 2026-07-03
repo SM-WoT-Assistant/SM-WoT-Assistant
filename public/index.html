@@ -86,13 +86,6 @@
     </section>
 
     <section>
-        <h2>Releases</h2>
-        <div id="releases-container">
-            <div class="empty">Loading...</div>
-        </div>
-    </section>
-
-    <section>
         <h2>How to update</h2>
         <p style="color:#999;font-size:14px;">
             The app automatically checks for new versions on startup. If an update is available, you'll see a notification in the status bar. You can also always download the latest version manually from GitHub.
@@ -122,60 +115,34 @@ const db = firebase.database();
 
 const GITHUB_RELEASES = "https://github.com/nkcgml-boop/SM-WoT-Assistant/releases";
 
-function compareVersions(a, b) {
-    const pa = (a || "0.0.0").replace("v", "").split(".").map(Number);
-    const pb = (b || "0.0.0").replace("v", "").split(".").map(Number);
-    for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-        const na = pa[i] || 0;
-        const nb = pb[i] || 0;
-        if (na !== nb) return na - nb;
-    }
-    return 0;
-}
-
-function loadReleases() {
+function loadLatestVersion() {
     db.ref("versions").once("value")
         .then(snap => {
             const data = snap.val();
-            const container = document.getElementById("releases-container");
             const dlBtn = document.getElementById("download-btn");
             const latestSpan = document.getElementById("latest-version");
-
             if (!data) {
-                container.innerHTML = '<div class="empty">No published releases. Check <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">GitHub</a>.</div>';
                 dlBtn.href = GITHUB_RELEASES;
                 return;
             }
-
             const { latest: _, ...versions } = data;
             const items = Object.values(versions).sort((a, b) => {
                 const dateCmp = (b.release_date || '').localeCompare(a.release_date || '');
                 if (dateCmp !== 0) return dateCmp;
-                return compareVersions(b.version || '0.0.0', a.version || '0.0.0');
+                return (b.version || '0_0_0').localeCompare(a.version || '0_0_0');
             });
-
-            const topItem = items[0];
-            if (topItem) {
-                dlBtn.href = topItem.download_url || (GITHUB_RELEASES + "/tag/v" + topItem.version);
-                dlBtn.textContent = "Download v" + (topItem.version || "");
-                latestSpan.textContent = (topItem.build_size || "") + " · Windows 10/11 · " + (topItem.release_date || "").slice(0, 10);
+            const top = items[0];
+            if (top) {
+                dlBtn.href = top.download_url || (GITHUB_RELEASES + "/tag/v" + top.version);
+                dlBtn.textContent = "Download v" + (top.version || "");
+                latestSpan.textContent = (top.build_size || "") + " · Windows 10/11 · " + (top.release_date || "").slice(0, 10);
             }
-
-            container.innerHTML = '<table><tr><th>Version</th><th>Date</th><th>Size</th><th></th></tr>' +
-                items.map(d => `<tr>
-                    <td class="release-ver">v${d.version || ''}</td>
-                    <td class="release-date">${(d.release_date || '').slice(0, 10)}</td>
-                    <td class="release-size">${d.build_size || ''}</td>
-                    <td class="release-dl"><a href="${d.download_url || (GITHUB_RELEASES + '/tag/v' + d.version)}" class="btn btn-secondary" style="padding:6px 14px;font-size:13px">Download</a></td>
-                </tr>`).join('') + '</table>';
         })
         .catch(() => {
-            document.getElementById("releases-container").innerHTML =
-                '<div class="empty">Error loading releases. <a href="' + GITHUB_RELEASES + '" style="color:#ffaa00">Check GitHub</a>.</div>';
             document.getElementById("download-btn").href = GITHUB_RELEASES;
         });
 }
-loadReleases();
+loadLatestVersion();
 </script>
 
 </body>

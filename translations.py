@@ -328,7 +328,11 @@ TRANSLATIONS = {
             "login_dialog_msg": "Connect with saved credentials",
             "group_schemes_section_label": "Group Schemes",
             "group_scheme_delete_confirm": "Delete this scheme?",
-            "btn_delete_scheme": "Delete"
+            "btn_delete_scheme": "Delete",
+            "download_show_hidden": "Show hidden",
+            "hide_scheme": "Hide",
+            "unhide_scheme": "Unhide",
+            "hidden_scheme_label": "(hidden)"
         }
     }
 }

@@ -1730,6 +1730,7 @@ class WotAssistantHQ:
             if hasattr(self, 'painter') and self.painter:
                 self.painter._group_schemes = data.get("schemes", {})
                 self.painter._scheme_downloaded_at = data.get("downloaded_at", {})
+                self.painter._hidden_download_schemes = set(data.get("hidden_schemes", []))
                 print(f"[GROUPS] Завантажено {len(self.painter._group_schemes)} групових схем з кешу")
         except Exception as e:
             print(f"[GROUPS] Помилка завантаження кешу: {e}")
@@ -1742,6 +1743,7 @@ class WotAssistantHQ:
             data = {
                 "schemes": getattr(self.painter, '_group_schemes', {}),
                 "downloaded_at": getattr(self.painter, '_scheme_downloaded_at', {}),
+                "hidden_schemes": list(getattr(self.painter, '_hidden_download_schemes', set())),
                 "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
             }
             os.makedirs(os.path.dirname(config.GROUP_CACHE_FILE), exist_ok=True)
@@ -1779,8 +1781,13 @@ class WotAssistantHQ:
 
             meta = firebase_groups.get_group_schemes_meta(gid)
             if not meta:
+                # All local schemes were deleted server-side
+                if self.painter._group_schemes:
+                    self.root.after(0, lambda: self._show_group_deleted_notification(
+                        list(self.painter._group_schemes.keys())))
                 return
 
+            # Check for updates
             pending = []
             for drawing_id, remote in meta.items():
                 local = self.painter._group_schemes.get(drawing_id)
@@ -1792,10 +1799,93 @@ class WotAssistantHQ:
                     pending.append((drawing_id, remote.get("map_id", ""),
                                    remote.get("updated_by", "")))
 
+            # Check for deleted schemes (in local but not in remote meta)
+            deleted = []
+            for drawing_id in list(self.painter._group_schemes.keys()):
+                if drawing_id not in meta:
+                    deleted.append(drawing_id)
+
             if pending:
                 self.root.after(0, lambda: self._show_group_sync_notification(pending))
+
+            if deleted:
+                self.root.after(0, lambda: self._show_group_deleted_notification(deleted))
         except Exception as e:
             print(f"[GROUPS] Sync error: {e}")
+
+    def _show_group_deleted_notification(self, deleted_ids):
+        if not deleted_ids or not hasattr(self, 'painter') or not self.painter:
+            return
+
+        gid = self.active_group_id
+        count = len(deleted_ids)
+
+        dlg = tk.Toplevel(self.root)
+        dlg.configure(bg="#222")
+        dlg.overrideredirect(True)
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.attributes("-topmost", True)
+        dlg.lift()
+        dlg.focus_force()
+
+        hdr = tk.Frame(dlg, bg="#2a2a2a", height=28)
+        hdr.pack(fill="x"); hdr.pack_propagate(False)
+        tk.Label(hdr, text="Scheme Deleted",
+                 bg="#2a2a2a", fg="#ff6666", font=("Arial", 9, "bold")).pack(side="left", padx=8)
+        tk.Button(hdr, text="\u2715", bg="#2a2a2a", fg="#aaa", bd=0,
+                  font=("Arial", 10), activebackground="#c33", activeforeground="white",
+                  command=dlg.destroy).pack(side="right", padx=4)
+        dialog_utils._DragHelper(dlg, hdr)
+
+        msg = f"{count} group scheme{'s' if count > 1 else ''} deleted by commander."
+        tk.Label(dlg, text=msg, bg="#222", fg="#ccc",
+                 font=("Arial", 9), wraplength=320).pack(padx=20, pady=(20, 4))
+
+        def do_keep():
+            try:
+                for drawing_id in deleted_ids:
+                    scheme = self.painter._group_schemes.get(drawing_id)
+                    if not scheme:
+                        continue
+                    map_id = scheme.get("map_id", "")
+                    elements = scheme.get("elements", [])
+                    if not isinstance(elements, list):
+                        continue
+                    existing = self.painter.drawings.get(map_id, [])
+                    self.painter.drawings[map_id] = existing + elements
+                    del self.painter._group_schemes[drawing_id]
+                    self.painter._scheme_downloaded_at.pop(drawing_id, None)
+                self.painter.data_mgr.save_drawings(self.painter.drawings)
+                self._save_group_schemes_to_cache()
+                self.painter.redraw()
+            except Exception as e:
+                print(f"[GROUPS] Keep copy error: {e}")
+            dlg.destroy()
+
+        def do_remove():
+            try:
+                for drawing_id in deleted_ids:
+                    self.painter._group_schemes.pop(drawing_id, None)
+                    self.painter._scheme_downloaded_at.pop(drawing_id, None)
+                self._save_group_schemes_to_cache()
+                self.painter.redraw()
+            except Exception as e:
+                print(f"[GROUPS] Remove error: {e}")
+            dlg.destroy()
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(12, 14))
+        tk.Button(bf, text="Keep local copy", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=12, pady=4,
+                  command=do_keep).pack(side="left", padx=6)
+        tk.Button(bf, text="Remove", bg="#553333", fg="#cc9999", bd=0,
+                  font=("Arial", 9), padx=12, pady=4,
+                  command=do_remove).pack(side="left", padx=6)
+
+        dialog_utils._center_on_root(dlg, self.root)
+        dlg.grab_set()
+        self.root.wait_window(dlg)
 
     def _show_group_sync_notification(self, pending):
         if not pending:

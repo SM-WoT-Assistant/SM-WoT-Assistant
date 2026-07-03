@@ -1369,6 +1369,7 @@ class DrawingPalette(tk.Toplevel):
                 "elements": data.get("elements", []),
                 "source": source,
                 "source_name": source_name,
+                "author_user_id": data.get("author_id", ""),
             })
 
         items.sort(key=lambda x: x.get("created", ""), reverse=True)
@@ -1422,6 +1423,25 @@ class DrawingPalette(tk.Toplevel):
                                               state="readonly", width=14, font=("Arial", 8))
         author_filter_cb.pack(side="left", padx=4)
 
+        # ── Second filter row: search + show hidden ──
+        ff2 = tk.Frame(self._download_frame, bg=bg)
+        ff2.pack(fill="x", padx=8, pady=(0, 2))
+
+        tk.Label(ff2, text="\U0001F50D", bg=bg, fg="#888", font=("Arial", 9)).pack(side="left", padx=(0, 4))
+        search_var = tk.StringVar()
+        search_entry = tk.ttk.Entry(ff2, textvariable=search_var, font=("Arial", 8), width=24)
+        search_entry.pack(side="left", padx=(0, 8))
+
+        show_hidden_var = tk.BooleanVar(value=False)
+        show_hidden_cb = tk.Checkbutton(ff2, text=self.app.t('ui', 'download_show_hidden'),
+                                         variable=show_hidden_var, bg=bg, fg="#aaa",
+                                         selectcolor="#333", activebackground=bg,
+                                         activeforeground="#ccc", font=("Arial", 8))
+        show_hidden_cb.pack(side="right", padx=4)
+
+        # Stored hidden schemes reference
+        hidden_set = self.painter._hidden_download_schemes
+
         tf = tk.Frame(self._download_frame, bg=bg)
         tf.pack(fill="both", expand=True, padx=8, pady=4)
 
@@ -1446,10 +1466,21 @@ class DrawingPalette(tk.Toplevel):
         tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
 
+        # Get current user info for delete permissions
+        current_uid = ""
+        current_nick = ""
+        if firebase_identity.is_connected():
+            ident = firebase_identity.get_identity()
+            if ident:
+                current_uid = ident.get("user_id", "")
+                current_nick = ident.get("nickname", "")
+
         def _do_filter(*args):
             sf = source_filter_var.get()
             mf = map_filter_var.get()
             af = author_filter_var.get()
+            search_text = search_var.get().strip().lower()
+            show_hidden = show_hidden_var.get()
             tree.delete(*tree.get_children())
             for it in items:
                 if sf != all_label and it["source_name"] != sf:
@@ -1458,17 +1489,81 @@ class DrawingPalette(tk.Toplevel):
                     continue
                 if af != all_label and it["author"] != af:
                     continue
+                # Hidden filter
+                sid = it["scheme_id"]
+                is_hidden = sid in hidden_set
+                if is_hidden and not show_hidden:
+                    continue
+                # Search text
+                if search_text:
+                    haystack = f"{it['map_name']} {it['author']} {it['comment']} {it['source_name']}".lower()
+                    if search_text not in haystack:
+                        continue
+                map_display = it["map_name"]
+                if is_hidden:
+                    map_display = map_display + " " + self.app.t('ui', 'hidden_scheme_label')
                 has_preview = it["map_id"] != "all_maps"
                 tree.insert("", "end",
-                            values=(it["map_name"], it["source_name"], it["comment"],
+                            values=(map_display, it["source_name"], it["comment"],
                                     it["author"], it["created"],
                                     "Preview" if has_preview else ""),
-                            iid=it["scheme_id"])
+                            iid=sid)
 
         source_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
         map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
         author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
+        search_var.trace("w", lambda *a: self.after(150, _do_filter))
+        show_hidden_var.trace("w", lambda *a: _do_filter())
 
+        # ── Right-click context menu ──
+        ctx_menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ccc",
+                           activebackground="#444", activeforeground="white")
+
+        def _on_right_click(event):
+            row = tree.identify_row(event.y)
+            if not row:
+                return
+            tree.selection_set(row)
+            sid = row
+            # Find item data
+            it = None
+            for x in items:
+                if x["scheme_id"] == sid:
+                    it = x
+                    break
+            if not it:
+                return
+            ctx_menu.delete(0, "end")
+
+            # Preview
+            if it["map_id"] != "all_maps":
+                ctx_menu.add_command(label=self.app.t('ui', 'download_preview'),
+                                     command=lambda: self._preview_scheme(it, self._download_frame))
+
+            # Hide / Unhide
+            is_hidden = sid in hidden_set
+            if is_hidden:
+                ctx_menu.add_command(label=self.app.t('ui', 'unhide_scheme'),
+                                     command=lambda: self._toggle_hide(sid, hidden_set, _do_filter))
+            else:
+                ctx_menu.add_command(label=self.app.t('ui', 'hide_scheme'),
+                                     command=lambda: self._toggle_hide(sid, hidden_set, _do_filter))
+
+            # Delete (commander-author only)
+            author_uid = it.get("author_user_id", "")
+            if author_uid and current_uid and author_uid == current_uid:
+                ctx_menu.add_separator()
+                ctx_menu.add_command(label=self.app.t('ui', 'btn_delete_scheme'),
+                                     command=lambda: self._delete_download_scheme(it, _do_filter))
+
+            try:
+                ctx_menu.tk_popup(event.x_root, event.y_root)
+            finally:
+                ctx_menu.grab_release()
+
+        tree.bind("<Button-3>", _on_right_click)
+
+        # ── Left-click: preview on col #6 ──
         def on_tree_click(event):
             region = tree.identify_region(event.x, event.y)
             if region == "cell":
@@ -1509,6 +1604,75 @@ class DrawingPalette(tk.Toplevel):
                   font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
 
         _do_filter()
+
+    def _toggle_hide(self, scheme_id, hidden_set, refresh_cb):
+        """Toggle hide/unhide for a scheme in the download dialog."""
+        if scheme_id in hidden_set:
+            hidden_set.discard(scheme_id)
+        else:
+            hidden_set.add(scheme_id)
+        self.app._save_group_schemes_to_cache()
+        refresh_cb()
+
+    def _delete_download_scheme(self, it, refresh_cb):
+        """Delete scheme from RTDB (commander-author only)."""
+        yes = dialog_utils.dark_confirmbox(self,
+            self.app.t('ui', 'group_scheme_delete_confirm'),
+            f"{it.get('map_name', '?')}: {it.get('comment', '')[:40] or '?'}")
+        if not yes:
+            return
+        source = it.get("source", "public")
+        scheme_id = it.get("scheme_id", "")
+        if "__" in scheme_id:
+            gid = source
+            drawing_id = scheme_id.split("__", 1)[1]
+        else:
+            gid = source
+            drawing_id = scheme_id
+        # Save undo copy
+        undo_copy = dict(it)
+        # Delete from RTDB
+        ok = firebase_groups.delete_group_scheme(gid, drawing_id)
+        if not ok:
+            dialog_utils.dark_messagebox(self, "Error", "Failed to delete scheme.")
+            return
+        # Show undo notification
+        def _show_undo():
+            undo_win = tk.Toplevel(self)
+            undo_win.overrideredirect(True)
+            undo_win.configure(bg="#2a2a2a")
+            undo_win.attributes("-topmost", True)
+            tk.Label(undo_win, text="Scheme deleted.", bg="#2a2a2a", fg="#ccc",
+                     font=("Arial", 9)).pack(side="left", padx=12, pady=8)
+            undo_btn = tk.Button(undo_win, text="Undo", bg="#446644", fg="#cfc",
+                                 bd=0, font=("Arial", 9, "bold"), padx=10)
+            undo_btn.pack(side="right", padx=(0, 8), pady=8)
+            done = [False]
+            def do_undo():
+                if done[0]:
+                    return
+                done[0] = True
+                undo_win.destroy()
+                # Re-publish the scheme
+                firebase_groups.publish_to_group(gid, drawing_id, undo_copy.get("elements", []),
+                                                  undo_copy.get("map_id", ""),
+                                                  undo_copy.get("map_name", ""),
+                                                  undo_copy.get("comment", ""),
+                                                  undo_copy.get("author_nickname", ""))
+                refresh_cb()
+            undo_btn.config(command=do_undo)
+            undo_win.update_idletasks()
+            w = undo_win.winfo_reqwidth()
+            h = undo_win.winfo_reqheight()
+            cx = self.winfo_rootx() + self.winfo_width() // 2 - w // 2
+            cy = self.winfo_rooty() + self.winfo_height() // 2 - h // 2
+            undo_win.geometry(f"+{cx}+{cy}")
+            # Auto-close after 10s
+            self.after(10000, lambda: (undo_win.destroy() if not done[0] else None))
+        self.after(0, _show_undo)
+        # Invalidate cache and refresh
+        firebase_groups.invalidate_group_schemes_cache(gid)
+        refresh_cb()
 
     def _handle_download_result(self, item):
         """Called when user selects a scheme to download. Shows choice dialog."""

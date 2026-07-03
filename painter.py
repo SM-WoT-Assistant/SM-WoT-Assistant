@@ -46,6 +46,7 @@ class MapPainter:
 
         self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
+        self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
 
     def _coords_match(self, c1, c2):
         if len(c1) != len(c2):
