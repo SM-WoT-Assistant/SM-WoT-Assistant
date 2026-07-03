@@ -70,11 +70,21 @@ def is_registered():
     return get_identity() is not None
 
 
-def register(nickname, pin):
-    data = _load()
-    if data.get("user_id"):
-        return False, "Вже зареєстровано. Використовуйте зміну PIN."
+def check_nickname_available(nickname):
+    """Перевіряє чи нікнейм вільний в RTDB."""
+    nickname = nickname.strip().lower()
+    if len(nickname) < 2:
+        return True
+    data = _rtdb_get(f'users?orderBy="nickname_lower"&equalTo="{nickname}"')
+    if not data:
+        return True
+    for v in data.values():
+        if isinstance(v, dict) and v.get("nickname_lower") == nickname:
+            return False
+    return True
 
+
+def register(nickname, pin):
     if not nickname or not pin:
         return False, "Нікнейм та PIN обов'язкові."
 
@@ -87,6 +97,13 @@ def register(nickname, pin):
         return False, "Нікнейм має бути не більше 20 символів."
     if not pin.isdigit() or len(pin) != 4:
         return False, "PIN має бути рівно 4 цифри."
+
+    if not check_nickname_available(nickname):
+        return False, "Цей нікнейм вже зайнятий."
+
+    data = _load()
+    if data.get("user_id"):
+        return False, "Вже зареєстровано. Використовуйте зміну PIN."
 
     data["user_id"] = str(uuid.uuid4())
     data["nickname"] = nickname
@@ -136,6 +153,34 @@ def login(nickname, pin):
         return True, entry["nickname"]
     except Exception as e:
         return False, str(e)
+
+
+def is_connected():
+    data = _load()
+    return data.get("connected", False)
+
+
+def connect():
+    """Локальна верифікація: перевіряє збережені дані без RTDB."""
+    data = _load()
+    nick = data.get("nickname", "")
+    pin = data.get("pin_text", "")
+    hash_ = data.get("pin_hash", "")
+    if not nick or not pin or not hash_:
+        return False, "Немає збережених облікових даних."
+    if hash_pin(pin) != hash_:
+        return False, "Дані пошкоджено."
+    data["connected"] = True
+    _save(data)
+    return True, nick
+
+
+def disconnect():
+    """Відключення: встановлює connected=False без видалення даних."""
+    data = _load()
+    if data.get("user_id"):
+        data["connected"] = False
+        _save(data)
 
 
 def verify_pin(pin):

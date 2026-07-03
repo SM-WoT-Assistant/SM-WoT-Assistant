@@ -315,7 +315,20 @@ TRANSLATIONS = {
             "btn_remove": "Remove",
             "btn_regenerate_code": "Regenerate Code",
             "btn_leave_group": "Leave Group",
-            "btn_close": "Close"
+            "btn_close": "Close",
+            "disconnect": "Disconnect",
+            "connect": "Connect",
+            "not_connected": "Not connected",
+            "wrong_pin": "Wrong PIN",
+            "save": "Save",
+            "new_pin": "New PIN",
+            "confirm_disconnect_title": "Disconnect",
+            "confirm_disconnect_msg": "Are you sure you want to disconnect?",
+            "login_dialog_title": "Login",
+            "login_dialog_msg": "Connect with saved credentials",
+            "group_schemes_section_label": "Group Schemes",
+            "group_scheme_delete_confirm": "Delete this scheme?",
+            "btn_delete_scheme": "Delete"
         }
     }
 }

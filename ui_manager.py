@@ -26,18 +26,18 @@ class UIManager:
 
         tk.Button(self.app.top_bar, text=chr(0xF00D), bg="#800", fg="white", bd=0,
                   width=3, padx=2, font=("FontAwesome", 11),
-                  command=self.app.quit_app).pack(side="right", pady=7)
+                  command=self.app.quit_app).pack(side="right", pady=2)
 
         tk.Button(self.app.top_bar, text=chr(0xF068), bg="#444", fg="white", bd=0,
                   width=3, padx=2, font=("FontAwesome", 11),
-                  command=self.app.toggle_visibility).pack(side="right", pady=7)
+                  command=self.app.toggle_visibility).pack(side="right", pady=2)
 
         self.app.settings_btn = tk.Button(self.app.top_bar, text=chr(0xF013), bg="#333", fg="white",
                                            bd=0, width=3, padx=2, font=("FontAwesome", 11),
                                            command=self._show_settings_menu)
-        self.app.settings_btn.pack(side="right", padx=5, pady=7)
+        self.app.settings_btn.pack(side="right", padx=5, pady=2)
 
-        self.app.btn_format_lock.pack(side="right", padx=(1,5), pady=7)
+        self.app.btn_format_lock.pack(side="right", padx=(1,5), pady=2)
 
         # Left button frame spans full height (mode buttons expand with second_row)
         btn_frame = tk.Frame(self.app.top_bar, bg="#222")
@@ -46,13 +46,13 @@ class UIManager:
         tk.Frame(btn_frame, width=7, bg="#222").pack(side="left", fill="y")
 
         self.app.btn_mode_ai_stats = tk.Button(btn_frame, text="SETUP", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=self.app.switch_to_ai_stats)
-        self.app.btn_mode_ai_stats.pack(side="left", fill="y", expand=True)
+        self.app.btn_mode_ai_stats.pack(side="left", padx=(0, 1), pady=2)
 
         self.app.btn_mode_maps_2 = tk.Button(btn_frame, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
-        self.app.btn_mode_maps_2.pack(side="left", fill="y", expand=True)
+        self.app.btn_mode_maps_2.pack(side="left", padx=1, pady=2)
 
         self.app.btn_mode_maps_1 = tk.Button(btn_frame, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
-        self.app.btn_mode_maps_1.pack(side="left", fill="y", expand=True)
+        self.app.btn_mode_maps_1.pack(side="left", padx=(1, 0), pady=2)
 
         # Content frame for horizontal space between mode buttons and right buttons
         content_frame = tk.Frame(self.app.top_bar, bg="#222")
@@ -119,6 +119,13 @@ class UIManager:
         )
         self.app.identity_pin_label.pack(side="left", padx=(2, 8), pady=4)
 
+        self.app.identity_edit_btn = tk.Button(
+            self.app.identity_bar, text=self.app.t('ui', 'edit_btn'), bg="#333", fg="#999", bd=0,
+            font=("Arial", 8), padx=6,
+            command=self._show_edit_dialog
+        )
+        self.app.identity_edit_btn.pack(side="right", padx=5, pady=3)
+
         self.app.identity_action_btn = tk.Button(
             self.app.identity_bar, text="", bg="#333", fg="#ccc", bd=0,
             font=("Arial", 8), padx=8,
@@ -130,17 +137,28 @@ class UIManager:
         import firebase_groups
         if not hasattr(self.app, 'group_selector') or not self.app.group_selector:
             return
-        if not firebase_identity.is_registered():
+        if not firebase_identity.is_registered() or not firebase_identity.is_connected():
             try:
                 self.app.group_selector.pack_forget()
                 self.app.group_token_btn.pack_forget()
             except Exception:
                 pass
             self.app.group_selector["values"] = []
+            self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
             return
-        self.app.group_selector.pack(side="left", padx=5, pady=2)
 
         groups = firebase_groups.get_user_groups()
+        has_custom = any(gid != firebase_groups.PUBLIC_GROUP_ID for gid in groups)
+        if not has_custom:
+            try:
+                self.app.group_selector.pack_forget()
+                self.app.group_token_btn.pack_forget()
+            except Exception:
+                pass
+            self.app.group_selector["values"] = []
+            self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            return
+        self.app.group_selector.pack(side="left", padx=5, pady=2)
         self.app._cached_groups = groups
         names = []
         id_map = {}
@@ -261,14 +279,22 @@ class UIManager:
         if firebase_identity.is_registered():
             nick = firebase_identity.get_nickname()
             pin_text = firebase_identity.get_pin_text()
-            self.app.identity_nick_label.config(text=f"  {nick}")
-            self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#888888")
-            self.app.identity_action_btn.config(text=self.app.t('ui', 'logout'), bg="#553333", fg="#cc9999")
+            if firebase_identity.is_connected():
+                self.app.identity_nick_label.config(text=f"  {nick}")
+                self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#888888")
+                self.app.identity_action_btn.config(text=self.app.t('ui', 'disconnect'), bg="#553333", fg="#cc9999")
+                self.app.identity_edit_btn.pack(side="right", padx=5, pady=3)
+            else:
+                self.app.identity_nick_label.config(text=f"  {nick}", fg="#666666")
+                self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#444444")
+                self.app.identity_action_btn.config(text=self.app.t('ui', 'connect'), bg="#334455", fg="#99ccff")
+                self.app.identity_edit_btn.pack_forget()
             self._refresh_group_selector()
         else:
-            self.app.identity_nick_label.config(text="  " + self.app.t('ui', 'not_registered'))
+            self.app.identity_nick_label.config(text="  " + self.app.t('ui', 'not_connected'))
             self.app.identity_pin_label.config(text="")
             self.app.identity_action_btn.config(text=self.app.t('ui', 'register'), bg="#335533", fg="#99cc99")
+            self.app.identity_edit_btn.pack_forget()
             try:
                 self.app.group_selector.pack_forget()
                 self.app.group_token_btn.pack_forget()
@@ -277,7 +303,10 @@ class UIManager:
 
     def _identity_action(self):
         if firebase_identity.is_registered():
-            self._confirm_logout()
+            if firebase_identity.is_connected():
+                self._confirm_disconnect()
+            else:
+                self._do_connect()
         else:
             self._show_registration_dialog()
 
@@ -347,9 +376,9 @@ class UIManager:
         menu.bind("<Escape>", lambda e: close())
         menu.focus_set()
 
-    def _confirm_logout(self):
+    def _confirm_disconnect(self):
         dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'confirm_logout_title'))
+        dlg.title(self.app.t('ui', 'confirm_disconnect_title'))
         dlg.configure(bg="#2a2a2a")
         dlg.resizable(False, False)
         dlg.minsize(260, 100)
@@ -360,20 +389,71 @@ class UIManager:
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 50
         dlg.geometry(f"+{cx}+{cy}")
 
-        tk.Label(dlg, text=self.app.t('ui', 'confirm_logout_msg'),
+        tk.Label(dlg, text=self.app.t('ui', 'confirm_disconnect_msg'),
                  font=("Arial", 10), bg="#2a2a2a", fg="#cccccc", justify="center").pack(pady=(15, 10))
 
         bf = tk.Frame(dlg, bg="#2a2a2a")
         bf.pack(pady=(0, 10))
         def on_yes():
+            firebase_identity.disconnect()
             dlg.destroy()
-            os.remove(os.path.join(config.USER_DATA_DIR, "identity.json"))
             self._refresh_identity_bar()
-            pass
         tk.Button(bf, text=self.app.t('ui', 'yes'), bg="#553333", fg="white", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=on_yes).pack(side="left", padx=10)
         tk.Button(bf, text=self.app.t('ui', 'no'), bg="#444", fg="#aaa", bd=0,
                   font=("Arial", 9), padx=15, pady=4, command=dlg.destroy).pack(side="left", padx=10)
+        self.app.root.wait_window(dlg)
+
+    def _do_connect(self):
+        ok, msg = firebase_identity.connect()
+        if ok:
+            self._refresh_identity_bar()
+        else:
+            self._show_connect_error_dialog(msg)
+
+    def _show_connect_error_dialog(self, msg):
+        dlg = tk.Toplevel(self.app.root)
+        dlg.configure(bg="#2a2a2a")
+        dlg.resizable(False, False)
+        dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
+        dlg.grab_set()
+
+        tk.Label(dlg, text=msg, font=("Arial", 10), bg="#2a2a2a",
+                 fg="#ff6666", wraplength=300, justify="center").pack(pady=(15, 10))
+
+        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf.pack(pady=(0, 10))
+
+        def clear_and_register():
+            dlg.destroy()
+            try:
+                os.remove(os.path.join(config.USER_DATA_DIR, "identity.json"))
+            except Exception:
+                pass
+            self._show_registration_dialog()
+
+        def retry():
+            dlg.destroy()
+            ok2, msg2 = firebase_identity.connect()
+            if ok2:
+                self._refresh_identity_bar()
+            else:
+                self._show_connect_error_dialog(msg2)
+
+        tk.Button(bf, text="Clear & Register", bg="#553333", fg="white", bd=0,
+                  font=("Arial", 9), padx=10, pady=4, command=clear_and_register).pack(side="left", padx=5)
+        tk.Button(bf, text=self.app.t('ui', 'connect'), bg="#334455", fg="#99ccff", bd=0,
+                  font=("Arial", 9), padx=10, pady=4, command=retry).pack(side="left", padx=5)
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=10, pady=4, command=dlg.destroy).pack(side="left", padx=5)
+
+        dlg.update_idletasks()
+        w = dlg.winfo_reqwidth()
+        h = dlg.winfo_reqheight()
+        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - w // 2
+        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - h // 2
+        dlg.geometry(f"+{cx}+{cy}")
         self.app.root.wait_window(dlg)
 
     def _show_registration_dialog(self):
@@ -405,9 +485,37 @@ class UIManager:
                  anchor="e", width=10).grid(row=1, column=0, padx=(0, 10), pady=5, sticky="e")
         pin_var = tk.StringVar()
         pin_entry = tk.Entry(f, textvariable=pin_var, font=("Arial", 11),
-                             bg="#333", fg="white", insertbackground="white",
-                             width=18, relief="flat", bd=4, show="•")
+                              bg="#333", fg="white", insertbackground="white",
+                              width=18, relief="flat", bd=4, show="•")
         pin_entry.grid(row=1, column=1, pady=5)
+
+        nick_available = tk.BooleanVar(value=True)
+        nick_validate_job = tk.StringVar()
+
+        def check_nick_debounce():
+            nick = nick_var.get().strip()
+            if len(nick) < 2:
+                nick_entry.config(bg="#333")
+                nick_available.set(True)
+                register_btn.config(state="normal")
+                return
+            avail = firebase_identity.check_nickname_available(nick)
+            nick_available.set(avail)
+            if avail:
+                nick_entry.config(bg="#2a4a2a")
+                register_btn.config(state="normal")
+            else:
+                nick_entry.config(bg="#4a2a2a")
+                register_btn.config(state="disabled")
+
+        def on_nick_key(event=None):
+            job = nick_validate_job.get()
+            if job:
+                try:
+                    dlg.after_cancel(job)
+                except Exception:
+                    pass
+            nick_validate_job.set(dlg.after(400, check_nick_debounce))
 
         status_var = tk.StringVar()
         status_label = tk.Label(dlg, textvariable=status_var, font=("Arial", 9),
@@ -424,7 +532,6 @@ class UIManager:
             if ok:
                 dlg.destroy()
                 self._refresh_identity_bar()
-                pass
             else:
                 status_var.set(msg)
 
@@ -438,12 +545,14 @@ class UIManager:
             else:
                 status_var.set(msg)
 
-        tk.Button(bf, text=self.app.t('ui', 'login'), bg="#334455", fg="#99ccff", bd=0,
+        login_btn = tk.Button(bf, text=self.app.t('ui', 'login'), bg="#334455", fg="#99ccff", bd=0,
                   font=("Arial", 10, "bold"), padx=15, pady=6,
-                  command=do_login).pack(side="left", padx=5)
-        tk.Button(bf, text=self.app.t('ui', 'register'), bg="#335533", fg="#99cc99", bd=0,
+                  command=do_login)
+        login_btn.pack(side="left", padx=5)
+        register_btn = tk.Button(bf, text=self.app.t('ui', 'register'), bg="#335533", fg="#99cc99", bd=0,
                   font=("Arial", 10, "bold"), padx=15, pady=6,
-                  command=do_register).pack(side="left", padx=5)
+                  command=do_register)
+        register_btn.pack(side="left", padx=5)
 
         def skip_registration():
             dlg.destroy()
@@ -451,8 +560,138 @@ class UIManager:
                   font=("Arial", 9), padx=15, pady=6,
                   command=skip_registration).pack(side="left", padx=5)
 
+        nick_entry.bind("<KeyRelease>", on_nick_key)
         nick_entry.bind("<Return>", lambda e: pin_entry.focus_set())
         pin_entry.bind("<Return>", lambda e: do_register())
+
+        dlg.update_idletasks()
+        w = dlg.winfo_reqwidth()
+        h = dlg.winfo_reqheight()
+        cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - w // 2
+        cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - h // 2
+        dlg.geometry(f"+{cx}+{cy}")
+
+        nick_entry.focus_set()
+        self.app.root.wait_window(dlg)
+
+    def _show_edit_dialog(self):
+        """Діалог зміни нікнейму та PIN (з валідацією)."""
+        dlg = tk.Toplevel(self.app.root)
+        dlg.title(self.app.t('ui', 'edit'))
+        dlg.configure(bg="#222")
+        dlg.resizable(False, False)
+        dlg.attributes("-topmost", True)
+        dialog_utils._set_dark_title_bar(dlg)
+        dlg.grab_set()
+
+        f = tk.Frame(dlg, bg="#222")
+        f.pack(padx=25, pady=15)
+
+        # Nickname row
+        tk.Label(f, text=self.app.t('ui', 'nickname_label'), font=("Arial", 10),
+                 bg="#222", fg="#ccc", anchor="e", width=10).grid(row=0, column=0, padx=(0, 10), pady=5, sticky="e")
+        nick_var = tk.StringVar(value=firebase_identity.get_nickname())
+        nick_entry = tk.Entry(f, textvariable=nick_var, font=("Arial", 11),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=18, relief="flat", bd=4)
+        nick_entry.grid(row=0, column=1, pady=5)
+
+        # PIN row
+        tk.Label(f, text=self.app.t('ui', 'pin_label'), font=("Arial", 10),
+                 bg="#222", fg="#ccc", anchor="e", width=10).grid(row=1, column=0, padx=(0, 10), pady=5, sticky="e")
+        pin_var = tk.StringVar(value=firebase_identity.get_pin_text())
+        pin_entry = tk.Entry(f, textvariable=pin_var, font=("Arial", 11),
+                             bg="#333", fg="white", insertbackground="white",
+                             width=18, relief="flat", bd=4, show="•")
+        pin_entry.grid(row=1, column=1, pady=5)
+
+        # New PIN row
+        tk.Label(f, text=self.app.t('ui', 'new_pin'), font=("Arial", 10),
+                 bg="#222", fg="#ccc", anchor="e", width=10).grid(row=2, column=0, padx=(0, 10), pady=5, sticky="e")
+        new_pin_var = tk.StringVar()
+        new_pin_entry = tk.Entry(f, textvariable=new_pin_var, font=("Arial", 11),
+                                 bg="#333", fg="white", insertbackground="white",
+                                 width=18, relief="flat", bd=4, show="•")
+        new_pin_entry.grid(row=2, column=1, pady=5)
+
+        nick_available = tk.BooleanVar(value=True)
+        own_nick = firebase_identity.get_nickname().lower()
+        nick_validate_job = tk.StringVar()
+
+        def check_nick_debounce():
+            nick = nick_var.get().strip()
+            if len(nick) < 2 or nick.lower() == own_nick:
+                nick_entry.config(bg="#333")
+                nick_available.set(True)
+                save_btn.config(state="normal")
+                return
+            avail = firebase_identity.check_nickname_available(nick)
+            nick_available.set(avail)
+            if avail:
+                nick_entry.config(bg="#2a4a2a")
+                save_btn.config(state="normal")
+            else:
+                nick_entry.config(bg="#4a2a2a")
+                save_btn.config(state="disabled")
+
+        def on_nick_key(event=None):
+            job = nick_validate_job.get()
+            if job:
+                try:
+                    dlg.after_cancel(job)
+                except Exception:
+                    pass
+            nick_validate_job.set(dlg.after(400, check_nick_debounce))
+
+        status_var = tk.StringVar()
+        status_label = tk.Label(dlg, textvariable=status_var, font=("Arial", 9),
+                                bg="#222", fg="#ff6666", wraplength=280)
+        status_label.pack(pady=(5, 0))
+
+        bf = tk.Frame(dlg, bg="#222")
+        bf.pack(pady=(10, 15))
+
+        def do_save():
+            nick = nick_var.get().strip()
+            pin = pin_var.get().strip()
+            new_pin = new_pin_var.get().strip()
+            if not nick_available.get():
+                status_var.set("Nickname is taken")
+                return
+            if not pin:
+                status_var.set("Current PIN is required")
+                return
+            if new_pin and (len(new_pin) != 4 or not new_pin.isdigit()):
+                status_var.set("New PIN must be 4 digits")
+                return
+            if not firebase_identity.verify_pin(pin):
+                status_var.set(self.app.t('ui', 'wrong_pin'))
+                return
+            # Change nickname
+            if nick != firebase_identity.get_nickname():
+                if not firebase_identity.check_nickname_available(nick):
+                    status_var.set("Nickname is taken")
+                    return
+            ok, msg = firebase_identity.change_nickname(nick, pin)
+            if not ok:
+                status_var.set(msg)
+                return
+            # Change PIN if provided
+            if new_pin:
+                firebase_identity.change_pin(pin, new_pin)
+            dlg.destroy()
+            self._refresh_identity_bar()
+
+        save_btn = tk.Button(bf, text=self.app.t('ui', 'save'), bg="#335533", fg="#99cc99", bd=0,
+                   font=("Arial", 10, "bold"), padx=15, pady=6, command=do_save)
+        save_btn.pack(side="left", padx=5)
+        tk.Button(bf, text=self.app.t('ui', 'btn_cancel'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=15, pady=6, command=dlg.destroy).pack(side="left", padx=5)
+
+        nick_entry.bind("<KeyRelease>", on_nick_key)
+        nick_entry.bind("<Return>", lambda e: pin_entry.focus_set())
+        pin_entry.bind("<Return>", lambda e: new_pin_entry.focus_set())
+        new_pin_entry.bind("<Return>", lambda e: do_save())
 
         dlg.update_idletasks()
         w = dlg.winfo_reqwidth()

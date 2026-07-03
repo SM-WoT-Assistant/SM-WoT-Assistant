@@ -171,13 +171,6 @@ class DrawingPalette(tk.Toplevel):
         self._count_lbl.pack(side="left", padx=4)
         self._text_frame.pack(fill="x", padx=8)
 
-        self._del_frame = tk.Frame(self, bg=bg)
-        self._del_btn = tk.Button(self._del_frame, text=self.app.t('ui', 'delete_btn').upper(), bg="#cc3333",
-                                  fg="white", bd=0, font=("Arial", 8), command=self._delete_selected)
-        self._del_btn.pack(fill="x", padx=8, pady=4)
-        self._del_frame.pack(fill="x")
-        self._del_frame.pack_forget()
-
         self._brush_frame = tk.Frame(self, bg=bg)
         self._arrow_start_var = tk.BooleanVar(value=False)
         self._arrow_end_var = tk.BooleanVar(value=False)
@@ -210,10 +203,14 @@ class DrawingPalette(tk.Toplevel):
         sep5 = tk.Frame(self, bg="#333", height=1)
         sep5.pack(fill="x", padx=6, pady=2)
 
-        cf = tk.Frame(self, bg=bg)
-        cf.pack(fill="x", padx=8, pady=(2, 2))
-        tk.Button(cf, text=self.app.t('ui', 'clear').upper(), bg="#444", fg="white", bd=0,
-                  font=("Arial", 8), command=self._clear_all).pack(fill="x", expand=True, padx=1)
+        action_frame = tk.Frame(self, bg=bg)
+        action_frame.pack(fill="x", padx=8, pady=(2, 2))
+        self._del_btn = tk.Button(action_frame, text=self.app.t('ui', 'delete_btn').upper(),
+                                  bg="#555555", fg="#888888", bd=0, font=("Arial", 8),
+                                  state="disabled", command=self._delete_selected)
+        self._del_btn.pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(action_frame, text=self.app.t('ui', 'clear').upper(), bg="#444", fg="white",
+                  bd=0, font=("Arial", 8), command=self._clear_all).pack(side="left", fill="x", expand=True, padx=1)
 
         sep6 = tk.Frame(self, bg="#333", height=1)
         sep6.pack(fill="x", padx=6, pady=2)
@@ -487,6 +484,51 @@ class DrawingPalette(tk.Toplevel):
                 tk.Button(row, text=self.app.t('ui', 'btn_remove'), bg="#553333", fg="#cc9999",
                           bd=0, font=("Arial", 7), padx=6,
                           command=on_kick).pack(side="right", padx=4, pady=2)
+
+        # ═══ Group Schemes section ═══
+        tk.Label(dlg, text=self.app.t('ui', 'group_schemes_section_label'),
+                 bg="#222", fg="#ccc", font=("Arial", 9, "bold")).pack(anchor="w", padx=20, pady=(10, 2))
+
+        sf = tk.Frame(dlg, bg="#222")
+        sf.pack(padx=20, fill="x")
+
+        group_schemes = firebase_groups.get_group_schemes(active_id)
+        if group_schemes:
+            for sid, sdata in sorted(group_schemes.items(),
+                                     key=lambda x: x[1].get("updated_at", ""), reverse=True):
+                if not isinstance(sdata, dict):
+                    continue
+                row = tk.Frame(sf, bg="#1a1a1a")
+                row.pack(fill="x", pady=1)
+                mid = sdata.get("map_id", "?")
+                mname = sdata.get("map_name", "")
+                comment = (sdata.get("comment") or "")[:30]
+                updated = (sdata.get("updated_at") or "")[:10]
+                info = f"{mname or mid}  |  {updated}"
+                if comment:
+                    info += f"  —  {comment}"
+                tk.Label(row, text=info, bg="#1a1a1a", fg="#aaa",
+                         font=("Arial", 8), anchor="w").pack(side="left", padx=8, pady=3, fill="x", expand=True)
+
+                def on_delete_scheme(sid=sid):
+                    yes = dialog_utils.dark_confirmbox(dlg,
+                        self.app.t('ui', 'group_scheme_delete_confirm'),
+                        f"{mname or mid}: {sdata.get('comment', '')[:40] or '?'}")
+                    if yes:
+                        firebase_groups.delete_group_scheme(active_id, sid)
+                        firebase_groups.invalidate_group_schemes_cache(active_id)
+                        row.destroy()
+                        if not any(c.winfo_children() for c in (sf,)):
+                            no_schemes_lbl = tk.Label(sf, text="—", bg="#222", fg="#555",
+                                                       font=("Arial", 8))
+                            no_schemes_lbl.pack(pady=2)
+
+                tk.Button(row, text=self.app.t('ui', 'btn_remove'), bg="#553333", fg="#cc9999",
+                          bd=0, font=("Arial", 7), padx=6,
+                          command=on_delete_scheme).pack(side="right", padx=4, pady=2)
+        else:
+            tk.Label(sf, text="—", bg="#222", fg="#555",
+                     font=("Arial", 8)).pack(pady=2)
 
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(12, 14))
@@ -1156,7 +1198,7 @@ class DrawingPalette(tk.Toplevel):
             else:
                 self._highlight_toolbar_button("marker")
             self.painter.set_tool(None)
-            self._del_frame.pack(fill="x")
+            self._del_btn.config(state="normal", bg="#cc3333", fg="white")
             if obj["type"] == "marker":
                 label = self.app.t('ui', 'status_editing_marker')
             elif obj["type"] == "arrow":
@@ -1183,7 +1225,7 @@ class DrawingPalette(tk.Toplevel):
         self._active_tool_code = None
         self._update_toolbar_buttons()
         self.painter.set_tool(None)
-        self._del_frame.pack_forget()
+        self._del_btn.config(state="disabled", bg="#555555", fg="#888888")
         self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
 

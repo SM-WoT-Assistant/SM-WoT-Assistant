@@ -88,6 +88,16 @@
             </div>
             <div id="schemes-container"><div class="empty">Loading...</div></div>
         </div>
+
+        <div class="card">
+            <h2>Users (RTDB users/)</h2>
+            <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <input type="text" id="users-filter" placeholder="Filter by nickname..." oninput="renderUsers()"
+                       style="background:#222;color:#ccc;border:1px solid #333;padding:4px 8px;border-radius:3px;font-size:13px;width:180px">
+                <span style="color:#888;font-size:12px;" id="user-count"></span>
+            </div>
+            <div id="users-container"><div class="empty">Loading...</div></div>
+        </div>
     </div>
 </main>
 
@@ -167,6 +177,7 @@ function loadDashboard() {
     loadInstallations();
     loadAdminSchemes();
     loadAdminReleases();
+    loadUsers();
 }
 
 function objSize(obj) { return obj ? Object.keys(obj).length : 0; }
@@ -325,6 +336,78 @@ function deleteSelectedReleases() {
         alert(`Deleted: ${done}, failed: ${failed}`);
         loadAdminReleases();
     }
+}
+
+// ═══ Users management ═══
+let allAdminUsers = [];
+
+function loadUsers() {
+    db.ref("users").once("value")
+        .then(snap => {
+            const data = snap.val();
+            if (!data) {
+                document.getElementById("users-container").innerHTML = '<div class="empty">No users</div>';
+                document.getElementById("user-count").textContent = "";
+                allAdminUsers = [];
+                return;
+            }
+            allAdminUsers = Object.entries(data).map(([key, val]) => ({ ...val, _key: key }));
+            document.getElementById("user-count").textContent = `Total: ${allAdminUsers.length}`;
+            renderUsers();
+        })
+        .catch(() => {
+            document.getElementById("users-container").innerHTML = '<div class="empty">Loading error</div>';
+        });
+}
+
+function renderUsers() {
+    const filter = (document.getElementById("users-filter").value || "").toLowerCase().trim();
+    const container = document.getElementById("users-container");
+    let filtered = allAdminUsers;
+    if (filter) {
+        filtered = allAdminUsers.filter(u => (u.nickname || "").toLowerCase().includes(filter));
+    }
+
+    // Detect duplicate nicknames
+    const nickCount = {};
+    filtered.forEach(u => {
+        const n = (u.nickname || "").toLowerCase();
+        nickCount[n] = (nickCount[n] || 0) + 1;
+    });
+    const dupNicks = new Set(Object.entries(nickCount).filter(([,c]) => c > 1).map(([n]) => n));
+
+    if (!filtered.length) {
+        container.innerHTML = '<div class="empty">No users found</div>';
+        return;
+    }
+    let html = '<table><tr><th>Nickname</th><th>User ID</th><th>PIN</th><th>Registered</th><th></th></tr>';
+    filtered.forEach(u => {
+        const isDup = dupNicks.has((u.nickname || "").toLowerCase());
+        const nickDisplay = isDup ? `<span style="color:#ff6666">⚠ ${u.nickname || '?'}</span>` : (u.nickname || '?');
+        const hasPin = u.pin_hash ? "✅" : "❌";
+        const date = (u.created_at || "").slice(0, 10);
+        const uid = (u._key || "").slice(0, 8) + "...";
+        html += `<tr>
+            <td style="color:#ffaa00">${nickDisplay}</td>
+            <td style="font-family:monospace;font-size:11px;color:#888">${uid}</td>
+            <td>${hasPin}</td>
+            <td>${date}</td>
+            <td><button class="btn btn-danger" onclick="deleteUser('${u._key}')">Delete</button></td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+}
+
+function deleteUser(uid) {
+    if (!confirm(`Delete user ${uid.slice(0,8)}...?\nThis will also remove from all groups.`)) return;
+    db.ref("users/" + uid).remove()
+        .then(() => db.ref("user_groups/" + uid).remove())
+        .then(() => {
+            alert("User deleted.");
+            loadUsers();
+        })
+        .catch(e => alert("Error: " + e.message));
 }
 
 // ═══ Releases management ═══
