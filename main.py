@@ -1859,6 +1859,8 @@ class WotAssistantHQ:
                 self.painter.data_mgr.save_drawings(self.painter.drawings)
                 self._save_group_schemes_to_cache()
                 self.painter.redraw()
+                if hasattr(self, 'palette') and self.palette and self.palette.winfo_exists():
+                    self.palette._refresh_linked_schemes_list()
             except Exception as e:
                 print(f"[GROUPS] Keep copy error: {e}")
             dlg.destroy()
@@ -1870,6 +1872,8 @@ class WotAssistantHQ:
                     self.painter._scheme_downloaded_at.pop(drawing_id, None)
                 self._save_group_schemes_to_cache()
                 self.painter.redraw()
+                if hasattr(self, 'palette') and self.palette and self.palette.winfo_exists():
+                    self.palette._refresh_linked_schemes_list()
             except Exception as e:
                 print(f"[GROUPS] Remove error: {e}")
             dlg.destroy()
@@ -1940,6 +1944,8 @@ class WotAssistantHQ:
                             remote.get("updated_at", "")
                 self.painter.redraw()
                 self._save_group_schemes_to_cache()
+                if hasattr(self, 'palette') and self.palette and self.palette.winfo_exists():
+                    self.palette._refresh_linked_schemes_list()
             except Exception as e:
                 print(f"[GROUPS] Update error: {e}")
             dlg.destroy()

@@ -254,6 +254,57 @@ class DrawingPalette(tk.Toplevel):
                   bd=0, font=("Arial", 8), command=self._show_manage_group_dialog
                   ).pack(side="left", fill="x", expand=True, padx=1)
 
+        # Linked schemes list (populated by _refresh_linked_schemes_list)
+        sep_linked = tk.Frame(self._group_mgmt_frame, bg="#333", height=1)
+        sep_linked.pack(fill="x", padx=4, pady=(0, 2))
+        self._linked_schemes_frame = tk.Frame(self._group_mgmt_frame, bg="#1a1a1a")
+        self._linked_schemes_frame.pack(fill="x", padx=2, pady=(0, 2))
+
+        self._refresh_linked_schemes_list()
+
+    def _refresh_linked_schemes_list(self):
+        """Перебудовує список linked-схем у _group_mgmt_frame."""
+        for w in self._linked_schemes_frame.winfo_children():
+            w.destroy()
+        painter = self.painter
+        if not hasattr(painter, '_group_schemes') or not painter._group_schemes:
+            tk.Label(self._linked_schemes_frame, text="No linked schemes",
+                     bg="#1a1a1a", fg="#555", font=("Arial", 7)).pack(pady=2)
+            return
+        active_group = getattr(self.app, "active_group_id", None)
+        hidden = painter._hidden_download_schemes
+        import config
+        for drawing_id, scheme in list(painter._group_schemes.items()):
+            if active_group and scheme.get("group_id") != active_group:
+                continue
+            map_id = scheme.get("map_id", "")
+            map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+            updated = (scheme.get("updated_at") or "")[:10]
+            sid = f"{scheme.get('group_id', '')}__{drawing_id}"
+            is_hidden = sid in hidden
+
+            row = tk.Frame(self._linked_schemes_frame, bg="#1a1a1a")
+            row.pack(fill="x", pady=1)
+
+            # Checkbox (show/hide)
+            hide_var = tk.BooleanVar(value=not is_hidden)
+            def toggle_hide_cb(s=sid, v=hide_var):
+                if v.get():
+                    hidden.discard(s)
+                else:
+                    hidden.add(s)
+                self.app._save_group_schemes_to_cache()
+            tk.Checkbutton(row, variable=hide_var, command=toggle_hide_cb,
+                           bg="#1a1a1a", fg="white", selectcolor="#333",
+                           activebackground="#1a1a1a").pack(side="left", padx=(4, 2))
+
+            # Info
+            label_text = f"{map_name}  {updated}"
+            if is_hidden:
+                label_text += " " + self.app.t('ui', 'hidden_scheme_label')
+            tk.Label(row, text=label_text, bg="#1a1a1a", fg="#888" if is_hidden else "#aaa",
+                     font=("Arial", 7), anchor="w").pack(side="left", padx=2, fill="x", expand=True)
+
     def _make_dark_header(self, parent, title):
         hdr = tk.Frame(parent, bg="#2a2a2a", height=28)
         hdr.pack(fill="x")
@@ -1629,48 +1680,10 @@ class DrawingPalette(tk.Toplevel):
         else:
             gid = source
             drawing_id = scheme_id
-        # Save undo copy
-        undo_copy = dict(it)
-        # Delete from RTDB
         ok = firebase_groups.delete_group_scheme(gid, drawing_id)
         if not ok:
             dialog_utils.dark_messagebox(self, "Error", "Failed to delete scheme.")
             return
-        # Show undo notification
-        def _show_undo():
-            undo_win = tk.Toplevel(self)
-            undo_win.overrideredirect(True)
-            undo_win.configure(bg="#2a2a2a")
-            undo_win.attributes("-topmost", True)
-            tk.Label(undo_win, text="Scheme deleted.", bg="#2a2a2a", fg="#ccc",
-                     font=("Arial", 9)).pack(side="left", padx=12, pady=8)
-            undo_btn = tk.Button(undo_win, text="Undo", bg="#446644", fg="#cfc",
-                                 bd=0, font=("Arial", 9, "bold"), padx=10)
-            undo_btn.pack(side="right", padx=(0, 8), pady=8)
-            done = [False]
-            def do_undo():
-                if done[0]:
-                    return
-                done[0] = True
-                undo_win.destroy()
-                # Re-publish the scheme
-                firebase_groups.publish_to_group(gid, drawing_id, undo_copy.get("elements", []),
-                                                  undo_copy.get("map_id", ""),
-                                                  undo_copy.get("map_name", ""),
-                                                  undo_copy.get("comment", ""),
-                                                  undo_copy.get("author_nickname", ""))
-                refresh_cb()
-            undo_btn.config(command=do_undo)
-            undo_win.update_idletasks()
-            w = undo_win.winfo_reqwidth()
-            h = undo_win.winfo_reqheight()
-            cx = self.winfo_rootx() + self.winfo_width() // 2 - w // 2
-            cy = self.winfo_rooty() + self.winfo_height() // 2 - h // 2
-            undo_win.geometry(f"+{cx}+{cy}")
-            # Auto-close after 10s
-            self.after(10000, lambda: (undo_win.destroy() if not done[0] else None))
-        self.after(0, _show_undo)
-        # Invalidate cache and refresh
         firebase_groups.invalidate_group_schemes_cache(gid)
         refresh_cb()
 
@@ -1716,6 +1729,7 @@ class DrawingPalette(tk.Toplevel):
             self._show_custom_message(
                 "Download", f"Scheme linked to group '{item.get('source_name', source)}'.\nIt will auto-sync.")
             painter.redraw()
+            self._refresh_linked_schemes_list()
             return
 
         if choice == "replace":
