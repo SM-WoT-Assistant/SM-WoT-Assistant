@@ -216,6 +216,22 @@ class UIManager:
             return
         self.app.root.clipboard_clear()
         self.app.root.clipboard_append(code)
+        self._show_copied_popup(self.app.group_token_btn)
+
+    def _show_copied_popup(self, anchor_widget):
+        popup = tk.Toplevel(self.app.root)
+        popup.overrideredirect(True)
+        popup.configure(bg="#222")
+        popup.attributes("-topmost", True)
+        tk.Label(popup, text=self.app.t('ui', 'copied_to_clipboard'), bg="#222", fg="#4c4",
+                 font=("Arial", 9, "bold")).pack(padx=16, pady=8)
+        popup.update_idletasks()
+        px = anchor_widget.winfo_rootx() + anchor_widget.winfo_width()//2 - popup.winfo_reqwidth()//2
+        py = anchor_widget.winfo_rooty() + anchor_widget.winfo_height()//2 - popup.winfo_reqheight()//2
+        popup.geometry(f"+{px}+{py}")
+        popup.lift()
+        popup.grab_set()
+        self.app.root.after(2000, lambda: (popup.grab_release(), popup.destroy()))
 
     def _update_token_from_cache(self):
         """Оновлює token_btn з кешованих даних без RTDB запиту."""

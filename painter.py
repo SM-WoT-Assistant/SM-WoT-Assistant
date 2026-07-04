@@ -767,11 +767,15 @@ class MapPainter:
                 
         return True
 
-    def _render_elements(self, canvas, elements, cw, ch):
-        """Render elements on a given canvas. No visibility filtering — renders all."""
+    def _render_elements(self, canvas, elements, cw, ch, offset_x=0, offset_y=0, img_w=None, img_h=None):
+        """Render elements on a given canvas. No visibility filtering — renders all.
+        offset_x/offset_y: image offset within canvas (for preview).
+        img_w/img_h: if set, use as reference dimensions instead of cw/ch."""
         canvas.delete("painter_obj")
         if not elements:
             return
+        if img_w is not None and img_h is not None:
+            cw, ch = img_w, img_h
         sc = min(cw, ch) / 800.0
 
         for obj in elements:
@@ -789,8 +793,8 @@ class MapPainter:
 
             if obj["type"] == "marker":
                 if len(coords) < 4: continue
-                x1, y1 = coords[0]*cw, coords[1]*ch
-                x2, y2 = coords[2]*cw, coords[3]*ch
+                x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
+                x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
                 canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
 
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
@@ -798,31 +802,43 @@ class MapPainter:
 
                 if obj.get("classes"):
                     icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
+                    if offset_x or offset_y:
+                        icon_x += offset_x
+                        icon_y += offset_y
                     self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
                     if mx is not None:
+                        if offset_x or offset_y:
+                            mx += offset_x
+                            my += offset_y
                         canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
 
             elif obj["type"] == "arrow":
                 if len(coords) < 4: continue
-                x1, y1 = coords[0]*cw, coords[1]*ch
-                x2, y2 = coords[2]*cw, coords[3]*ch
+                x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
+                x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
                 canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
 
                 if obj.get("classes"):
                     icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
+                    if offset_x or offset_y:
+                        icon_x += offset_x
+                        icon_y += offset_y
                     self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
                     if mx is not None:
+                        if offset_x or offset_y:
+                            mx += offset_x
+                            my += offset_y
                         canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
 
             elif obj["type"] == "brush":
                 if len(coords) < 4: continue
-                flat_px = [coords[i]*cw if i%2==0 else coords[i]*ch for i in range(len(coords))]
+                flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
                 arr = tk.NONE
                 if obj.get("arrow_start") and obj.get("arrow_end"):
                     arr = tk.BOTH
@@ -834,16 +850,22 @@ class MapPainter:
 
                 if obj.get("classes"):
                     icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
+                    if offset_x or offset_y:
+                        icon_x += offset_x
+                        icon_y += offset_y
                     self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
                     if mx is not None:
+                        if offset_x or offset_y:
+                            mx += offset_x
+                            my += offset_y
                         canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
 
             elif obj["type"] == "text":
                 if len(coords) < 2: continue
-                x, y = coords[0]*cw, coords[1]*ch
+                x, y = coords[0]*cw + offset_x, coords[1]*ch + offset_y
 
                 poi_data = obj.get("poi", [])
                 if isinstance(poi_data, str):

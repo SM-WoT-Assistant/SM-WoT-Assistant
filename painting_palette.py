@@ -519,13 +519,26 @@ class DrawingPalette(tk.Toplevel):
 
         icf = tk.Frame(dlg, bg="#222")
         icf.pack(pady=(2, 4))
-        tk.Label(icf, text=f"{self.app.t('ui', 'group_invite_code_label')} {invite_code}", bg="#222", fg="#ffaa00",
-                 font=("Arial", 10, "bold")).pack(side="left", padx=(0, 8))
-        tk.Button(icf, text=self.app.t('ui', 'btn_copy'), bg="#334455", fg="white",
-                  bd=0, font=("Arial", 8), padx=8, pady=2,
-                  command=lambda c=invite_code: (self.app.root.clipboard_clear(),
-                                                self.app.root.clipboard_append(c))
-                  ).pack(side="left")
+        invite_lbl = tk.Label(icf, text=f"{self.app.t('ui', 'group_invite_code_label')} {invite_code}", bg="#222", fg="#ffaa00",
+                 font=("Arial", 10, "bold"), cursor="hand2")
+        invite_lbl.pack(side="left", padx=(0, 8))
+        def _copy_invite(event=None):
+            self.app.root.clipboard_clear()
+            self.app.root.clipboard_append(invite_code)
+            popup = tk.Toplevel(self.app.root)
+            popup.overrideredirect(True)
+            popup.configure(bg="#222")
+            popup.attributes("-topmost", True)
+            tk.Label(popup, text=self.app.t('ui', 'copied_to_clipboard'), bg="#222", fg="#4c4",
+                     font=("Arial", 9, "bold")).pack(padx=16, pady=8)
+            popup.update_idletasks()
+            px = invite_lbl.winfo_rootx() + invite_lbl.winfo_width()//2 - popup.winfo_reqwidth()//2
+            py = invite_lbl.winfo_rooty() + invite_lbl.winfo_height()//2 - popup.winfo_reqheight()//2
+            popup.geometry(f"+{px}+{py}")
+            popup.lift()
+            popup.grab_set()
+            self.after(2000, lambda: (popup.grab_release(), popup.destroy()))
+        invite_lbl.bind("<Button-1>", _copy_invite)
 
         tk.Label(dlg, text=self.app.t('ui', 'group_members_label'), bg="#222", fg="#ccc",
                  font=("Arial", 9, "bold")).pack(anchor="w", padx=20, pady=(8, 2))
@@ -604,33 +617,24 @@ class DrawingPalette(tk.Toplevel):
         bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(12, 14))
 
-        def _regenerate_code():
-            import uuid
-            new_code = uuid.uuid4().hex[:6].upper()
-            firebase_groups._put(f"groups/{active_id}/invite_code", new_code)
-            dialog_utils.dark_messagebox(dlg,
-                self.app.t('ui', 'group_code_changed_title'),
-                self.app.t('ui', 'group_code_changed_msg').format(code=new_code))
-
-        def _leave_group():
-            def confirm_leave():
-                firebase_groups.leave_group(active_id, uid)
-                dlg.destroy()
-                if hasattr(self.app, 'ui_mgr'):
-                    self.app.ui_mgr._refresh_group_selector()
-                self._refresh_linked_schemes_list()
+        def _delete_group():
             yes = dialog_utils.dark_confirmbox(dlg,
-                self.app.t('ui', 'group_leave_confirm_title'),
-                self.app.t('ui', 'group_leave_confirm_msg'))
-            if yes:
-                confirm_leave()
+                self.app.t('ui', 'group_delete_confirm_title'),
+                self.app.t('ui', 'group_delete_confirm_msg').format(name=group_name))
+            if not yes:
+                return
+            firebase_groups.delete_group(active_id)
+            dlg.destroy()
+            if hasattr(self.app, 'ui_mgr'):
+                self.app.ui_mgr._refresh_group_selector()
+            self._refresh_linked_schemes_list()
+            self.app._stop_group_sync()
+            self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            self.app.ui_mgr._on_group_select()
 
-        tk.Button(bf, text=self.app.t('ui', 'btn_regenerate_code'), bg="#446688", fg="white",
+        tk.Button(bf, text=self.app.t('ui', 'btn_delete_group'), bg="#553333", fg="#cc9999",
                   bd=0, font=("Arial", 9), padx=10, pady=3,
-                  command=_regenerate_code).pack(side="left", padx=4)
-        tk.Button(bf, text=self.app.t('ui', 'btn_leave_group'), bg="#553333", fg="#cc9999",
-                  bd=0, font=("Arial", 9), padx=10, pady=3,
-                  command=_leave_group).pack(side="left", padx=4)
+                  command=_delete_group).pack(side="left", padx=4)
         tk.Button(bf, text=self.app.t('ui', 'btn_close'), bg="#444", fg="#aaa",
                   bd=0, font=("Arial", 9), padx=10, pady=3,
                   command=dlg.destroy).pack(side="left", padx=4)
@@ -780,6 +784,12 @@ class DrawingPalette(tk.Toplevel):
                 map_name, on_map,
                 self.app.t('ui', 'publish_all'), on_all)
         else:
+            my_role = ginfo.get("role", "") if isinstance(ginfo, dict) else ""
+            if my_role != "officer":
+                self._show_custom_message(
+                    self.app.t('ui', 'publish_map'),
+                    "Only officer can publish to this group.")
+                return
             map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
             def on_map_group():
                 self._hide_choice_inline()
@@ -1012,7 +1022,7 @@ class DrawingPalette(tk.Toplevel):
         return result[0]
 
     def _publish_to_group(self):
-        """Публікує поточну мапу в активну групу."""
+        """Публікує поточну мапу в активну групу (upsert — якщо схема для цієї мапи вже є, оновлює)."""
         self._lift_self()
         if not firebase_identity.is_registered():
             self._show_custom_message(
@@ -1036,42 +1046,76 @@ class DrawingPalette(tk.Toplevel):
         ginfo = groups.get(active_group, {})
         group_name = ginfo.get("name", "?") if isinstance(ginfo, dict) else "?"
 
+        # Role check (safety guard)
+        my_role = ginfo.get("role", "") if isinstance(ginfo, dict) else ""
+        if my_role != "officer":
+            self._show_custom_message(
+                self.app.t('ui', 'publish_map'),
+                "Only officer can publish.")
+            return
+
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
 
-        def on_done(drawing_id, ok, msg):
+        # Upsert: check if a scheme for this map already exists in the group
+        group_schemes = firebase_groups.get_group_schemes(active_group)
+        existing_drawing_id = None
+        for sid, sdata in group_schemes.items():
+            if sdata.get("map_id") == self.app.current_map_eng:
+                existing_drawing_id = sid
+                break
+
+        import time
+        if existing_drawing_id:
+            ok, msg = firebase_groups.update_group_scheme(
+                active_group, existing_drawing_id, elements_data=drawings, comment="")
             if ok:
+                self.painter._group_schemes[existing_drawing_id] = {
+                    "drawing_id": existing_drawing_id,
+                    "group_id": active_group,
+                    "map_id": self.app.current_map_eng,
+                    "map_name": map_name,
+                    "elements": list(drawings),
+                    "comment": "",
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                self.app._save_group_schemes_to_cache()
+                self._refresh_linked_schemes_list()
+                self.after(0, lambda: self._show_custom_message(
+                    "Publish", f"Updated scheme for \"{group_name}\"!"))
+            else:
+                self.after(0, lambda: self._show_custom_message(
+                    "Publish Error", msg, is_error=True))
+        else:
+            drawing_id, ok, msg = firebase_groups.publish_to_group(
+                group_id=active_group,
+                map_id=self.app.current_map_eng,
+                map_name=map_name,
+                elements_data=drawings,
+                comment="",
+            )
+            if ok and drawing_id:
+                self.painter._group_schemes[drawing_id] = {
+                    "drawing_id": drawing_id,
+                    "group_id": active_group,
+                    "map_id": self.app.current_map_eng,
+                    "map_name": map_name,
+                    "elements": list(drawings),
+                    "comment": "",
+                    "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+                self.app._save_group_schemes_to_cache()
+                self._refresh_linked_schemes_list()
                 self.after(0, lambda: self._show_custom_message(
                     "Publish", f"Published to \"{group_name}\"!"))
             else:
                 self.after(0, lambda: self._show_custom_message(
                     "Publish Error", msg, is_error=True))
 
-        drawing_id, ok, msg = firebase_groups.publish_to_group(
-            group_id=active_group,
-            map_id=self.app.current_map_eng,
-            map_name=map_name,
-            elements_data=drawings,
-            comment="",
-        )
-        if ok and drawing_id:
-            import time
-            self.painter._group_schemes[drawing_id] = {
-                "drawing_id": drawing_id,
-                "group_id": active_group,
-                "map_id": self.app.current_map_eng,
-                "map_name": map_name,
-                "elements": list(drawings),
-                "comment": "",
-                "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-                "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
-            }
-            self.app._save_group_schemes_to_cache()
-            self._refresh_linked_schemes_list()
-        on_done(drawing_id, ok, msg)
-
     def _publish_all_to_group(self):
-        """Публікує всі мапи з малюнками в активну групу."""
+        """Публікує всі мапи з малюнками в активну групу (upsert per map)."""
         self._lift_self()
         if not firebase_identity.is_registered():
             self._show_custom_message(
@@ -1093,26 +1137,37 @@ class DrawingPalette(tk.Toplevel):
 
         groups = getattr(self.app, '_cached_groups', {})
         ginfo = groups.get(active_group, {})
+        # Role check (safety guard)
+        my_role = ginfo.get("role", "") if isinstance(ginfo, dict) else ""
+        if my_role != "officer":
+            self._show_custom_message(
+                self.app.t('ui', 'publish_all'),
+                "Only officer can publish.")
+            return
+
         group_name = ginfo.get("name", "?") if isinstance(ginfo, dict) else "?"
 
         import config
         ok_count = 0
         err_count = 0
         import time
+
+        # Fetch existing schemes once for upsert
+        existing_group_schemes = firebase_groups.get_group_schemes(active_group)
+        scheme_by_map = {}
+        for sid, sdata in existing_group_schemes.items():
+            scheme_by_map[sdata.get("map_id")] = sid
+
         for map_id, elements in maps_with.items():
             map_name = config.MAP_NAMES_EN.get(map_id, map_id)
-            drawing_id, ok, _ = firebase_groups.publish_to_group(
-                group_id=active_group,
-                map_id=map_id,
-                map_name=map_name,
-                elements_data=elements,
-                comment="",
-            )
-            if ok:
-                ok_count += 1
-                if drawing_id:
-                    self.painter._group_schemes[drawing_id] = {
-                        "drawing_id": drawing_id,
+            existing_id = scheme_by_map.get(map_id)
+            if existing_id:
+                ok, _ = firebase_groups.update_group_scheme(
+                    active_group, existing_id, elements_data=elements, comment="")
+                if ok:
+                    ok_count += 1
+                    self.painter._group_schemes[existing_id] = {
+                        "drawing_id": existing_id,
                         "group_id": active_group,
                         "map_id": map_id,
                         "map_name": map_name,
@@ -1121,8 +1176,31 @@ class DrawingPalette(tk.Toplevel):
                         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                         "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                     }
+                else:
+                    err_count += 1
             else:
-                err_count += 1
+                drawing_id, ok, _ = firebase_groups.publish_to_group(
+                    group_id=active_group,
+                    map_id=map_id,
+                    map_name=map_name,
+                    elements_data=elements,
+                    comment="",
+                )
+                if ok:
+                    ok_count += 1
+                    if drawing_id:
+                        self.painter._group_schemes[drawing_id] = {
+                            "drawing_id": drawing_id,
+                            "group_id": active_group,
+                            "map_id": map_id,
+                            "map_name": map_name,
+                            "elements": list(elements),
+                            "comment": "",
+                            "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                            "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                else:
+                    err_count += 1
 
         if ok_count > 0:
             self.app._save_group_schemes_to_cache()
@@ -1393,7 +1471,7 @@ class DrawingPalette(tk.Toplevel):
             self._palette_compact_geo = self.geometry()
         except Exception:
             self._palette_compact_geo = None
-        self.geometry("580x720")
+        self.geometry("580x780")
         bg = "#222"
         tk.Label(self._download_frame, text=self.app.t('ui', 'download_loading'),
                  bg=bg, fg="#888", font=("Arial", 9)).pack(padx=10, pady=10)
@@ -1484,7 +1562,7 @@ class DrawingPalette(tk.Toplevel):
             unique_sources.insert(0, pub_label)
 
         style = ttk.Style()
-        style.theme_use("default")
+        style.theme_use("clam")
         style.configure("Treeview", background="#1a1a1a", foreground="#cccccc",
                         fieldbackground="#1a1a1a", bordercolor="#333", arrowcolor="#888")
         style.configure("Treeview.Heading", background="#333", foreground="#aaa",
@@ -1504,28 +1582,25 @@ class DrawingPalette(tk.Toplevel):
         ff = tk.Frame(self._download_frame, bg=bg)
         ff.pack(fill="x", padx=8, pady=(6, 2))
 
-        tk.Label(ff, text="Source:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
-        source_filter_var = tk.StringVar(value=all_label)
-        source_filter_cb = tk.ttk.Combobox(ff, textvariable=source_filter_var,
-                                           values=[all_label] + unique_sources,
-                                           state="readonly", width=14, font=("Arial", 8))
-        source_filter_cb.pack(side="left", padx=4)
+        t_ = self.app.t
 
-        tk.Label(ff, text="Map:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
+        tk.Label(ff, text=t_('ui', 'download_filter_map') + ":", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(0, 2))
         map_filter_var = tk.StringVar(value=all_label)
         map_filter_cb = tk.ttk.Combobox(ff, textvariable=map_filter_var,
                                          values=[all_label] + unique_maps,
                                          state="readonly", width=18, font=("Arial", 8))
         map_filter_cb.pack(side="left", padx=4)
+        map_filter_var.trace("w", lambda *a: _do_filter())
 
-        tk.Label(ff, text="Author:", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
+        tk.Label(ff, text=t_('ui', 'download_filter_author') + ":", bg=bg, fg="#aaa", font=("Arial", 8, "bold")).pack(side="left", padx=(8, 2))
         author_filter_var = tk.StringVar(value=all_label)
         author_filter_cb = tk.ttk.Combobox(ff, textvariable=author_filter_var,
                                               values=[all_label] + unique_authors,
                                               state="readonly", width=14, font=("Arial", 8))
         author_filter_cb.pack(side="left", padx=4)
+        author_filter_var.trace("w", lambda *a: _do_filter())
 
-        # ── Second filter row: search + show hidden ──
+        # ── Second filter row: search only ──
         ff2 = tk.Frame(self._download_frame, bg=bg)
         ff2.pack(fill="x", padx=8, pady=(0, 2))
 
@@ -1533,34 +1608,25 @@ class DrawingPalette(tk.Toplevel):
         search_var = tk.StringVar()
         search_entry = tk.ttk.Entry(ff2, textvariable=search_var, font=("Arial", 8), width=24)
         search_entry.pack(side="left", padx=(0, 8))
-
-        show_hidden_var = tk.BooleanVar(value=False)
-        show_hidden_cb = tk.Checkbutton(ff2, text=self.app.t('ui', 'download_show_hidden'),
-                                         variable=show_hidden_var, bg=bg, fg="#aaa",
-                                         selectcolor="#333", activebackground=bg,
-                                         activeforeground="#ccc", font=("Arial", 8))
-        show_hidden_cb.pack(side="right", padx=4)
-
-        # Stored hidden schemes reference
-        hidden_set = self.painter._hidden_download_schemes
+        search_var.trace("w", lambda *a: _do_filter())
 
         tf = tk.Frame(self._download_frame, bg=bg)
         tf.pack(fill="both", expand=True, padx=8, pady=4)
 
-        columns = ("map", "source", "comment", "author", "date", "preview")
-        tree = tk.ttk.Treeview(tf, columns=columns, show="headings",
-                                height=7, selectmode="browse")
-        tree.heading("map", text="Map Name")
-        tree.heading("source", text=self.app.t('ui', 'group_schemes'))
-        tree.heading("comment", text="Description")
-        tree.heading("author", text="Author")
-        tree.heading("date", text="Date")
+        columns = ("map", "comment", "author", "date", "preview")
+        tree = tk.ttk.Treeview(tf, columns=columns, show="tree headings",
+                                height=7, selectmode="none")
+        tree.heading("#0", text="")
+        tree.heading("map", text=t_('ui', 'download_col_map'))
+        tree.heading("comment", text=t_('ui', 'download_col_comment'))
+        tree.heading("author", text=t_('ui', 'download_col_author'))
+        tree.heading("date", text=t_('ui', 'download_col_date'))
         tree.heading("preview", text="")
-        tree.column("map", width=105)
-        tree.column("source", width=65)
-        tree.column("comment", width=130)
-        tree.column("author", width=75)
-        tree.column("date", width=65)
+        tree.column("#0", width=30, anchor="center", minwidth=30, stretch=False)
+        tree.column("map", width=110)
+        tree.column("comment", width=160)
+        tree.column("author", width=85)
+        tree.column("date", width=70)
         tree.column("preview", width=40, anchor="center")
 
         vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
@@ -1568,133 +1634,76 @@ class DrawingPalette(tk.Toplevel):
         tree.pack(side="left", fill="both", expand=True)
         vsb.pack(side="right", fill="y")
 
-        # Get current user info for delete permissions
-        current_uid = ""
-        current_nick = ""
-        if firebase_identity.is_connected():
-            ident = firebase_identity.get_identity()
-            if ident:
-                current_uid = ident.get("user_id", "")
-                current_nick = ident.get("nickname", "")
+        check_vars = {}
 
         def _do_filter(*args):
-            sf = source_filter_var.get()
             mf = map_filter_var.get()
             af = author_filter_var.get()
             search_text = search_var.get().strip().lower()
-            show_hidden = show_hidden_var.get()
             tree.delete(*tree.get_children())
             for it in items:
-                if sf != all_label and it["source_name"] != sf:
-                    continue
                 if mf != all_label and it["map_name"] != mf:
                     continue
                 if af != all_label and it["author"] != af:
                     continue
-                # Hidden filter
-                sid = it["scheme_id"]
-                is_hidden = sid in hidden_set
-                if is_hidden and not show_hidden:
-                    continue
-                # Search text
                 if search_text:
                     haystack = f"{it['map_name']} {it['author']} {it['comment']} {it['source_name']}".lower()
                     if search_text not in haystack:
                         continue
-                map_display = it["map_name"]
-                if is_hidden:
-                    map_display = map_display + " " + self.app.t('ui', 'hidden_scheme_label')
-                has_preview = it["map_id"] != "all_maps"
+                sid = it["scheme_id"]
+                is_all = it["map_id"] == "all_maps"
+                if sid not in check_vars:
+                    check_vars[sid] = tk.BooleanVar(value=False)
+                cb_state = "" if not is_all else "disabled"
+                has_preview = not is_all
                 tree.insert("", "end",
-                            values=(map_display, it["source_name"], it["comment"],
+                            text="☐" if not is_all else "",
+                            values=(it["map_name"], it["comment"],
                                     it["author"], it["created"],
                                     "Preview" if has_preview else ""),
-                            iid=sid)
+                            iid=sid, tags=(cb_state,))
 
-        source_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
-        map_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
-        author_filter_cb.bind("<<ComboboxSelected>>", _do_filter)
-        search_var.trace("w", lambda *a: self.after(150, _do_filter))
-        show_hidden_var.trace("w", lambda *a: _do_filter())
-
-        # ── Right-click context menu ──
-        ctx_menu = tk.Menu(self, tearoff=0, bg="#2a2a2a", fg="#ccc",
-                           activebackground="#444", activeforeground="white")
-
-        def _on_right_click(event):
+        def _toggle_check(event):
             row = tree.identify_row(event.y)
             if not row:
                 return
-            tree.selection_set(row)
-            sid = row
-            # Find item data
             it = None
             for x in items:
-                if x["scheme_id"] == sid:
+                if x["scheme_id"] == row:
                     it = x
                     break
             if not it:
                 return
-            ctx_menu.delete(0, "end")
-
-            # Preview
-            if it["map_id"] != "all_maps":
-                ctx_menu.add_command(label=self.app.t('ui', 'download_preview'),
-                                     command=lambda: self._preview_scheme(it, self._download_frame))
-
-            # Hide / Unhide
-            is_hidden = sid in hidden_set
-            if is_hidden:
-                ctx_menu.add_command(label=self.app.t('ui', 'unhide_scheme'),
-                                     command=lambda: self._toggle_hide(sid, hidden_set, _do_filter))
-            else:
-                ctx_menu.add_command(label=self.app.t('ui', 'hide_scheme'),
-                                     command=lambda: self._toggle_hide(sid, hidden_set, _do_filter))
-
-            # Delete (commander-author only)
-            author_uid = it.get("author_user_id", "")
-            if author_uid and current_uid and author_uid == current_uid:
-                ctx_menu.add_separator()
-                ctx_menu.add_command(label=self.app.t('ui', 'btn_delete_scheme'),
-                                     command=lambda: self._delete_download_scheme(it, _do_filter))
-
-            try:
-                ctx_menu.tk_popup(event.x_root, event.y_root)
-            finally:
-                ctx_menu.grab_release()
-
-        tree.bind("<Button-3>", _on_right_click)
-
-        # ── Left-click: preview on col #6 ──
-        def on_tree_click(event):
             region = tree.identify_region(event.x, event.y)
-            if region == "cell":
+            if region == "tree":
+                if it["map_id"] == "all_maps":
+                    return
+                var = check_vars[row]
+                var.set(not var.get())
+                tree.item(row, text="☑" if var.get() else "☐")
+            elif region == "cell":
                 col = tree.identify_column(event.x)
-                if col == "#6":
-                    sel = tree.selection()
-                    if sel:
-                        sid = sel[0]
-                        for it in items:
-                            if it["scheme_id"] == sid and it["map_id"] != "all_maps":
-                                self._preview_scheme(it, self._download_frame)
-                                return
+                if col == "#5":
+                    self._preview_scheme(it, self._download_frame)
 
-        tree.bind("<ButtonRelease-1>", on_tree_click)
+        tree.bind("<ButtonRelease-1>", _toggle_check)
+
+        self._preview_tree = tree
 
         bf = tk.Frame(self._download_frame, bg=bg)
         bf.pack(fill="x", padx=8, pady=(0, 8))
 
         def on_download():
-            sel = tree.selection()
-            if not sel:
+            checked = [it for it in items if check_vars.get(it["scheme_id"], tk.BooleanVar(value=False)).get()]
+            if not checked:
                 return
-            sid = sel[0]
-            for it in items:
-                if it["scheme_id"] == sid:
-                    self._download_result = it
-                    self._hide_download_inline()
-                    self._handle_download_result(it)
-                    return
+            self._download_result = checked
+            self._hide_download_inline()
+            for cit in checked:
+                self._handle_download_result(cit)
+            self._show_custom_message(
+                "Download",
+                f"Downloaded {len(checked)} scheme(s).")
 
         def on_cancel():
             self._download_result = None
@@ -1706,37 +1715,6 @@ class DrawingPalette(tk.Toplevel):
                   font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
 
         _do_filter()
-
-    def _toggle_hide(self, scheme_id, hidden_set, refresh_cb):
-        """Toggle hide/unhide for a scheme in the download dialog."""
-        if scheme_id in hidden_set:
-            hidden_set.discard(scheme_id)
-        else:
-            hidden_set.add(scheme_id)
-        self.app._save_group_schemes_to_cache()
-        refresh_cb()
-
-    def _delete_download_scheme(self, it, refresh_cb):
-        """Delete scheme from RTDB (commander-author only)."""
-        yes = dialog_utils.dark_confirmbox(self,
-            self.app.t('ui', 'group_scheme_delete_confirm'),
-            f"{it.get('map_name', '?')}: {it.get('comment', '')[:40] or '?'}")
-        if not yes:
-            return
-        source = it.get("source", "public")
-        scheme_id = it.get("scheme_id", "")
-        if "__" in scheme_id:
-            gid = source
-            drawing_id = scheme_id.split("__", 1)[1]
-        else:
-            gid = source
-            drawing_id = scheme_id
-        ok = firebase_groups.delete_group_scheme(gid, drawing_id)
-        if not ok:
-            dialog_utils.dark_messagebox(self, "Error", "Failed to delete scheme.")
-            return
-        firebase_groups.invalidate_group_schemes_cache(gid)
-        refresh_cb()
 
     def _handle_download_result(self, item):
         """Called when user selects a scheme to download. Shows choice dialog."""
@@ -1959,12 +1937,13 @@ class DrawingPalette(tk.Toplevel):
             pv.destroy()
             return
 
-        # Render elements on preview canvas
+        # Render elements on preview canvas with correct offset
         if isinstance(elements, list):
             map_id_cur = self.app.current_map_eng
             painter = self.app.painter
             if painter:
-                painter._render_elements(canvas, elements, pw, ph)
+                painter._render_elements(canvas, elements, pw, ph,
+                    offset_x=cx, offset_y=cy, img_w=new_w, img_h=new_h)
 
         tk.Button(pv, text="Close", bg="#444", fg="white", bd=0,
                   font=("Arial", 9), command=pv.destroy).pack(pady=4)

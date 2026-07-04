@@ -332,7 +332,18 @@ TRANSLATIONS = {
             "download_show_hidden": "Show hidden",
             "hide_scheme": "Hide",
             "unhide_scheme": "Unhide",
-            "hidden_scheme_label": "(hidden)"
+            "hidden_scheme_label": "(hidden)",
+            "btn_delete_group": "Delete Group",
+            "group_delete_confirm_title": "Delete Group",
+            "group_delete_confirm_msg": "Are you sure you want to delete group '{name}'?\nAll schemes in this group will be lost.",
+            "copied_to_clipboard": "Copied!",
+            "download_filter_source": "Source",
+            "download_filter_map": "Map",
+            "download_filter_author": "Author",
+            "download_col_map": "Map Name",
+            "download_col_comment": "Description",
+            "download_col_author": "Author",
+            "download_col_date": "Date"
         }
     }
 }

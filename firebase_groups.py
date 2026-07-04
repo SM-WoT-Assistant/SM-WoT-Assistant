@@ -361,6 +361,25 @@ def get_user_role_in_group(group_id, user_id=None):
     return None
 
 
+def delete_group(group_id):
+    """Повністю видаляє групу: схеми, members, саму групу, user_groups всіх учасників."""
+    if not firebase_reporter._is_configured():
+        return False
+
+    gdata = _get(f"groups/{group_id}")
+    if not gdata:
+        return False
+
+    members = gdata.get("members", {})
+    if isinstance(members, dict):
+        for muid in members:
+            _put(f"user_groups/{muid}/{group_id}", None)
+
+    ok = _put(f"groups/{group_id}", None)
+    invalidate_group_schemes_cache(group_id)
+    return ok
+
+
 def delete_group_scheme(group_id, drawing_id):
     """Видаляє схему з групи."""
     if not firebase_reporter._is_configured():
