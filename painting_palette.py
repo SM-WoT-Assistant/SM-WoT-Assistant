@@ -261,16 +261,12 @@ class DrawingPalette(tk.Toplevel):
         self._linked_schemes_frame = tk.Frame(self._group_mgmt_frame, bg="#1a1a1a")
         self._linked_schemes_frame.pack(fill="x", padx=2, pady=(0, 2))
 
-        self._refresh_linked_schemes_list()
-
     def _refresh_linked_schemes_list(self):
         """Перебудовує список linked-схем у _group_mgmt_frame."""
         for w in self._linked_schemes_frame.winfo_children():
             w.destroy()
         painter = self.painter
         if not hasattr(painter, '_group_schemes') or not painter._group_schemes:
-            tk.Label(self._linked_schemes_frame, text="No linked schemes",
-                     bg="#1a1a1a", fg="#555", font=("Arial", 7)).pack(pady=2)
             self._adapt_palette_height()
             return
         active_group = getattr(self.app, "active_group_id", None)

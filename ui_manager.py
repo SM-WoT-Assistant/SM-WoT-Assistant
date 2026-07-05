@@ -791,6 +791,9 @@ class UIManager:
             else:
                 self.app._stop_group_sync()
 
+            if hasattr(self.app, 'drawing_palette'):
+                self.app.drawing_palette._refresh_linked_schemes_list()
+
         elif view_name == "stats":
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
                 self.app._po_win.withdraw()
