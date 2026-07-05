@@ -266,6 +266,7 @@ class WotAssistantHQ:
         self._po_win.attributes("-transparentcolor", "#010101")
         self._po_win.wm_attributes("-alpha", 1.0)
         self._po_win.transient(self.root)
+        self.root.lower(self._po_win)
         self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
         self._po_canvas.pack(fill="both", expand=True)
         self.painter.bind_events_to(self._po_canvas)
@@ -300,7 +301,6 @@ class WotAssistantHQ:
         if self._hidden_by_f10:
             return
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
-            self._sync_po_pos()
             self._po_win.lift()
 
     def _on_root_focus_in(self, event=None):
@@ -1633,7 +1633,6 @@ class WotAssistantHQ:
 
         # geometry after deiconify
         self.root.update_idletasks()
-        self.h = self.w + self.get_edit_extra_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.update_idletasks()
@@ -1658,6 +1657,7 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.deiconify()
             self._sync_po_pos()
+            self.root.lower(self._po_win)
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
