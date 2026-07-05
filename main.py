@@ -293,6 +293,7 @@ class WotAssistantHQ:
         if cw > 50 and ch > 50:
             try:
                 self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
+                self.root.lower(self._po_win)
             except Exception:
                 pass
 
