@@ -141,10 +141,12 @@ class UIManager:
             try:
                 self.app.group_selector.pack_forget()
                 self.app.group_token_btn.pack_forget()
+                self.app.second_row.pack_forget()
             except Exception:
                 pass
             self.app.group_selector["values"] = []
             self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            self.app.top_bar.update_idletasks()
             return
 
         groups = firebase_groups.get_user_groups()
@@ -153,11 +155,15 @@ class UIManager:
             try:
                 self.app.group_selector.pack_forget()
                 self.app.group_token_btn.pack_forget()
+                self.app.second_row.pack_forget()
             except Exception:
                 pass
             self.app.group_selector["values"] = []
             self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            self.app.top_bar.update_idletasks()
             return
+        if getattr(self.app, 'active_view', None) == "maps":
+            self.app.second_row.pack(side="top", fill="x")
         self.app.group_selector.pack(side="left", padx=5, pady=2)
         self.app._cached_groups = groups
         names = []
@@ -210,6 +216,7 @@ class UIManager:
             else:
                 self.app.group_token_btn.config(text="🔒", fg="#666", command=None)
             self.app.group_token_btn.pack(side="left", padx=5, pady=2)
+        self.app.top_bar.update_idletasks()
 
     def _copy_group_token(self, code):
         if not code:
@@ -317,6 +324,7 @@ class UIManager:
             try:
                 self.app.group_selector.pack_forget()
                 self.app.group_token_btn.pack_forget()
+                self.app.second_row.pack_forget()
             except Exception:
                 pass
 
