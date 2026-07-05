@@ -54,6 +54,7 @@ class WotAssistantHQ:
         if ctypes.windll.kernel32.GetLastError() == 183:
             sys.exit(0)
         self._update_mutex = mutex
+        self.root.attributes("-topmost", True)
 
         self.mode = "edit" 
         self.map_mode = 1 
