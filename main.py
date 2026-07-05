@@ -300,6 +300,7 @@ class WotAssistantHQ:
         if self._hidden_by_f10:
             return
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
+            self._sync_po_pos()
             self._po_win.lift()
 
     def _on_root_focus_in(self, event=None):
@@ -354,7 +355,7 @@ class WotAssistantHQ:
             cx, cy = self.root.winfo_x(), self.root.winfo_y()
         except tk.TclError:
             return
-        if cx < -5000: return
+        if cx < -5000 or cx <= 0 or cy <= 0: return
         try:
             if self.root.winfo_width() < 100: return
         except tk.TclError:
@@ -546,6 +547,9 @@ class WotAssistantHQ:
         else:
             px = self.settings.get(f"{prefix}x", 100)
             py = self.settings.get(f"{prefix}y", 100)
+            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+            px = max(0, min(int(px), max(0, sw - self.w)))
+            py = max(0, min(int(py), max(0, sh - self.h)))
         
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.attributes("-alpha", 0.0)
@@ -1627,8 +1631,9 @@ class WotAssistantHQ:
         except Exception as e:
             print(f"[INIT] Помилка показу головного вікна: {e}")
 
-        # geometry після deiconify — Windows приймає зміну розміру
+        # geometry after deiconify
         self.root.update_idletasks()
+        self.h = self.w + self.get_edit_extra_height()
         px, py = self.root.winfo_x(), self.root.winfo_y()
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.update_idletasks()
@@ -1707,7 +1712,7 @@ class WotAssistantHQ:
                 safe_x = max(0, (sw - safe_w) // 2)
                 safe_y = max(0, (sh - safe_h) // 2)
                 self.root.geometry(f"{safe_w}x{safe_h}+{safe_x}+{safe_y}")
-                self.root.attributes("-alpha", max(0.2, min(float(self.alpha), 1.0)))
+                self.root.attributes("-alpha", max(0.1, min(float(self.alpha), 1.0)))
                 self.root.deiconify()
                 self.root.lift()
                 self.root.focus_force()

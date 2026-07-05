@@ -96,7 +96,7 @@ class WindowManager:
         self.app.w = max(500, min(int(self.app.w), self.app.max_window_w))
         self.app.h = self.app.settings.get("edit_h", self.app.w + 160)
         self.app.alpha = self.app.settings.get("edit_alpha", 1.0)
-        self.app.alpha = max(0.2, min(float(self.app.alpha), 1.0))
+        self.app.alpha = max(0.1, min(float(self.app.alpha), 1.0))
         self.app.contrast = self.app.settings.get("edit_contrast", 1.0)
         
         px = self.app.settings.get("edit_x", (sw - self.app.w) // 2)
@@ -191,6 +191,7 @@ class WindowManager:
                         if self.app.mode == "norm" and not self.format_mode_enabled:
                             self.set_clickthrough(True)
                         self.app.save_settings()
+                        if hasattr(self.app, '_sync_po_pos'): self.app._sync_po_pos()
                         print("[DRAG] Кінець drag")
                 
                 time.sleep(0.016)  # ~60 FPS
@@ -269,6 +270,7 @@ class WindowManager:
                 self.mouse_drag_active = False
                 self.mouse_last_pos = None
                 self.app.save_settings()
+                if hasattr(self.app, '_sync_po_pos'): self.app._sync_po_pos()
 
         def on_any_mouse_event(event):
             et = getattr(event, "event_type", None)
@@ -317,6 +319,7 @@ class WindowManager:
     def stop_win_move(self, e):
         self.drag = None
         self.app.save_settings()
+        if hasattr(self.app, '_sync_po_pos'): self.app._sync_po_pos()
 
     def resize_up(self, e): 
         if not self._is_ctrl_armed():
