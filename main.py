@@ -266,7 +266,6 @@ class WotAssistantHQ:
         self._po_win.attributes("-transparentcolor", "#010101")
         self._po_win.wm_attributes("-alpha", 1.0)
         self._po_win.transient(self.root)
-        self.root.lower(self._po_win)
         self._po_canvas = tk.Canvas(self._po_win, bg="#010101", highlightthickness=0)
         self._po_canvas.pack(fill="both", expand=True)
         self.painter.bind_events_to(self._po_canvas)
@@ -1657,7 +1656,6 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.deiconify()
             self._sync_po_pos()
-            self.root.lower(self._po_win)
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)
