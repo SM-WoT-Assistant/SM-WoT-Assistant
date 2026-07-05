@@ -1,4 +1,4 @@
-    
+            
 
 import os, sys, json, ctypes, re
 
@@ -60,7 +60,7 @@ class WotAssistantHQ:
         self.dialog_open = False 
         self.edit_focus_lock = False
         self._last_mode_hotkey_ts = 0.0
-        self.active_view = "maps"
+        self.active_view = ""
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
