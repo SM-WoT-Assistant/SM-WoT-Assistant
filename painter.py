@@ -511,6 +511,7 @@ class MapPainter:
         self._move_history.append((idx, original))
         self.move_drag = None
         self.save_drawings()
+        self.app.root.after(50, self._edit_object_at, idx)
         return "break"
 
     def _draw_class_icons(self, canvas, x, y, class_list, color, sc=1.0):
@@ -689,13 +690,8 @@ class MapPainter:
         self.redraw()
 
     def _confirm_delete(self, label):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'confirm_title'))
-        dlg.configure(bg="#2a2a2a")
-        dlg.resizable(False, False)
-        dlg.minsize(300, 120)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'confirm_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 150
@@ -703,9 +699,9 @@ class MapPainter:
         dlg.geometry(f"+{cx}+{cy}")
 
         tk.Label(dlg, text=self.app.t('ui', 'confirm_delete_msg').format(label=label), font=("Arial", 10),
-                 bg="#2a2a2a", fg="#cccccc").pack(pady=(20, 15))
+                 bg="#222", fg="#cccccc", wraplength=360).pack(padx=20, pady=(20, 15))
 
-        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 15))
         result = {"ok": False}
         def on_yes(): result["ok"] = True; dlg.destroy()

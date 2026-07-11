@@ -27,7 +27,7 @@ def _get_translator():
 _KNOWN_KEYS = [
     "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12",
     "F13", "F14", "F15", "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23", "F24",
-    "Ctrl", "Alt", "Shift", "LMB", "RMB", "Enter", "Esc", "Tab", "Del", "Delete",
+    "Ctrl", "Alt", "Shift", "LMB", "RMB", "Enter", "Esc", "Tab", "Del",
     "Up", "Down", "Left", "Right", "Home", "End", "PgUp", "PgDn", "Space", "Backspace",
     "E", "Z", "X", "C", "V",
     "LT", "MT", "HT", "TD", "SPG",

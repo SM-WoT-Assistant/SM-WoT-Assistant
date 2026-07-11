@@ -13,6 +13,25 @@ def _set_dark_title_bar(window):
     except Exception:
         pass
 
+def make_custom_dialog(parent, title_text, width=None, height=None):
+    """Створює overrideredirect Toplevel з темним header + ✕ close.
+    Повертає (dialog, header_frame) для наповнення та _DragHelper."""
+    dlg = tk.Toplevel(parent)
+    dlg.overrideredirect(True)
+    dlg.configure(bg="#222")
+    dlg.attributes("-topmost", True)
+    dlg.resizable(False, False)
+    dlg.update_idletasks()
+    if width and height:
+        dlg.geometry(f"{width}x{height}")
+    hdr = tk.Frame(dlg, bg="#2a2a2a")
+    hdr.pack(fill="x")
+    tk.Label(hdr, text=title_text, bg="#2a2a2a", fg="#cccccc",
+             font=("Arial", 9)).pack(side="left", padx=10, pady=6)
+    tk.Button(hdr, text="✕", bg="#2a2a2a", fg="#888",
+              bd=0, command=dlg.destroy).pack(side="right", padx=6)
+    return dlg, hdr
+
 class _DragHelper:
     def __init__(self, toplevel, frame):
         self.tl = toplevel; self.x = 0; self.y = 0
@@ -39,14 +58,9 @@ def _center_on_root(dlg, parent):
     except Exception:
         pass
 
-def dark_messagebox(parent, title, message, is_error=False):
-    dlg = tk.Toplevel(parent)
-    dlg.title(title)
-    dlg.configure(bg="#222")
-    dlg.resizable(False, False)
-    dlg.transient(parent)
-    dlg.attributes("-topmost", True)
-    _set_dark_title_bar(dlg)
+def dark_messagebox(parent, title, message, is_error=False, ok_text="OK"):
+    dlg, hdr = make_custom_dialog(parent, title)
+    _DragHelper(dlg, hdr)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
@@ -55,12 +69,12 @@ def dark_messagebox(parent, title, message, is_error=False):
              font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
     tk.Label(dlg, text=message, bg="#222",
              fg="#ff6666" if is_error else "#cccccc",
-             font=("Arial", 9), wraplength=360, justify="left").pack(padx=20, pady=(4, 12))
+             font=("Arial", 9), wraplength=400, justify="left").pack(padx=20, pady=(4, 12))
     bf = tk.Frame(dlg, bg="#222")
     bf.pack(pady=(0, 12))
     btn_bg = "#664444" if is_error else "#446644"
     btn_fg = "#fcc" if is_error else "#cfc"
-    tk.Button(bf, text="OK", bg=btn_bg, fg=btn_fg, bd=0,
+    tk.Button(bf, text=ok_text, bg=btn_bg, fg=btn_fg, bd=0,
               font=("Arial", 9, "bold"), padx=20, pady=4,
               command=dlg.destroy).pack()
 
@@ -68,13 +82,8 @@ def dark_messagebox(parent, title, message, is_error=False):
     parent.wait_window(dlg)
 
 def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
-    dlg = tk.Toplevel(parent)
-    dlg.title(title)
-    dlg.configure(bg="#222")
-    dlg.resizable(False, False)
-    dlg.transient(parent)
-    dlg.attributes("-topmost", True)
-    _set_dark_title_bar(dlg)
+    dlg, hdr = make_custom_dialog(parent, title)
+    _DragHelper(dlg, hdr)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
@@ -89,7 +98,7 @@ def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
              font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
     tk.Label(dlg, text=message, bg="#222", fg="#cccccc",
-             font=("Arial", 9), wraplength=360, justify="left").pack(padx=20, pady=(4, 12))
+             font=("Arial", 9), wraplength=400, justify="left").pack(padx=20, pady=(4, 12))
 
     bf = tk.Frame(dlg, bg="#222")
     bf.pack(pady=(0, 12))
@@ -104,14 +113,9 @@ def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
     parent.wait_window(dlg)
     return result[0]
 
-def dark_promptbox(parent, title, prompt, initialvalue=""):
-    dlg = tk.Toplevel(parent)
-    dlg.title(title)
-    dlg.configure(bg="#222")
-    dlg.resizable(False, False)
-    dlg.transient(parent)
-    dlg.attributes("-topmost", True)
-    _set_dark_title_bar(dlg)
+def dark_promptbox(parent, title, prompt, initialvalue="", ok_text="OK", cancel_text="Cancel"):
+    dlg, hdr = make_custom_dialog(parent, title)
+    _DragHelper(dlg, hdr)
     dlg.grab_set()
     dlg.lift()
     dlg.focus_force()
@@ -141,10 +145,10 @@ def dark_promptbox(parent, title, prompt, initialvalue=""):
 
     bf = tk.Frame(dlg, bg="#222")
     bf.pack(pady=(0, 12))
-    tk.Button(bf, text="OK", bg="#446644", fg="#cfc", bd=0,
+    tk.Button(bf, text=ok_text, bg="#446644", fg="#cfc", bd=0,
               font=("Arial", 9, "bold"), padx=20, pady=4,
               command=on_ok).pack(side="left", padx=6)
-    tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+    tk.Button(bf, text=cancel_text, bg="#444", fg="#aaa", bd=0,
               font=("Arial", 9), padx=12, pady=4,
               command=on_cancel).pack(side="left", padx=6)
 

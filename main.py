@@ -65,6 +65,8 @@ class WotAssistantHQ:
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
+        self._restore_button = None
+        self._restore_drag_start = {"x": 0, "y": 0}
         self.active_group_id = "public"
         self._cached_groups = {}
         self._group_id_map = {}
@@ -429,13 +431,8 @@ class WotAssistantHQ:
                 self.map_mgr.run_map_updater()
 
     def ask_clear_confirm(self, map_title, on_done):
-        dlg = tk.Toplevel(self.root)
-        dlg.title(self.t('ui', 'dialog_clear_title'))
-        dlg.configure(bg="#2a2a2a")
-        dlg.resizable(False, False)
-        dlg.minsize(300, 120)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.root, self.t('ui', 'dialog_clear_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
@@ -443,9 +440,9 @@ class WotAssistantHQ:
         dlg.geometry(f"+{cx}+{cy}")
 
         tk.Label(dlg, text=self.t('ui', 'dialog_clear_msg').format(map_title=map_title),
-                 font=("Arial", 10), bg="#2a2a2a", fg="#cccccc").pack(pady=(20, 15))
+                 font=("Arial", 10), bg="#222", fg="#cccccc", wraplength=360).pack(padx=20, pady=(20, 15))
 
-        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 15))
         result = {"ok": False}
         def on_yes(): result["ok"] = True; dlg.destroy()
@@ -588,7 +585,8 @@ class WotAssistantHQ:
                 w = self.root.winfo_width()
                 target_h = w + 18
                 if abs(self.root.winfo_height() - target_h) > 1:
-                    self.root.geometry(f"{w}x{int(target_h)}")
+                    cur_x, cur_y = self.root.winfo_x(), self.root.winfo_y()
+                    self.root.geometry(f"{w}x{int(target_h)}+{cur_x}+{cur_y}")
                     self.root.update_idletasks()
             self.root.update_idletasks()
             self.map_renderer.show_main_splash()
@@ -662,12 +660,14 @@ class WotAssistantHQ:
                 on_click=self._on_tray_click
             )
         self.root.withdraw()
+        self.root.after(200, self._show_restore_button)
 
     def _restore_from_tray(self):
         """Відновити програму з системного трею"""
+        self._hide_restore_button()
         if self._tray_icon:
             self._tray_icon.remove()
-            self._tray_icon = None
+        self._tray_icon = None
         self._hidden_by_f10 = False
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
@@ -682,6 +682,81 @@ class WotAssistantHQ:
     def _on_tray_click(self):
         """Колбек при кліку на іконку в треї"""
         self._restore_from_tray()
+
+    def _show_restore_button(self):
+        if self._restore_button is not None and self._restore_button.winfo_exists():
+            return
+        border_color = "#ffffff"
+        btn = self._restore_button = tk.Toplevel(self.root)
+        btn.overrideredirect(True)
+        btn.attributes("-topmost", True)
+        btn.attributes("-alpha", 0.82)
+        btn.configure(bg=border_color)
+
+        # Load logo
+        ico_path = os.path.join(config.BASE_DIR, "icon.ico")
+        logo_img = None
+        if os.path.exists(ico_path):
+            try:
+                pil_img = Image.open(ico_path).resize((64, 64), Image.LANCZOS)
+                logo_img = ImageTk.PhotoImage(pil_img)
+            except Exception:
+                pass
+
+        cf = tk.Frame(btn, bg="#222")
+        cf.pack(padx=4, pady=4, fill="both", expand=True)
+
+        if logo_img:
+            logo_lbl = tk.Label(cf, image=logo_img, bg="#222")
+            logo_lbl.image = logo_img
+            logo_lbl.pack(pady=(10, 2))
+
+        text_lbl = tk.Label(cf, text=self.t('ui', 'expand_btn').upper(),
+                            font=("Arial", 9, "bold"), bg="#222", fg="white")
+        text_lbl.pack(pady=(2, 2), padx=16)
+
+        arrow_lbl = tk.Label(cf, text=chr(0xF063),
+                             font=("FontAwesome", 14), bg="#222", fg="#ffaa00")
+        arrow_lbl.pack(pady=(2, 4), padx=16)
+
+        def _drag_start(event):
+            self._restore_drag_start["x"] = event.x_root
+            self._restore_drag_start["y"] = event.y_root
+            self._restore_drag_start["ox"] = event.x_root
+            self._restore_drag_start["oy"] = event.y_root
+
+        def _drag_move(event):
+            dx = event.x_root - self._restore_drag_start["x"]
+            dy = event.y_root - self._restore_drag_start["y"]
+            x = btn.winfo_x() + dx
+            y = btn.winfo_y() + dy
+            btn.geometry(f"+{x}+{y}")
+            self._restore_drag_start["x"] = event.x_root
+            self._restore_drag_start["y"] = event.y_root
+
+        def _drag_release(event):
+            dx = abs(event.x_root - self._restore_drag_start["ox"])
+            dy = abs(event.y_root - self._restore_drag_start["oy"])
+            if dx < 5 and dy < 5:
+                self._hide_restore_button()
+                self._restore_from_tray()
+
+        for w in (cf, logo_lbl if logo_img else cf, text_lbl, arrow_lbl):
+            w.bind("<Button-1>", _drag_start)
+            w.bind("<B1-Motion>", _drag_move)
+            w.bind("<ButtonRelease-1>", _drag_release)
+
+        btn.update_idletasks()
+        btn.geometry(f"+20+20")
+
+
+    def _hide_restore_button(self):
+        if self._restore_button is not None:
+            try:
+                self._restore_button.destroy()
+            except Exception:
+                pass
+            self._restore_button = None
 
     def _ensure_edit_focus(self):
         if not self.edit_focus_lock or self.mode != "edit" or self.root.state() == "withdrawn":
@@ -799,15 +874,18 @@ class WotAssistantHQ:
 
     def export_current_tactic(self):
         if not self.current_map_eng: return
+        _t = lambda k, d: self.t('ui', k)
         tactics_manager.export_tactic(
             self.root, 
             self.current_map_eng, 
             self.translate_map_name(self.current_map_eng), 
-            self.painter.drawings
+            self.painter.drawings,
+            _t=_t
         )
 
     def import_external_tactic(self):
         if not self.current_map_eng: return
+        _t = lambda k, d: self.t('ui', k)
         def on_success():
             self.painter.save_drawings()
             self.painter.redraw()
@@ -817,28 +895,32 @@ class WotAssistantHQ:
             self.current_map_eng,
             self.translate_map_name(self.current_map_eng),
             self.painter.drawings,
-            on_success
+            on_success,
+            _t=_t
         )
 
     def export_all_tactics(self):
-        tactics_manager.export_all_tactics(self.root, self.painter.drawings)
+        _t = lambda k, d: self.t('ui', k)
+        tactics_manager.export_all_tactics(self.root, self.painter.drawings, _t=_t)
 
     def import_all_tactics(self):
+        _t = lambda k, d: self.t('ui', k)
         def on_success():
             self.painter.save_drawings()
             self.painter.redraw()
         tactics_manager.import_all_tactics(
-            self.root, self.painter.drawings, on_success
+            self.root, self.painter.drawings, on_success, _t=_t
         )
 
     def import_tactic_unified(self):
+        _t = lambda k, d: self.t('ui', k)
         def on_success():
             self.painter.save_drawings()
             self.painter.redraw()
         tactics_manager.import_unified(
             self.root, self.current_map_eng,
             self.translate_map_name(self.current_map_eng) if self.current_map_eng else "",
-            self.painter.drawings, on_success
+            self.painter.drawings, on_success, _t=_t
         )
 
     def on_minimap_appeared(self, map_id, mode):
@@ -969,6 +1051,7 @@ class WotAssistantHQ:
 
     def quit_app(self):
         self._sync_running = False
+        self._hide_restore_button()
         if self._tray_icon:
             self._tray_icon.remove()
             self._tray_icon = None
@@ -1000,17 +1083,13 @@ class WotAssistantHQ:
         firebase_reporter.check_for_updates(on_done=_on_result)
 
     def _show_update_dialog(self, latest_ver, current_ver, download_url):
-        dlg = tk.Toplevel(self.root)
-        dlg.title(self.t('ui', 'dialog_update_title'))
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.root, self.t('ui', 'dialog_update_title'), 300, 180)
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
         cx = self.root.winfo_x() + self.root.winfo_width() // 2 - 150
         cy = self.root.winfo_y() + self.root.winfo_height() // 2 - 80
-        dlg.geometry(f"300x180+{cx}+{cy}")
+        dlg.geometry(f"+{cx}+{cy}")
 
         tk.Label(dlg, text=self.t('ui', 'dialog_update_available'), font=("Arial", 12, "bold"),
                  bg="#222", fg="#ffaa00").pack(pady=(15, 5))
@@ -1040,17 +1119,13 @@ class WotAssistantHQ:
         self.root.wait_window(dlg)
 
     def _download_and_install(self, url, latest_ver):
-        pw = tk.Toplevel(self.root)
-        pw.title(self.t('ui', 'dialog_update_title'))
-        pw.configure(bg="#222")
-        pw.resizable(False, False)
-        pw.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(pw)
+        pw, hdr = dialog_utils.make_custom_dialog(self.root, self.t('ui', 'dialog_update_title'), 380, 160)
+        dialog_utils._DragHelper(pw, hdr)
 
         sw, sh = 380, 160
         cx = self.root.winfo_screenwidth() // 2 - sw // 2
         cy = self.root.winfo_screenheight() // 2 - sh // 2
-        pw.geometry(f"{sw}x{sh}+{cx}+{cy}")
+        pw.geometry(f"+{cx}+{cy}")
 
         status_var = tk.StringVar(value=self.t('ui', 'dialog_update_downloading').format(version=latest_ver))
         tk.Label(pw, textvariable=status_var, font=("Arial", 10, "bold"),

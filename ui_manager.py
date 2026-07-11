@@ -404,13 +404,8 @@ class UIManager:
         menu.focus_set()
 
     def _confirm_disconnect(self):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'confirm_disconnect_title'))
-        dlg.configure(bg="#2a2a2a")
-        dlg.resizable(False, False)
-        dlg.minsize(260, 100)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'confirm_disconnect_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - 130
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - 50
@@ -439,17 +434,14 @@ class UIManager:
             self._show_connect_error_dialog(msg)
 
     def _show_connect_error_dialog(self, msg):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.configure(bg="#2a2a2a")
-        dlg.resizable(False, False)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'confirm_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
-        tk.Label(dlg, text=msg, font=("Arial", 10), bg="#2a2a2a",
-                 fg="#ff6666", wraplength=300, justify="center").pack(pady=(15, 10))
+        tk.Label(dlg, text=msg, font=("Arial", 10), bg="#222",
+                 fg="#ff6666", wraplength=360, justify="center").pack(pady=(15, 10))
 
-        bf = tk.Frame(dlg, bg="#2a2a2a")
+        bf = tk.Frame(dlg, bg="#222")
         bf.pack(pady=(0, 10))
 
         def clear_and_register():
@@ -468,7 +460,7 @@ class UIManager:
             else:
                 self._show_connect_error_dialog(msg2)
 
-        tk.Button(bf, text="Clear & Register", bg="#553333", fg="white", bd=0,
+        tk.Button(bf, text=self.app.t('ui', 'clear_register_btn'), bg="#553333", fg="white", bd=0,
                   font=("Arial", 9), padx=10, pady=4, command=clear_and_register).pack(side="left", padx=5)
         tk.Button(bf, text=self.app.t('ui', 'connect'), bg="#334455", fg="#99ccff", bd=0,
                   font=("Arial", 9), padx=10, pady=4, command=retry).pack(side="left", padx=5)
@@ -484,12 +476,8 @@ class UIManager:
         self.app.root.wait_window(dlg)
 
     def _show_registration_dialog(self):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'registration_title'))
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'registration_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
         tk.Label(dlg, text="SM WoT Assistant", font=("Arial", 14, "bold"),
@@ -603,12 +591,8 @@ class UIManager:
 
     def _show_edit_dialog(self):
         """Діалог зміни нікнейму та PIN (з валідацією)."""
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'edit'))
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'edit'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
 
         f = tk.Frame(dlg, bg="#222")

@@ -85,7 +85,10 @@ class LocaleManager:
             cached = curr_ui.get(key)
             stored_en = en_snapshot.get(key)
             # Re-translate if: no cache, value is still English, OR EN source changed
-            if cached is None or cached == en_val or stored_en != en_val:
+            # OR cached starts with "Delete" (Google Translate partial failure)
+            needs_retranslate = (cached is None or cached == en_val or stored_en != en_val or
+                                 (en_val.startswith("Delete") and isinstance(cached, str) and cached.startswith("Delete")))
+            if needs_retranslate:
                 missing[key] = en_val
 
         if not missing:

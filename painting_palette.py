@@ -941,13 +941,9 @@ class DrawingPalette(tk.Toplevel):
 
     def _ask_publish_description(self, name, count=0, existing_comments=None,
                                   map_id=None, map_ids=None):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'publish_map') if count == 0 else self.app.t('ui', 'publish_all'))
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.transient(self.app.root)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        title = self.app.t('ui', 'publish_map') if count == 0 else self.app.t('ui', 'publish_all')
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, title)
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -995,7 +991,7 @@ class DrawingPalette(tk.Toplevel):
                 for mid in check_ids:
                     if (mid, desc_en) in existing_comments:
                         text_w.config(bg="#331111")
-                        err_lbl.config(text="Same map with this description already exists. Change description to publish.")
+                        err_lbl.config(text=self.app.t('ui', 'publish_duplicate_error'))
                         err_lbl.pack(fill="x", padx=16)
                         return
 
@@ -1231,13 +1227,8 @@ class DrawingPalette(tk.Toplevel):
         dlg.geometry(f"+{x}+{y}")
 
     def _show_custom_message(self, title, message, is_error=False):
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(title)
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.transient(self.app.root)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, title)
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()
@@ -1803,13 +1794,8 @@ class DrawingPalette(tk.Toplevel):
 
     def _choose_download_action(self, map_name, is_all_maps, is_group_scheme=False):
         """Show choice dialog for download action. Returns 'replace', 'add', 'save_pc', 'link' or None."""
-        dlg = tk.Toplevel(self.app.root)
-        dlg.title(self.app.t('ui', 'download_confirm_title'))
-        dlg.configure(bg="#222")
-        dlg.resizable(False, False)
-        dlg.transient(self.app.root)
-        dlg.attributes("-topmost", True)
-        dialog_utils._set_dark_title_bar(dlg)
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'download_confirm_title'))
+        dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         dlg.lift()
         dlg.focus_force()

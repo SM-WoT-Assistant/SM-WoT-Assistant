@@ -182,7 +182,7 @@ class MapRenderer:
             if map_y <= py <= map_y + map_h:
                 app.canvas.create_line(map_x, py, map_x + map_w, py, fill=gc, width=1, tags="map")
 
-        row_letters = [chr(ord('A') + i) for i in range(rows)]
+        row_letters = ['A','B','C','D','E','F','G','H','I','K']
 
         for col in range(cols):
             gx = minX + cell_w * (col + 0.5)

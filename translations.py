@@ -343,7 +343,39 @@ TRANSLATIONS = {
             "download_col_map": "Map Name",
             "download_col_comment": "Description",
             "download_col_author": "Author",
-            "download_col_date": "Date"
+            "download_col_date": "Date",
+
+            "btn_ok": "OK",
+            "clear_register_btn": "Clear & Register",
+
+            "tactic_replace": "Replace",
+            "tactic_merge": "Merge",
+            "tactic_choice_cancel": "Cancel",
+
+            "export_no_drawings": "No drawings",
+            "export_success": "Exported!",
+            "export_all_success": "Exported {maps} maps ({count} items)",
+            "export_save_error": "Save failed: {error}",
+
+            "import_error_format": "Invalid format",
+            "import_error_all_maps": "All-maps file.\nUse Import All.",
+            "import_warning_title": "Map mismatch",
+            "import_warning_msg": "Created for '{src}'.\nImport to '{dst}'?",
+            "import_choice_msg": "Replace or merge?",
+            "import_success": "Imported!",
+            "import_read_error": "Read failed: {error}",
+
+            "import_all_info": "File: {src_m} maps ({src_o} items)\nCurrent: {dst_m} maps ({dst_o} items)",
+            "import_all_choice_msg": "Replace all or merge?",
+            "import_all_success": "Imported {src_m} maps.\nTotal: {total} items.",
+            "import_all_error_format": "Invalid all-maps format",
+
+            "unified_error_format": "Invalid file format",
+            "unified_single_format_error": "Invalid format:\nexpected array of drawings",
+
+            "publish_duplicate_error": "Description already exists",
+
+            "expand_btn": "Expand"
         }
     }
 }

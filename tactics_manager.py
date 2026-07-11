@@ -3,13 +3,10 @@ import tkinter as tk
 from tkinter import filedialog
 import dialog_utils
 
-def _choice_dialog(parent, title, text):
-    dlg = tk.Toplevel(parent)
-    dlg.title(title)
-    dlg.configure(bg="#222")
-    dlg.resizable(False, False)
-    dlg.attributes("-topmost", True)
-    dialog_utils._set_dark_title_bar(dlg)
+def _choice_dialog(parent, title, text, _t=None):
+    _t = _t or (lambda k, d: d)
+    dlg, hdr = dialog_utils.make_custom_dialog(parent, title)
+    dialog_utils._DragHelper(dlg, hdr)
     dlg.grab_set()
     result = None
     tk.Label(dlg, text=text, bg="#222", fg="#ccc",
@@ -22,28 +19,29 @@ def _choice_dialog(parent, title, text):
         nonlocal result; result = False; dlg.destroy()
     def on_cancel():
         nonlocal result; result = None; dlg.destroy()
-    tk.Button(bf, text="ЗАМІНИТИ", bg="#553333", fg="#ff6666", bd=0,
+    tk.Button(bf, text=_t('tactic_replace', 'Replace'), bg="#553333", fg="#ff6666", bd=0,
               font=("Arial", 9, "bold"), padx=12, pady=4, command=on_replace).pack(side="left", padx=4)
-    tk.Button(bf, text="ОБ'ЄДНАТИ", bg="#335533", fg="#66cc66", bd=0,
+    tk.Button(bf, text=_t('tactic_merge', 'Merge'), bg="#335533", fg="#66cc66", bd=0,
               font=("Arial", 9, "bold"), padx=12, pady=4, command=on_merge).pack(side="left", padx=4)
-    tk.Button(bf, text="СКАСУВАТИ", bg="#444", fg="#aaa", bd=0,
+    tk.Button(bf, text=_t('tactic_choice_cancel', 'Cancel'), bg="#444", fg="#aaa", bd=0,
               font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="left", padx=4)
     parent.wait_window(dlg)
     return result
 
-def export_tactic(parent, map_id, map_name, drawings):
+def export_tactic(parent, map_id, map_name, drawings, _t=None):
+    _t = _t or (lambda k, d: d)
     if not map_id or map_id not in drawings or not drawings[map_id]:
-        dialog_utils.dark_messagebox(parent, "Експорт", "На цій карті немає малюнків для експорту.")
+        dialog_utils.dark_messagebox(parent, _t('export_no_drawings', 'Export'), _t('export_no_drawings', 'No drawings'))
         return
-    
+
     file_path = filedialog.asksaveasfilename(
         parent=parent,
-        title=f"Експорт тактики: {map_name}",
+        title=_t('export_success', 'Export tactic'),
         defaultextension=".json",
         filetypes=[("JSON files", "*.json")],
         initialfile=f"{map_name}.json"
     )
-    
+
     if file_path:
         data = {
             "map_id": map_id,
@@ -55,41 +53,41 @@ def export_tactic(parent, map_id, map_name, drawings):
         try:
             with open(file_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4, ensure_ascii=False)
-            dialog_utils.dark_messagebox(parent, "Експорт", "Тактику успішно експортовано!")
+            dialog_utils.dark_messagebox(parent, _t('export_success', 'Export'), _t('export_success', 'Exported!'))
         except Exception as e:
-            dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося зберегти файл: {e}", is_error=True)
+            dialog_utils.dark_messagebox(parent, _t('export_save_error', 'Error'), _t('export_save_error', 'Save failed: {error}').format(error=e), is_error=True)
 
-def import_tactic(parent, current_map_id, current_map_name, drawings, on_success):
+def import_tactic(parent, current_map_id, current_map_name, drawings, on_success, _t=None):
+    _t = _t or (lambda k, d: d)
     file_path = filedialog.askopenfilename(
         parent=parent,
-        title="Імпорт тактики",
+        title=_t('import_success', 'Import tactic'),
         filetypes=[("JSON files", "*.json")]
     )
-    
+
     if file_path:
         try:
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            
+
             if not isinstance(data, dict) or "drawings" not in data:
-                dialog_utils.dark_messagebox(parent, "Помилка", "Некоректний формат файлу тактики.", is_error=True)
+                dialog_utils.dark_messagebox(parent, _t('import_error_format', 'Error'), _t('import_error_format', 'Invalid format'), is_error=True)
                 return
 
             if not isinstance(data["drawings"], list):
-                dialog_utils.dark_messagebox(parent, "Помилка",
-                    "Це файл усіх тактик (містить кілька мап).\nВикористайте ALL IMPORT.",
+                dialog_utils.dark_messagebox(parent, _t('import_error_all_maps', 'Error'),
+                    _t('import_error_all_maps', 'All-maps file.\nUse Import All.'),
                     is_error=True)
                 return
 
             import_map_id = data.get("map_id")
             if import_map_id and import_map_id != current_map_id:
-                msg = (f"Ця тактика була створена для мапи '{data.get('map_name', import_map_id)}'.\n"
-                       f"Імпортувати на поточну мапу '{current_map_name}'?")
-                if not dialog_utils.dark_confirmbox(parent, "Попередження", msg, yes_text="ТАК", no_text="НІ"):
+                msg = _t('import_warning_msg', "Created for '{src}'.\nImport to '{dst}'?").format(src=data.get('map_name', import_map_id), dst=current_map_name)
+                if not dialog_utils.dark_confirmbox(parent, _t('import_warning_title', 'Map mismatch'), msg, yes_text=_t('btn_yes', 'Yes'), no_text=_t('btn_no', 'No')):
                     return
 
-            choice = _choice_dialog(parent, "Імпорт",
-                "Бажаєте ЗАМІНИТИ існуючі малюнки чи ОБ'ЄДНАТИ з поточними?")
+            choice = _choice_dialog(parent, _t('import_choice_msg', 'Import'),
+                _t('import_choice_msg', 'Replace or merge?'), _t=_t)
 
             if choice is None:
                 return
@@ -101,17 +99,18 @@ def import_tactic(parent, current_map_id, current_map_name, drawings, on_success
                 drawings[current_map_id] = data["drawings"]
             else:
                 drawings[current_map_id].extend(data["drawings"])
-            
+
             on_success()
-            dialog_utils.dark_messagebox(parent, "Імпорт", "Тактику успішно імпортовано!")
-            
+            dialog_utils.dark_messagebox(parent, _t('import_success', 'Import'), _t('import_success', 'Imported!'))
+
         except Exception as e:
-            dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося прочитати файл: {e}", is_error=True)
+            dialog_utils.dark_messagebox(parent, _t('import_read_error', 'Error'), _t('import_read_error', 'Read failed: {error}').format(error=e), is_error=True)
 
 
-def export_all_tactics(parent, drawings, map_names=None):
+def export_all_tactics(parent, drawings, map_names=None, _t=None):
+    _t = _t or (lambda k, d: d)
     if not drawings:
-        dialog_utils.dark_messagebox(parent, "Експорт", "Немає малюнків для експорту.")
+        dialog_utils.dark_messagebox(parent, _t('export_no_drawings', 'Export'), _t('export_no_drawings', 'No drawings'))
         return
 
     from datetime import datetime
@@ -119,7 +118,7 @@ def export_all_tactics(parent, drawings, map_names=None):
 
     file_path = filedialog.asksaveasfilename(
         parent=parent,
-        title="Експорт усіх тактик",
+        title=_t('export_all_success', 'Export all tactics'),
         defaultextension=".json",
         filetypes=[("JSON files", "*.json")],
         initialfile="all_maps.json"
@@ -141,16 +140,17 @@ def export_all_tactics(parent, drawings, map_names=None):
     try:
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(export_data, f, indent=2, ensure_ascii=False)
-        dialog_utils.dark_messagebox(parent, "Експорт",
-            f"Експортовано {len(drawings)} мап ({count} об'єктів).")
+        dialog_utils.dark_messagebox(parent, _t('export_all_success', 'Export'),
+            _t('export_all_success', 'Exported {maps} maps ({count} items)').format(maps=len(drawings), count=count))
     except Exception as e:
-        dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося зберегти файл: {e}", is_error=True)
+        dialog_utils.dark_messagebox(parent, _t('export_save_error', 'Error'), _t('export_save_error', 'Save failed: {error}').format(error=e), is_error=True)
 
 
-def import_all_tactics(parent, drawings, on_success):
+def import_all_tactics(parent, drawings, on_success, _t=None):
+    _t = _t or (lambda k, d: d)
     file_path = filedialog.askopenfilename(
         parent=parent,
-        title="Імпорт усіх тактик",
+        title=_t('import_all_success', 'Import all tactics'),
         filetypes=[("JSON files", "*.json")]
     )
     if not file_path:
@@ -161,7 +161,7 @@ def import_all_tactics(parent, drawings, on_success):
             data = json.load(f)
 
         if not isinstance(data, dict):
-            dialog_utils.dark_messagebox(parent, "Помилка", "Некоректний формат файлу тактик.", is_error=True)
+            dialog_utils.dark_messagebox(parent, _t('import_all_error_format', 'Error'), _t('import_all_error_format', 'Invalid all-maps format'), is_error=True)
             return
 
         if "drawings" not in data:
@@ -173,13 +173,10 @@ def import_all_tactics(parent, drawings, on_success):
         dst_maps = len(drawings)
         dst_items = sum(len(v) for v in drawings.values())
 
-        info = (
-            f"Файл містить {src_maps} мап ({src_items} об'єктів).\n"
-            f"Поточний проект має {dst_maps} мап ({dst_items} об'єктів).\n\n"
-        )
+        info = _t('import_all_info', "File: {src_m} maps ({src_o} items)\nCurrent: {dst_m} maps ({dst_o} items)").format(src_m=src_maps, src_o=src_items, dst_m=dst_maps, dst_o=dst_items)
 
-        choice = _choice_dialog(parent, "Імпорт",
-            info + "Бажаєте ЗАМІНИТИ всі малюнки чи ОБ'ЄДНАТИ з поточними?")
+        choice = _choice_dialog(parent, _t('import_all_choice_msg', 'Import'),
+            info + "\n\n" + _t('import_all_choice_msg', 'Replace all or merge?'), _t=_t)
         if choice is None:
             return
 
@@ -194,18 +191,19 @@ def import_all_tactics(parent, drawings, on_success):
 
         on_success()
         new_total = sum(len(v) for v in drawings.values())
-        dialog_utils.dark_messagebox(parent, "Імпорт",
-            f"Імпортовано {src_maps} мап. Всього: {len(drawings)} мап ({new_total} об'єктів).")
+        dialog_utils.dark_messagebox(parent, _t('import_all_success', 'Import'),
+            _t('import_all_success', 'Imported {src_m} maps.\nTotal: {total} items.').format(src_m=src_maps, total=new_total))
 
     except Exception as e:
-        dialog_utils.dark_messagebox(parent, "Помилка", f"Не вдалося прочитати файл: {e}", is_error=True)
+        dialog_utils.dark_messagebox(parent, _t('import_read_error', 'Error'), _t('import_read_error', 'Read failed: {error}').format(error=e), is_error=True)
 
 
-def import_unified(parent, current_map_id, current_map_name, drawings, on_success):
+def import_unified(parent, current_map_id, current_map_name, drawings, on_success, _t=None):
     """Auto-detect single-map or all-maps format and import."""
+    _t = _t or (lambda k, d: d)
     file_path = filedialog.askopenfilename(
         parent=parent,
-        title="Import tactic",
+        title=_t('unified_error_format', 'Import tactic'),
         filetypes=[("JSON files", "*.json")]
     )
     if not file_path:
@@ -216,7 +214,7 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
             data = json.load(f)
 
         if not isinstance(data, dict):
-            dialog_utils.dark_messagebox(parent, "Error", "Invalid file format.", is_error=True)
+            dialog_utils.dark_messagebox(parent, _t('unified_error_format', 'Error'), _t('unified_error_format', 'Invalid file format'), is_error=True)
             return
 
         # Detect all_maps type: has "type":"all_maps" OR "drawings" is a dict
@@ -232,12 +230,9 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
             dst_maps = len(drawings)
             dst_items = sum(len(v) for v in drawings.values() if isinstance(v, list))
 
-            info = (
-                f"File contains {src_maps} maps ({src_items} objects).\n"
-                f"Current project has {dst_maps} maps ({dst_items} objects).\n\n"
-            )
-            choice = _choice_dialog(parent, "Import",
-                info + "Replace all drawings or Merge with current?")
+            info = _t('import_all_info', "File: {src_m} maps ({src_o} items)\nCurrent: {dst_m} maps ({dst_o} items)").format(src_m=src_maps, src_o=src_items, dst_m=dst_maps, dst_o=dst_items)
+            choice = _choice_dialog(parent, _t('import_all_choice_msg', 'Import'),
+                info + "\n\n" + _t('import_all_choice_msg', 'Replace all or merge?'), _t=_t)
             if choice is None:
                 return
 
@@ -253,25 +248,24 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
 
             on_success()
             new_total = sum(len(v) for v in drawings.values() if isinstance(v, list))
-            dialog_utils.dark_messagebox(parent, "Import",
-                f"Imported {src_maps} maps. Total: {len(drawings)} maps ({new_total} objects).")
+            dialog_utils.dark_messagebox(parent, _t('import_all_success', 'Import'),
+                _t('import_all_success', 'Imported {src_m} maps.\nTotal: {total} items.').format(src_m=src_maps, total=new_total))
         else:
             # Single-map import
             if "drawings" not in data or not isinstance(data["drawings"], list):
-                dialog_utils.dark_messagebox(parent, "Error",
-                    "Invalid tactic file format.\nExpected a 'drawings' array.",
+                dialog_utils.dark_messagebox(parent, _t('unified_single_format_error', 'Error'),
+                    _t('unified_single_format_error', 'Invalid format:\nexpected array of drawings'),
                     is_error=True)
                 return
 
             import_map_id = data.get("map_id")
             if import_map_id and import_map_id != current_map_id:
-                msg = (f"This tactic was created for map '{data.get('map_name', import_map_id)}'.\n"
-                       f"Import to current map '{current_map_name}'?")
-                if not dialog_utils.dark_confirmbox(parent, "Warning", msg, yes_text="YES", no_text="NO"):
+                msg = _t('import_warning_msg', "Created for '{src}'.\nImport to '{dst}'?").format(src=data.get('map_name', import_map_id), dst=current_map_name)
+                if not dialog_utils.dark_confirmbox(parent, _t('import_warning_title', 'Map mismatch'), msg, yes_text=_t('btn_yes', 'Yes'), no_text=_t('btn_no', 'No')):
                     return
 
-            choice = _choice_dialog(parent, "Import",
-                "Replace existing drawings or Merge with current?")
+            choice = _choice_dialog(parent, _t('import_choice_msg', 'Import'),
+                _t('import_choice_msg', 'Replace or merge?'), _t=_t)
             if choice is None:
                 return
 
@@ -284,7 +278,7 @@ def import_unified(parent, current_map_id, current_map_name, drawings, on_succes
                 drawings[current_map_id].extend(data["drawings"])
 
             on_success()
-            dialog_utils.dark_messagebox(parent, "Import", "Tactic imported successfully!")
+            dialog_utils.dark_messagebox(parent, _t('import_success', 'Import'), _t('import_success', 'Imported!'))
 
     except Exception as e:
-        dialog_utils.dark_messagebox(parent, "Error", f"Failed to read file: {e}", is_error=True)
+        dialog_utils.dark_messagebox(parent, _t('import_read_error', 'Error'), _t('import_read_error', 'Read failed: {error}').format(error=e), is_error=True)
