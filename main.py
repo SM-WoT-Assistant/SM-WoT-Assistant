@@ -359,7 +359,7 @@ class WotAssistantHQ:
             cx, cy = self.root.winfo_x(), self.root.winfo_y()
         except tk.TclError:
             return
-        if cx < -5000 or cx < 0 or cy < 0: return
+        if cx < -100 or cy < -100: return
         try:
             if self.root.winfo_width() < 100: return
         except tk.TclError:
@@ -549,17 +549,26 @@ class WotAssistantHQ:
             px = mid_x - self.w // 2
             py = mid_y - self.h // 2
         else:
-            margin = 10
-            default_x = max(0, sw - self.w - margin)
-            default_y = max(0, sh - self.h - margin)
+            default_x = max(-20, sw - self.w + 20)
+            default_y = max(-20, sh - self.h + 20)
             px = self.settings.get(f"{prefix}x", default_x)
             py = self.settings.get(f"{prefix}y", default_y)
-            px = max(0, min(int(px), max(0, sw - self.w)))
-            py = max(0, min(int(py), max(0, sh - self.h)))
+            px = max(-20, min(int(px), max(-20, sw - self.w + 20)))
+            py = max(-20, min(int(py), max(-20, sh - self.h + 20)))
         
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.attributes("-alpha", 0.0)
         if self.mode == "norm":
+            if not self.settings.get("norm_pos_v2", False):
+                px = max(-20, sw - self.w + 20)
+                py = max(-20, sh - self.h + 20)
+                self.settings["norm_x"] = px
+                self.settings["norm_y"] = py
+                self.settings["norm_cx"] = px + self.w // 2
+                self.settings["norm_cy"] = py + self.h // 2
+                self.settings["norm_pos_v2"] = True
+                self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
+                self.root.geometry(f"{self.w}x{self.h}+{int(px)}+{int(py)}")
             self.root.aspect(1, 1, 1, 1)
             self.root.minsize(1, 1)
         elif self.mode == "edit":
@@ -628,10 +637,9 @@ class WotAssistantHQ:
     def _reset_norm_position(self):
         if self.mode != "norm":
             return
-        margin = 10
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        default_x = max(0, sw - self.w - margin)
-        default_y = max(0, sh - self.h - margin)
+        default_x = max(-20, sw - self.w + 20)
+        default_y = max(-20, sh - self.h + 20)
         self.settings["norm_x"] = default_x
         self.settings["norm_y"] = default_y
         self.settings["norm_cx"] = default_x + self.w // 2
@@ -1012,6 +1020,8 @@ class WotAssistantHQ:
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
+        if self.auto_battle_var.get() and self.mode != "edit":
+            self.root.after(0, self.toggle_editor)
 
     def on_battle_ended(self):
         self.save_settings()
