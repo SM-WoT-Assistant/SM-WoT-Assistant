@@ -359,7 +359,7 @@ class WotAssistantHQ:
             cx, cy = self.root.winfo_x(), self.root.winfo_y()
         except tk.TclError:
             return
-        if cx < -5000 or cx <= 0 or cy <= 0: return
+        if cx < -5000 or cx < 0 or cy < 0: return
         try:
             if self.root.winfo_width() < 100: return
         except tk.TclError:
@@ -368,16 +368,12 @@ class WotAssistantHQ:
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
         self.settings[f"{prefix}h"] = self.h
-        if self.mode == "edit":
-            aw = self.root.winfo_width()
-            ah = self.root.winfo_height()
-            self.settings[f"{prefix}cx"] = cx + aw // 2
-            self.settings[f"{prefix}cy"] = cy + ah // 2
-            self.settings[f"{prefix}x"] = cx
-            self.settings[f"{prefix}y"] = cy
-        else:
-            self.settings[f"{prefix}x"] = cx
-            self.settings[f"{prefix}y"] = cy
+        aw = self.root.winfo_width()
+        ah = self.root.winfo_height()
+        self.settings[f"{prefix}cx"] = cx + aw // 2
+        self.settings[f"{prefix}cy"] = cy + ah // 2
+        self.settings[f"{prefix}x"] = cx
+        self.settings[f"{prefix}y"] = cy
         self.settings[f"{prefix}alpha"] = self.alpha
         self.settings[f"{prefix}contrast"] = self.contrast
         self.settings["auto_sync"] = self.auto_sync_var.get()
@@ -539,15 +535,14 @@ class WotAssistantHQ:
             self.h = self.w + 18
         self.alpha = self.settings.get(f"{prefix}alpha", 1.0)
         self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
-        if self.mode == "edit":
-            mid_x = self.settings.get(f"{prefix}cx", self.settings.get(f"{prefix}x", 100) + self.w // 2)
-            mid_y = self.settings.get(f"{prefix}cy", self.settings.get(f"{prefix}y", 100) + self.h // 2)
-            px = mid_x - self.w // 2
-            py = mid_y - self.h // 2
-        else:
-            px = self.settings.get(f"{prefix}x", 100)
-            py = self.settings.get(f"{prefix}y", 100)
-            sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        mid_x = self.settings.get(f"{prefix}cx",
+                 self.settings.get(f"{prefix}x", (sw - self.w) // 2) + self.w // 2)
+        mid_y = self.settings.get(f"{prefix}cy",
+                 self.settings.get(f"{prefix}y", (sh - self.h) // 2) + self.h // 2)
+        px = mid_x - self.w // 2
+        py = mid_y - self.h // 2
+        if self.mode == "norm":
             px = max(0, min(int(px), max(0, sw - self.w)))
             py = max(0, min(int(py), max(0, sh - self.h)))
         
