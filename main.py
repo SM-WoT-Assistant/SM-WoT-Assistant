@@ -65,6 +65,7 @@ class WotAssistantHQ:
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
+        self._restored_by_battle = False
         self._restore_button = None
         self._restore_drag_start = {"x": 0, "y": 0}
         self.active_group_id = "public"
@@ -491,7 +492,7 @@ class WotAssistantHQ:
 
         if self.mode == "edit":
             self.mode = "norm"
-            self.win_mgr.set_clickthrough(not self.win_mgr.format_mode_enabled)
+            self.win_mgr.set_clickthrough(False)
             if self.active_view == "maps":
                 self.battle_status_top.pack(side="top", fill="x")
                 self.canvas.pack(side="top", fill="both", expand=True)
@@ -660,6 +661,7 @@ class WotAssistantHQ:
 
     def _minimize_to_tray(self):
         """Згорнути програму в системний трей"""
+        self._restored_by_battle = False
         self._hidden_by_f10 = True
         self._stop_group_sync()
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
@@ -976,6 +978,7 @@ class WotAssistantHQ:
         print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}, unhide_on_battle={self._unhide_on_battle_var.get()}")
 
         if self._unhide_on_battle_var.get() and self._hidden_by_f10:
+            self._restored_by_battle = True
             self._restore_from_tray()
         
         if not self.auto_sync_var.get():
@@ -992,7 +995,12 @@ class WotAssistantHQ:
 
     def on_battle_ended(self):
         self.save_settings()
-        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}")
+        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}, restored_by_battle={self._restored_by_battle}")
+        
+        if self._restored_by_battle:
+            self._restored_by_battle = False
+            self.root.after(200, self._minimize_to_tray)
+            return
         
         if not self.last_battle_map or not self.auto_battle_var.get():
             return
