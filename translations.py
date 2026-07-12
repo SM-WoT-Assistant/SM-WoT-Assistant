@@ -83,6 +83,7 @@ TRANSLATIONS = {
             "mode_battle": "BATTLE",
             "mode_label": "[MODE]",
             "format_label": "Formatting",
+            "reset_position": "Reset position",
             "update_module_missing": "Module {module} not found",
             "update_already_running": "Update already in progress",
             "checking_updates": "Checking updates...",

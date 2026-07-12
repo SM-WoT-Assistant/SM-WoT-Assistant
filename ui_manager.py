@@ -93,6 +93,11 @@ class UIManager:
             command=lambda: self.app.toggle_formatting_mode(True))
         self.app.btn_format_lock_battle.pack(side="left", padx=(3, 1))
 
+        self.app.btn_reset_position = tk.Button(self.app.battle_status_top,
+            text=chr(0xF0E2), font=("FontAwesome", 8), bg="#333", fg="#888",
+            bd=0, width=2, command=self.app._reset_norm_position)
+        self.app.btn_reset_position.pack(side="left", padx=(1, 0))
+
         self.app.battle_status_label = tk.Label(self.app.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
         self.app.battle_status_label.pack(side="left", padx=6)
 

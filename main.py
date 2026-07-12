@@ -368,12 +368,16 @@ class WotAssistantHQ:
         prefix = "edit_" if self.mode == "edit" else "norm_"
         self.settings[f"{prefix}w"] = self.w
         self.settings[f"{prefix}h"] = self.h
-        aw = self.root.winfo_width()
-        ah = self.root.winfo_height()
-        self.settings[f"{prefix}cx"] = cx + aw // 2
-        self.settings[f"{prefix}cy"] = cy + ah // 2
-        self.settings[f"{prefix}x"] = cx
-        self.settings[f"{prefix}y"] = cy
+        if self.mode == "edit":
+            aw = self.root.winfo_width()
+            ah = self.root.winfo_height()
+            self.settings[f"{prefix}cx"] = cx + aw // 2
+            self.settings[f"{prefix}cy"] = cy + ah // 2
+            self.settings[f"{prefix}x"] = cx
+            self.settings[f"{prefix}y"] = cy
+        else:
+            self.settings[f"{prefix}x"] = cx
+            self.settings[f"{prefix}y"] = cy
         self.settings[f"{prefix}alpha"] = self.alpha
         self.settings[f"{prefix}contrast"] = self.contrast
         self.settings["auto_sync"] = self.auto_sync_var.get()
@@ -479,6 +483,7 @@ class WotAssistantHQ:
         self.battle_status_top.pack_forget()
         self.top_bar.pack_forget()
         if hasattr(self, 'identity_bar'): self.identity_bar.pack_forget()
+        if hasattr(self, 'second_row'): self.second_row.pack_forget()
         self.map_toolbar.pack_forget()
         self.filter_panel.pack_forget()
         self.status_label.pack_forget()
@@ -536,13 +541,19 @@ class WotAssistantHQ:
         self.alpha = self.settings.get(f"{prefix}alpha", 1.0)
         self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        mid_x = self.settings.get(f"{prefix}cx",
-                 self.settings.get(f"{prefix}x", (sw - self.w) // 2) + self.w // 2)
-        mid_y = self.settings.get(f"{prefix}cy",
-                 self.settings.get(f"{prefix}y", (sh - self.h) // 2) + self.h // 2)
-        px = mid_x - self.w // 2
-        py = mid_y - self.h // 2
-        if self.mode == "norm":
+        if self.mode == "edit":
+            mid_x = self.settings.get(f"{prefix}cx",
+                     self.settings.get(f"{prefix}x", (sw - self.w) // 2) + self.w // 2)
+            mid_y = self.settings.get(f"{prefix}cy",
+                     self.settings.get(f"{prefix}y", (sh - self.h) // 2) + self.h // 2)
+            px = mid_x - self.w // 2
+            py = mid_y - self.h // 2
+        else:
+            margin = 10
+            default_x = max(0, sw - self.w - margin)
+            default_y = max(0, sh - self.h - margin)
+            px = self.settings.get(f"{prefix}x", default_x)
+            py = self.settings.get(f"{prefix}y", default_y)
             px = max(0, min(int(px), max(0, sw - self.w)))
             py = max(0, min(int(py), max(0, sh - self.h)))
         
@@ -580,11 +591,11 @@ class WotAssistantHQ:
             self.root.after_cancel(self._rsz_timer)
         try:
             if self.mode == "norm":
-                w = self.root.winfo_width()
-                target_h = w + 18
+                use_w = getattr(self, 'w', self.root.winfo_width())
+                target_h = use_w + 18
                 if abs(self.root.winfo_height() - target_h) > 1:
                     cur_x, cur_y = self.root.winfo_x(), self.root.winfo_y()
-                    self.root.geometry(f"{w}x{int(target_h)}+{cur_x}+{cur_y}")
+                    self.root.geometry(f"{use_w}x{int(target_h)}+{cur_x}+{cur_y}")
                     self.root.update_idletasks()
             self.root.update_idletasks()
             self.map_renderer.show_main_splash()
@@ -613,6 +624,20 @@ class WotAssistantHQ:
                 bg="#2a5a2a" if fmt_enabled else "#333",
                 fg="white" if fmt_enabled else "#bbbbbb"
             )
+
+    def _reset_norm_position(self):
+        if self.mode != "norm":
+            return
+        margin = 10
+        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        default_x = max(0, sw - self.w - margin)
+        default_y = max(0, sh - self.h - margin)
+        self.settings["norm_x"] = default_x
+        self.settings["norm_y"] = default_y
+        self.settings["norm_cx"] = default_x + self.w // 2
+        self.settings["norm_cy"] = default_y + self.h // 2
+        self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
+        self.root.geometry(f"{self.w}x{self.h}+{int(default_x)}+{int(default_y)}")
 
     def toggle_formatting_mode(self, from_lock_button=False):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
