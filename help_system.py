@@ -26,6 +26,10 @@ class HelpManager:
         h = self._help_win.winfo_reqheight()
         cx = self.app.root.winfo_x() + self.app.root.winfo_width() // 2 - w // 2
         cy = self.app.root.winfo_y() + self.app.root.winfo_height() // 2 - h // 2
+        sw = self._help_win.winfo_screenwidth()
+        sh = self._help_win.winfo_screenheight()
+        cx = max(0, min(cx, sw - w - 20))
+        cy = max(0, min(cy, sh - h - 20))
         self._help_win.geometry(f"{w}x{h}+{cx}+{cy}")
         self._help_win.focus_force()
 
@@ -89,6 +93,7 @@ class HelpManager:
         _r = [0]
 
         row("F10", self.app.t('ui', 'help_f10'), first=True)
+        hint(self.app.t('ui', 'help_restore_btn'))
         fr = tk.Frame(body, bg=bg)
         tk.Label(fr, text=chr(0xF023), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
         tk.Label(fr, text=chr(0xF09C), font=("FontAwesome", 10), bg=bg, fg=hotkey_fg).pack(side="left")
@@ -98,6 +103,11 @@ class HelpManager:
         _r[0] += 1
         row("TAB", self.app.t('ui', 'help_e'))
         row("F1", self.app.t('ui', 'help_f1'))
+
+        section(self.app.t('ui', 'help_section_battle'))
+        row("Ctrl + LMB", self.app.t('ui', 'help_ctrl_lmb_battle'), wrap=380)
+        hint(self.app.t('ui', 'help_unhide_battle'))
+        hint(self.app.t('ui', 'help_f8_icon_battle'))
 
         section(self.app.t('ui', 'help_section_draw'))
         row("LMB + drag", self.app.t('ui', 'help_lmb_drag'))

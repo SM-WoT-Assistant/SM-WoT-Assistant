@@ -109,6 +109,7 @@ class WotAssistantHQ:
         
         self.auto_sync_var = tk.BooleanVar(value=self.settings.get("auto_sync", False))
         self.auto_battle_var = tk.BooleanVar(value=self.settings.get("auto_battle", False))
+        self._unhide_on_battle_var = tk.BooleanVar(value=self.settings.get("unhide_on_battle", True))
         self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
         self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
@@ -380,6 +381,7 @@ class WotAssistantHQ:
         self.settings[f"{prefix}contrast"] = self.contrast
         self.settings["auto_sync"] = self.auto_sync_var.get()
         self.settings["auto_battle"] = self.auto_battle_var.get()
+        self.settings["unhide_on_battle"] = self._unhide_on_battle_var.get()
         self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
         self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
         self.settings["auto_update"] = self.auto_update_var.get()
@@ -609,8 +611,14 @@ class WotAssistantHQ:
                 text=chr(0xF09C) if fmt_enabled else chr(0xF023),
                 fg="#ffaa00" if fmt_enabled else "#bbbbbb"
             )
+        if hasattr(self, "btn_format_lock_battle"):
+            self.btn_format_lock_battle.config(
+                text=chr(0xF09C) if fmt_enabled else chr(0xF023),
+                bg="#2a5a2a" if fmt_enabled else "#333",
+                fg="white" if fmt_enabled else "#bbbbbb"
+            )
 
-    def toggle_formatting_mode(self):
+    def toggle_formatting_mode(self, from_lock_button=False):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
         if self.dialog_open:
             return
@@ -628,8 +636,15 @@ class WotAssistantHQ:
             self.root.focus_force()
         else:
             if self.mode == "norm":
-                self.win_mgr.set_clickthrough(True)
-                self.win_mgr.focus_game_window()
+                if from_lock_button:
+                    self.root.lift()
+                    self.root.focus_force()
+                else:
+                    self.win_mgr.set_clickthrough(True)
+                    self.win_mgr.focus_game_window()
+            elif from_lock_button:
+                self.root.lift()
+                self.root.focus_force()
         self.refresh_mode_indicator()
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._sync_po_pos()
@@ -958,7 +973,10 @@ class WotAssistantHQ:
         self.last_battle_map = map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
-        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}")
+        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}, unhide_on_battle={self._unhide_on_battle_var.get()}")
+
+        if self._unhide_on_battle_var.get() and self._hidden_by_f10:
+            self._restore_from_tray()
         
         if not self.auto_sync_var.get():
             return
@@ -1129,7 +1147,7 @@ class WotAssistantHQ:
 
         status_var = tk.StringVar(value=self.t('ui', 'dialog_update_downloading').format(version=latest_ver))
         tk.Label(pw, textvariable=status_var, font=("Arial", 10, "bold"),
-                 bg="#222", fg="#ffaa00").pack(pady=(20, 8))
+                 bg="#222", fg="#ffaa00", wraplength=360).pack(pady=(20, 8))
 
         pf = tk.Frame(pw, bg="#222")
         pf.pack(fill="x", padx=40)

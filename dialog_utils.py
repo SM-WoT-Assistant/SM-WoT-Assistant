@@ -123,7 +123,7 @@ def dark_promptbox(parent, title, prompt, initialvalue="", ok_text="OK", cancel_
     tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
              font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4))
     tk.Label(dlg, text=prompt, bg="#222", fg="#ccc",
-             font=("Arial", 9)).pack(padx=20, pady=(0, 8))
+             font=("Arial", 9), wraplength=380).pack(padx=20, pady=(0, 8))
 
     var = tk.StringVar(value=initialvalue)
     entry = tk.Entry(dlg, textvariable=var, font=("Arial", 11),

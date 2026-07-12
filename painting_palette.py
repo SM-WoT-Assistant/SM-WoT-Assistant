@@ -1803,7 +1803,7 @@ class DrawingPalette(tk.Toplevel):
         tk.Label(dlg, text=self.app.t('ui', 'download_confirm_title'),
                  bg="#222", fg="#ffaa00", font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
         tk.Label(dlg, text=f" {map_name}",
-                 bg="#222", fg="#cccccc", font=("Arial", 9)).pack(padx=20, pady=(0, 4))
+                 bg="#222", fg="#cccccc", font=("Arial", 9), wraplength=360).pack(padx=20, pady=(0, 4))
         if is_group_scheme:
             tk.Label(dlg, text=self.app.t('ui', 'group_scheme_link'),
                      bg="#222", fg="#ffaa00", font=("Arial", 8)).pack(padx=20, pady=(0, 4))

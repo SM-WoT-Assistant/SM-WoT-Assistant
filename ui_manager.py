@@ -22,7 +22,7 @@ class UIManager:
 
         self.app.btn_format_lock = tk.Button(self.app.top_bar, text=chr(0xF023),
             font=("FontAwesome", 11), bg="#444", fg="#bbbbbb", bd=0, width=3, padx=2,
-            command=self.app.toggle_formatting_mode)
+            command=lambda: self.app.toggle_formatting_mode(True))
 
         tk.Button(self.app.top_bar, text=chr(0xF00D), bg="#800", fg="white", bd=0,
                   width=3, padx=2, font=("FontAwesome", 11),
@@ -87,6 +87,12 @@ class UIManager:
 
         self.app.battle_status_top = tk.Frame(self.app.root, bg="#111", height=18)
         self.app.battle_status_top.pack_propagate(False)
+
+        self.app.btn_format_lock_battle = tk.Button(self.app.battle_status_top, text=chr(0xF023),
+            font=("FontAwesome", 8), bg="#333", fg="#bbbbbb", bd=0, width=2,
+            command=lambda: self.app.toggle_formatting_mode(True))
+        self.app.btn_format_lock_battle.pack(side="left", padx=(3, 1))
+
         self.app.battle_status_label = tk.Label(self.app.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
         self.app.battle_status_label.pack(side="left", padx=6)
 
@@ -351,7 +357,7 @@ class UIManager:
 
         x = self.app.settings_btn.winfo_rootx() - 100
         y = self.app.settings_btn.winfo_rooty() + self.app.settings_btn.winfo_height() + 2
-        menu.geometry(f"260x260+{x}+{y}")  # тимчасова висота, буде перерахована після пакування
+        menu.geometry(f"+{x}+{y}")  # тільки позиція, ширина визначиться після пакування
 
         def make_btn(text, cmd):
             btn = tk.Button(menu, text=text, command=cmd, anchor="w",
@@ -374,6 +380,7 @@ class UIManager:
         make_btn(self.app.t('ui', 'set_wot_path'), self.app.ask_wot_path)
         sep()
         make_chk(self.app.t('ui', 'auto_sync'), self.app.auto_sync_var)
+        make_chk(self.app.t('ui', 'unhide_on_battle'), self.app._unhide_on_battle_var)
         make_chk(self.app.t('ui', 'auto_mode_filter'), self.app.auto_mode_filter_var)
         make_chk(self.app.t('ui', 'auto_vehicle_filter'), self.app.auto_vehicle_filter_var)
         make_chk(self.app.t('ui', 'auto_battle'), self.app.auto_battle_var)
@@ -390,7 +397,13 @@ class UIManager:
         ver_label.pack(pady=(4, 6))
 
         menu.update_idletasks()
-        menu.geometry(f"260x{menu.winfo_reqheight()}+{x}+{y}")
+        w = menu.winfo_reqwidth()
+        h = menu.winfo_reqheight()
+        sw = menu.winfo_screenwidth()
+        sh = menu.winfo_screenheight()
+        x = max(0, min(x, sw - w - 10))
+        y = max(0, min(y, sh - h - 10))
+        menu.geometry(f"{w}x{h}+{x}+{y}")
 
         def close():
             try:
@@ -412,7 +425,7 @@ class UIManager:
         dlg.geometry(f"+{cx}+{cy}")
 
         tk.Label(dlg, text=self.app.t('ui', 'confirm_disconnect_msg'),
-                 font=("Arial", 10), bg="#2a2a2a", fg="#cccccc", justify="center").pack(pady=(15, 10))
+                 font=("Arial", 10), bg="#2a2a2a", fg="#cccccc", wraplength=360, justify="center").pack(pady=(15, 10))
 
         bf = tk.Frame(dlg, bg="#2a2a2a")
         bf.pack(pady=(0, 10))
