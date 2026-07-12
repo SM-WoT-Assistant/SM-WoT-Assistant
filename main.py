@@ -538,7 +538,7 @@ class WotAssistantHQ:
             self.h = self.w + self.get_edit_extra_height()
         else:
             self.h = self.w + 18
-        self.alpha = self.settings.get(f"{prefix}alpha", 1.0)
+        self.alpha = self.settings.get(f"{prefix}alpha", 0.5 if self.mode == "norm" else 1.0)
         self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         if self.mode == "edit":
@@ -566,7 +566,9 @@ class WotAssistantHQ:
                 self.settings["norm_y"] = py
                 self.settings["norm_cx"] = px + self.w // 2
                 self.settings["norm_cy"] = py + self.h // 2
+                self.settings["norm_alpha"] = 0.5
                 self.settings["norm_pos_v2"] = True
+                self.alpha = 0.5
                 self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
                 self.root.geometry(f"{self.w}x{self.h}+{int(px)}+{int(py)}")
             self.root.aspect(1, 1, 1, 1)
