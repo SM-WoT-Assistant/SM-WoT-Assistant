@@ -318,6 +318,7 @@ def build_launcher():
         PYTHON_EXE, "-m", "PyInstaller",
         "--onefile", "--windowed",
         "--hidden-import", "unicodedata",
+        "--hidden-import", "PIL._imaging",
         "--collect-all", "unicodedata",
         "--add-data", f"{logo}{sep}.",
         "--add-data", f"{ver}{sep}.",
