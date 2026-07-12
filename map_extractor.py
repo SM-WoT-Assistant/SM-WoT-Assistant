@@ -6,13 +6,14 @@ import re
 import xml.etree.ElementTree as ET
 import wot_decoder
 import struct
+import config
 
 print("[DEBUG] map_extractor module loaded")
 
 
 class MapExtractor:
     def __init__(self):
-        self.settings_path = "settings.json"
+        self.settings_path = config.SETTINGS_FILE
         self.settings = self.load_json(self.settings_path)
         self.wot_path = self.settings.get("wot_path", "")
         self.temp_path = os.path.join("extracted_maps", "temp_xml")
