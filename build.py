@@ -527,14 +527,23 @@ def generate_manifest(version):
 
 def create_github_release(version, is_beta=False):
     dv = version + (" Beta" if is_beta else "")
-    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{dv}.exe")
-    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{dv}.zip")
-    manifest = os.path.join(DIST_DIR, f"build_manifest_v{dv}.txt")
+    uv = dv.replace(" ", "_")  # GitHub assets не підтримують пробіли
+
+    pairs = [
+        (os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{dv}.exe"), f"SM_WoT_Assistant_Setup_v{uv}.exe"),
+        (os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{dv}.zip"), f"SM_WoT_Assistant_Portable_v{uv}.zip"),
+        (os.path.join(DIST_DIR, f"build_manifest_v{dv}.txt"), f"build_manifest_v{uv}.txt"),
+    ]
 
     assets = []
-    for f in (installer, portable, manifest):
-        if os.path.exists(f):
-            assets.append(f)
+    temp_files = []
+    for local, name in pairs:
+        if os.path.exists(local):
+            temp = os.path.join(DIST_DIR, name)
+            if local != temp:
+                shutil.copy2(local, temp)
+                temp_files.append(temp)
+            assets.append(temp)
 
     if not assets:
         print("[BUILD] ERROR: No release artifacts found.")
@@ -548,6 +557,12 @@ def create_github_release(version, is_beta=False):
     print(f"[BUILD] Creating GitHub release {tag}...")
     cmd = ["gh", "release", "create", tag] + assets + ["--title", display_tag] + notes_flag
     result = subprocess.run(cmd, cwd=BASE_DIR)
+    # Clean up temp underscore-named copies
+    for f in temp_files:
+        try:
+            os.remove(f)
+        except Exception:
+            pass
     if result.returncode == 0:
         print(f"[BUILD] GitHub release {tag} created")
         return True
@@ -567,6 +582,7 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
     display_ver = version + (" Beta" if is_beta else "")
+    uv = display_ver.replace(" ", "_")  # GitHub assets не підтримують пробіли
     today = release_date or time.strftime("%Y-%m-%d")
     installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{display_ver}.exe")
     installer_size = ""
@@ -574,8 +590,8 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
         sz = os.path.getsize(installer_path)
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
-    dl_filename = f"SM_WoT_Assistant_Setup_v{display_ver}.exe"
-    dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{urllib.parse.quote(dl_filename)}"
+    dl_filename = f"SM_WoT_Assistant_Setup_v{uv}.exe"
+    dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
 
     data = json.dumps({
         "version": version,
