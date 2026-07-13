@@ -330,7 +330,6 @@ class WotAssistantHQ:
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
-        # Всі віджети мають існувати до виклику (initialize_window більше його не використовує)
         if not hasattr(self, "top_bar"):
             return 160
 
@@ -339,7 +338,8 @@ class WotAssistantHQ:
         identity_h = self.identity_bar.winfo_reqheight() if hasattr(self, "identity_bar") else 0
         filter_h = self.filter_panel.winfo_reqheight() if hasattr(self, "filter_panel") else 0
         status_h = self.status_label.winfo_reqheight() if hasattr(self, "status_label") else 0
-        return top_h + identity_h + filter_h + status_h
+        second_h = self.second_row.winfo_reqheight() if hasattr(self, "second_row") else 0
+        return top_h + identity_h + filter_h + status_h + second_h
 
     def process_queue(self):
         while self.thread_queue:
@@ -549,19 +549,19 @@ class WotAssistantHQ:
             px = mid_x - self.w // 2
             py = mid_y - self.h // 2
         else:
-            default_x = max(-20, sw - self.w + 20)
-            default_y = max(-20, sh - self.h + 20)
+            default_x = max(-10, sw - self.w + 10)
+            default_y = max(-10, sh - self.h + 10)
             px = self.settings.get(f"{prefix}x", default_x)
             py = self.settings.get(f"{prefix}y", default_y)
-            px = max(-20, min(int(px), max(-20, sw - self.w + 20)))
-            py = max(-20, min(int(py), max(-20, sh - self.h + 20)))
+            px = max(-10, min(int(px), max(-10, sw - self.w + 10)))
+            py = max(-10, min(int(py), max(-10, sh - self.h + 10)))
         
         self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
         self.root.attributes("-alpha", 0.0)
         if self.mode == "norm":
             if not self.settings.get("norm_pos_v2", False):
-                px = max(-20, sw - self.w + 20)
-                py = max(-20, sh - self.h + 20)
+                px = max(-10, sw - self.w + 10)
+                py = max(-10, sh - self.h + 10)
                 self.settings["norm_x"] = px
                 self.settings["norm_y"] = py
                 self.settings["norm_cx"] = px + self.w // 2
@@ -640,8 +640,8 @@ class WotAssistantHQ:
         if self.mode != "norm":
             return
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        default_x = max(-20, sw - self.w + 20)
-        default_y = max(-20, sh - self.h + 20)
+        default_x = max(-10, sw - self.w + 10)
+        default_y = max(-10, sh - self.h + 10)
         self.settings["norm_x"] = default_x
         self.settings["norm_y"] = default_y
         self.settings["norm_cx"] = default_x + self.w // 2
