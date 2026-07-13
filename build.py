@@ -408,14 +408,15 @@ def rename_onedir(version):
     return versioned
 
 
-def create_portable_zip(version):
+def create_portable_zip(version, file_ver=None):
     """Create a portable ZIP from the versioned onedir (no admin required)."""
+    fv = file_ver or version
     onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
     if not os.path.exists(onedir):
         print("[BUILD] WARNING: onedir not found, skipping portable ZIP.")
         return None
 
-    zip_base = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}")
+    zip_base = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{fv}")
     print("[BUILD] Creating portable ZIP...")
     shutil.make_archive(zip_base, "zip", DIST_DIR, f"SM WoT Assistant v{version}")
 
@@ -673,7 +674,7 @@ def main():
 
     # Phase 4: Rename to versioned directory + portable ZIP
     rename_onedir(display_ver)
-    portable_zip = create_portable_zip(display_ver)
+    portable_zip = create_portable_zip(display_ver, file_ver=file_ver if is_beta else None)
 
     # Phase 5: Verification
     verify_build(display_ver)
