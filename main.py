@@ -512,6 +512,8 @@ class WotAssistantHQ:
             self.status_label.pack_forget()
             if self.mode == "edit":
                 self.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
+                if hasattr(self, 'second_row') and firebase_identity.is_registered() and hasattr(self, '_cached_groups') and len(self._cached_groups) > 1:
+                    self.second_row.pack(side="top", fill="x")
                 self.filter_panel.pack(side="bottom", fill="x")
                 self.status_label.pack(side="bottom", fill="x")
                 self.status_label.config(height=2, bg="#1a1a1a")

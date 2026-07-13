@@ -543,7 +543,7 @@ def create_github_release(version):
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
 
     print(f"[BUILD] Creating GitHub release {tag}...")
-    cmd = ["gh", "release", "create", tag] + assets + ["--title", tag] + notes_flag
+    cmd = ["gh", "release", "create", tag] + assets + ["--title", f"{tag} Beta"] + notes_flag
     result = subprocess.run(cmd, cwd=BASE_DIR)
     if result.returncode == 0:
         print(f"[BUILD] GitHub release {tag} created")
