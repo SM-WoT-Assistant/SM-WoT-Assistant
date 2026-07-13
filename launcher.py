@@ -91,7 +91,7 @@ class Launcher:
         if not candidates:
             return self.version
         candidates.sort(key=lambda x: x[0])
-        return candidates[-1][1]
+        return candidates[-1][1].split()[0]
 
     def _clean_old_versions(self):
         """При старті — видалити всі EXE крім поточного внесеної версії."""
