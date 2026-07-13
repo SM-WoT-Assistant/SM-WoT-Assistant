@@ -359,13 +359,12 @@ def build_launcher():
     return launcher_exe
 
 
-def run_nsis(version, makensis_exe, file_ver=None):
+def run_nsis(version, makensis_exe):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
         return None
 
-    fv = file_ver or version
-    out_exe = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{fv}.exe")
+    out_exe = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
     print(f"[BUILD] Running NSIS: {makensis_exe}")
     result = subprocess.run(
         [makensis_exe, f"/DVERSION={version}", NSI_FILE],
@@ -375,23 +374,9 @@ def run_nsis(version, makensis_exe, file_ver=None):
         print("[BUILD] NSIS FAILED")
         return None
 
-    # NSIS creates with display version (may have space in name), rename to file_ver
-    if file_ver:
-        nsis_out = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
-        if os.path.exists(nsis_out) and not os.path.exists(out_exe):
-            os.rename(nsis_out, out_exe)
-            print(f"[BUILD] Installer renamed: {os.path.basename(out_exe)}")
-
     if os.path.exists(out_exe):
         size_mb = os.path.getsize(out_exe) / (1024 * 1024)
         print(f"[BUILD] Installer: {size_mb:.1f} MB")
-    else:
-        # Try the NSIS output name as fallback
-        nsis_out = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
-        if os.path.exists(nsis_out):
-            out_exe = nsis_out
-            size_mb = os.path.getsize(out_exe) / (1024 * 1024)
-            print(f"[BUILD] Installer: {size_mb:.1f} MB (using NSIS default name)")
     return out_exe
 
 
@@ -408,15 +393,14 @@ def rename_onedir(version):
     return versioned
 
 
-def create_portable_zip(version, file_ver=None):
+def create_portable_zip(version):
     """Create a portable ZIP from the versioned onedir (no admin required)."""
-    fv = file_ver or version
     onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
     if not os.path.exists(onedir):
         print("[BUILD] WARNING: onedir not found, skipping portable ZIP.")
         return None
 
-    zip_base = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{fv}")
+    zip_base = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}")
     print("[BUILD] Creating portable ZIP...")
     shutil.make_archive(zip_base, "zip", DIST_DIR, f"SM WoT Assistant v{version}")
 
@@ -541,11 +525,11 @@ def generate_manifest(version):
 #  GitHub Release
 # ═══════════════════════════════════════════════════════════════════
 
-def create_github_release(version, file_ver=None):
-    fv = file_ver or version
-    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{fv}.exe")
-    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{fv}.zip")
-    manifest = os.path.join(DIST_DIR, f"build_manifest_v{fv}.txt")
+def create_github_release(version, is_beta=False):
+    dv = version + (" Beta" if is_beta else "")
+    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{dv}.exe")
+    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{dv}.zip")
+    manifest = os.path.join(DIST_DIR, f"build_manifest_v{dv}.txt")
 
     assets = []
     for f in (installer, portable, manifest):
@@ -557,7 +541,7 @@ def create_github_release(version, file_ver=None):
         return False
 
     tag = f"v{version}"
-    display_tag = f"v{version} Beta" if fv != version else tag
+    display_tag = f"v{version} Beta" if is_beta else tag
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
 
@@ -576,24 +560,29 @@ def create_github_release(version, file_ver=None):
 #  Main
 # ═══════════════════════════════════════════════════════════════════
 
-def write_version_to_rtdb(version, release_date=None, file_ver=None):
+def write_version_to_rtdb(version, release_date=None, is_beta=False):
     import urllib.request
+    import urllib.parse
     RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
     API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
-    fv = file_ver or version
+    display_ver = version + (" Beta" if is_beta else "")
     today = release_date or time.strftime("%Y-%m-%d")
-    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{fv}.exe")
+    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{display_ver}.exe")
     installer_size = ""
     if os.path.exists(installer_path):
         sz = os.path.getsize(installer_path)
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
+    dl_filename = f"SM_WoT_Assistant_Setup_v{display_ver}.exe"
+    dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{urllib.parse.quote(dl_filename)}"
+
     data = json.dumps({
         "version": version,
+        "display_version": display_ver,
         "release_date": today,
         "build_size": installer_size,
-        "download_url": f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Setup_v{fv}.exe",
+        "download_url": dl_url,
         "changelog": f"Release v{version}",
     }).encode("utf-8")
 
@@ -611,9 +600,10 @@ def write_version_to_rtdb(version, release_date=None, file_ver=None):
     # Write latest pointer: versions/latest (release_date far future)
     latest_data = json.dumps({
         "version": version,
+        "display_version": display_ver,
         "release_date": "9999-12-31",
         "build_size": installer_size,
-        "download_url": f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Setup_v{fv}.exe",
+        "download_url": dl_url,
         "changelog": f"Release v{version}",
     }).encode("utf-8")
     url_latest = f"{RTDB_URL}/versions/latest.json?auth={API_KEY}"
@@ -646,7 +636,6 @@ def main():
     version = read_version()
     display_suffix = " Beta" if is_beta else ""
     display_ver = version + display_suffix
-    file_ver = version + ("_Beta" if is_beta else "")
 
     # Phase 0: Pre-flight checks
     makensis_exe = preflight(version)
@@ -670,17 +659,17 @@ def main():
         print(f"[BUILD] EXE renamed: SM WoT Assistant v{display_ver}.exe")
 
     # Phase 3: NSIS installer (needs FIXED_ONEDIR to exist)
-    installer = run_nsis(display_ver if is_beta else version, makensis_exe, file_ver=file_ver if is_beta else None)
+    installer = run_nsis(display_ver if is_beta else version, makensis_exe)
 
     # Phase 4: Rename to versioned directory + portable ZIP
     rename_onedir(display_ver)
-    portable_zip = create_portable_zip(display_ver, file_ver=file_ver if is_beta else None)
+    portable_zip = create_portable_zip(display_ver)
 
     # Phase 5: Verification
     verify_build(display_ver)
 
     # Phase 6: Manifest
-    generate_manifest(file_ver if is_beta else version)
+    generate_manifest(display_ver)
 
     # Phase 7: Summary
     print()
@@ -693,14 +682,14 @@ def main():
         print(f"  Installer:      {os.path.basename(installer)}")
     if portable_zip:
         print(f"  Portable ZIP:   {os.path.basename(portable_zip)}")
-    print(f"  Manifest:       build_manifest_v{file_ver}.txt")
+    print(f"  Manifest:       build_manifest_v{display_ver}.txt")
     print(f"  Output dir:     {DIST_DIR}")
     print()
 
     # Always create GitHub release (required for auto-update download URL)
-    if create_github_release(version, file_ver=file_ver if is_beta else None):
+    if create_github_release(version, is_beta):
         # Write version to RTDB only after successful GitHub release
-        write_version_to_rtdb(version, release_date, file_ver=file_ver if is_beta else None)
+        write_version_to_rtdb(version, release_date, is_beta)
 
     print(f"[BUILD] Done: v{display_ver}")
 

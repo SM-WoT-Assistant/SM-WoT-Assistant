@@ -133,8 +133,9 @@ function loadLatestVersion() {
             });
             const top = items[0];
             if (top) {
+                const displayVer = top.display_version || top.version || "";
                 dlBtn.href = top.download_url || (GITHUB_RELEASES + "/tag/v" + top.version);
-                dlBtn.textContent = "Download v" + (top.version || "");
+                dlBtn.textContent = "Download v" + displayVer;
                 latestSpan.textContent = (top.build_size || "") + " · Windows 10/11 · " + (top.release_date || "").slice(0, 10);
             }
         })

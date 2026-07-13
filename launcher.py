@@ -72,6 +72,7 @@ class Launcher:
         self.version = load_version()
         self.install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
         self.installed_version = self._detect_installed_version()
+        self._clean_old_versions()
         self._dot_animating = False
 
     def _detect_installed_version(self):
@@ -91,6 +92,19 @@ class Launcher:
             return self.version
         candidates.sort(key=lambda x: x[0])
         return candidates[-1][1]
+
+    def _clean_old_versions(self):
+        """При старті — видалити всі EXE крім поточного внесеної версії."""
+        if not os.path.isdir(self.install_dir):
+            return
+        current_prefix = f"SM WoT Assistant v{self.installed_version}"
+        for f in os.listdir(self.install_dir):
+            if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
+                if not f.startswith(current_prefix):
+                    try:
+                        os.remove(os.path.join(self.install_dir, f))
+                    except Exception:
+                        pass
 
     def _find_main_exe(self):
         """Знайти встановлений головний EXE."""
