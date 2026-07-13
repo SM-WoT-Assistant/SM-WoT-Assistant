@@ -81,9 +81,10 @@ class Launcher:
         candidates = []
         try:
             for f in os.listdir(self.install_dir):
-                m = re.match(r"SM WoT Assistant v(\d+\.\d+\.\d+)\.exe", f)
+                m = re.match(r"SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta)?)\.exe", f)
                 if m:
-                    candidates.append((tuple(int(n) for n in m.group(1).split(".")), m.group(1)))
+                    ver_str = m.group(1).split()[0]  # "1.0.38 Beta" -> "1.0.38"
+                    candidates.append((tuple(int(n) for n in ver_str.split(".")), m.group(1)))
         except Exception:
             return self.version
         if not candidates:
@@ -288,19 +289,23 @@ class Launcher:
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
 
-                install_exe = os.path.join(self.install_dir, f"SM WoT Assistant v{latest_ver}.exe")
+                install_prefix = os.path.join(self.install_dir, f"SM WoT Assistant v{latest_ver}")
 
                 for f in os.listdir(self.install_dir):
                     if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
                         fp = os.path.join(self.install_dir, f)
                         try:
-                            if os.path.abspath(fp) != os.path.abspath(install_exe):
+                            if not fp.startswith(install_prefix):
                                 os.remove(fp)
                         except Exception:
                             pass
 
-                if not os.path.exists(install_exe):
-                    raise RuntimeError(f"EXE not found: {install_exe}")
+                found = any(
+                    f.startswith(f"SM WoT Assistant v{latest_ver}") and f.endswith(".exe")
+                    for f in os.listdir(self.install_dir)
+                )
+                if not found:
+                    raise RuntimeError(f"EXE not found for v{latest_ver} in {self.install_dir}")
 
                 try:
                     os.remove(tmp)
