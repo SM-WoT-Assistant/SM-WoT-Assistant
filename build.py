@@ -526,24 +526,17 @@ def generate_manifest(version):
 # ═══════════════════════════════════════════════════════════════════
 
 def create_github_release(version, is_beta=False):
-    dv = version + (" Beta" if is_beta else "")
-    uv = dv.replace(" ", "_")  # GitHub assets не підтримують пробіли
-
-    pairs = [
-        (os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{dv}.exe"), f"SM_WoT_Assistant_Setup_v{uv}.exe"),
-        (os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{dv}.zip"), f"SM_WoT_Assistant_Portable_v{uv}.zip"),
-        (os.path.join(DIST_DIR, f"build_manifest_v{dv}.txt"), f"build_manifest_v{uv}.txt"),
-    ]
+    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
+    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}.zip")
+    manifest = os.path.join(DIST_DIR, f"build_manifest_v{version}.txt")
 
     assets = []
-    temp_files = []
-    for local, name in pairs:
-        if os.path.exists(local):
-            temp = os.path.join(DIST_DIR, name)
-            if local != temp:
-                shutil.copy2(local, temp)
-                temp_files.append(temp)
-            assets.append(temp)
+    if os.path.exists(installer):
+        assets.append(installer)
+    if os.path.exists(portable):
+        assets.append(portable)
+    if os.path.exists(manifest):
+        assets.append(manifest)
 
     if not assets:
         print("[BUILD] ERROR: No release artifacts found.")
@@ -557,12 +550,6 @@ def create_github_release(version, is_beta=False):
     print(f"[BUILD] Creating GitHub release {tag}...")
     cmd = ["gh", "release", "create", tag] + assets + ["--title", display_tag] + notes_flag
     result = subprocess.run(cmd, cwd=BASE_DIR)
-    # Clean up temp underscore-named copies
-    for f in temp_files:
-        try:
-            os.remove(f)
-        except Exception:
-            pass
     if result.returncode == 0:
         print(f"[BUILD] GitHub release {tag} created")
         return True
@@ -582,15 +569,14 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
     display_ver = version + (" Beta" if is_beta else "")
-    uv = display_ver.replace(" ", "_")  # GitHub assets не підтримують пробіли
     today = release_date or time.strftime("%Y-%m-%d")
-    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{display_ver}.exe")
+    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
     installer_size = ""
     if os.path.exists(installer_path):
         sz = os.path.getsize(installer_path)
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
-    dl_filename = f"SM_WoT_Assistant_Setup_v{uv}.exe"
+    dl_filename = f"SM_WoT_Assistant_Setup_v{version}.exe"
     dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
 
     data = json.dumps({
@@ -650,8 +636,8 @@ def main():
         write_version(new_version)
 
     version = read_version()
-    display_suffix = " Beta" if is_beta else ""
-    display_ver = version + display_suffix
+    is_beta_suffix = " Beta" if is_beta else ""
+    display_ver = version + is_beta_suffix
 
     # Phase 0: Pre-flight checks
     makensis_exe = preflight(version)
@@ -659,35 +645,35 @@ def main():
     # Phase 1: Clean previous intermediate build
     clean_dist()
 
-    # Phase 2: PyInstaller
-    update_nsi_version(display_ver if is_beta else version)
+    # Phase 2: PyInstaller — завжди чистий version
+    update_nsi_version(version)
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()
 
-    # Rename EXE to include version
+    # Rename EXE to include version (clean, без Beta)
     exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")
-    exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{display_ver}.exe")
+    exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{version}.exe")
     if os.path.exists(exe_plain):
         if os.path.exists(exe_ver):
             os.remove(exe_ver)
         os.rename(exe_plain, exe_ver)
-        print(f"[BUILD] EXE renamed: SM WoT Assistant v{display_ver}.exe")
+        print(f"[BUILD] EXE renamed: SM WoT Assistant v{version}.exe")
 
-    # Phase 3: NSIS installer (needs FIXED_ONEDIR to exist)
-    installer = run_nsis(display_ver if is_beta else version, makensis_exe)
+    # Phase 3: NSIS installer (чистий version)
+    installer = run_nsis(version, makensis_exe)
 
-    # Phase 4: Rename to versioned directory + portable ZIP
-    rename_onedir(display_ver)
-    portable_zip = create_portable_zip(display_ver)
+    # Phase 4: Rename to versioned directory + portable ZIP (чистий version)
+    rename_onedir(version)
+    portable_zip = create_portable_zip(version)
 
     # Phase 5: Verification
-    verify_build(display_ver)
+    verify_build(version)
 
     # Phase 6: Manifest
-    generate_manifest(display_ver)
+    generate_manifest(version)
 
-    # Phase 7: Summary
+    # Phase 7: Summary — display_ver з Beta тільки для показу
     print()
     print("=" * 60)
     print(f"  BUILD COMPLETE — SM WoT Assistant v{display_ver}")
@@ -698,7 +684,7 @@ def main():
         print(f"  Installer:      {os.path.basename(installer)}")
     if portable_zip:
         print(f"  Portable ZIP:   {os.path.basename(portable_zip)}")
-    print(f"  Manifest:       build_manifest_v{display_ver}.txt")
+    print(f"  Manifest:       build_manifest_v{version}.txt")
     print(f"  Output dir:     {DIST_DIR}")
     print()
 
