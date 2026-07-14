@@ -107,6 +107,31 @@ def update_nsi_version(version):
         f.write(content)
 
 
+def commit_version_files(version):
+    """Commit VERSION and installer.nsi so the version bump is saved before GitHub release."""
+    try:
+        r = subprocess.run(
+            ["git", "status", "--porcelain", VERSION_FILE, NSI_FILE],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
+        )
+        if not r.stdout.strip():
+            return  # nothing to commit
+        subprocess.run(
+            ["git", "add", VERSION_FILE, NSI_FILE],
+            cwd=BASE_DIR, capture_output=True, timeout=10,
+        )
+        result = subprocess.run(
+            ["git", "commit", "-m", f"chore: bump to v{version}"],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            print(f"[BUILD] Committed: v{version}")
+        else:
+            print(f"[BUILD] Commit skipped: {result.stdout.strip()}")
+    except Exception as e:
+        print(f"[BUILD] Commit warning: {e}")
+
+
 # ═══════════════════════════════════════════════════════════════════
 #  Pre-flight
 # ═══════════════════════════════════════════════════════════════════
@@ -647,6 +672,7 @@ def main():
 
     # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
+    commit_version_files(version)
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()

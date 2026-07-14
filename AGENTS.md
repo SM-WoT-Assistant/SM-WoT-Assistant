@@ -123,8 +123,12 @@
 ### Seeding файлів у AppData (перший запуск)
 - `config.DEFAULT_FILES` (config.py:34) = `["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]`
 - `main.py:1093-1101` — копіює з `config.BUNDLE_DIR` в `config.USER_DATA_DIR` якщо файл ще не існує
+### Auto-commit версії
+
+build.py автоматично комітить VERSION та installer.nsi після оновлення версії (build.py:commit_version_files). Окремо комітити не треба — це робить build.py перед білдом.
 
 ### Порядок дій для нового релізу
+
 `python build.py X.Y.Z` робить все: білд + GitHub release + RTDB. Verify phase перевіряє автоматично.
 Після білду запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test.
 
