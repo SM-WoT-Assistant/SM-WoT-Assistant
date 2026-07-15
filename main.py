@@ -536,7 +536,7 @@ class WotAssistantHQ:
             self.status_label.pack(side="bottom", fill="x")
 
         prefix = "edit_" if self.mode == "edit" else "norm_"
-        self.w = self.settings.get(f"{prefix}w", 800 if self.mode=="edit" else 400)
+        self.w = self.settings.get(f"{prefix}w", 800 if self.mode=="edit" else 500)
         if self.mode == "edit":
             self.h = self.w + self.get_edit_extra_height()
         else:
