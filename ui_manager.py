@@ -785,7 +785,9 @@ class UIManager:
                     self.app._sync_po_pos()
                     self.app.root.update_idletasks()
                     self.app.root.after(100, self.app._sync_po_pos)
-                self.app.painter.redraw()
+                    self.app.root.after(150, self.app.painter.redraw)
+                else:
+                    self.app.painter.redraw()
 
             import firebase_groups
             if hasattr(self.app, 'active_group_id') and self.app.active_group_id != firebase_groups.PUBLIC_GROUP_ID:

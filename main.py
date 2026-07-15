@@ -338,7 +338,7 @@ class WotAssistantHQ:
         identity_h = self.identity_bar.winfo_reqheight() if hasattr(self, "identity_bar") else 0
         filter_h = self.filter_panel.winfo_reqheight() if hasattr(self, "filter_panel") else 0
         status_h = self.status_label.winfo_reqheight() if hasattr(self, "status_label") else 0
-        second_h = self.second_row.winfo_reqheight() if hasattr(self, "second_row") else 0
+        second_h = self.second_row.winfo_reqheight() if (hasattr(self, "second_row") and self.second_row.winfo_viewable()) else 0
         return top_h + identity_h + filter_h + status_h + second_h
 
     def process_queue(self):
@@ -540,16 +540,14 @@ class WotAssistantHQ:
             self.h = self.w + self.get_edit_extra_height()
         else:
             self.h = self.w + 18
+        self.settings[f"{prefix}w"] = self.w
+        self.settings[f"{prefix}h"] = self.h
         self.alpha = self.settings.get(f"{prefix}alpha", 0.5 if self.mode == "norm" else 1.0)
         self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
         sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
         if self.mode == "edit":
-            mid_x = self.settings.get(f"{prefix}cx",
-                     self.settings.get(f"{prefix}x", (sw - self.w) // 2) + self.w // 2)
-            mid_y = self.settings.get(f"{prefix}cy",
-                     self.settings.get(f"{prefix}y", (sh - self.h) // 2) + self.h // 2)
-            px = mid_x - self.w // 2
-            py = mid_y - self.h // 2
+            px = self.settings.get(f"{prefix}x", (sw - self.w) // 2)
+            py = self.settings.get(f"{prefix}y", (sh - self.h) // 2)
         else:
             default_x = max(-10, sw - self.w + 10)
             default_y = max(-10, sh - self.h + 10)
@@ -584,6 +582,29 @@ class WotAssistantHQ:
         self.map_renderer.show_main_splash()
         self.root.attributes("-alpha", self.alpha)
         self.refresh_mode_indicator()
+        self.root.after(0, self._finalize_toggle)
+
+    def _finalize_toggle(self):
+        if self.mode != "edit" or self.active_view not in ("maps", "tactic"):
+            return
+        self.root.update_idletasks()
+        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
+        if cw > 100 and abs(ch - cw) > 2:
+            cur_h = self.root.winfo_height()
+            cur_w = self.root.winfo_width()
+            new_h = cur_h - (ch - cw)
+            if new_h > cw + 18:
+                cur_x = self.root.winfo_x()
+                cur_y = self.root.winfo_y()
+                self.root.geometry(f"{cur_w}x{new_h}+{cur_x}+{cur_y}")
+                self.root.minsize(cur_w, new_h)
+                self.h = new_h
+        if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            self._po_win.withdraw()
+            self.root.update_idletasks()
+            self._po_win.deiconify()
+            self._sync_po_pos()
+            self.painter.redraw()
 
     def _on_canvas_resize(self, event=None):
         if self.active_view != "maps":
@@ -614,6 +635,7 @@ class WotAssistantHQ:
             self.map_renderer.show_main_splash()
             self.root.attributes("-alpha", self.alpha)
             self._sync_po_pos()
+            self.painter.redraw()
         finally:
             self._redrawing = False
 
