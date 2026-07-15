@@ -514,6 +514,7 @@ class WotAssistantHQ:
                 self.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
                 if hasattr(self, 'second_row') and firebase_identity.is_registered() and hasattr(self, '_cached_groups') and len(self._cached_groups) > 1:
                     self.second_row.pack(side="top", fill="x")
+                    self.ui_mgr._refresh_group_selector()
                 self.filter_panel.pack(side="bottom", fill="x")
                 self.status_label.pack(side="bottom", fill="x")
                 self.status_label.config(height=2, bg="#1a1a1a")
@@ -582,9 +583,9 @@ class WotAssistantHQ:
         self.map_renderer.show_main_splash()
         self.root.attributes("-alpha", self.alpha)
         self.refresh_mode_indicator()
-        self.root.after(0, self._finalize_toggle)
+        self.root.after(0, self._adjust_for_canvas)
 
-    def _finalize_toggle(self):
+    def _adjust_for_canvas(self):
         if self.mode != "edit" or self.active_view not in ("maps", "tactic"):
             return
         self.root.update_idletasks()

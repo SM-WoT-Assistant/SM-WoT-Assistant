@@ -157,10 +157,12 @@ class UIManager:
                 pass
             self.app.group_selector["values"] = []
             self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            self.app._cached_groups = {}
             self.app.top_bar.update_idletasks()
+            self.app._adjust_for_canvas()
             return
 
-        groups = firebase_groups.get_user_groups()
+        groups = getattr(self.app, '_cached_groups', {}) or {}
         has_custom = any(gid != firebase_groups.PUBLIC_GROUP_ID for gid in groups)
         if not has_custom:
             try:
@@ -171,7 +173,9 @@ class UIManager:
                 pass
             self.app.group_selector["values"] = []
             self.app.active_group_id = firebase_groups.PUBLIC_GROUP_ID
+            self.app._cached_groups = {}
             self.app.top_bar.update_idletasks()
+            self.app._adjust_for_canvas()
             return
         if getattr(self.app, 'active_view', None) == "maps":
             self.app.second_row.pack(side="top", fill="x")
@@ -326,6 +330,8 @@ class UIManager:
                 self.app.identity_pin_label.config(text=f"PIN: {pin_text}" if pin_text else "", fg="#444444")
                 self.app.identity_action_btn.config(text=self.app.t('ui', 'connect'), bg="#334455", fg="#99ccff")
                 self.app.identity_edit_btn.pack_forget()
+            import firebase_groups
+            self.app._cached_groups = firebase_groups.get_user_groups()
             self._refresh_group_selector()
         else:
             self.app.identity_nick_label.config(text="  " + self.app.t('ui', 'not_connected'))
