@@ -16,7 +16,7 @@ USER_DATA_DIR = _appdata_dir()
 def load_version():
     try:
         with open(os.path.join(BUNDLE_DIR, "VERSION"), "r", encoding="utf-8") as f:
-            return f.read().strip() + " Beta"
+            return f.read().strip()
     except Exception:
         return "0.0.0"
 
