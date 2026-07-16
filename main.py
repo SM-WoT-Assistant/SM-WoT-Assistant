@@ -39,35 +39,6 @@ import firebase_drawings
 import firebase_groups
 import tray_icon
 
-# ─── Tray watcher helpers ───
-WM_CLOSE = 0x0010
-
-def _stop_tray_watcher():
-    """Signal the tray watcher launcher to exit before update."""
-    try:
-        hwnd = ctypes.windll.user32.FindWindowW("SM_WoT_Watcher_Window", None)
-        if hwnd:
-            ctypes.windll.user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
-            time.sleep(0.3)
-            print("[INIT] Tray watcher stopped for update")
-            return True
-    except Exception as e:
-        print(f"[INIT] stop tray watcher error: {e}")
-    return False
-
-def _restart_tray_watcher():
-    """Restart the tray watcher after update if it was running."""
-    try:
-        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
-        launcher_exe = os.path.join(install_dir, "SM WoT Assistant Launcher.exe")
-        if os.path.exists(launcher_exe):
-            subprocess.Popen([launcher_exe, "--tray"], creationflags=0x08000000)
-            print("[INIT] Tray watcher restarted")
-            return True
-    except Exception as e:
-        print(f"[INIT] restart tray watcher error: {e}")
-    return False
-
 try:
     import map_extractor
 except ImportError:
@@ -137,16 +108,12 @@ class WotAssistantHQ:
         self.alpha = self.settings.get("edit_alpha", 1.0)
         self.contrast = self.settings.get("edit_contrast", 1.0)
         
-        self._start_to_tray = "--tray" in sys.argv
         self.auto_sync_var = tk.BooleanVar(value=self.settings.get("auto_sync", False))
         self.auto_battle_var = tk.BooleanVar(value=self.settings.get("auto_battle", False))
         self._unhide_on_battle_var = tk.BooleanVar(value=self.settings.get("unhide_on_battle", True))
         self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
         self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
-        self._run_at_startup_var = tk.BooleanVar(value=self.settings.get("run_at_startup", False))
-        self._launch_on_game_start_var = tk.BooleanVar(value=self.settings.get("launch_on_game_start", False))
-        self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         
         self.win_mgr = window_manager.WindowManager(self)
         self.win_mgr.initialize_window()
@@ -232,9 +199,7 @@ class WotAssistantHQ:
         firebase_reporter.setup_global_excepthook(self)
         firebase_reporter.ping_version_async(self)
 
-        if self._start_to_tray:
-            self._start_startup_checks()
-        elif bool(self.settings.get("disable_startup_splash", False)):
+        if bool(self.settings.get("disable_startup_splash", False)):
             self._start_startup_checks()
         else:
             self.show_small_loading_splash()
@@ -257,7 +222,7 @@ class WotAssistantHQ:
                         return
             except Exception as e:
                 print(f"[INIT] Update check error: {e}")
-        elif not self._start_to_tray and self.auto_update_var.get():
+        elif self.auto_update_var.get():
             self._check_for_app_updates()
 
         self._start_startup_checks_continue()
@@ -421,51 +386,10 @@ class WotAssistantHQ:
         self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
         self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
         self.settings["auto_update"] = self.auto_update_var.get()
-        self.settings["run_at_startup"] = self._run_at_startup_var.get()
-        self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
-        self.settings["start_minimized"] = self._start_minimized_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
             self.log_watcher.update_path(self.settings.get("log_path", ""))
-
-    def _get_launcher_exe(self):
-        """Знайти шлях до лаунчера для реєстрового запису автозапуску."""
-        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
-        launcher = os.path.join(install_dir, "SM WoT Assistant Launcher.exe")
-        if os.path.exists(launcher):
-            return launcher
-        if getattr(sys, 'frozen', False):
-            base = os.path.dirname(sys.executable)
-            launcher2 = os.path.join(base, "SM WoT Assistant Launcher.exe")
-            if os.path.exists(launcher2):
-                return launcher2
-        return None
-
-    def _set_windows_startup(self, enable):
-        """Додати/видалити запис у HKCU Software\\Microsoft\\Windows\\CurrentVersion\\Run для автозапуску лаунчера з --tray."""
-        import winreg
-        key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
-        try:
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0,
-                                 winreg.KEY_SET_VALUE | winreg.KEY_READ)
-            if enable:
-                launcher = self._get_launcher_exe()
-                if launcher:
-                    cmd = f'"{launcher}" --tray'
-                    winreg.SetValueEx(key, "SM WoT Assistant", 0, winreg.REG_SZ, cmd)
-                    print(f"[INIT] Windows startup enabled: {cmd}")
-                else:
-                    print("[INIT] Cannot enable startup: launcher not found")
-            else:
-                try:
-                    winreg.DeleteValue(key, "SM WoT Assistant")
-                    print("[INIT] Windows startup disabled")
-                except FileNotFoundError:
-                    pass
-            winreg.CloseKey(key)
-        except Exception as e:
-            print(f"[INIT] Failed to set Windows startup: {e}")
 
 
     def reload_tank_data(self):
@@ -1350,7 +1274,6 @@ class WotAssistantHQ:
                     status_var.set(self.t('ui', 'dialog_update_installing'))
                 ))
 
-                _stop_tray_watcher()
                 result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
@@ -1374,7 +1297,6 @@ class WotAssistantHQ:
                         ctypes.windll.kernel32.CloseHandle(self._update_mutex)
                     except Exception:
                         pass
-                    _restart_tray_watcher()
                     subprocess.Popen([install_exe], creationflags=0x08000000)
                     pw.after(200, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
                 pw.after(3000, _finish)
@@ -1534,7 +1456,6 @@ class WotAssistantHQ:
             self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_installing'), "#ffaa00", ("Arial", 11, "bold")))
 
-            _stop_tray_watcher()
             result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
             if result.returncode != 0:
                 raise RuntimeError(f"Installer exit code {result.returncode}")
@@ -1560,7 +1481,6 @@ class WotAssistantHQ:
                     ctypes.windll.kernel32.CloseHandle(self._update_mutex)
                 except Exception:
                     pass
-                _restart_tray_watcher()
                 subprocess.Popen([install_exe], creationflags=0x08000000)
                 self.root.after(200, self._quit_app_for_update)
             self.root.after(3000, _finish)
@@ -1842,7 +1762,7 @@ class WotAssistantHQ:
         shown_at = getattr(self, "_splash_shown_at", 0.0)
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
         min_visible_ms = 2000  # Принаймні 2 секунди
-        if not self._start_to_tray and elapsed_ms < min_visible_ms:
+        if elapsed_ms < min_visible_ms:
             self.root.after(min_visible_ms - elapsed_ms, self.finish_startup_splash)
             return
         try:
@@ -1862,16 +1782,6 @@ class WotAssistantHQ:
                     del self.splash
                 except Exception:
                     pass
-
-        if self._start_to_tray:
-            self.current_map_eng = None
-            if hasattr(self, 'painter'):
-                self.painter.canvas.delete("painter_obj")
-            self._load_group_schemes_from_cache()
-            self._startup_complete = True
-            self.root.after(200, self._minimize_to_tray)
-            return
-
         try:
             self.root.deiconify()
             self.root.lift()
