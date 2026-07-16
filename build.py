@@ -108,28 +108,42 @@ def update_nsi_version(version):
 
 
 def commit_version_files(version):
-    """Commit VERSION and installer.nsi so the version bump is saved before GitHub release."""
+    """Commit all changes and create a git tag so the release state is fully reproducible."""
     try:
         r = subprocess.run(
-            ["git", "status", "--porcelain", VERSION_FILE, NSI_FILE],
+            ["git", "status", "--porcelain"],
             cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
         )
         if not r.stdout.strip():
+            print("[BUILD] Nothing to commit — working tree clean")
             return  # nothing to commit
         subprocess.run(
-            ["git", "add", VERSION_FILE, NSI_FILE],
+            ["git", "add", "-A"],
             cwd=BASE_DIR, capture_output=True, timeout=10,
         )
         result = subprocess.run(
-            ["git", "commit", "-m", f"chore: bump to v{version}"],
+            ["git", "commit", "-m", f"release: v{version}"],
             cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
         )
         if result.returncode == 0:
-            print(f"[BUILD] Committed: v{version}")
+            print(f"[BUILD] All changes committed: release v{version}")
         else:
             print(f"[BUILD] Commit skipped: {result.stdout.strip()}")
     except Exception as e:
         print(f"[BUILD] Commit warning: {e}")
+
+
+def create_git_tag(version):
+    """Create a local git tag for the release, providing a rollback point."""
+    tag = f"v{version}"
+    try:
+        subprocess.run(
+            ["git", "tag", "-f", tag],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
+        )
+        print(f"[BUILD] Git tag created: {tag}")
+    except Exception as e:
+        print(f"[BUILD] Git tag warning: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -673,6 +687,7 @@ def main():
     # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
     commit_version_files(version)
+    create_git_tag(version)
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()

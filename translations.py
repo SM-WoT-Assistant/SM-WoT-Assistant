@@ -187,13 +187,13 @@ TRANSLATIONS = {
             "help_f1": "This help",
             "help_section_editor": "Window Control (EDITOR Mode)",
             "help_hint_editor": "F8 / Lock button toggles move/resize without Ctrl",
-            "help_ctrl_lmb": "Drag editor window",
+            "help_ctrl_lmb": "Drag window",
             "help_ctrl_updown": "Resize window",
             "help_ctrl_leftright": "Change opacity",
-            "help_ctrlshift_updown": "Change map contrast",
+            "help_ctrlshift_updown": "Change contrast",
             "help_section_battle": "Window Control (BATTLE Mode)",
             "help_hint_battle": "F8 / Lock button toggles move/resize without Ctrl",
-            "help_ctrl_lmb_battle": "Drag window in battle",
+            "help_ctrl_lmb_battle": "Hold Ctrl to focus window, then click Lock button or press F8 to toggle.",
             "help_section_draw": "Drawing (EDITOR -> MAPS)",
             "help_lmb_drag": "Create marker / text",
             "help_ctrl_lmb_drag": "Move object",
@@ -380,7 +380,14 @@ TRANSLATIONS = {
 
             "publish_duplicate_error": "Description already exists",
 
-            "expand_btn": "Expand"
+            "expand_btn": "Expand",
+            "run_at_startup": "Launch in tray at Windows startup",
+            "launch_on_game_start": "Launch program when game starts",
+            "start_minimized": "Launch minimized",
+            "help_section_startup": "Startup & Game Launch",
+            "help_run_at_startup": "Settings (⚙) → Launch in tray at Windows startup. Registers launcher in Windows autorun. Icon appears in system tray, polls for game.",
+            "help_launch_on_game_start": "Settings (⚙) → Available when first checkbox is ON. When WoT starts, watcher launches the main program.",
+            "help_start_minimized": "Settings (⚙) → Available when second checkbox is ON. Main program starts directly in system tray, no window shown."
         }
     }
 }
