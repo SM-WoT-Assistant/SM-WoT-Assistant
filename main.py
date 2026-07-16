@@ -1349,13 +1349,13 @@ class WotAssistantHQ:
 
                 pw.after(0, lambda: status_var.set(f"Updated to v{latest_ver}"))
                 def _finish():
-                    status_var.set(self.t('ui', 'dialog_update_starting'))
                     try:
+                        status_var.set(self.t('ui', 'dialog_update_starting'))
                         ctypes.windll.kernel32.CloseHandle(self._update_mutex)
-                    except Exception:
-                        pass
-                    subprocess.Popen([install_exe], creationflags=0x08000000)
-                    pw.after(200, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
+                        subprocess.Popen([install_exe], creationflags=0x08000000)
+                    except Exception as e:
+                        print(f"[UPDATE] Finish error: {e}")
+                    pw.after(200, lambda: self._quit_app_for_update())
                 pw.after(3000, _finish)
 
             except Exception as e:
@@ -1543,13 +1543,13 @@ class WotAssistantHQ:
             self.root.after(0, lambda: self._splash_status_safe(
                 f"Updated to v{latest_ver}", "#22cc44", ("Arial", 13, "bold")))
             def _finish():
-                self._splash_status_safe(
-                    self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold"))
                 try:
+                    self._splash_status_safe(
+                        self.t('ui', 'dialog_update_starting'), "#22cc44", ("Arial", 12, "bold"))
                     ctypes.windll.kernel32.CloseHandle(self._update_mutex)
-                except Exception:
-                    pass
-                subprocess.Popen([install_exe], creationflags=0x08000000)
+                    subprocess.Popen([install_exe], creationflags=0x08000000)
+                except Exception as e:
+                    print(f"[UPDATE] Finish error: {e}")
                 self.root.after(200, self._quit_app_for_update)
             self.root.after(3000, _finish)
 

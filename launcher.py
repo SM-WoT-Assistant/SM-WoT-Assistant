@@ -116,7 +116,8 @@ def check_for_updates_sync():
 def compare_versions(current, latest):
     try:
         def _parts(v):
-            return tuple(int(x) for x in str(v).replace("v", "").split(".")[:3])
+            clean = str(v).replace("v", "").split()[0]  # "1.0.43 Beta" → "1.0.43"
+            return tuple(int(x) for x in clean.split(".")[:3])
         return _parts(latest) > _parts(current)
     except Exception:
         return False
