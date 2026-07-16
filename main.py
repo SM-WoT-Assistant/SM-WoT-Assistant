@@ -39,6 +39,35 @@ import firebase_drawings
 import firebase_groups
 import tray_icon
 
+# ─── Tray watcher helpers ───
+WM_CLOSE = 0x0010
+
+def _stop_tray_watcher():
+    """Signal the tray watcher launcher to exit before update."""
+    try:
+        hwnd = ctypes.windll.user32.FindWindowW("SM_WoT_Watcher_Window", None)
+        if hwnd:
+            ctypes.windll.user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            time.sleep(0.3)
+            print("[INIT] Tray watcher stopped for update")
+            return True
+    except Exception as e:
+        print(f"[INIT] stop tray watcher error: {e}")
+    return False
+
+def _restart_tray_watcher():
+    """Restart the tray watcher after update if it was running."""
+    try:
+        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+        launcher_exe = os.path.join(install_dir, "SM WoT Assistant Launcher.exe")
+        if os.path.exists(launcher_exe):
+            subprocess.Popen([launcher_exe, "--tray"], creationflags=0x08000000)
+            print("[INIT] Tray watcher restarted")
+            return True
+    except Exception as e:
+        print(f"[INIT] restart tray watcher error: {e}")
+    return False
+
 try:
     import map_extractor
 except ImportError:
@@ -1321,6 +1350,7 @@ class WotAssistantHQ:
                     status_var.set(self.t('ui', 'dialog_update_installing'))
                 ))
 
+                _stop_tray_watcher()
                 result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
@@ -1344,6 +1374,7 @@ class WotAssistantHQ:
                         ctypes.windll.kernel32.CloseHandle(self._update_mutex)
                     except Exception:
                         pass
+                    _restart_tray_watcher()
                     subprocess.Popen([install_exe], creationflags=0x08000000)
                     pw.after(200, lambda: (pw.destroy(), self.save_settings(), sys.exit(0)))
                 pw.after(3000, _finish)
@@ -1503,6 +1534,7 @@ class WotAssistantHQ:
             self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_installing'), "#ffaa00", ("Arial", 11, "bold")))
 
+            _stop_tray_watcher()
             result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
             if result.returncode != 0:
                 raise RuntimeError(f"Installer exit code {result.returncode}")
@@ -1528,6 +1560,7 @@ class WotAssistantHQ:
                     ctypes.windll.kernel32.CloseHandle(self._update_mutex)
                 except Exception:
                     pass
+                _restart_tray_watcher()
                 subprocess.Popen([install_exe], creationflags=0x08000000)
                 self.root.after(200, self._quit_app_for_update)
             self.root.after(3000, _finish)

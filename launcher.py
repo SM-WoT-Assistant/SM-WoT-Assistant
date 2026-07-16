@@ -74,6 +74,9 @@ _tray_click_flag = 0  # 0=none, 1=left, 2=right
 _tray_class_registered = False
 _tray_wndproc_instance = None
 _tray_hicon = None
+_tray_active_launcher = None  # Reference to active Launcher in --tray mode
+
+WM_CLOSE = 0x0010
 
 def load_version():
     try:
@@ -451,6 +454,8 @@ class Launcher:
 
     def _run_tray_watcher(self):
         """Lightweight tray-only mode: no window, polls for WoT launch."""
+        global _tray_active_launcher
+        _tray_active_launcher = self
         self._tray_root = tk.Tk()
         self._tray_root.withdraw()
         self._tray_root.title("SM WoT Assistant Watcher")
@@ -602,6 +607,8 @@ class Launcher:
 
     def _tray_exit(self):
         """Cleanup and exit the tray watcher."""
+        global _tray_active_launcher
+        _tray_active_launcher = None
         print("[LAUNCHER] Tray watcher exiting")
         self._tray_remove()
         try:
@@ -657,14 +664,44 @@ class Launcher:
             return False
 
 
+def stop_tray_watcher():
+    """Signal the running tray watcher to exit (from another process)."""
+    try:
+        hwnd = ctypes.windll.user32.FindWindowW("SM_WoT_Watcher_Window", None)
+        if hwnd:
+            ctypes.windll.user32.PostMessageW(hwnd, WM_CLOSE, 0, 0)
+            print("[LAUNCHER] Tray watcher signalled to exit")
+            return True
+    except Exception as e:
+        print(f"[LAUNCHER] Error stopping tray watcher: {e}")
+    return False
+
+
+def restart_tray_watcher():
+    """Restart the tray watcher launcher (called after update)."""
+    install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+    launcher_exe = os.path.join(install_dir, "SM WoT Assistant Launcher.exe")
+    if os.path.exists(launcher_exe):
+        try:
+            subprocess.Popen([launcher_exe, "--tray"], creationflags=0x08000000)
+            print("[LAUNCHER] Tray watcher restarted")
+            return True
+        except Exception as e:
+            print(f"[LAUNCHER] Error restarting tray watcher: {e}")
+    return False
+
+
 def _tray_wndproc_func(hwnd, msg, wparam, lparam):
     """Tray message-only window procedure."""
-    global _tray_click_flag
+    global _tray_click_flag, _tray_active_launcher
     if msg == WM_APP and lparam in (0x0202, 0x0205):
         if lparam == 0x0202:
             _tray_click_flag = 1
         elif lparam == 0x0205:
             _tray_click_flag = 2
+    elif msg == WM_CLOSE:
+        if _tray_active_launcher is not None:
+            _tray_active_launcher._tray_exit()
     return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
