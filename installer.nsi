@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.49"
+!define PRODUCT_VERSION "1.0.42"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant v${PRODUCT_VERSION}.exe"
@@ -27,6 +27,7 @@ UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
+    Delete "$INSTDIR\SM WoT Assistant v*.exe"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"

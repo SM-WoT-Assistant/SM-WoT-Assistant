@@ -213,9 +213,9 @@ class Launcher:
             self._dot_state = (self._dot_state + 1) % 3
             dots = "." * (self._dot_state + 1)
             self.canvas.itemconfigure(self.status_text, text=base + dots)
+            self.splash.after(500, self._animate_dots)
         except Exception:
             pass
-        self.splash.after(500, self._animate_dots)
 
     def _show_update_prompt(self, latest):
         latest_ver = latest.get("version", "")
@@ -299,39 +299,27 @@ class Launcher:
                     self._start_dot_animation()
                 ))
 
-                print(f"[DEBUG 1] Running installer: {tmp}")
-                result = subprocess.run(
-                    [tmp, "/S", "/NCRC"],
-                    creationflags=0x08000000,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-                print(f"[DEBUG 2] Installer done, exit code: {result.returncode}")
+                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
 
                 install_prefix = os.path.join(self.install_dir, f"SM WoT Assistant v{latest_ver}")
-                print(f"[DEBUG 3] install_prefix: {install_prefix}")
 
-                print(f"[DEBUG 4] Listing install dir: {self.install_dir}")
                 for f in os.listdir(self.install_dir):
                     if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
                         fp = os.path.join(self.install_dir, f)
                         try:
                             if not fp.startswith(install_prefix):
                                 os.remove(fp)
-                                print(f"[DEBUG 5] Removed old EXE: {f}")
                         except Exception:
                             pass
 
-                print(f"[DEBUG 6] Checking for new EXE...")
                 found = any(
                     f.startswith(f"SM WoT Assistant v{latest_ver}") and f.endswith(".exe")
                     for f in os.listdir(self.install_dir)
                 )
                 if not found:
                     raise RuntimeError(f"EXE not found for v{latest_ver} in {self.install_dir}")
-                print(f"[DEBUG 7] New EXE found OK")
 
                 try:
                     os.remove(tmp)
@@ -350,7 +338,6 @@ class Launcher:
                     except Exception:
                         pass
                     launcher_exe = os.path.join(self.install_dir, "SM WoT Assistant Launcher.exe")
-                    print(f"[DEBUG 8] Starting launcher: {launcher_exe}")
                     subprocess.Popen([launcher_exe, "--skip-splash"], creationflags=0x08000000)
                     self.splash.after(200, lambda: (self.splash.destroy(), sys.exit(0)))
 
