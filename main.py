@@ -1314,19 +1314,29 @@ class WotAssistantHQ:
                 install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
                 install_exe = os.path.join(install_dir, f"SM WoT Assistant v{latest_ver}.exe")
 
+                install_state = {"running": True}
+                def _inst_dots(n=0):
+                    if not install_state["running"]:
+                        return
+                    d = "." * ((n % 3) + 1)
+                    status_var.set(self.t('ui', 'dialog_update_installing') + d)
+                    pw.after(500, lambda: _inst_dots(n + 1))
+
                 pw.after(0, lambda: (
                     pbar_canvas.delete("bar"),
                     pbar_canvas.create_rectangle(0, 0, pb_w, 16, fill="#22cc44", outline="", tags="bar"),
                     pct_var.set("100%"),
                     status_var.set(self.t('ui', 'dialog_update_installing'))
                 ))
+                pw.after(0, lambda: _inst_dots())
 
-                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000, timeout=180)
+                install_state["running"] = False
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
 
                 for f in os.listdir(install_dir):
-                    if f.startswith("SM WoT Assistant") and f.endswith(".exe"):
+                    if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
                         fp = os.path.join(install_dir, f)
                         try:
                             if os.path.abspath(fp) != os.path.abspath(sys.executable):
@@ -1500,15 +1510,26 @@ class WotAssistantHQ:
             install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
             install_exe = os.path.join(install_dir, f"SM WoT Assistant v{latest_ver}.exe")
 
+            inst_state = {"running": True}
+            def _sp_dots(n=0):
+                if not inst_state["running"]:
+                    return
+                d = "." * ((n % 3) + 1)
+                self.root.after(0, lambda t=d: self._splash_status_safe(
+                    self.t('ui', 'dialog_update_installing') + t, "#ffaa00", ("Arial", 11, "bold")))
+                self.root.after(500, lambda: _sp_dots(n + 1))
+
             self.root.after(0, lambda: self._splash_status_safe(
                 self.t('ui', 'dialog_update_installing'), "#ffaa00", ("Arial", 11, "bold")))
+            self.root.after(0, lambda: _sp_dots())
 
-            result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+            result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000, timeout=180)
+            inst_state["running"] = False
             if result.returncode != 0:
                 raise RuntimeError(f"Installer exit code {result.returncode}")
 
             for f in os.listdir(install_dir):
-                if f.startswith("SM WoT Assistant") and f.endswith(".exe"):
+                if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
                     fp = os.path.join(install_dir, f)
                     try:
                         if os.path.abspath(fp) != os.path.abspath(sys.executable):

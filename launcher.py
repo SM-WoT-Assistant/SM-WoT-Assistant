@@ -372,7 +372,7 @@ class Launcher:
                     self._start_dot_animation()
                 ))
 
-                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
+                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000, timeout=180)
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
 
