@@ -68,16 +68,14 @@ def read_version():
     return "0.0.0"
 
 
-def write_version(v, suffix=""):
-    full = v.strip() + suffix
+def write_version(v):
     with open(VERSION_FILE, "w", encoding="utf-8") as f:
-        f.write(full + "\n")
-    print(f"[BUILD] VERSION := {full}")
+        f.write(v.strip() + "\n")
+    print(f"[BUILD] VERSION := {v.strip()}")
 
 
 def validate_semver(v):
-    clean = v.split()[0]  # "1.0.43 Beta" → "1.0.43"
-    if re.match(r'^\d+\.\d+\.\d+$', clean):
+    if re.match(r'^\d+\.\d+\.\d+$', v):
         return True
     print(f"[BUILD] FATAL: VERSION '{v}' is not valid semver (X.Y.Z)")
     return False
@@ -102,10 +100,9 @@ def find_nsis():
 def update_nsi_version(version):
     if not os.path.exists(NSI_FILE):
         return
-    clean = version.split()[0]  # "1.0.43 Beta" → "1.0.43"
     with open(NSI_FILE, "r", encoding="utf-8") as f:
         content = f.read()
-    content = re.sub(r'!define PRODUCT_VERSION "[^"]*"', f'!define PRODUCT_VERSION "{clean}"', content)
+    content = re.sub(r'!define PRODUCT_VERSION "[^"]*"', f'!define PRODUCT_VERSION "{version}"', content)
     with open(NSI_FILE, "w", encoding="utf-8") as f:
         f.write(content)
 
@@ -679,51 +676,49 @@ def main():
             new_version = a
 
     if new_version:
-        suffix = " Beta" if is_beta else ""
-        write_version(new_version, suffix)
+        write_version(new_version)
 
-    version = read_version()          # e.g. "1.0.43 Beta" or "1.0.43"
-    clean_ver = version.split()[0]    # e.g. "1.0.43"
+    version = read_version()
     is_beta_suffix = " Beta" if is_beta else ""
-    display_ver = version
+    display_ver = version + is_beta_suffix
 
     # Phase 0: Pre-flight checks
-    makensis_exe = preflight(clean_ver)
+    makensis_exe = preflight(version)
 
     # Phase 1: Clean previous intermediate build
     clean_dist()
 
-    # Phase 2: PyInstaller — чистий version для NSIS/файлів
+    # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
-    commit_version_files(clean_ver)
-    create_git_tag(clean_ver)
+    commit_version_files(version)
+    create_git_tag(version)
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()
 
-    # Rename EXE to include version (clean, без суфікса)
+    # Rename EXE to include version (clean, без Beta)
     exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")
-    exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{clean_ver}.exe")
+    exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{version}.exe")
     if os.path.exists(exe_plain):
         if os.path.exists(exe_ver):
             os.remove(exe_ver)
         os.rename(exe_plain, exe_ver)
-        print(f"[BUILD] EXE renamed: SM WoT Assistant v{clean_ver}.exe")
+        print(f"[BUILD] EXE renamed: SM WoT Assistant v{version}.exe")
 
     # Phase 3: NSIS installer (чистий version)
-    installer = run_nsis(clean_ver, makensis_exe)
+    installer = run_nsis(version, makensis_exe)
 
     # Phase 4: Rename to versioned directory + portable ZIP (чистий version)
-    rename_onedir(clean_ver)
-    portable_zip = create_portable_zip(clean_ver)
+    rename_onedir(version)
+    portable_zip = create_portable_zip(version)
 
     # Phase 5: Verification
-    verify_build(clean_ver)
+    verify_build(version)
 
     # Phase 6: Manifest
-    generate_manifest(clean_ver)
+    generate_manifest(version)
 
-    # Phase 7: Summary
+    # Phase 7: Summary — display_ver з Beta тільки для показу
     print()
     print("=" * 60)
     print(f"  BUILD COMPLETE — SM WoT Assistant v{display_ver}")
@@ -734,13 +729,14 @@ def main():
         print(f"  Installer:      {os.path.basename(installer)}")
     if portable_zip:
         print(f"  Portable ZIP:   {os.path.basename(portable_zip)}")
-    print(f"  Manifest:       build_manifest_v{clean_ver}.txt")
+    print(f"  Manifest:       build_manifest_v{version}.txt")
     print(f"  Output dir:     {DIST_DIR}")
     print()
 
-    # Always create GitHub release
-    if create_github_release(clean_ver, is_beta):
-        write_version_to_rtdb(clean_ver, release_date, is_beta)
+    # Always create GitHub release (required for auto-update download URL)
+    if create_github_release(version, is_beta):
+        # Write version to RTDB only after successful GitHub release
+        write_version_to_rtdb(version, release_date, is_beta)
 
     print(f"[BUILD] Done: v{display_ver}")
 

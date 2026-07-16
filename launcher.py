@@ -6,7 +6,6 @@ so running setup.exe does NOT conflict with locked files in the install dir.
 """
 
 import os, sys, tempfile, threading, subprocess, ctypes, time, re
-from ctypes import wintypes
 import tkinter as tk
 from PIL import Image, ImageTk, ImageOps
 import unicodedata  # force PyInstaller to bundle C extension for idna/requests
@@ -19,68 +18,6 @@ else:
 
 LOGO_FILE = os.path.join(BUNDLE_DIR, "logo.png")
 VERSION_FILE = os.path.join(BUNDLE_DIR, "VERSION")
-ICO_FILE = os.path.join(BUNDLE_DIR, "icon.ico")
-
-# ─── WinAPI constants for tray icon ───
-WM_DESTROY = 0x0002
-WM_USER = 0x0400
-WM_LBUTTONUP = 0x0202
-WM_RBUTTONUP = 0x0205
-NIM_ADD = 0
-NIM_DELETE = 2
-NIM_SETVERSION = 4
-NIF_MESSAGE = 1
-NIF_ICON = 2
-NIF_TIP = 4
-IMAGE_ICON = 1
-LR_LOADFROMFILE = 0x00000010
-LR_DEFAULTSIZE = 0x00000040
-NOTIFYICON_VERSION_4 = 4
-
-# Global state for tray WNDPROC
-_tray_click_flag = 0  # 0=none, 1=left, 2=right
-_tray_class_registered = False
-_tray_wndproc_instance = None
-_tray_hicon = None
-
-# WinAPI structures for tray icon
-class NOTIFYICONDATAW(ctypes.Structure):
-    _fields_ = [
-        ("cbSize", wintypes.DWORD),
-        ("hwnd", wintypes.HWND),
-        ("uID", wintypes.UINT),
-        ("uFlags", wintypes.UINT),
-        ("uCallbackMessage", wintypes.UINT),
-        ("hIcon", wintypes.HANDLE),
-        ("szTip", wintypes.WCHAR * 128),
-        ("dwState", wintypes.DWORD),
-        ("dwStateMask", wintypes.DWORD),
-        ("szInfo", wintypes.WCHAR * 256),
-        ("uVersion", wintypes.UINT),
-        ("szInfoTitle", wintypes.WCHAR * 64),
-        ("dwInfoFlags", wintypes.DWORD),
-        ("guidItem", ctypes.c_byte * 16),
-        ("hBalloonIcon", wintypes.HANDLE),
-    ]
-
-class WNDCLASSW(ctypes.Structure):
-    _fields_ = [
-        ("style", wintypes.UINT),
-        ("lpfnWndProc", ctypes.c_void_p),
-        ("cbClsExtra", ctypes.c_int),
-        ("cbWndExtra", ctypes.c_int),
-        ("hInstance", wintypes.HINSTANCE),
-        ("hIcon", wintypes.HANDLE),
-        ("hCursor", wintypes.HANDLE),
-        ("hbrBackground", wintypes.HANDLE),
-        ("lpszMenuName", wintypes.LPCWSTR),
-        ("lpszClassName", wintypes.LPCWSTR),
-    ]
-
-WM_APP = 0x8000
-HWND_MESSAGE = -3
-SM_CXSMICON = 49
-SM_CYSMICON = 50
 
 def load_version():
     try:
@@ -116,8 +53,7 @@ def check_for_updates_sync():
 def compare_versions(current, latest):
     try:
         def _parts(v):
-            clean = str(v).replace("v", "").split()[0]  # "1.0.43 Beta" → "1.0.43"
-            return tuple(int(x) for x in clean.split(".")[:3])
+            return tuple(int(x) for x in str(v).replace("v", "").split(".")[:3])
         return _parts(latest) > _parts(current)
     except Exception:
         return False
@@ -127,11 +63,9 @@ SPLASH_W, SPLASH_H = 450, 350
 
 class Launcher:
     def __init__(self):
-        self.is_tray = "--tray" in sys.argv
         self.skip_splash = "--skip-splash" in sys.argv
 
-        mutex_name = "SM_WoT_Assistant_Watcher" if self.is_tray else "SM_WoT_Assistant_SingleInstance"
-        self.mutex = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
+        self.mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
         if ctypes.windll.kernel32.GetLastError() == 183:
             sys.exit(0)
 
@@ -140,11 +74,6 @@ class Launcher:
         self.installed_version = self._detect_installed_version()
         self._clean_old_versions()
         self._dot_animating = False
-        # Tray watcher state
-        self._tray_root = None
-        self._tray_nid = None
-        self._tray_hwnd = None
-        self._game_was_running = False
 
     def _detect_installed_version(self):
         """Визначає встановлену версію з імен EXE-файлів у директорії інсталяції."""
@@ -233,9 +162,6 @@ class Launcher:
         self.splash.update()
 
     def run(self):
-        if self.is_tray:
-            self._run_tray_watcher()
-            return
         if self.skip_splash:
             exe = self._find_main_exe()
             if exe:
@@ -373,7 +299,7 @@ class Launcher:
                     self._start_dot_animation()
                 ))
 
-                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000, timeout=180)
+                result = subprocess.run([tmp, "/S", "/NCRC"], creationflags=0x08000000)
                 if result.returncode != 0:
                     raise RuntimeError(f"Installer exit code {result.returncode}")
 
@@ -449,235 +375,6 @@ class Launcher:
 
         subprocess.Popen([main_exe, f"--splash-geometry={geo}"], creationflags=0x08000000)
         self.splash.after(100, lambda: (self.splash.destroy(), sys.exit(0)))
-
-    # ═══════════════════════════════════════════════════════════════════
-    #  Tray Watcher Mode (--tray)
-    # ═══════════════════════════════════════════════════════════════════
-
-    def _run_tray_watcher(self):
-        """Lightweight tray-only mode: no window, polls for WoT launch."""
-        self._tray_root = tk.Tk()
-        self._tray_root.withdraw()
-        self._tray_root.title("SM WoT Assistant Watcher")
-        self._tray_setup()
-        self._game_was_running = self._is_wot_running()
-        self._tray_poll()
-        self._tray_root.mainloop()
-
-    def _tray_setup(self):
-        """Create tray icon via WinAPI Shell_NotifyIconW."""
-        global _tray_class_registered, _tray_wndproc_instance, _tray_hicon
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        shell32 = ctypes.windll.shell32
-        hinst = kernel32.GetModuleHandleW(None)
-
-        if not _tray_class_registered:
-            wndproc_type = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
-            _tray_wndproc_instance = wndproc_type(_tray_wndproc_func)
-            wc = WNDCLASSW()
-            wc.style = 0
-            wc.lpfnWndProc = ctypes.cast(_tray_wndproc_instance, ctypes.c_void_p).value
-            wc.cbClsExtra = 0
-            wc.cbWndExtra = 0
-            wc.hInstance = hinst
-            wc.hIcon = 0
-            wc.hCursor = 0
-            wc.hbrBackground = 0
-            wc.lpszMenuName = None
-            wc.lpszClassName = "SM_WoT_Watcher_Window"
-            if user32.RegisterClassW(ctypes.byref(wc)):
-                _tray_class_registered = True
-
-        self._tray_hwnd = user32.CreateWindowExW(
-            0, "SM_WoT_Watcher_Window", "", 0, 0, 0, 0, 0,
-            None, None, hinst, None
-        )
-
-        # Load icon
-        small_w = user32.GetSystemMetrics(SM_CXSMICON)
-        small_h = user32.GetSystemMetrics(SM_CYSMICON)
-        icon_path = os.path.join(BUNDLE_DIR, "icon.ico")
-        if not os.path.exists(icon_path) and self.install_dir:
-            candidate = os.path.join(self.install_dir, "_internal", "icon.ico")
-            if os.path.exists(candidate):
-                icon_path = candidate
-        _tray_hicon = 0
-        if os.path.exists(icon_path):
-            _tray_hicon = user32.LoadImageW(
-                None, icon_path, IMAGE_ICON, small_w, small_h, LR_LOADFROMFILE | LR_DEFAULTSIZE
-            )
-
-        nid = NOTIFYICONDATAW()
-        nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
-        nid.hwnd = self._tray_hwnd
-        nid.uID = 1
-        nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
-        nid.uCallbackMessage = WM_APP
-        nid.hIcon = _tray_hicon
-        nid.szTip = f"SM WoT Assistant v{self.version}"
-
-        if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid)):
-            self._tray_nid = nid
-            print(f"[LAUNCHER] Tray watcher started (v{self.version})")
-        else:
-            print("[LAUNCHER] Shell_NotifyIconW NIM_ADD failed")
-
-    def _tray_remove(self):
-        global _tray_hicon
-        if self._tray_nid:
-            try:
-                ctypes.windll.shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(self._tray_nid))
-            except Exception:
-                pass
-            self._tray_nid = None
-        if self._tray_hwnd:
-            try:
-                ctypes.windll.user32.DestroyWindow(self._tray_hwnd)
-            except Exception:
-                pass
-            self._tray_hwnd = None
-        if _tray_hicon:
-            try:
-                ctypes.windll.user32.DestroyIcon(_tray_hicon)
-            except Exception:
-                pass
-            _tray_hicon = None
-
-    def _tray_poll(self):
-        """Poll for clicks + game detection every 1 second."""
-        global _tray_click_flag
-        # Handle tray icon clicks
-        if _tray_click_flag == 1:
-            _tray_click_flag = 0
-            self._tray_launch_main()
-        elif _tray_click_flag == 2:
-            _tray_click_flag = 0
-            self._tray_show_menu()
-
-        # Read settings for game launch detection
-        settings = self._read_settings()
-        launch_on_game = settings.get("launch_on_game_start", False)
-
-        is_running = self._is_wot_running()
-        if is_running and not self._game_was_running and launch_on_game:
-            start_minimized = settings.get("start_minimized", False)
-            print(f"[LAUNCHER] Game detected, launching main (minimized={start_minimized})")
-            self._tray_launch_main(start_minimized=start_minimized)
-        elif not is_running and self._game_was_running:
-            print(f"[LAUNCHER] Game stopped, watcher continues")
-        self._game_was_running = is_running
-
-        try:
-            if self._tray_root and self._tray_root.winfo_exists():
-                self._tray_root.after(1000, self._tray_poll)
-        except Exception:
-            pass
-
-    def _tray_launch_main(self, start_minimized=False):
-        """Launch the main program from the tray watcher."""
-        main_exe = self._find_main_exe()
-        if not main_exe or not os.path.exists(main_exe):
-            print("[LAUNCHER] Main EXE not found")
-            return
-        args = [main_exe]
-        if start_minimized:
-            args.append("--tray")
-        try:
-            subprocess.Popen(args, creationflags=0x08000000)
-            print(f"[LAUNCHER] Launched main: {os.path.basename(main_exe)}")
-        except Exception as e:
-            print(f"[LAUNCHER] Failed to launch main: {e}")
-
-    def _tray_show_menu(self):
-        """Show right-click popup menu near cursor."""
-        if not self._tray_root or not self._tray_root.winfo_exists():
-            return
-        menu = tk.Menu(self._tray_root, tearoff=False, bg="#252525", fg="#cccccc",
-                       activebackground="#444", activeforeground="#ffffff",
-                       font=("Arial", 9))
-        menu.add_command(label="Launch SM WoT Assistant", command=self._tray_launch_main)
-        menu.add_separator()
-        menu.add_command(label="Exit", command=self._tray_exit)
-        try:
-            x, y = ctypes.windll.user32.GetCursorPos()
-            menu.tk_popup(x, y)
-        except Exception:
-            pass
-        finally:
-            try:
-                menu.grab_release()
-            except Exception:
-                pass
-
-    def _tray_exit(self):
-        """Cleanup and exit the tray watcher."""
-        print("[LAUNCHER] Tray watcher exiting")
-        self._tray_remove()
-        try:
-            ctypes.windll.kernel32.CloseHandle(self.mutex)
-        except Exception:
-            pass
-        try:
-            if self._tray_root and self._tray_root.winfo_exists():
-                self._tray_root.destroy()
-        except Exception:
-            pass
-        sys.exit(0)
-
-    def _read_settings(self):
-        """Read settings.json from user data dir."""
-        settings_file = os.path.join(
-            os.environ.get("APPDATA", ""), "SM WoT Assistant", "settings.json"
-        )
-        if not os.path.exists(settings_file):
-            return {}
-        try:
-            import json
-            with open(settings_file, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return {}
-
-    def _is_wot_running(self):
-        """Check if WorldOfTanks.exe process is running via WinAPI."""
-        try:
-            kernel32 = ctypes.windll.kernel32
-            TH32CS_SNAPPROCESS = 0x00000002
-            snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-            if snapshot == -1:
-                return False
-
-            PE_SIZE = 556  # sizeof(PROCESSENTRY32W)
-            pe = (ctypes.c_byte * PE_SIZE)()
-            ctypes.memset(pe, 0, PE_SIZE)
-            ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)  # dwSize
-
-            found = False
-            if kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
-                while True:
-                    exe_buf = ctypes.create_unicode_buffer(260)
-                    ctypes.memmove(exe_buf, ctypes.byref(pe, 44), 260 * 2)
-                    if exe_buf.value and "WorldOfTanks.exe" in exe_buf.value:
-                        found = True
-                        break
-                    if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
-                        break
-            kernel32.CloseHandle(snapshot)
-            return found
-        except Exception:
-            return False
-
-
-def _tray_wndproc_func(hwnd, msg, wparam, lparam):
-    """Tray message-only window procedure."""
-    global _tray_click_flag
-    if msg == WM_APP and lparam in (WM_LBUTTONUP, WM_RBUTTONUP):
-        if lparam == WM_LBUTTONUP:
-            _tray_click_flag = 1
-        elif lparam == WM_RBUTTONUP:
-            _tray_click_flag = 2
-    return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
 if __name__ == "__main__":
