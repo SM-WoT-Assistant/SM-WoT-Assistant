@@ -586,6 +586,10 @@ def create_github_release(version, is_beta=False):
 
     tag = f"v{version}"
     display_tag = f"v{version} Beta" if is_beta else tag
+
+    # Push tag first so gh release create can find it on GitHub
+    subprocess.run(["git", "push", "origin", tag], cwd=BASE_DIR, capture_output=True, timeout=15)
+
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
 
