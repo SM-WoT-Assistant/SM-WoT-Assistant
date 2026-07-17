@@ -93,3 +93,7 @@ temp_scripts.zip
 # Process output capture (generated during test runs)
 *_err.txt
 *_out.txt
+
+# Magic Context
+.cortexkit/
+magic-context.jsonc.MOVED_READPLEASE
