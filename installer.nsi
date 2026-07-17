@@ -2,7 +2,7 @@
 ; Build: makensis installer.nsi
 
 !define PRODUCT_NAME "SM WoT Assistant"
-!define PRODUCT_VERSION "1.0.42"
+!define PRODUCT_VERSION "1.0.50"
 !define PRODUCT_PUBLISHER "SM WoT Assistant"
 !define PRODUCT_WEB_SITE ""
 !define PRODUCT_DIR_REGKEY "Software\Microsoft\Windows\CurrentVersion\App Paths\SM WoT Assistant v${PRODUCT_VERSION}.exe"
@@ -50,6 +50,7 @@ Section "Install"
     WriteUninstaller "$INSTDIR\uninst.exe"
 
     System::Call 'shell32.dll::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
+    Exec "$INSTDIR\SM WoT Assistant v${PRODUCT_VERSION}.exe"
 SectionEnd
 
 Section "Uninstall"
