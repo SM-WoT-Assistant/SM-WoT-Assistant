@@ -400,30 +400,16 @@ class UIManager:
         make_chk(self.app.t('ui', 'auto_update'), self.app.auto_update_var)
         sep()
 
-        # ─── Windows startup & game launch settings ───
-        chk_startup = make_chk(self.app.t('ui', 'run_at_startup'), self.app._run_at_startup_var)
+        # ─── Game launch settings ───
         chk_launch_game = make_chk(self.app.t('ui', 'launch_on_game_start'), self.app._launch_on_game_start_var)
         chk_minimized = make_chk(self.app.t('ui', 'start_minimized'), self.app._start_minimized_var)
 
-        def _sync_startup_chain():
-            self.app.save_settings()
-            if self.app._run_at_startup_var.get():
-                chk_launch_game.configure(state="normal")
-            else:
-                chk_launch_game.configure(state="disabled")
-                self.app._launch_on_game_start_var.set(False)
-            self.app.save_settings()
-
-        def _on_run_at_startup():
-            enabled = self.app._run_at_startup_var.get()
+        def _on_launch_on_game_start():
+            enabled = self.app._launch_on_game_start_var.get()
             self.app._set_windows_startup(enabled)
-            _sync_startup_chain()
+            self.app.save_settings()
 
-        chk_startup.configure(command=_on_run_at_startup)
-        chk_launch_game.configure(command=_sync_startup_chain)
-
-        if not self.app._run_at_startup_var.get():
-            chk_launch_game.configure(state="disabled")
+        chk_launch_game.configure(command=_on_launch_on_game_start)
 
         sep()
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)

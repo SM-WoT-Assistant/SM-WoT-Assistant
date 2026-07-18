@@ -115,7 +115,6 @@ class WotAssistantHQ:
         self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
         self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
-        self._run_at_startup_var = tk.BooleanVar(value=self.settings.get("run_at_startup", False))
         self._launch_on_game_start_var = tk.BooleanVar(value=self.settings.get("launch_on_game_start", False))
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         
@@ -392,7 +391,6 @@ class WotAssistantHQ:
         self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
         self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
         self.settings["auto_update"] = self.auto_update_var.get()
-        self.settings["run_at_startup"] = self._run_at_startup_var.get()
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
@@ -1783,7 +1781,7 @@ class WotAssistantHQ:
                 except Exception:
                     pass
 
-        if self._start_to_tray:
+        if self._start_to_tray or self._start_minimized_var.get():
             self.current_map_eng = None
             if hasattr(self, 'painter'):
                 self.painter.canvas.delete("painter_obj")

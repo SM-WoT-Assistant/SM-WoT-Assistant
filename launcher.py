@@ -554,7 +554,9 @@ class Launcher:
         global _tray_click_flag
         if _tray_click_flag == 1:
             _tray_click_flag = 0
-            self._tray_launch_main()
+            settings = self._read_settings()
+            start_minimized = settings.get("start_minimized", False)
+            self._tray_launch_main(start_minimized=start_minimized)
         elif _tray_click_flag == 2:
             _tray_click_flag = 0
             self._tray_show_menu()

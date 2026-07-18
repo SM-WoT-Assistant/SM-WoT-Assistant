@@ -382,7 +382,6 @@ TRANSLATIONS = {
 
             "expand_btn": "Expand",
 
-            "run_at_startup": "Launch in tray at Windows startup",
             "launch_on_game_start": "Launch program when game starts",
             "start_minimized": "Launch minimized"
         }
