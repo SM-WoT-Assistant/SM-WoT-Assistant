@@ -20,6 +20,7 @@ def load_version():
     except Exception:
         return "0.0.0"
 
+ICON_FILE = os.path.join(BASE_DIR, "icon.ico")
 LOGO_FILE = os.path.join(BUNDLE_DIR, "logo.png")
 MAPS_DIR = os.path.join(BUNDLE_DIR, "maps")
 

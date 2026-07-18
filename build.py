@@ -108,16 +108,16 @@ def update_nsi_version(version):
 
 
 def commit_version_files(version):
-    """Commit VERSION and installer.nsi so the version bump is saved before GitHub release."""
+    """Commit all changed files so the version bump is saved before GitHub release."""
     try:
         r = subprocess.run(
-            ["git", "status", "--porcelain", VERSION_FILE, NSI_FILE],
+            ["git", "status", "--porcelain"],
             cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
         )
         if not r.stdout.strip():
             return  # nothing to commit
         subprocess.run(
-            ["git", "add", VERSION_FILE, NSI_FILE],
+            ["git", "add", "-A"],
             cwd=BASE_DIR, capture_output=True, timeout=10,
         )
         result = subprocess.run(
@@ -130,6 +130,31 @@ def commit_version_files(version):
             print(f"[BUILD] Commit skipped: {result.stdout.strip()}")
     except Exception as e:
         print(f"[BUILD] Commit warning: {e}")
+
+
+def create_git_tag(version):
+    """Create and push a git tag for the release."""
+    tag = f"v{version}"
+    try:
+        result = subprocess.run(
+            ["git", "tag", tag],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=10,
+        )
+        if result.returncode == 0:
+            print(f"[BUILD] Git tag created: {tag}")
+        else:
+            print(f"[BUILD] Git tag warning: {result.stdout.strip() or result.stderr.strip()}")
+            return
+        result = subprocess.run(
+            ["git", "push", "origin", tag],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=30,
+        )
+        if result.returncode == 0:
+            print(f"[BUILD] Git tag pushed: {tag}")
+        else:
+            print(f"[BUILD] Git tag push warning: {result.stdout.strip() or result.stderr.strip()}")
+    except Exception as e:
+        print(f"[BUILD] Git tag error: {e}")
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -673,6 +698,7 @@ def main():
     # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
     commit_version_files(version)
+    create_git_tag(version)
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()

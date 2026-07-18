@@ -142,7 +142,10 @@ def ping_version_async(app):
     def _ping():
         result = ping_version()
         if hasattr(app, 'root'):
-            app.root.after(0, lambda: _on_ping_done(result, _get_install_id()))
+            try:
+                app.root.after(0, lambda: _on_ping_done(result, _get_install_id()))
+            except RuntimeError:
+                pass  # main loop ще не запущений (race з --tray)
     t = threading.Thread(target=_ping, daemon=True)
     t.start()
 

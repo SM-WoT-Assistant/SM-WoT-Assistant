@@ -147,12 +147,11 @@ class TrayIcon:
     def _load_icon(self):
         small_w = user32.GetSystemMetrics(SM_CXSMICON)
         small_h = user32.GetSystemMetrics(SM_CYSMICON)
-        ico_path = os.path.join(config.BASE_DIR, "icon.ico")
-        if not os.path.exists(ico_path):
-            print(f"[TRAY] icon.ico not found at {ico_path}")
+        if not os.path.exists(config.ICON_FILE):
+            print(f"[TRAY] icon.ico not found at {config.ICON_FILE}")
             return None
         hicon = user32.LoadImageW(
-            None, ico_path, IMAGE_ICON,
+            None, config.ICON_FILE, IMAGE_ICON,
             small_w, small_h,
             LR_LOADFROMFILE | LR_DEFAULTSIZE
         )
