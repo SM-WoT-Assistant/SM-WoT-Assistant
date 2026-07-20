@@ -383,7 +383,8 @@ TRANSLATIONS = {
             "expand_btn": "Expand",
 
             "launch_on_game_start": "Launch program when game starts",
-            "start_minimized": "Launch minimized"
+            "start_minimized": "Launch minimized",
+            "close_with_game": "Close program when game closes"
         }
     }
 }

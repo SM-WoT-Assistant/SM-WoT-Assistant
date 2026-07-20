@@ -117,6 +117,7 @@ class WotAssistantHQ:
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
         self._launch_on_game_start_var = tk.BooleanVar(value=self.settings.get("launch_on_game_start", False))
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
+        self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         
         self.win_mgr = window_manager.WindowManager(self)
         self.win_mgr.initialize_window()
@@ -393,6 +394,7 @@ class WotAssistantHQ:
         self.settings["auto_update"] = self.auto_update_var.get()
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
+        self.settings["close_with_game"] = self._close_with_game_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
@@ -412,21 +414,34 @@ class WotAssistantHQ:
                 return launcher2
         return None
 
+    def _get_tray_watcher_exe(self):
+        """Знайти шлях до tray_watcher для реєстрового запису автозапуску."""
+        install_dir = os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+        tray = os.path.join(install_dir, "SM WoT Assistant Tray Watcher.exe")
+        if os.path.exists(tray):
+            return tray
+        if getattr(sys, 'frozen', False):
+            base = os.path.dirname(sys.executable)
+            tray2 = os.path.join(base, "SM WoT Assistant Tray Watcher.exe")
+            if os.path.exists(tray2):
+                return tray2
+        return None
+
     def _set_windows_startup(self, enable):
-        """Додати/видалити запис у HKCU Run для автозапуску лаунчера з --tray."""
+        """Додати/видалити запис у HKCU Run для автозапуску tray_watcher."""
         import winreg
         key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
         try:
             key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0,
                                  winreg.KEY_SET_VALUE | winreg.KEY_READ)
             if enable:
-                launcher = self._get_launcher_exe()
-                if launcher:
-                    cmd = f'"{launcher}" --tray'
+                tray = self._get_tray_watcher_exe()
+                if tray:
+                    cmd = f'"{tray}"'
                     winreg.SetValueEx(key, "SM WoT Assistant", 0, winreg.REG_SZ, cmd)
-                    print(f"[INIT] Windows startup enabled: {cmd}")
+                    print(f"[INIT] Windows startup enabled (tray_watcher): {cmd}")
                 else:
-                    print("[INIT] Cannot enable startup: launcher not found")
+                    print("[INIT] Cannot enable startup: tray_watcher.exe not found")
             else:
                 try:
                     winreg.DeleteValue(key, "SM WoT Assistant")

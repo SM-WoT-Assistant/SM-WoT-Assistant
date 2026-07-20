@@ -395,6 +395,41 @@ def build_launcher():
     print(f"[BUILD] Launcher: {size_mb:.1f} MB")
     return launcher_exe
 
+
+def build_tray_watcher():
+    """Build tray_watcher as onefile directly into the onedir output."""
+    print("[BUILD] Building tray watcher (onefile)...")
+    tray_py = os.path.join(BASE_DIR, "tray_watcher.py")
+    if not os.path.exists(tray_py):
+        print("[BUILD] FATAL: tray_watcher.py not found")
+        sys.exit(1)
+
+    result = subprocess.run([
+        PYTHON_EXE, "-m", "PyInstaller",
+        "--onefile", "--windowed",
+        "--icon", os.path.join(BASE_DIR, "icon.ico"),
+        "--name", "SM WoT Assistant Tray Watcher",
+        "--distpath", FIXED_ONEDIR,
+        "--workpath", os.path.join(BASE_DIR, "build", "tray_watcher"),
+        "--specpath", os.path.join(BASE_DIR, "build"),
+        "--clean",
+        tray_py,
+    ], cwd=BASE_DIR)
+
+    if result.returncode != 0:
+        print("[BUILD] Tray watcher build FAILED")
+        sys.exit(1)
+
+    tray_exe = os.path.join(FIXED_ONEDIR, "SM WoT Assistant Tray Watcher.exe")
+    if not os.path.exists(tray_exe):
+        print("[BUILD] FATAL: Tray Watcher EXE not found")
+        sys.exit(1)
+
+    size_mb = os.path.getsize(tray_exe) / (1024 * 1024)
+    print(f"[BUILD] Tray Watcher: {size_mb:.1f} MB")
+    return tray_exe
+
+
     if result.returncode != 0:
         print("[BUILD] Launcher build FAILED")
         sys.exit(1)
@@ -493,6 +528,12 @@ def verify_build(version):
         errors.append("Launcher EXE not found")
     else:
         print(f"  Launcher:          {os.path.getsize(launcher_exe)/(1024*1024):.1f} MB  OK")
+
+    tray_exe = os.path.join(onedir, "SM WoT Assistant Tray Watcher.exe")
+    if not os.path.exists(tray_exe):
+        errors.append("Tray Watcher EXE not found")
+    else:
+        print(f"  Tray Watcher:      {os.path.getsize(tray_exe)/(1024*1024):.1f} MB  OK")
 
     for j in _CRITICAL_JSON:
         if not os.path.exists(os.path.join(internal, j)):
@@ -702,6 +743,7 @@ def main():
     run_pyinstaller()
     data_count = copy_data_files()
     build_launcher()
+    build_tray_watcher()
 
     # Rename EXE to include version (clean, без Beta)
     exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")

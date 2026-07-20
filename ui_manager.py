@@ -403,6 +403,7 @@ class UIManager:
         # ─── Game launch settings ───
         chk_launch_game = make_chk(self.app.t('ui', 'launch_on_game_start'), self.app._launch_on_game_start_var)
         chk_minimized = make_chk(self.app.t('ui', 'start_minimized'), self.app._start_minimized_var)
+        chk_close_game = make_chk(self.app.t('ui', 'close_with_game'), self.app._close_with_game_var)
 
         def _on_launch_on_game_start():
             enabled = self.app._launch_on_game_start_var.get()

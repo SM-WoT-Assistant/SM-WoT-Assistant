@@ -179,6 +179,15 @@ build.py автоматично комітить VERSION та installer.nsi пі
 7. Ці шість пунктів треба перевіряти при КОЖНІЙ зміні `finish_startup_splash()`, `on_map_select()`, `get_edit_extra_height()`, `initialize_window()` — без винятків.
 8. **`root.minsize(self.w, self.h)`** — обов'язково після зміни геометрії в `finish_startup_splash()`, щоб вікно ніколи не ставало меншим за сумарний розмір всіх елементів.
 
+## Tray Watcher (19.07.2026)
+1. **tray_watcher.py** — мінімальний процес-спостерігач (чистий stdlib + ctypes, без tkinter/PIL/requests).
+2. **Принцип роботи:** стартує з Windows (HKCU\Run), слідкує за WorldOfTanks.exe кожні 5с. Коли гра запускається → запускає launcher.exe (повноцінний лаунчер зі сплешем). Після запуску програми — продовжує спостереження.
+3. **close_with_game:** новий чекбокс в Settings. Якщо True + гра закрилась → tray_watcher TerminateProcess для SM WoT Assistant v*.exe. Після закриття — повертається до спостереження.
+4. **Ланцюжок:** Windows boot → tray_watcher.exe (0 вікон) → WoT запустився → launcher.exe (splash) → main.exe (--tray якщо start_minimized) → WoT закрився + close_with_game → main.exe закривається → повернення до спостереження.
+5. **HKCU\Run тепер:** `"C:\...\SM WoT Assistant Tray Watcher.exe"` (замість `launcher.exe --tray`). Fallback на launcher --tray якщо tray_watcher.exe не знайдено.
+6. **launcher.py:_launch_main()** — тепер читає start_minimized з settings.json і передає --tray до main.exe.
+7. build.py:build_tray_watcher() — збирає tray_watcher.py як --onefile (без hidden-imports, тільки stdlib). Верифікація білду перевіряє наявність Tray Watcher EXE.
+
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.
 2. **Наприкінці сесії:** зберегти ключові факти в `ctx_memory`:

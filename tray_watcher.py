@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""SM WoT Assistant Tray Watcher — minimal process monitor (no tkinter/no PIL/no requests).
+
+Built as --onefile (PyInstaller). Watches for WorldOfTanks.exe via
+CreateToolhelp32Snapshot at 5s intervals. When game starts: launches
+SM WoT Assistant Launcher.exe. When game stops + close_with_game setting:
+closes SM WoT Assistant v*.exe. Then returns to monitoring.
+"""
+
+import os, sys, json, time, ctypes, subprocess, re
+from ctypes import wintypes
+
+kernel32 = ctypes.windll.kernel32
+user32 = ctypes.windll.user32
+TH32CS_SNAPPROCESS = 0x00000002
+PROCESS_TERMINATE = 0x0001
+
+def _read_settings():
+    appdata = os.environ.get("APPDATA", "")
+    path = os.path.join(appdata, "SM WoT Assistant", "settings.json")
+    if not os.path.exists(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def _install_dir():
+    return os.path.join(os.environ.get("LOCALAPPDATA", ""), "SM WoT Assistant")
+
+def _find_launcher_exe():
+    install_dir = _install_dir()
+    launcher = os.path.join(install_dir, "SM WoT Assistant Launcher.exe")
+    if os.path.exists(launcher):
+        return launcher
+    exe_dir = os.path.dirname(os.path.abspath(
+        sys.executable if getattr(sys, 'frozen', False) else __file__))
+    launcher2 = os.path.join(exe_dir, "SM WoT Assistant Launcher.exe")
+    if os.path.exists(launcher2):
+        return launcher2
+    return None
+
+def _is_wot_running():
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot == -1:
+        return False
+    try:
+        PE_SIZE = 556
+        pe = (ctypes.c_byte * PE_SIZE)()
+        ctypes.memset(pe, 0, PE_SIZE)
+        ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+            return False
+        while True:
+            exe_buf = ctypes.create_unicode_buffer(260)
+            ctypes.memmove(exe_buf, ctypes.byref(pe, 44), 260 * 2)
+            if exe_buf.value and "WorldOfTanks.exe" in exe_buf.value:
+                return True
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                break
+        return False
+    finally:
+        kernel32.CloseHandle(snapshot)
+
+def _find_main_pids():
+    pids = []
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot == -1:
+        return pids
+    try:
+        PE_SIZE = 556
+        pe = (ctypes.c_byte * PE_SIZE)()
+        ctypes.memset(pe, 0, PE_SIZE)
+        ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+            return pids
+        while True:
+            exe_buf = ctypes.create_unicode_buffer(260)
+            ctypes.memmove(exe_buf, ctypes.byref(pe, 44), 260 * 2)
+            name = exe_buf.value
+            if name and re.match(r"SM WoT Assistant v\d+\.\d+\.\d+.*\.exe", name):
+                pid_bytes = (ctypes.c_byte * 4)()
+                ctypes.memmove(pid_bytes, ctypes.byref(pe, 8), 4)
+                pid = int.from_bytes(bytes(pid_bytes), 'little')
+                pids.append(pid)
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                break
+        return pids
+    finally:
+        kernel32.CloseHandle(snapshot)
+
+def _close_main_app():
+    pids = _find_main_pids()
+    if not pids:
+        return
+    for pid in pids:
+        h = kernel32.OpenProcess(PROCESS_TERMINATE, False, pid)
+        if h:
+            kernel32.TerminateProcess(h, 0)
+            kernel32.CloseHandle(h)
+
+def _launch_app():
+    launcher = _find_launcher_exe()
+    if launcher:
+        subprocess.Popen([launcher], creationflags=0x08000000)
+        return
+    install_dir = _install_dir()
+    if os.path.isdir(install_dir):
+        for f in os.listdir(install_dir):
+            if f.startswith("SM WoT Assistant v") and f.endswith(".exe"):
+                exe = os.path.join(install_dir, f)
+                settings = _read_settings()
+                args = [exe]
+                if settings.get("start_minimized", False):
+                    args.append("--tray")
+                subprocess.Popen(args, creationflags=0x08000000)
+                return
+
+def main():
+    mutex = kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_TrayWatcher")
+    if kernel32.GetLastError() == 183:
+        sys.exit(0)
+    game_was = _is_wot_running()
+    launched = False
+    while True:
+        settings = _read_settings()
+        close_game = settings.get("close_with_game", False)
+        game_is = _is_wot_running()
+        if game_is and not game_was and not launched:
+            _launch_app()
+            launched = True
+        elif not game_is and game_was and launched:
+            if close_game:
+                _close_main_app()
+            launched = False
+        game_was = game_is
+        if launched:
+            if not _find_main_pids() and game_is:
+                launched = False
+        time.sleep(5)
+
+if __name__ == "__main__":
+    main()
