@@ -801,6 +801,19 @@ class WotAssistantHQ:
             self._tray_icon.remove()
         self._tray_icon = None
         self._hidden_by_f10 = False
+        if not self.active_view:
+            saved_view = self.settings.get("_saved_view")
+            if saved_view == "maps":
+                self.ui_mgr.show_view("maps", mode=self.settings.get("_saved_map_mode", 1))
+            elif saved_view in ("stats", "ai_stats"):
+                self.ui_mgr.show_view(saved_view)
+            else:
+                self.current_map_eng = None
+                self.map_var.set("")
+                self.map_renderer.show_main_splash()
+                if hasattr(self, 'painter'):
+                    self.painter.canvas.delete("painter_obj")
+                self._startup_complete = True
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
         self.root.deiconify()
@@ -878,16 +891,24 @@ class WotAssistantHQ:
             w.bind("<ButtonRelease-1>", _drag_release)
 
         btn.update_idletasks()
-        btn.geometry(f"+20+20")
+        rx = self.settings.get("restore_btn_x", 20)
+        ry = self.settings.get("restore_btn_y", 20)
+        btn.geometry(f"+{rx}+{ry}")
 
 
     def _hide_restore_button(self):
         if self._restore_button is not None:
             try:
+                self.settings["restore_btn_x"] = self._restore_button.winfo_x()
+                self.settings["restore_btn_y"] = self._restore_button.winfo_y()
+            except Exception:
+                pass
+            try:
                 self._restore_button.destroy()
             except Exception:
                 pass
             self._restore_button = None
+            self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
 
     def _ensure_edit_focus(self):
         if not self.edit_focus_lock or self.mode != "edit" or self.root.state() == "withdrawn":

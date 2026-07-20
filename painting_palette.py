@@ -1552,8 +1552,10 @@ class DrawingPalette(tk.Toplevel):
         style.theme_use("clam")
         style.configure("Treeview", background="#1a1a1a", foreground="#cccccc",
                         fieldbackground="#1a1a1a", bordercolor="#333", arrowcolor="#888")
-        style.configure("Treeview.Heading", background="#333", foreground="#aaa",
-                        fieldbackground="#333")
+        style.configure("Treeview.Heading", background="#1a1a1a", foreground="#aaa",
+                        fieldbackground="#1a1a1a", borderwidth=1, relief="solid",
+                        bordercolor="#000", lightcolor="#000", darkcolor="#000",
+                        padding=(4, 2))
         style.map("Treeview", background=[("selected", "#444")],
                   foreground=[("selected", "white")])
         style.configure("TCombobox", background="#1a1a1a", foreground="#cccccc",
@@ -1602,7 +1604,7 @@ class DrawingPalette(tk.Toplevel):
 
         columns = ("map", "comment", "author", "date", "preview")
         tree = tk.ttk.Treeview(tf, columns=columns, show="tree headings",
-                                height=7, selectmode="none")
+                                height=7, selectmode="browse")
         tree.heading("#0", text="")
         tree.heading("map", text=t_('ui', 'download_col_map'))
         tree.heading("comment", text=t_('ui', 'download_col_comment'))
@@ -1682,6 +1684,10 @@ class DrawingPalette(tk.Toplevel):
 
         def on_download():
             checked = [it for it in items if check_vars.get(it["scheme_id"], tk.BooleanVar(value=False)).get()]
+            if not checked:
+                sel = tree.selection()
+                if sel:
+                    checked = [it for it in items if it["scheme_id"] in sel]
             if not checked:
                 return
             self._download_result = checked

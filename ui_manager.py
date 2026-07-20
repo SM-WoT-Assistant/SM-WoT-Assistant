@@ -755,6 +755,9 @@ class UIManager:
 
     def show_view(self, view_name, **kwargs):
         self.app.active_view = view_name
+        self.app.settings["_saved_view"] = view_name
+        if view_name == "maps":
+            self.app.settings["_saved_map_mode"] = kwargs.get("mode", 1)
 
         self.app.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
