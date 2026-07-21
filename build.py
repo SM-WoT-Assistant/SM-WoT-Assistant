@@ -203,6 +203,7 @@ def preflight(version):
                 print(f"                {line}")
             if len(dirty) > 5:
                 print(f"                ... and {len(dirty) - 5} more")
+            errors.append(f"Working tree is dirty ({len(dirty)} uncommitted change(s)) — commit or stash first")
         else:
             print(f"  Git:          clean")
     except Exception:
@@ -393,7 +394,39 @@ def build_launcher():
 
     size_mb = os.path.getsize(launcher_exe) / (1024 * 1024)
     print(f"[BUILD] Launcher: {size_mb:.1f} MB")
+    verify_launcher_bundle(launcher_exe)
     return launcher_exe
+
+
+def verify_launcher_bundle(launcher_exe):
+    """Перевіряє що launcher --onefile містить Tcl/Tk DLL та _tkinter.pyd.
+    PyInstaller onefile зберігає імена файлів як plain text в TOC архіву."""
+    required = [b"tcl86t.dll", b"tk86t.dll", b"_tkinter.pyd"]
+    missing = []
+    try:
+        with open(launcher_exe, "rb") as f:
+            data = f.read()
+        for name in required:
+            if name not in data:
+                missing.append(name.decode())
+    except Exception as e:
+        print(f"[BUILD] Launcher verify error: {e}")
+        sys.exit(1)
+
+    if missing:
+        print()
+        print("=" * 60)
+        print("  LAUNCHER VERIFICATION FAILED")
+        print("=" * 60)
+        for m in missing:
+            print(f"  MISSING: {m} — launcher --onefile не містить цей файл")
+        print()
+        print("[BUILD] Aborting — launcher буде падати з DLL load failed.")
+        print("[BUILD] Додайте --add-binary для відсутніх DLL в build_launcher().")
+        sys.exit(1)
+
+    print(f"[BUILD] Launcher bundle verification PASSED (tcl86t.dll, tk86t.dll, _tkinter.pyd)")
+    return True
 
 
 def build_tray_watcher():
@@ -444,7 +477,7 @@ def build_tray_watcher():
     return launcher_exe
 
 
-def run_nsis(version, makensis_exe):
+def run_nsis(version, makensis_exe, is_beta=False):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
         return None
@@ -458,6 +491,11 @@ def run_nsis(version, makensis_exe):
     if result.returncode != 0:
         print("[BUILD] NSIS FAILED")
         return None
+
+    if is_beta and os.path.exists(out_exe):
+        beta_exe = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}_Beta.exe")
+        os.rename(out_exe, beta_exe)
+        out_exe = beta_exe
 
     if os.path.exists(out_exe):
         size_mb = os.path.getsize(out_exe) / (1024 * 1024)
@@ -478,7 +516,7 @@ def rename_onedir(version):
     return versioned
 
 
-def create_portable_zip(version):
+def create_portable_zip(version, is_beta=False):
     """Create a portable ZIP from the versioned onedir (no admin required)."""
     onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
     if not os.path.exists(onedir):
@@ -490,6 +528,11 @@ def create_portable_zip(version):
     shutil.make_archive(zip_base, "zip", DIST_DIR, f"SM WoT Assistant v{version}")
 
     zip_path = zip_base + ".zip"
+    if is_beta and os.path.exists(zip_path):
+        beta_zip = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}_Beta.zip")
+        os.rename(zip_path, beta_zip)
+        zip_path = beta_zip
+
     if os.path.exists(zip_path):
         size_mb = os.path.getsize(zip_path) / (1024 * 1024)
         print(f"[BUILD] Portable ZIP: {size_mb:.1f} MB")
@@ -613,12 +656,89 @@ def generate_manifest(version):
 
 
 # ═══════════════════════════════════════════════════════════════════
+#  Release Artifacts Verification
+# ═══════════════════════════════════════════════════════════════════
+
+def verify_release_artifacts(version, is_beta=False):
+    """Перевіряє всі артефакти релізу ПЕРЕД створенням GitHub release.
+    При помилці — друкує детальний звіт і завершує build з exit code 1."""
+    errors = []
+    beta_suffix = "_Beta" if is_beta else ""
+    onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
+
+    # 1. Файли артефактів — всі існують
+    expected = {
+        "Installer": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"),
+        "Portable ZIP": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{beta_suffix}.zip"),
+        "Build manifest": os.path.join(DIST_DIR, f"build_manifest_v{version}.txt"),
+        "Main EXE": os.path.join(onedir, f"SM WoT Assistant v{version}.exe"),
+        "Launcher": os.path.join(onedir, "SM WoT Assistant Launcher.exe"),
+        "Tray Watcher": os.path.join(onedir, "SM WoT Assistant Tray Watcher.exe"),
+    }
+    for label, path in expected.items():
+        if not os.path.exists(path):
+            errors.append(f"Missing {label}: {path}")
+
+    # 2. Версії: VERSION == installer.nsi PRODUCT_VERSION
+    from_v = read_version()
+    if from_v != version:
+        errors.append(f"VERSION file mismatch: expected '{version}', got '{from_v}'")
+
+    if os.path.exists(NSI_FILE):
+        with open(NSI_FILE, "r", encoding="utf-8") as f:
+            nsi_content = f.read()
+        m = re.search(r'!define PRODUCT_VERSION "([^"]*)"', nsi_content)
+        if m and m.group(1) != version:
+            errors.append(f"installer.nsi PRODUCT_VERSION mismatch: expected '{version}', got '{m.group(1)}'")
+
+    # 3. Release title format: create_github_release() має створити правильний title
+    expected_title = f"v{version} Beta" if is_beta else f"v{version}"
+    # Це перевірка що код create_github_release() згенерує саме такий title
+    display_tag = f"v{version} Beta" if is_beta else f"v{version}"
+    if display_tag != expected_title:
+        errors.append(f"Release title format mismatch: '{display_tag}' != '{expected_title}'")
+
+    # 4. Prerelease flag: is_beta має правильно впливати на --prerelease
+    expected_pr = is_beta  # True для beta, False для stable
+    if expected_pr != is_beta:
+        errors.append(f"Prerelease flag mismatch: expected {expected_pr}, got is_beta={is_beta}")
+
+    # 5. Консистентність імен: RTDB download_url співпадає з реальним файлом
+    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
+    expected_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
+    print(f"  RTDB URL check: {expected_url}")
+    dl_url_check = os.path.join(DIST_DIR, expected_filename)
+    if os.path.exists(expected.get("Installer", "")) and os.path.basename(dl_url_check) != os.path.basename(expected.get("Installer", "")):
+        errors.append(f"Internal: download_url filename '{os.path.basename(dl_url_check)}' != installer '{os.path.basename(expected.get('Installer', ''))}'")
+
+    if errors:
+        print()
+        print("=" * 60)
+        print("  RELEASE ARTIFACT VERIFICATION FAILED")
+        print("=" * 60)
+        for e in errors:
+            print(f"  ERROR: {e}")
+        print()
+        print("[BUILD] Aborting — do not create GitHub release or RTDB entry.")
+        sys.exit(1)
+
+    print("[BUILD] Release artifacts verification PASSED")
+    for label, path in expected.items():
+        if os.path.exists(path):
+            sz = os.path.getsize(path)
+            print(f"  {label + ':':20s} {os.path.basename(path)}  ({sz/(1024*1024):.0f} MB)" if sz > 1024*1024 else f"  {label + ':':20s} {os.path.basename(path)}  ({sz:,} bytes)")
+    print(f"  RTDB URL:    {expected_url}")
+    return True
+
+
+# ═══════════════════════════════════════════════════════════════════
 #  GitHub Release
 # ═══════════════════════════════════════════════════════════════════
 
 def create_github_release(version, is_beta=False):
-    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
-    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}.zip")
+    beta_suffix = "_Beta" if is_beta else ""
+    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe")
+    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{beta_suffix}.zip")
     manifest = os.path.join(DIST_DIR, f"build_manifest_v{version}.txt")
 
     assets = []
@@ -637,9 +757,10 @@ def create_github_release(version, is_beta=False):
     display_tag = f"v{version} Beta" if is_beta else tag
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
+    pr_flag = ["--prerelease"] if is_beta else []
 
     print(f"[BUILD] Creating GitHub release {tag}...")
-    cmd = ["gh", "release", "create", tag] + assets + ["--title", display_tag] + notes_flag
+    cmd = ["gh", "release", "create", tag] + assets + ["--title", display_tag] + pr_flag + notes_flag
     result = subprocess.run(cmd, cwd=BASE_DIR)
     if result.returncode == 0:
         print(f"[BUILD] GitHub release {tag} created")
@@ -647,6 +768,97 @@ def create_github_release(version, is_beta=False):
     else:
         print(f"[BUILD] GitHub release FAILED (exit code {result.returncode})")
         return False
+
+
+# ═══════════════════════════════════════════════════════════════════
+#  Post-release Audit
+# ═══════════════════════════════════════════════════════════════════
+
+def audit_github_release(version, is_beta=False):
+    """Перевіряє GitHub release після створення — назва та prerelease flag.
+    Якщо не співпадає — видаляє реліз і завершує build з помилкою."""
+    tag = f"v{version}"
+    expected_name = f"v{version} Beta" if is_beta else f"v{version}"
+    print(f"[BUILD] Auditing GitHub release {tag}...")
+
+    try:
+        r = subprocess.run(
+            ["gh", "release", "view", tag, "--json", "name,isPrerelease"],
+            cwd=BASE_DIR, capture_output=True, text=True, timeout=15,
+        )
+        if r.returncode != 0:
+            print(f"[BUILD] AUDIT FAILED: could not view release (exit {r.returncode})")
+            print(f"  stderr: {r.stderr.strip()}")
+            sys.exit(1)
+
+        data = json.loads(r.stdout)
+        actual_name = data.get("name", "")
+        actual_pr = data.get("isPrerelease", False)
+
+        problems = []
+        if actual_name != expected_name:
+            problems.append(f"title='{actual_name}' (expected '{expected_name}')")
+        if actual_pr != is_beta:
+            problems.append(f"prerelease={actual_pr} (expected {is_beta})")
+
+        if problems:
+            print("[BUILD] AUDIT FAILED — release created with wrong metadata:")
+            for p in problems:
+                print(f"  {p}")
+            print(f"[BUILD] Deleting release {tag} and aborting...")
+            subprocess.run(
+                ["gh", "release", "delete", tag, "--yes"],
+                cwd=BASE_DIR, capture_output=True, timeout=15,
+            )
+            sys.exit(1)
+
+        print(f"[BUILD] GitHub release audit PASSED (name='{actual_name}', prerelease={actual_pr})")
+        return True
+
+    except json.JSONDecodeError as e:
+        print(f"[BUILD] AUDIT FAILED: JSON parse error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"[BUILD] AUDIT FAILED: {e}")
+        sys.exit(1)
+
+
+def audit_rtdb_entry(version, is_beta=False):
+    """Перевіряє RTDB download_url після запису."""
+    beta_suffix = "_Beta" if is_beta else ""
+    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
+    expected_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
+
+    try:
+        import urllib.request
+        RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
+        API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+        url = f"{RTDB_URL}/versions/{version.replace('.', '_')}/download_url.json?auth={API_KEY}"
+        r = urllib.request.urlopen(url, timeout=10)
+        actual_url = json.loads(r.read().decode("utf-8"))
+
+        if isinstance(actual_url, dict):
+            print(f"[BUILD] RTDB AUDIT FAILED: download_url is an OBJECT, not a string:")
+            print(f"  Value: {json.dumps(actual_url, ensure_ascii=False)}")
+            print(f"  Expected a plain string URL")
+            sys.exit(1)
+
+        if not isinstance(actual_url, str):
+            print(f"[BUILD] RTDB AUDIT FAILED: download_url is type {type(actual_url).__name__}, not string")
+            sys.exit(1)
+
+        if actual_url != expected_url:
+            print(f"[BUILD] RTDB AUDIT FAILED:")
+            print(f"  Expected: {expected_url}")
+            print(f"  Actual:   {actual_url}")
+            sys.exit(1)
+
+        print(f"[BUILD] RTDB audit PASSED (download_url matches)")
+        return True
+
+    except Exception as e:
+        print(f"[BUILD] RTDB audit error: {e}")
+        sys.exit(1)
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -660,14 +872,15 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
     display_ver = version + (" Beta" if is_beta else "")
+    beta_suffix = "_Beta" if is_beta else ""
     today = release_date or time.strftime("%Y-%m-%d")
-    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}.exe")
+    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe")
     installer_size = ""
     if os.path.exists(installer_path):
         sz = os.path.getsize(installer_path)
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
-    dl_filename = f"SM_WoT_Assistant_Setup_v{version}.exe"
+    dl_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
     dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
 
     data = json.dumps({
@@ -755,11 +968,11 @@ def main():
         print(f"[BUILD] EXE renamed: SM WoT Assistant v{version}.exe")
 
     # Phase 3: NSIS installer (чистий version)
-    installer = run_nsis(version, makensis_exe)
+    installer = run_nsis(version, makensis_exe, is_beta)
 
     # Phase 4: Rename to versioned directory + portable ZIP (чистий version)
     rename_onedir(version)
-    portable_zip = create_portable_zip(version)
+    portable_zip = create_portable_zip(version, is_beta)
 
     # Phase 5: Verification
     verify_build(version)
@@ -782,10 +995,17 @@ def main():
     print(f"  Output dir:     {DIST_DIR}")
     print()
 
+    # Phase 7b: Verify release artifacts before publishing
+    verify_release_artifacts(version, is_beta)
+
     # Always create GitHub release (required for auto-update download URL)
     if create_github_release(version, is_beta):
-        # Write version to RTDB only after successful GitHub release
-        write_version_to_rtdb(version, release_date, is_beta)
+        # Post-release audit: verify title & prerelease flag
+        audit_github_release(version, is_beta)
+        # Write version to RTDB only after successful GitHub release + audit
+        if write_version_to_rtdb(version, release_date, is_beta):
+            # RTDB audit: verify download_url
+            audit_rtdb_entry(version, is_beta)
 
     print(f"[BUILD] Done: v{display_ver}")
 
