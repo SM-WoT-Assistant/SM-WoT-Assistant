@@ -1,6 +1,7 @@
 import ctypes
 from ctypes import wintypes
 import os
+import uuid
 import config
 
 shell32 = ctypes.windll.shell32
@@ -18,6 +19,7 @@ NIM_DELETE = 2
 NIF_MESSAGE = 1
 NIF_ICON = 2
 NIF_TIP = 4
+NIF_GUID = 0x20
 WM_LBUTTONUP = 0x0202
 WM_LBUTTONDBLCLK = 0x0203
 WM_RBUTTONUP = 0x0205
@@ -66,6 +68,7 @@ WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wint
 _ACTIVE_TRAY = None
 _CLASS_REGISTERED = False
 _GLOBAL_WNDPROC = None
+_TRAY_GUID = uuid.UUID("12345678-9abc-def0-1234-56789abcdef0")
 
 
 def _global_wndproc_func(hwnd, msg, wparam, lparam):
@@ -133,10 +136,13 @@ class TrayIcon:
         self._nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
         self._nid.hwnd = self._msg_hwnd
         self._nid.uID = 1
-        self._nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+        self._nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP | NIF_GUID
         self._nid.uCallbackMessage = WM_APP
         self._nid.hIcon = self._hicon
         self._nid.szTip = "SM WoT Assistant v" + config.load_version()
+        guid_bytes = _TRAY_GUID.bytes_le
+        for i in range(16):
+            self._nid.guidItem[i] = guid_bytes[i]
 
         if shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(self._nid)):
             _ACTIVE_TRAY = self

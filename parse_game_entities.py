@@ -8,7 +8,7 @@ parse_game_entities.py - КРОК 1
 - Польова модернізація (field mods)
 - Снаряди (ammo shells)
 
-Використовує Orion для декодування XML файлів клієнта.
+Використовує Python декодер для XML файлів клієнта.
 """
 import os
 import re
@@ -148,7 +148,7 @@ class GameEntitiesExtractor:
             return False
     
     def decode_xml_file(self, file_path):
-        """Декодує один XML файл через Python (без PjOrion)"""
+        """Декодує один XML файл через Python"""
         if not self.is_encoded(file_path):
             return True
         
@@ -161,7 +161,7 @@ class GameEntitiesExtractor:
             return False
     
     def run_orion_decode(self, folder_path):
-        """Декодує XML файли в папці через Python"""
+        """Декодує XML файли в папці через Python декодер"""
         abs_folder = os.path.abspath(str(folder_path))
         xml_files = [f for f in os.listdir(abs_folder) if f.endswith('.xml')]
         
@@ -346,7 +346,7 @@ class GameEntitiesExtractor:
         if equip_file.exists():
             print(f"\n[1] Парсинг {equip_file.name}...")
             
-            # Декодуємо через Orion
+            # Декодуємо через Python
             self.run_orion_decode(common_dir)
             
             # Парсимо XML

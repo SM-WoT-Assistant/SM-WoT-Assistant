@@ -8,6 +8,18 @@ try:
 except ImportError:
     map_extractor = None
 
+# Мапи-евенти/варіанти/старі мапи яких НЕМАЄ на сайті тактік
+_EVENT_MAP_IDS = {
+    "08_ruinberg_sm24", "101_dday_sm24", "105_germany_sm24", "108_normandy_nom",
+    "140_fall_tanks", "141_dash_to_go", "142_road_to_dash",
+    "14_siegfried_line_nom", "14_siegfried_line_wt", "34_redshire_wt", "35_steppes_wt",
+    "208_bf_epic_normandy", "209_wg_epic_suburbia", "210_bf_epic_desert",
+    "212_epic_random_valley_sm25",
+    "250_br_battle_city2-1", "251_br_battle_city3", "252_br_battle_city4",
+    "37_caucasus", "59_asia_great_wall",
+}
+_UNAVAILABLE_FILE = os.path.join(config.USER_DATA_DIR, "unavailable_tactic_maps.json")
+
 try:
     import tank_extractor
 except ImportError:
@@ -18,6 +30,25 @@ class MapManager:
         self.app = app
         self._update_lock = threading.Lock()
         self._update_in_progress = False
+        self._last_changed_ids = []
+        self._unavailable_maps = set(self._load_unavailable())
+
+    def _load_unavailable(self):
+        try:
+            if os.path.exists(_UNAVAILABLE_FILE):
+                with open(_UNAVAILABLE_FILE, "r", encoding="utf-8") as f:
+                    d = json.load(f)
+                return d if isinstance(d, list) else []
+        except Exception:
+            pass
+        return []
+
+    def _save_unavailable(self):
+        try:
+            with open(_UNAVAILABLE_FILE, "w", encoding="utf-8") as f:
+                json.dump(list(self._unavailable_maps), f)
+        except Exception as e:
+            print(f"[MAP_MGR] Failed to save unavailable maps: {e}")
 
     def _try_begin_update(self):
         with self._update_lock:
@@ -96,6 +127,15 @@ class MapManager:
                 real_version_changed = current_v != saved_v
                 force_update_on_startup = bool(getattr(self.app, "settings", {}).get("force_update_on_startup", False))
                 version_changed = real_version_changed
+                if version_changed:
+                    print(f"[MAP_MGR] Game version changed: {saved_v} → {current_v}")
+                elif not version_changed:
+                    try:
+                        if ext.has_changed():
+                            print("[MAP_MGR] scripts.pkg змінився — запускаю оновлення")
+                            version_changed = True
+                    except Exception as e:
+                        print(f"[MAP_MGR] has_changed error: {e}")
                 required_tth_schema = 2
                 current_tth_schema = int(self.app.settings.get("tth_schema_version", 0) or 0)
                 tth_has_data = False
@@ -207,10 +247,13 @@ class MapManager:
                         emit(pct, "parsing_xml" if "аналіз" in low else "decoding_xml" if "декодування" in low else "xml_decode_complete")
 
                     maps_ok = ext.extract(callback_status=map_status_cb)
+                    self._last_changed_ids = ext.last_changed_ids
                     emit(58, "maps_stage2_done")
                 elif version_changed and not allow_map_decode:
+                    self._last_changed_ids = []
                     emit(55, "maps_autoupdate_disabled", "orange")
                 else:
+                    self._last_changed_ids = []
                     emit(45, "maps_up_to_date")
 
                 tanks_ok = True
@@ -251,7 +294,6 @@ class MapManager:
                                 emit(88, "stats_ai_building_db")
                                 db_ok = tex.build_database()
                                 if not db_ok:
-                                    # На старті не запускаємо Orion автоматично: він може відкрити REPL-вікно і заблокувати splash.
                                     emit(90, "stats_ai_db_unavailable", "orange")
                                 emit(94, "stats_ai_building_tth")
                                 tex.build_tth_database()
@@ -298,6 +340,8 @@ class MapManager:
                     emit(100, "update_complete_ai", "orange")
                 else:
                     emit(100, "update_failed", "red")
+
+                self._detect_pending_tactic_maps()
             except Exception as e:
                 import traceback
                 print(f"[MAP_MGR] Background update error: {e}")
@@ -306,6 +350,62 @@ class MapManager:
                 self._end_update()
                 finish()
         threading.Thread(target=checker, daemon=True).start()
+
+    def _detect_pending_tactic_maps(self):
+        """HEAD-перевірка нових мап під час екстракції. Завантажує якщо мапа є на сайті."""
+        dict_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_dictionary.json")
+        if not os.path.exists(dict_path):
+            return
+        try:
+            with open(dict_path, "r", encoding="utf-8") as f:
+                maps_maps = json.load(f)
+        except Exception:
+            return
+
+        existing_folders = set()
+        if os.path.isdir(config.MAPS_DIR):
+            for fname in os.listdir(config.MAPS_DIR):
+                if os.path.exists(os.path.join(config.MAPS_DIR, fname, "map.webp")):
+                    existing_folders.add(fname.lower().replace(' ', '_'))
+
+        new_maps = []
+        for map_id in maps_maps:
+            if map_id.startswith("type/") or map_id in ("invalid_map", "hangar_v4", "_default_") or map_id.startswith("h33_"):
+                continue
+            if map_id in _EVENT_MAP_IDS:
+                continue
+            eng = config.MAP_NAMES_EN.get(map_id, map_id)
+            folder = self._resolve_tactic_folder(eng)
+            safe = folder.replace(' ', '_').lower()
+            if safe in existing_folders:
+                continue
+            if map_id in self._unavailable_maps or eng in self._unavailable_maps:
+                continue
+            new_maps.append(map_id)
+
+        if not new_maps:
+            return
+
+        import requests
+        import map_updater
+        for map_id in new_maps:
+            eng = config.MAP_NAMES_EN.get(map_id, map_id)
+            clean = eng.replace('?', '').replace(':', '').replace('|', '')
+            safe = clean.replace(' - ', '_').replace(' ', '_').lower()
+            url = f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
+            try:
+                r = requests.head(url, timeout=5)
+                if r.status_code == 200:
+                    map_updater.download_single_map(eng, url)
+                    print(f"[MAP_MGR] Downloaded TACTIC map: {eng}")
+                else:
+                    self._unavailable_maps.add(map_id)
+                    print(f"[MAP_MGR] Map not on site: {eng} ({r.status_code})")
+            except Exception as e:
+                self._unavailable_maps.add(map_id)
+                print(f"[MAP_MGR] HEAD error for {eng}: {e}")
+        self._save_unavailable()
+        self._last_changed_ids = []
 
     def run_map_updater(self):
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
@@ -334,6 +434,7 @@ class MapManager:
                     ext = map_extractor.MapExtractor()
                     def status_cb(text): pass
                     success = ext.extract(callback_status=status_cb)
+                    self._last_changed_ids = ext.last_changed_ids
                     def on_finish():
                         if success:
                             self.load_map_list()
@@ -369,6 +470,8 @@ class MapManager:
                 if m.startswith("type/"):
                     continue
                 if m in ("invalid_map", "hangar_v4", "_default_") or m.startswith("h33_"):
+                    continue
+                if m in _EVENT_MAP_IDS:
                     continue
                 if m in self.app.map_data:
                     gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
@@ -439,11 +542,14 @@ class MapManager:
         return eng_key
 
     def _tactic_image_exists(self, eng_key):
-        folder_name = self._resolve_tactic_folder(eng_key)
+        eng_name = config.MAP_NAMES_EN.get(eng_key, eng_key)
+        folder_name = self._resolve_tactic_folder(eng_name)
         safe_folder = folder_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
         webp_path = os.path.join(config.MAPS_DIR, safe_folder, "map.webp")
         if os.path.exists(webp_path):
             return True
         jpg_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.jpg")
         png_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.png")
-        return os.path.exists(jpg_path) or os.path.exists(png_path)
+        if os.path.exists(jpg_path) or os.path.exists(png_path):
+            return True
+        return False

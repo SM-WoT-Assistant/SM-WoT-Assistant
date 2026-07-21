@@ -17,7 +17,8 @@ class MapRenderer:
         if self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
             paths.append(os.path.join(config.BASE_DIR, "extracted_maps", f"{self.app.current_map_eng}.png"))
         else:
-            eng_name = self.app.map_mgr._resolve_tactic_folder(self.app.current_map_eng)
+            map_nice = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
+            eng_name = self.app.map_mgr._resolve_tactic_folder(map_nice)
             safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
             paths = [os.path.join(config.MAPS_DIR, safe_folder, "map.webp"), 
                      os.path.join(config.MAPS_DIR, f"{eng_name}.jpg"),
@@ -237,8 +238,12 @@ class MapRenderer:
                     self.draw_arena_bases(cw, ch)
             else:
                 is_tactic = app.btn_mode_maps_1.cget("bg") == "#ff4500"
-                msg = app.t('ui', 'tactic_no_maps') if is_tactic else app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
-                app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
+                if is_tactic:
+                    msg = f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps\n{app.t('ui', 'tactic_no_map')}"
+                    app.canvas.create_text(cw//2, ch//2, text=msg, fill="#888888", font=("Arial", 10), justify="center", tags="map")
+                else:
+                    msg = app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
+                    app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
                 map_drawn = True 
 
                 
@@ -258,6 +263,8 @@ class MapRenderer:
                 tk.Label(h2_frame, text="  " + app.t('ui', 'h2'), font=("Arial", 11, "bold"), bg="black", fg="white").pack(side="left")
                 app.canvas.create_window(cw//2, ch - 115, window=h2_frame, tags="map")
                 app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
+                app.canvas.create_text(cw//2, ch - 127, text=f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps",
+                    fill="#888888", font=("Arial", 8), tags="map")
                 if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110

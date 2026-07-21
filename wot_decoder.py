@@ -1,4 +1,4 @@
-# wot_decoder.py 2_15 - тепер без PjOrion!
+# wot_decoder.py 2_16 - Python декодер для XML мап
 import os
 import time
 import subprocess
@@ -24,7 +24,7 @@ class WotXmlDecoder:
         for file_name in xml_files:
             xml_path = os.path.join(abs_folder_path, file_name)
             try:
-                if self.decoder.decode_file(xml_path):
+                if self.decoder.decode_file(xml_path, xml_path):
                     decoded_count += 1
             except Exception as e:
                 pass
@@ -48,6 +48,10 @@ class WotXmlDecoder:
             with open(xml_path, 'r', encoding='utf-8', errors='ignore') as f:
                 xml_text = f.read().strip()
             
+            if not xml_text: return None
+
+            # Видаляємо XML декларацію (<?xml ...?>), якщо є
+            xml_text = re.sub(r'^<\?xml[^>]*\?>\s*', '', xml_text)
             if not xml_text: return None
 
             # ВИПРАВЛЕННЯ ТЕГІВ: Тепер враховуємо цифри, крапки та ПІДКРЕСЛЕННЯ (_)

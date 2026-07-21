@@ -1666,7 +1666,7 @@ class StatsAI:
         return ordered
 
     def _load_field_mod_pairs_by_tank(self):
-        """Завантажує готову мапу пар FIELD MODS по танках, згенеровану з Orion-декодування."""
+        """Завантажує готову мапу пар FIELD MODS по танках, згенеровану з декодування XML."""
         path = os.path.join(
             _DATA_DIR,
             'extracted_data',

@@ -288,6 +288,8 @@ TRANSLATIONS = {
             "btn_cancel": "Cancel",
             "all_maps": "All Maps",
             "help_website": "Website: sm-wot-assistant.web.app",
+            "tactic_maps_source": "TACTIC maps from",
+            "tactic_no_map": "This map is not yet available for TACTIC mode",
             # Group dialogs
             "group_create_header": "Create New Group",
             "group_create_name_label": "Name:",

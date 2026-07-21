@@ -27,7 +27,6 @@ UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
-    Delete "$INSTDIR\SM WoT Assistant v*.exe"
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"

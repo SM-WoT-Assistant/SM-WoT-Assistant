@@ -20,6 +20,7 @@ class MapExtractor:
         self.out_path = "extracted_maps"
         self.manifest_path = os.path.join(self.out_path, ".map_extract_manifest.json")
         self.decoder = wot_decoder.WotXmlDecoder()
+        self.last_changed_ids = []
 
     def load_json(self, path):
         if os.path.exists(path):
@@ -48,6 +49,40 @@ class MapExtractor:
             "crc": int(getattr(info, "CRC", 0)),
             "mtime": list(getattr(info, "date_time", (0, 0, 0, 0, 0, 0))),
         }
+
+    def has_changed(self):
+        """Порівнює saved fingerprints з поточними. Без екстракції."""
+        pkg_path = os.path.join(self.wot_path, "res", "packages", "scripts.pkg")
+        if not os.path.exists(pkg_path):
+            return False
+        manifest = self._load_manifest()
+        if not manifest:
+            print("[MAP_EXTRACT] Перший запуск — manifest порожній")
+            return True
+        try:
+            with zipfile.ZipFile(pkg_path, 'r') as z:
+                for file in z.namelist():
+                    if "scripts/arena_defs/" not in file or not file.endswith(".xml"):
+                        continue
+                    if "_" not in file or file.endswith("_list_.xml"):
+                        continue
+                    info = z.getinfo(file)
+                    fp = self._entry_fingerprint(info)
+                    prev = manifest.get(file)
+                    if prev is None:
+                        print(f"[MAP_EXTRACT] Новий файл: {file}")
+                        return True
+                    if prev != fp:
+                        print(f"[MAP_EXTRACT] Файл змінився: {file}")
+                        return True
+                    del manifest[file]
+            if manifest:
+                print(f"[MAP_EXTRACT] {len(manifest)} файлів видалено з pkg")
+                return True
+        except Exception as e:
+            print(f"[MAP_EXTRACT] Помилка has_changed: {e}")
+            return True
+        return False
 
     def _load_manifest(self):
         manifest = self.load_json(self.manifest_path)
@@ -202,10 +237,13 @@ class MapExtractor:
         self._save_manifest(new_manifest)
 
         if not changed_targets and not force_full:
+            self.last_changed_ids = []
             print("[ЕКСТРАКТОР] Змін у XML мап не виявлено. Пропускаю декодування.")
             if callback_status:
                 callback_status("Мапи актуальні, змін не знайдено")
             return True
+
+        self.last_changed_ids = [os.path.basename(p).replace('.xml', '') for p in changed_targets]
 
         if callback_status:
             callback_status(f"Декодування XML: {len(changed_targets)} файлів")
@@ -259,6 +297,25 @@ class MapExtractor:
 
         with open(os.path.join(self.out_path, "map_dictionary.json"), "w", encoding="utf-8") as f:
             json.dump(dictionary, f, indent=4, ensure_ascii=False)
+
+        # Витягуємо minimap з space-пакетів ({map_id}.pkg → mmap.dds)
+        from PIL import Image
+        from io import BytesIO
+        extracted_png = 0
+        for map_id in all_map_data:
+            space_pkg = os.path.join(self.wot_path, "res", "packages", f"{map_id}.pkg")
+            if not os.path.exists(space_pkg):
+                continue
+            try:
+                with zipfile.ZipFile(space_pkg, 'r') as z:
+                    data = z.read(f"spaces/{map_id}/mmap.dds")
+                img = Image.open(BytesIO(data)).convert("RGB")
+                img.save(os.path.join(self.out_path, f"{map_id}.png"))
+                extracted_png += 1
+            except Exception as e:
+                pass
+        if extracted_png:
+            print(f"[ЕКСТРАКТОР] Вивантажено {extracted_png} minimap з space-пакетів")
 
         if callback_status:
             callback_status(f"Оновлено {len(all_map_data)} мап")

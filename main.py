@@ -119,6 +119,13 @@ class WotAssistantHQ:
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         
+        # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
+        # замінився на tray_watcher.exe після оновлення
+        if self._launch_on_game_start_var.get():
+            self._set_windows_startup(True)
+        else:
+            self._set_windows_startup(False)
+        
         self.win_mgr = window_manager.WindowManager(self)
         self.win_mgr.initialize_window()
         
@@ -1663,6 +1670,7 @@ class WotAssistantHQ:
     def _on_startup_ready(self):
         """Startup data checks complete → launch AI → then close splash."""
         self._startup_ready_at = time.time()
+        self.root.after(0, self._check_pending_tactic_maps)
         if hasattr(self, 'stats_ai_module') and not self.stats_ai_module.needs_ai_refresh():
             print("[INIT] Кеш свіжий, AI не потрібен")
             try:
@@ -1731,6 +1739,12 @@ class WotAssistantHQ:
         ))
         self.root.after(500, self._cancel_ai_timers)
         self.root.after(500, lambda: self.finish_startup_splash())
+
+    def _check_pending_tactic_maps(self):
+        pass
+
+    def _refresh_pending_tactic_maps(self):
+        pass
 
     def _cancel_ai_timers(self):
         self._startup_creep_active = False
@@ -2188,6 +2202,19 @@ if __name__ == "__main__":
                     shutil.copy2(src, dst)
                 except Exception:
                     pass
+
+    # Очищення старих версій при запуску
+    if getattr(sys, 'frozen', False):
+        install_dir = os.path.dirname(sys.executable)
+        current_name = os.path.basename(sys.executable)
+        exe_pattern = r'SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta)?)\.exe'
+        for f in os.listdir(install_dir):
+            if re.match(exe_pattern, f) and f != current_name:
+                try:
+                    os.remove(os.path.join(install_dir, f))
+                except Exception:
+                    pass
+
     if "--ai-webview" in sys.argv:
         from ai_webview_gui import main as webview_main
         webview_main()

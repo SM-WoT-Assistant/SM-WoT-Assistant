@@ -344,14 +344,10 @@ class Launcher:
                 ))
 
                 def _finish():
-                    self._set_status("Starting...", "#22cc44", ("Arial", 12))
                     try:
                         ctypes.windll.kernel32.CloseHandle(self.mutex)
                     except Exception:
                         pass
-                    launcher_exe = os.path.join(self.install_dir, "SM WoT Assistant Launcher.exe")
-                    print(f"[DEBUG 8] Starting launcher: {launcher_exe}")
-                    subprocess.Popen([launcher_exe, "--skip-splash"], creationflags=0x08000000)
                     self.splash.after(200, lambda: (self.splash.destroy(), sys.exit(0)))
 
                 self.splash.after(3000, _finish)

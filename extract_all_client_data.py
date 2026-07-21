@@ -39,7 +39,7 @@ def extract_all_packages():
             print(f"  Extracted to: {output_dir}")
 
 def decode_with_python():
-    """Крок 2: Декодувати XML через Python (без PjOrion)"""
+    """Крок 2: Декодувати XML через Python"""
     
     folders_to_decode = [
         "extracted_data/common",
@@ -64,7 +64,7 @@ def decode_with_python():
         
         for xml_file in xml_files:
             try:
-                if decoder.decode_file(str(xml_file)):
+                if decoder.decode_file(str(xml_file), str(xml_file)):
                     decoded += 1
             except Exception as e:
                 pass

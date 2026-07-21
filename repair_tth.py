@@ -18,11 +18,8 @@ def main():
         print("[ERROR] extract_metadata failed")
         return
 
-    # 2) Безпечний merge (без Orion)
+    # 2) Python-декодування для всіх XML
     tex.update_tth_database_safe(allow_decode_retry=False)
-
-    # 3) Точковий ремонт відсутніх TTH через Orion батчами
-    tex.repair_missing_tth_with_orion(batch_size=20, timeout_sec=75)
 
 
 if __name__ == "__main__":

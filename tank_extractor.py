@@ -1,13 +1,9 @@
 import os
 import zipfile
-import subprocess
 import time
 import json
 import xml.etree.ElementTree as ET
 import re
-import shutil
-import tempfile
-import ctypes
 from pathlib import Path
 from tth_updater import safe_merge_tth_from_extracted, safe_merge_tth_from_file_list
 from decode_xml import WotXmlParser
@@ -86,115 +82,13 @@ class TankExtractor:
         decoded_count = 0
         for xml_file in xml_files:
             try:
-                if decoder.decode_file(str(xml_file)):
+                if decoder.decode_file(str(xml_file), str(xml_file)):
                     decoded_count += 1
             except Exception as e:
                 pass
         
         time.sleep(0.5)
         return decoded_count > 0
-
-    def _kill_orion_processes(self):
-        if os.name == "nt":
-            os.system('taskkill /f /im PjOrion.exe >nul 2>&1')
-
-    def _hide_window_for_pid(self, pid):
-        if os.name != "nt" or not pid:
-            return
-        try:
-            user32 = ctypes.windll.user32
-            SW_HIDE = 0
-
-            @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-            def enum_cb(hwnd, lparam):
-                proc_id = ctypes.c_ulong(0)
-                user32.GetWindowThreadProcessId(hwnd, ctypes.byref(proc_id))
-                if proc_id.value == pid:
-                    user32.ShowWindow(hwnd, SW_HIDE)
-                return True
-
-            user32.EnumWindows(enum_cb, 0)
-        except Exception:
-            pass
-
-    def _hide_orion_windows(self):
-        if os.name != "nt":
-            return
-        try:
-            user32 = ctypes.windll.user32
-            SW_HIDE = 0
-
-            @ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
-            def enum_cb(hwnd, lparam):
-                length = user32.GetWindowTextLengthW(hwnd)
-                if length <= 0:
-                    return True
-                buf = ctypes.create_unicode_buffer(length + 1)
-                user32.GetWindowTextW(hwnd, buf, length + 1)
-                title = (buf.value or "").lower()
-                if "orion" in title or "pjorion" in title:
-                    user32.ShowWindow(hwnd, SW_HIDE)
-                return True
-
-            user32.EnumWindows(enum_cb, 0)
-        except Exception:
-            pass
-
-    def _decode_files_batched(self, xml_files, timeout_sec=60, batch_size=24, fail_fast=True):
-        if not xml_files:
-            return True
-
-        work_root = os.path.join(tempfile.gettempdir(), "wot_orion_autodecode")
-        os.makedirs(work_root, exist_ok=True)
-
-        total = len(xml_files)
-        ok_batches = 0
-        for idx in range(0, total, batch_size):
-            batch = xml_files[idx:idx + batch_size]
-            batch_dir = os.path.join(work_root, f"batch_{idx // batch_size:03d}")
-            if os.path.isdir(batch_dir):
-                shutil.rmtree(batch_dir, ignore_errors=True)
-            os.makedirs(batch_dir, exist_ok=True)
-
-            backmap = {}
-            for src in batch:
-                bn = os.path.basename(src)
-                dst = os.path.join(batch_dir, bn)
-                try:
-                    shutil.copy2(src, dst)
-                    backmap[bn] = src
-                except Exception as e:
-                    print(f"[WARN] Не вдалося підготувати XML для декодування: {src} ({e})")
-
-            if not backmap:
-                if fail_fast:
-                    return False
-                continue
-
-            print(f"[DECODER] Python decode batch {(idx // batch_size) + 1}/{(total + batch_size - 1) // batch_size}: {batch_dir}")
-            ok = self._run_python_decode_folder(batch_dir, timeout_sec=max(120, timeout_sec))
-
-            copied_back = 0
-            for bn, orig in backmap.items():
-                decoded = os.path.join(batch_dir, bn)
-                if not os.path.exists(decoded):
-                    continue
-                try:
-                    if self._is_probably_plain_xml(decoded):
-                        shutil.copy2(decoded, orig)
-                        copied_back += 1
-                except Exception as e:
-                    print(f"[WARN] Не вдалося повернути декодований XML: {orig} ({e})")
-
-            if copied_back > 0:
-                ok_batches += 1
-            elif not ok and fail_fast:
-                return False
-
-        if not fail_fast:
-            print(f"[DECODER] Батч-декодування завершено: успішно {ok_batches}/{(total + batch_size - 1) // batch_size}")
-            return ok_batches > 0
-        return ok_batches > 0
 
     def _entry_fingerprint(self, info):
         return {
@@ -844,7 +738,7 @@ class TankExtractor:
         decoded = 0
         for xml_file in vehicle_xml_files:
             try:
-                if decoder.decode_file(str(xml_file)):
+                if decoder.decode_file(str(xml_file), str(xml_file)):
                     decoded += 1
             except:
                 pass
@@ -866,9 +760,16 @@ class TankExtractor:
             if not files:
                 print("[DECODER] Немає валідних XML-файлів, декодування пропущено.")
                 return True
-            print(f"[DECODER] Тихий батч-декод Orion для {len(files)} XML...")
-            # Для GUI-бінарника Orion лишаємо більше часу навіть на малому батчі.
-            return self._decode_files_batched(files, timeout_sec=max(180, timeout_sec), batch_size=24, fail_fast=fail_fast)
+            decoder = WotXmlParser()
+            decoded = 0
+            for f in files:
+                try:
+                    if decoder.decode_file(str(f), str(f)):
+                        decoded += 1
+                except:
+                    pass
+            print(f"[DECODER] Декодовано {decoded}/{len(files)} XML через Python")
+            return decoded > 0
 
         targets = sorted(target_dirs if target_dirs is not None else self.changed_vehicle_dirs)
         if not targets:
@@ -895,7 +796,7 @@ class TankExtractor:
                 xml_files = list(Path(folder_path).glob("*.xml"))
                 decoded = 0
                 for xml_file in xml_files:
-                    if decoder.decode_file(str(xml_file)):
+                    if decoder.decode_file(str(xml_file), str(xml_file)):
                         decoded += 1
                 
                 if decoded > 0:
@@ -903,8 +804,6 @@ class TankExtractor:
                     
             except Exception as e:
                 pass
-                if os.name == "nt":
-                    os.system('taskkill /f /im PjOrion.exe >nul 2>&1')
                 if fail_fast:
                     return False
                 continue

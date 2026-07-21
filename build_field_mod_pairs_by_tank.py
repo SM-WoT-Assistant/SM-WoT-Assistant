@@ -2,11 +2,9 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import xml.etree.ElementTree as ET
 
 BASE_DIR = os.path.dirname(__file__)
-ORION_EXE = os.path.join(BASE_DIR, "tools", "orion", "PjOrion.exe")
 POST_PROG_DIR = os.path.join(BASE_DIR, "extracted_data", "common", "post_progression")
 FIELD_MOD_BIN = os.path.join(POST_PROG_DIR, "field_modifications.xml")
 TMP_DIR = os.path.join(BASE_DIR, "tmp", "field_mod_decode")
@@ -19,9 +17,7 @@ ROLE_RE = re.compile(r"role_[A-Za-z0-9_]+")
 PAIR_TAG_RE = re.compile(r"^(role_[A-Za-z0-9_]+)_pair_(\d+)_([12])$")
 
 
-def decode_field_modifications_with_orion():
-    if not os.path.exists(ORION_EXE):
-        raise FileNotFoundError(f"Orion not found: {ORION_EXE}")
+def decode_field_modifications():
     if not os.path.exists(FIELD_MOD_BIN):
         raise FileNotFoundError(f"Missing source: {FIELD_MOD_BIN}")
 
@@ -30,13 +26,10 @@ def decode_field_modifications_with_orion():
     os.makedirs(TMP_DIR, exist_ok=True)
     shutil.copy2(FIELD_MOD_BIN, FIELD_MOD_XML)
 
-    cmd = f'cmd /c start /wait "" "{ORION_EXE}" --unpack-folder="{TMP_DIR}" --exit'
-    rc = subprocess.call(cmd, cwd=os.path.dirname(ORION_EXE), shell=True, timeout=120)
-    if rc not in (0, None):
-        raise RuntimeError(f"Orion returned {rc}")
-
-    if not os.path.exists(FIELD_MOD_XML):
-        raise FileNotFoundError("Decoded XML not produced")
+    from decode_xml import WotXmlParser
+    parser = WotXmlParser()
+    if not parser.decode_file(FIELD_MOD_XML, FIELD_MOD_XML):
+        raise RuntimeError("Python decode failed")
 
     with open(FIELD_MOD_XML, "rb") as f:
         head = f.read(16)
@@ -172,12 +165,12 @@ def build_pairs_by_tank(role_pairs):
 
 
 def main():
-    decode_field_modifications_with_orion()
+    decode_field_modifications()
     role_pairs = parse_role_pair_icons_from_decoded_xml()
     by_tank, total, with_pairs = build_pairs_by_tank(role_pairs)
 
     payload = {
-        "source": "decoded field_modifications.xml via Orion + tank postProgressionTree role",
+        "source": "decoded field_modifications.xml via Python + tank postProgressionTree role",
         "role_pair_sets": len(role_pairs),
         "total_tanks": total,
         "tanks_with_pairs": with_pairs,

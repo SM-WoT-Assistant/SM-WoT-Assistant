@@ -416,6 +416,7 @@ class UIManager:
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)
         sep()
         make_btn(self.app.t('ui', 'help_website'), lambda: webbrowser.open("https://sm-wot-assistant.web.app"))
+        make_btn("TACTIC maps: wotmapsbyyaya.com", lambda: webbrowser.open("https://wotmapsbyyaya.com/maps"))
         sep()
 
         ver_label = tk.Label(menu, text=f"v{config.load_version()}",

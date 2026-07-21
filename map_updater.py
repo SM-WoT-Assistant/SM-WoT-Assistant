@@ -6,12 +6,10 @@ import requests
 import html
 import urllib3
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 # Імпорт нашого модуля конфігурації
 import config as config
@@ -38,13 +36,14 @@ def sync_all(callback_status=None):
                 old_links = json.load(f)
         
         chrome_options = Options()
+        chrome_options.add_argument("--headless")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--log-level=3")
+        chrome_options.add_argument("--window-size=1920,1080")
+        chrome_options.add_experimental_option("excludeSwitches", ["enable-logging"])
         
-        # Використовуємо перевірений метод (вікно за межами екрана)
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-        driver.set_window_position(-2000, 0)
+        driver = webdriver.Chrome(options=chrome_options)
         
         log("ОЧІКУВАННЯ ЗАВАНТАЖЕННЯ САЙТУ...")
         driver.get("https://wotmapsbyyaya.com/maps")
@@ -65,10 +64,10 @@ def sync_all(callback_status=None):
         for card in cards:
             try:
                 map_name = card.get_attribute("id")
-                img_element = card.find_element(By.TAG_NAME, "img")
-                img_url = img_element.get_attribute("src")
-                if map_name and img_url:
+                if map_name:
                     clean_name = html.unescape(map_name.strip())
+                    safe_url_name = clean_name.lower().replace(' - ', '_').replace(' ', '_')
+                    img_url = f"https://images.wotmapsbyyaya.com/maps/{safe_url_name}.webp"
                     new_links[clean_name] = img_url
             except: 
                 continue
@@ -108,10 +107,9 @@ def sync_all(callback_status=None):
             os.makedirs(target_dir, exist_ok=True)
             file_path = os.path.join(target_dir, "map.webp")
             
-            # Якщо файл вже є і він нормального розміру — пропускаємо
-            if os.path.exists(file_path) and os.path.getsize(file_path) > 1000: 
-                continue 
-                
+            # Пропускаємо існуючі (щоб не навантажувати сайт)
+            if os.path.exists(file_path) and os.path.getsize(file_path) > 1000:
+                continue
             url = new_links.get(name)
             try:
                 res = requests.get(url, headers=config.HEADERS, timeout=15, verify=False)
@@ -143,5 +141,53 @@ if __name__ == "__main__":
     print("--- АВТОНОМНИЙ ТЕСТ МОДУЛЯ ОБНОВЛЕННЯ ---")
     sync_all()
     input("\nНатисніть Enter для виходу...")
+
+
+def download_single_map(eng_name: str, url: str) -> bool:
+    """Завантажує одну мапу з сайту (без Chrome)."""
+    safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace(' - ', '_').replace(' ', '_')
+    target_dir = os.path.join(config.MAPS_DIR, safe_folder)
+    os.makedirs(target_dir, exist_ok=True)
+    file_path = os.path.join(target_dir, "map.webp")
+
+    try:
+        res = requests.get(url, headers=config.HEADERS, timeout=15, verify=False)
+        if res.status_code == 200 and len(res.content) > 1000:
+            if b"AccessDenied" not in res.content[:150]:
+                with open(file_path, "wb") as f:
+                    f.write(res.content)
+
+                # Оновлюємо map_list.json
+                map_list_path = config.MAP_LIST_FILE
+                map_list = []
+                if os.path.exists(map_list_path):
+                    try:
+                        with open(map_list_path, "r", encoding="utf-8") as f:
+                            map_list = json.load(f)
+                    except Exception:
+                        pass
+                if eng_name not in map_list:
+                    map_list.append(eng_name)
+                    map_list.sort()
+                    with open(map_list_path, "w", encoding="utf-8") as f:
+                        json.dump(map_list, f, indent=4)
+
+                # Оновлюємо map_links.json
+                links_path = config.MAP_LINKS_FILE
+                links = {}
+                if os.path.exists(links_path):
+                    try:
+                        with open(links_path, "r", encoding="utf-8") as f:
+                            links = json.load(f)
+                    except Exception:
+                        pass
+                links[eng_name] = url
+                with open(links_path, "w", encoding="utf-8") as f:
+                    json.dump(links, f, indent=4)
+
+                return True
+    except Exception as e:
+        print(f"[MAP_DOWNLOAD] Помилка завантаження {eng_name}: {e}")
+    return False
 
 # map_updater_4_01.py
