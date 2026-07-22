@@ -1243,6 +1243,7 @@ class WotAssistantHQ:
             self._tray_icon = None
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
+        firebase_identity.disconnect()
         self._save_group_schemes_to_cache()
         self.save_settings()
         firebase_identity._save(firebase_identity._load())

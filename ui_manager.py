@@ -550,34 +550,6 @@ class UIManager:
                               width=18, relief="flat", bd=4, show="•")
         pin_entry.grid(row=1, column=1, pady=5)
 
-        nick_available = tk.BooleanVar(value=True)
-        nick_validate_job = tk.StringVar()
-
-        def check_nick_debounce():
-            nick = nick_var.get().strip()
-            if len(nick) < 2:
-                nick_entry.config(bg="#333")
-                nick_available.set(True)
-                register_btn.config(state="normal")
-                return
-            avail = firebase_identity.check_nickname_available(nick)
-            nick_available.set(avail)
-            if avail:
-                nick_entry.config(bg="#2a4a2a")
-                register_btn.config(state="normal")
-            else:
-                nick_entry.config(bg="#4a2a2a")
-                register_btn.config(state="disabled")
-
-        def on_nick_key(event=None):
-            job = nick_validate_job.get()
-            if job:
-                try:
-                    dlg.after_cancel(job)
-                except Exception:
-                    pass
-            nick_validate_job.set(dlg.after(400, check_nick_debounce))
-
         status_var = tk.StringVar()
         status_label = tk.Label(dlg, textvariable=status_var, font=("Arial", 9),
                                 bg="#222", fg="#ff6666", wraplength=280)
@@ -589,6 +561,9 @@ class UIManager:
         def do_register():
             nick = nick_var.get().strip()
             pin = pin_var.get().strip()
+            if nick and not firebase_identity.check_nickname_available(nick):
+                status_var.set("Цей нікнейм вже зайнятий.")
+                return
             ok, msg = firebase_identity.register(nick, pin)
             if ok:
                 dlg.destroy()
@@ -621,7 +596,6 @@ class UIManager:
                   font=("Arial", 9), padx=15, pady=6,
                   command=skip_registration).pack(side="left", padx=5)
 
-        nick_entry.bind("<KeyRelease>", on_nick_key)
         nick_entry.bind("<Return>", lambda e: pin_entry.focus_set())
         pin_entry.bind("<Return>", lambda e: do_register())
 

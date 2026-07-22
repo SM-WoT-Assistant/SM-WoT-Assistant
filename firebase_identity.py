@@ -36,6 +36,14 @@ def _rtdb_get(path):
     return None
 
 
+def _rtdb_patch(path, data):
+    try:
+        r = requests.patch(_rtdb_url(path), json=data, timeout=8)
+        return 200 <= r.status_code < 300
+    except Exception:
+        return False
+
+
 def _load():
     if os.path.exists(_IDENTITY_FILE):
         try:
@@ -173,6 +181,9 @@ def connect():
         return False, "Дані пошкоджено."
     data["connected"] = True
     _save(data)
+    uid = data.get("user_id")
+    if uid:
+        _rtdb_patch(f"users/{uid}", {"connected": True})
     return True, nick
 
 
@@ -182,6 +193,7 @@ def disconnect():
     if data.get("user_id"):
         data["connected"] = False
         _save(data)
+        _rtdb_patch(f"users/{data['user_id']}", {"connected": False})
 
 
 def verify_pin(pin):

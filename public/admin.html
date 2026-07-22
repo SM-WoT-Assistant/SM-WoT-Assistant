@@ -31,6 +31,9 @@
         .badge-error { background: #553333; color: #ff6666; }
         .badge-warning { background: #555533; color: #ffcc66; }
         .badge-info { background: #334455; color: #6699cc; }
+        .badge-success { background: #335533; color: #66cc66; }
+        .section-header { cursor: pointer; user-select: none; }
+        .section-header:hover { color: #ffcc66; }
         #login-screen { text-align: center; padding: 60px; }
         #login-screen input { background: #222; color: #ccc; border: 1px solid #333; padding: 8px 12px; border-radius: 4px; font-size: 14px; margin: 6px; }
         #dashboard { display: none; }
@@ -57,47 +60,53 @@
 
     <div id="dashboard">
         <div class="card">
-            <h2>Statistics</h2>
-            <div id="stats-container"></div>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Statistics</h2>
+            <div class="section-body" id="stats-container"></div>
         </div>
 
         <div class="card">
-            <h2>Errors (recent)</h2>
-            <div id="errors-container"><div class="empty">Loading...</div></div>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Errors (recent)</h2>
+            <div class="section-body" id="errors-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Installations by version</h2>
-            <div id="installs-container"><div class="empty">Loading...</div></div>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Installations by version</h2>
+            <div class="section-body" id="installs-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Releases (RTDB versions/)</h2>
-            <div style="margin-bottom:10px;">
-                <button class="btn btn-danger" onclick="deleteSelectedReleases()" id="delete-releases-btn">Delete selected (0)</button>
-                <span style="color:#888;font-size:12px;" id="release-count"></span>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Releases (RTDB versions/)</h2>
+            <div class="section-body">
+                <div style="margin-bottom:10px;">
+                    <button class="btn btn-danger" onclick="deleteSelectedReleases()" id="delete-releases-btn">Delete selected (0)</button>
+                    <span style="color:#888;font-size:12px;" id="release-count"></span>
+                </div>
+                <div id="releases-container"><div class="empty">Loading...</div></div>
             </div>
-            <div id="releases-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Schemes (RTDB schemes/)</h2>
-            <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button class="btn btn-danger" onclick="deleteSelectedSchemes()" id="delete-schemes-btn">Delete selected (0)</button>
-                <span style="color:#888;font-size:12px;" id="scheme-count"></span>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Schemes (RTDB schemes/)</h2>
+            <div class="section-body">
+                <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-danger" onclick="deleteSelectedSchemes()" id="delete-schemes-btn">Delete selected (0)</button>
+                    <span style="color:#888;font-size:12px;" id="scheme-count"></span>
+                </div>
+                <div id="schemes-container"><div class="empty">Loading...</div></div>
             </div>
-            <div id="schemes-container"><div class="empty">Loading...</div></div>
         </div>
 
         <div class="card">
-            <h2>Users (RTDB users/)</h2>
-            <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <button class="btn btn-danger" onclick="deleteSelectedUsers()" id="delete-users-btn">Delete selected (0)</button>
-                <input type="text" id="users-filter" placeholder="Filter by nickname..." oninput="renderUsers()"
-                       style="background:#222;color:#ccc;border:1px solid #333;padding:4px 8px;border-radius:3px;font-size:13px;width:180px">
-                <span style="color:#888;font-size:12px;" id="user-count"></span>
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Users (RTDB users/)</h2>
+            <div class="section-body">
+                <div style="margin-bottom:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <button class="btn btn-danger" onclick="deleteSelectedUsers()" id="delete-users-btn">Delete selected (0)</button>
+                    <input type="text" id="users-filter" placeholder="Filter by nickname..." oninput="renderUsers()"
+                           style="background:#222;color:#ccc;border:1px solid #333;padding:4px 8px;border-radius:3px;font-size:13px;width:180px">
+                    <span style="color:#888;font-size:12px;" id="user-count"></span>
+                </div>
+                <div id="users-container"><div class="empty">Loading...</div></div>
             </div>
-            <div id="users-container"><div class="empty">Loading...</div></div>
         </div>
     </div>
 </main>
@@ -304,6 +313,12 @@ function updateDeleteCount(cls, btnId) {
 function getSelectedKeys(cls) {
     return Array.from(document.querySelectorAll("." + cls + ":checked")).map(cb => cb.value);
 }
+function toggleSection(hdr) {
+    const body = hdr.nextElementSibling;
+    const collapsed = body.style.display === 'none';
+    body.style.display = collapsed ? '' : 'none';
+    hdr.innerHTML = (collapsed ? '▼' : '▶') + hdr.innerHTML.slice(1);
+}
 
 function deleteSelectedSchemes() {
     const keys = getSelectedKeys("scheme-check");
@@ -385,7 +400,7 @@ function renderUsers() {
     filtered.forEach(u => {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
         const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
-        const status = u.pin_hash ? '<span class="badge badge-info">connected</span>' : '<span style="color:#666">○</span>';
+        const status = u.connected ? '<span class="badge badge-success">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
         html += `<tr>
