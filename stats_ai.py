@@ -1266,12 +1266,10 @@ class StatsAI:
         old_grid = self.ai_grid_frame
         self.ai_grid_frame = new_grid
         old_grid.destroy()
-        
-        self.root.after(50, lambda: (
-            self.ai_grid_frame.update_idletasks(),
-            self.ai_canvas.configure(
-                scrollregion=(0, 0, self.ai_grid_frame.winfo_width(), self.ai_grid_frame.winfo_height()))
-        )[-1])
+
+        self.ai_grid_frame.update_idletasks()
+        self.ai_canvas.configure(
+            scrollregion=(0, 0, self.ai_grid_frame.winfo_width(), self.ai_grid_frame.winfo_height()))
         
         try:
             canvas_width = self.filter_progress_canvas.winfo_width()
