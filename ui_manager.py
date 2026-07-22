@@ -854,7 +854,8 @@ class UIManager:
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
             self.app.root.update_idletasks()
             self.app.root.update_idletasks()
-            if hasattr(self.app, 'stats_ai_module'): self.app.stats_ai_module.refresh_ai_view()
+            if hasattr(self.app, 'stats_ai_module'):
+                self.app.root.after(100, self.app.stats_ai_module.refresh_ai_view)
 
     def build_filters(self):
         for w in self.app.filter_panel.winfo_children(): w.destroy()
