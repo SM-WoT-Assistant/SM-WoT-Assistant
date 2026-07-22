@@ -851,6 +851,7 @@ class UIManager:
                 self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
+            self.app.root.update_idletasks()
             self.app.status_label.pack(side="bottom", fill="x")
             if hasattr(self.app, 'stats_ai_module'): self.app.stats_ai_module.refresh_ai_view()
 

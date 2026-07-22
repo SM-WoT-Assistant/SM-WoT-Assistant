@@ -537,6 +537,8 @@ class StatsAI:
         def _on_canvas_resize(event):
             self.ai_canvas.coords(self.ai_canvas_window, 0, 0)
             self.ai_canvas.itemconfig(self.ai_canvas_window, width=event.width)
+            if event.width < 100:
+                return
             new_max_cols = max(1, event.width // 171)
             if self._last_cols != new_max_cols:
                 self._last_cols = new_max_cols
