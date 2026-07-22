@@ -1026,9 +1026,12 @@ class StatsAI:
             return best
         return None
 
-    def refresh_ai_view(self):
+    def refresh_ai_view(self, on_complete=None):
         """Оновлює грід за допомогою чанків, щоб не блокувати UI."""
-        if not hasattr(self, 'ai_grid_frame'): return
+        if not hasattr(self, 'ai_grid_frame'):
+            if on_complete:
+                self.root.after(0, on_complete)
+            return
 
         search_q = self._parse_search_query()
         active_t, active_c, active_n = self._active_filter_values()
@@ -1090,6 +1093,8 @@ class StatsAI:
             items_to_show = items_to_show[:60]
 
         self._finish_filter_with_items(items_to_show)
+        if on_complete:
+            self.root.after(0, on_complete)
         
     def _collect_filtered_items(self):
         """Collect filtered items WITHOUT modifying UI. Returns (items_to_show, is_default)."""

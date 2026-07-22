@@ -770,21 +770,22 @@ class UIManager:
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
         
-        self.app.browser_frame.pack_forget()
-        self.app.canvas.pack_forget() 
-        self.app.filter_panel.pack_forget()
-        self.app.status_label.pack_forget()
-        self.app.ai_frame.pack_forget()
-        self.app.map_toolbar.pack_forget()
-        self.app.battle_status_top.pack_forget()
+        if view_name != "ai_stats":
+            self.app.browser_frame.pack_forget()
+            self.app.canvas.pack_forget() 
+            self.app.filter_panel.pack_forget()
+            self.app.status_label.pack_forget()
+            self.app.ai_frame.pack_forget()
+            self.app.map_toolbar.pack_forget()
+            self.app.battle_status_top.pack_forget()
 
-        self.app.top_bar.pack_forget()
-        self.app.identity_bar.pack_forget()
-        self.app.top_bar.pack(side="top", fill="x")
-        self.app.identity_bar.pack(side="top", fill="x")
+            self.app.top_bar.pack_forget()
+            self.app.identity_bar.pack_forget()
+            self.app.top_bar.pack(side="top", fill="x")
+            self.app.identity_bar.pack(side="top", fill="x")
 
-        if hasattr(self.app, 'second_row'):
-            self.app.second_row.pack_forget()
+            if hasattr(self.app, 'second_row'):
+                self.app.second_row.pack_forget()
 
         if view_name == "maps":
             show_second = (
@@ -852,14 +853,33 @@ class UIManager:
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             stats = getattr(self.app, 'stats_ai_module', None)
             if stats:
+                def do_ai_switch():
+                    if self.app.active_view != "ai_stats":
+                        return
+                    self.app.browser_frame.pack_forget()
+                    self.app.canvas.pack_forget()
+                    self.app.filter_panel.pack_forget()
+                    self.app.status_label.pack_forget()
+                    self.app.ai_frame.pack_forget()
+                    self.app.map_toolbar.pack_forget()
+                    self.app.battle_status_top.pack_forget()
+                    self.app.top_bar.pack_forget()
+                    self.app.identity_bar.pack_forget()
+                    self.app.top_bar.pack(side="top", fill="x")
+                    self.app.identity_bar.pack(side="top", fill="x")
+                    self.app.status_label.pack(side="bottom", fill="x")
+                    self.app.ai_frame.pack(side="top", fill="both", expand=True)
+                    self.app.root.update_idletasks()
+                    self.app.root.update_idletasks()
                 cw = self.app.root.winfo_width() - 20
                 if cw > 100:
                     stats._last_cols = max(1, cw // 171)
-                stats.refresh_ai_view()
-            self.app.status_label.pack(side="bottom", fill="x")
-            self.app.ai_frame.pack(side="top", fill="both", expand=True)
-            self.app.root.update_idletasks()
-            self.app.root.update_idletasks()
+                stats.refresh_ai_view(on_complete=do_ai_switch)
+            else:
+                self.app.status_label.pack(side="bottom", fill="x")
+                self.app.ai_frame.pack(side="top", fill="both", expand=True)
+                self.app.root.update_idletasks()
+                self.app.root.update_idletasks()
 
     def build_filters(self):
         for w in self.app.filter_panel.winfo_children(): w.destroy()
