@@ -771,8 +771,8 @@ class UIManager:
             self.app.top_bar.pack(side="top", fill="x")
             self.app.identity_bar.pack(side="top", fill="x")
 
-            if hasattr(self.app, 'second_row'):
-                self.app.second_row.pack_forget()
+        if hasattr(self.app, 'second_row'):
+            self.app.second_row.pack_forget()
 
         if view_name == "maps":
             show_second = (
