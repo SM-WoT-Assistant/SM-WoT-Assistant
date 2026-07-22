@@ -1451,12 +1451,12 @@ class WotAssistantHQ:
             fill="#aaa", font=("Arial", 9))
 
         # Мінімалістичні кнопки — тонка обводка без заливки
-        btn_w, btn_h = 120, 28
+        btn_w, btn_h = 90, 20
         btn_gap = 20
         total = btn_w * 2 + btn_gap
         lx = sw // 2 - total // 2
         rx = lx + btn_w + btn_gap
-        by = sh - 40
+        by = sh - 25
 
         self._splash_update_rect = self.splash_canvas.create_rectangle(
             lx, by, lx + btn_w, by + btn_h,
