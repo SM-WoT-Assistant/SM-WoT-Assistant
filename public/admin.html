@@ -400,7 +400,7 @@ function renderUsers() {
     filtered.forEach(u => {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
         const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
-        const pinDisplay = u.pin_hash ? "✅" : "❌";
+        const pinDisplay = u.pin_hash ? '<span style="font-family:monospace;font-size:11px;color:#888">' + u.pin_hash.slice(0, 10) + '...</span>' : '<span style="color:#666">—</span>';
         const status = u.connected ? '<span class="badge badge-success">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
