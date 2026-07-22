@@ -14,6 +14,8 @@ kernel32 = ctypes.windll.kernel32
 user32 = ctypes.windll.user32
 TH32CS_SNAPPROCESS = 0x00000002
 PROCESS_TERMINATE = 0x0001
+# sizeof(PROCESSENTRY32W): 32-bit=556, 64-bit=568
+PE_SIZE = 568 if ctypes.sizeof(ctypes.c_void_p) == 8 else 556
 
 def _read_settings():
     appdata = os.environ.get("APPDATA", "")
@@ -50,7 +52,6 @@ def _is_wot_running():
     if snapshot == -1:
         return False
     try:
-        PE_SIZE = 556
         pe = (ctypes.c_byte * PE_SIZE)()
         ctypes.memset(pe, 0, PE_SIZE)
         ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
@@ -67,13 +68,48 @@ def _is_wot_running():
     finally:
         kernel32.CloseHandle(snapshot)
 
+def _find_dev_pid():
+    """Прочитати dev_pid.txt, валідувати що PID живий і це python.exe/pythonw.exe."""
+    appdata = os.environ.get("APPDATA", "")
+    path = os.path.join(appdata, "SM WoT Assistant", "dev_pid.txt")
+    if not os.path.exists(path):
+        return None
+    try:
+        with open(path, "r") as f:
+            target = int(f.read().strip())
+    except (ValueError, OSError):
+        return None
+    snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if snapshot == -1:
+        return None
+    try:
+        pe = (ctypes.c_byte * PE_SIZE)()
+        ctypes.memset(pe, 0, PE_SIZE)
+        ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+            return None
+        while True:
+            pid_bytes = (ctypes.c_byte * 4)()
+            ctypes.memmove(pid_bytes, ctypes.byref(pe, 8), 4)
+            pid = int.from_bytes(bytes(pid_bytes), 'little')
+            exe_buf = ctypes.create_unicode_buffer(260)
+            ctypes.memmove(exe_buf, ctypes.byref(pe, 44), 260 * 2)
+            if pid == target and exe_buf.value:
+                name = exe_buf.value.lower()
+                if name in ("python.exe", "pythonw.exe"):
+                    return target
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                break
+        return None
+    finally:
+        kernel32.CloseHandle(snapshot)
+
 def _find_main_pids():
     pids = []
     snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     if snapshot == -1:
         return pids
     try:
-        PE_SIZE = 556
         pe = (ctypes.c_byte * PE_SIZE)()
         ctypes.memset(pe, 0, PE_SIZE)
         ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
@@ -94,8 +130,16 @@ def _find_main_pids():
     finally:
         kernel32.CloseHandle(snapshot)
 
-def _close_main_app():
+def _get_main_pids():
+    """Об'єднати frozen EXE + dev PID."""
     pids = _find_main_pids()
+    dev_pid = _find_dev_pid()
+    if dev_pid is not None and dev_pid not in pids:
+        pids.append(dev_pid)
+    return pids
+
+def _close_main_app():
+    pids = _get_main_pids()
     if not pids:
         return
     for pid in pids:
@@ -105,6 +149,8 @@ def _close_main_app():
             kernel32.CloseHandle(h)
 
 def _launch_app():
+    if _get_main_pids():
+        return
     launcher = _find_launcher_exe()
     if launcher:
         subprocess.Popen([launcher], creationflags=0x08000000)
@@ -140,7 +186,7 @@ def main():
             launched = False
         game_was = game_is
         if launched:
-            if not _find_main_pids() and game_is:
+            if not _get_main_pids() and game_is:
                 launched = False
         time.sleep(5)
 

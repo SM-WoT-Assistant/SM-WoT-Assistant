@@ -44,6 +44,26 @@ try:
 except ImportError:
     map_extractor = None
 
+# Dev PID file — для tray_watcher: записуємо PID python.exe main.py
+# щоб tray_watcher міг впізнати dev-процес (не тільки frozen EXE)
+_DEV_PID_PATH = os.path.join(config.USER_DATA_DIR, "dev_pid.txt")
+
+def _write_dev_pid():
+    if getattr(sys, 'frozen', False):
+        return
+    try:
+        with open(_DEV_PID_PATH, "w") as f:
+            f.write(str(os.getpid()))
+    except Exception:
+        pass
+
+def _dev_pid_cleanup():
+    try:
+        if os.path.exists(_DEV_PID_PATH):
+            os.remove(_DEV_PID_PATH)
+    except Exception:
+        pass
+
 class WotAssistantHQ:
     def __init__(self, root, splash_geometry=None):
         self.root = root
@@ -135,6 +155,11 @@ class WotAssistantHQ:
             self._set_windows_startup(True)
         else:
             self._set_windows_startup(False)
+        
+        # Записати PID файл для tray_watcher (тільки dev mode, не frozen)
+        _write_dev_pid()
+        import atexit
+        atexit.register(_dev_pid_cleanup)
         
         # Відновити стан входу — якщо користувач був підключений, підключити автоматично
         if firebase_identity.get_identity() and firebase_identity.get_identity().get("connected"):
@@ -1384,7 +1409,7 @@ class WotAssistantHQ:
                 subprocess.Popen([tmp, "/S", "/NCRC"], creationflags=0x08000000)
                 import time as _time
                 _time.sleep(0.5)
-                pw.after(0, lambda: (pw.destroy(), self.save_settings(), os._exit(0)))
+                pw.after(0, lambda: (pw.destroy(), self.save_settings(), _dev_pid_cleanup(), os._exit(0)))
 
             except Exception as e:
                 print(f"[UPDATE] Error: {e}")
@@ -1544,7 +1569,7 @@ class WotAssistantHQ:
             subprocess.Popen([tmp, "/S", "/NCRC"], creationflags=0x08000000)
             import time as _time
             _time.sleep(0.5)
-            self.root.after(0, lambda: (self.save_settings(), os._exit(0)))
+            self.root.after(0, lambda: (self.save_settings(), _dev_pid_cleanup(), os._exit(0)))
 
         except Exception as e:
             print(f"[UPDATE] Error: {e}")
