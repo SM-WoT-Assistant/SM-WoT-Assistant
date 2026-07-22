@@ -320,6 +320,29 @@ function toggleSection(hdr) {
     hdr.innerHTML = (isHidden ? '▼' : '▶') + hdr.innerHTML.slice(1);
 }
 
+async function _sha256(text) {
+    const enc = new TextEncoder().encode(text);
+    const buf = await crypto.subtle.digest('SHA-256', enc);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function resetUserPin(uid, nickname) {
+    const newPin = prompt(`New 4-digit PIN for ${nickname}:`);
+    if (!newPin) return;
+    if (!/^\d{4}$/.test(newPin)) {
+        alert("PIN must be exactly 4 digits.");
+        return;
+    }
+    _sha256("wot_assistant_pin_salt_" + newPin).then(hash => {
+        db.ref("users/" + uid + "/pin_hash").set(hash)
+            .then(() => {
+                alert(`PIN reset for ${nickname} successfully!`);
+                loadUsers();
+            })
+            .catch(e => alert("Error: " + e.message));
+    });
+}
+
 function deleteSelectedSchemes() {
     const keys = getSelectedKeys("scheme-check");
     if (!keys.length) { alert("No schemes selected."); return; }
@@ -401,6 +424,7 @@ function renderUsers() {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
         const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
         const pinDisplay = u.pin_hash ? '<span style="font-family:monospace;font-size:11px;color:#888">' + u.pin_hash.slice(0, 10) + '...</span>' : '<span style="color:#666">—</span>';
+        const resetBtn = u.pin_hash ? `<button class="btn" onclick="resetUserPin('${u._key}','${(u.nickname||'?').replace(/'/g,"\\'")}')" style="font-size:10px;padding:2px 6px;margin-left:4px">Reset</button>` : '';
         const status = u.connected ? '<span class="badge badge-success">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
@@ -408,7 +432,7 @@ function renderUsers() {
             <td><input type="checkbox" class="user-check" value="${u._key}" onchange="updateDeleteCount('user-check', 'delete-users-btn')"></td>
             <td style="color:#ffaa00">${nickDisplay}</td>
             <td style="font-family:monospace;font-size:11px;color:#888">${uid}</td>
-            <td style="text-align:center">${pinDisplay}</td>
+            <td style="text-align:center">${pinDisplay}${resetBtn}</td>
             <td>${status}</td>
             <td>${date}</td>
         </tr>`;
