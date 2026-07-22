@@ -550,6 +550,19 @@ class UIManager:
                               width=18, relief="flat", bd=4, show="•")
         pin_entry.grid(row=1, column=1, pady=5)
 
+        def _make_entry_menu(entry):
+            m = tk.Menu(entry, tearoff=0, bg="#333", fg="#ccc")
+            m.add_command(label="Cut", command=lambda: entry.event_generate("<<Cut>>"))
+            m.add_command(label="Copy", command=lambda: entry.event_generate("<<Copy>>"))
+            m.add_command(label="Paste", command=lambda: entry.event_generate("<<Paste>>"))
+            m.add_command(label="Select All", command=lambda: entry.event_generate("<<SelectAll>>"))
+            def show(e):
+                m.tk_popup(e.x_root, e.y_root)
+                self.app.root.after(100, lambda: m.grab_release())
+            entry.bind("<Button-3>", show)
+        _make_entry_menu(nick_entry)
+        _make_entry_menu(pin_entry)
+
         status_var = tk.StringVar()
         status_label = tk.Label(dlg, textvariable=status_var, font=("Arial", 9),
                                 bg="#222", fg="#ff6666", wraplength=280)
