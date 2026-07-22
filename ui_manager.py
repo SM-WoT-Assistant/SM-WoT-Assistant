@@ -685,6 +685,10 @@ class UIManager:
                     dlg.after_cancel(job)
                 except Exception:
                     pass
+        
+        # Синхронізувати висоту canvas після зміни ідентичності
+        if self.app.active_view == "maps" and self.app.mode == "edit":
+            self.app.root.after(50, self.app._adjust_for_canvas)
             nick_validate_job.set(dlg.after(400, check_nick_debounce))
 
         status_var = tk.StringVar()
