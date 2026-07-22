@@ -19,6 +19,7 @@ _RTDB_BASE = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabas
 def _rtdb_url(path):
     if "?" in path:
         base_path, qs = path.split("?", 1)
+        qs = qs.replace('"', '%22')
         return f"{_RTDB_BASE}/{base_path}.json?{qs}&auth={_FIREBASE_API_KEY}"
     return f"{_RTDB_BASE}/{path}.json?auth={_FIREBASE_API_KEY}"
 
