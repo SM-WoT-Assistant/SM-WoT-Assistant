@@ -17,6 +17,9 @@ _FIREBASE_API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 _RTDB_BASE = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
 
 def _rtdb_url(path):
+    if "?" in path:
+        base_path, qs = path.split("?", 1)
+        return f"{_RTDB_BASE}/{base_path}.json?{qs}&auth={_FIREBASE_API_KEY}"
     return f"{_RTDB_BASE}/{path}.json?auth={_FIREBASE_API_KEY}"
 
 def _rtdb_put(path, data):

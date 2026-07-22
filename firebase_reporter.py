@@ -56,6 +56,9 @@ def _to_firestore_value(val):
 
 
 def _rtdb_url(path):
+    if "?" in path:
+        base_path, qs = path.split("?", 1)
+        return f"{_RTDB_BASE}/{base_path}.json?{qs}&auth={FIREBASE_API_KEY}"
     return f"{_RTDB_BASE}/{path}.json?auth={FIREBASE_API_KEY}"
 
 
