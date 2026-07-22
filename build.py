@@ -463,20 +463,6 @@ def build_tray_watcher():
     return tray_exe
 
 
-    if result.returncode != 0:
-        print("[BUILD] Launcher build FAILED")
-        sys.exit(1)
-
-    launcher_exe = os.path.join(FIXED_ONEDIR, "SM WoT Assistant Launcher.exe")
-    if not os.path.exists(launcher_exe):
-        print(f"[BUILD] FATAL: Launcher EXE not found: {launcher_exe}")
-        sys.exit(1)
-
-    size_mb = os.path.getsize(launcher_exe) / (1024 * 1024)
-    print(f"[BUILD] Launcher: {size_mb:.1f} MB")
-    return launcher_exe
-
-
 def run_nsis(version, makensis_exe, is_beta=False):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
