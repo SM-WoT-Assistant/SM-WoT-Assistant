@@ -1446,49 +1446,61 @@ class WotAssistantHQ:
             fill="#ffaa00", font=("Arial", 13, "bold"))
 
         self._splash_ver_info = self.splash_canvas.create_text(
-            sw // 2, sh - 92,
+            sw // 2, sh - 80,
             text=f"You have v{current_ver}",
             fill="#aaa", font=("Arial", 9))
 
-        btn_w, btn_h = 140, 36
-        lx = sw // 2 - btn_w - 14
-        rx = sw // 2 + 14
-        by = sh - 68
+        # Мінімалістичні кнопки — тонка обводка без заливки
+        btn_w, btn_h = 120, 28
+        btn_gap = 20
+        total = btn_w * 2 + btn_gap
+        lx = sw // 2 - total // 2
+        rx = lx + btn_w + btn_gap
+        by = sh - 40
 
         self._splash_update_rect = self.splash_canvas.create_rectangle(
             lx, by, lx + btn_w, by + btn_h,
-            fill="#335533", outline="#66aa66", tags="splash_btn")
+            fill="", outline="#555", tags="splash_btn_upd")
         self._splash_update_txt = self.splash_canvas.create_text(
             lx + btn_w // 2, by + btn_h // 2,
-            text=self.t('ui', 'btn_update_now').upper(),
-            fill="#99cc99", font=("Arial", 10, "bold"), tags="splash_btn")
+            text=self.t('ui', 'btn_update_now'),
+            fill="#6a6", font=("Arial", 10), tags="splash_btn_upd")
 
         self._splash_later_rect = self.splash_canvas.create_rectangle(
             rx, by, rx + btn_w, by + btn_h,
-            fill="#444", outline="#666", tags="splash_btn")
+            fill="", outline="#555", tags="splash_btn_lat")
         self._splash_later_txt = self.splash_canvas.create_text(
             rx + btn_w // 2, by + btn_h // 2,
-            text=self.t('ui', 'btn_later').upper(),
-            fill="#aaa", font=("Arial", 10), tags="splash_btn")
+            text=self.t('ui', 'btn_later'),
+            fill="#888", font=("Arial", 10), tags="splash_btn_lat")
 
         self._splash_latest = latest
-        self.splash_canvas.tag_bind("splash_btn", "<Button-1>",
-            lambda e: self._on_splash_btn_click(e))
-        self.splash_canvas.tag_bind("splash_btn", "<Enter>",
-            lambda e: self.splash.config(cursor="hand2"))
-        self.splash_canvas.tag_bind("splash_btn", "<Leave>",
-            lambda e: self.splash.config(cursor=""))
 
-    def _on_splash_btn_click(self, event):
-        sw = int(self.splash_canvas["width"])
-        bx = sw // 2 - 140 - 14
-        if bx <= event.x <= bx + 140:
-            self._download_on_splash(self._splash_latest)
-        else:
-            self._splash_proceed_to_main()
+        def _upd_enter(e):
+            self.splash.config(cursor="hand2")
+            self.splash_canvas.itemconfigure(self._splash_update_rect, outline="#8a8")
+        def _upd_leave(e):
+            self.splash.config(cursor="")
+            self.splash_canvas.itemconfigure(self._splash_update_rect, outline="#555")
+        def _lat_enter(e):
+            self.splash.config(cursor="hand2")
+            self.splash_canvas.itemconfigure(self._splash_later_rect, outline="#aaa")
+        def _lat_leave(e):
+            self.splash.config(cursor="")
+            self.splash_canvas.itemconfigure(self._splash_later_rect, outline="#555")
+
+        self.splash_canvas.tag_bind("splash_btn_upd", "<Button-1>",
+            lambda e: self._download_on_splash(self._splash_latest))
+        self.splash_canvas.tag_bind("splash_btn_lat", "<Button-1>",
+            lambda e: self._splash_proceed_to_main())
+        self.splash_canvas.tag_bind("splash_btn_upd", "<Enter>", _upd_enter)
+        self.splash_canvas.tag_bind("splash_btn_upd", "<Leave>", _upd_leave)
+        self.splash_canvas.tag_bind("splash_btn_lat", "<Enter>", _lat_enter)
+        self.splash_canvas.tag_bind("splash_btn_lat", "<Leave>", _lat_leave)
 
     def _splash_proceed_to_main(self):
-        self.splash_canvas.delete("splash_btn")
+        self.splash_canvas.delete("splash_btn_upd")
+        self.splash_canvas.delete("splash_btn_lat")
         if hasattr(self, '_splash_ver_info'):
             self.splash_canvas.delete(self._splash_ver_info)
         self.splash_canvas.itemconfigure(self.splash_status_text,
@@ -1503,7 +1515,8 @@ class WotAssistantHQ:
         self._start_startup_checks_continue()
 
     def _download_on_splash(self, latest):
-        self.splash_canvas.delete("splash_btn")
+        self.splash_canvas.delete("splash_btn_upd")
+        self.splash_canvas.delete("splash_btn_lat")
         if hasattr(self, '_splash_ver_info'):
             self.splash_canvas.delete(self._splash_ver_info)
 
@@ -1989,10 +2002,10 @@ class WotAssistantHQ:
         version = "v" + config.load_version()
         self.splash_canvas.create_text(sw//2, sh - 100, text=version, fill="white", font=("Verdana", 11))
         lang_text = self.t('ui', 'language_label').format(lang=self.lang.upper())
-        self.splash_canvas.create_text(sw//2, sh - 87, text=lang_text, fill="#888888", font=("Arial", 9))
+        self.splash_canvas.create_text(sw//2, sh - 80, text=lang_text, fill="#888888", font=("Arial", 9))
         self.splash_status_text = self.splash_canvas.create_text(
             sw//2,
-            sh - 74,
+            sh - 60,
             text=self.t('ui', 'checking_updates'),
             fill="#bbbbbb",
             font=("Arial", 9),

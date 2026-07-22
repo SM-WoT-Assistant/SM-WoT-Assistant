@@ -148,7 +148,7 @@ class Launcher:
                                  fill="white", font=("Verdana", 11))
 
         self.status_text = self.canvas.create_text(
-            SPLASH_W // 2, SPLASH_H - 84,
+            SPLASH_W // 2, SPLASH_H - 80,
             text="Checking for updates...", fill="#bbbbbb", font=("Arial", 9))
 
         self.pct_text = self.canvas.create_text(
