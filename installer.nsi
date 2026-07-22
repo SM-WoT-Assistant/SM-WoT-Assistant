@@ -27,6 +27,8 @@ UninstPage instfiles
 
 Section "Install"
     SetOutPath "$INSTDIR"
+    ; Вбити запущений трей-вочер, бо Windows блокує перезапис .exe
+    ExecWait 'taskkill /f /im "SM WoT Assistant Tray Watcher.exe"'
     File /r "dist\SM WoT Assistant\*.*"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
