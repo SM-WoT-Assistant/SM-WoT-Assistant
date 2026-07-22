@@ -109,7 +109,13 @@ class UIManager:
         self.app.browser_frame = tk.Frame(self.app.root, bg="#000")
 
         self.app.ai_frame = tk.Frame(self.app.root, bg="#111")
-        self.app.stats_ai_module = stats_ai.StatsAI(self.app.ai_frame, self.app.tank_db, self.app.popular_tanks, self.app)
+        try:
+            self.app.stats_ai_module = stats_ai.StatsAI(self.app.ai_frame, self.app.tank_db, self.app.popular_tanks, self.app)
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"[DEBUG] StatsAI init failed: {e}")
+            self.app.stats_ai_module = None
 
         self.app.canvas.pack(side="top", fill="both", expand=True)
 

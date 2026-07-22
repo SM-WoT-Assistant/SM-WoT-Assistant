@@ -47,6 +47,16 @@ except ImportError:
 class WotAssistantHQ:
     def __init__(self, root, splash_geometry=None):
         self.root = root
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("smwotassistant.app.1")
+        except Exception:
+            pass
+        try:
+            ico_path = config.ICON_FILE if os.path.exists(config.ICON_FILE) else os.path.join(config.BASE_DIR, "icon.ico")
+            if os.path.exists(ico_path):
+                self.root.iconbitmap(default=ico_path)
+        except Exception:
+            pass
         self.root.withdraw()
         self._splash_geometry = splash_geometry
 
@@ -419,6 +429,9 @@ class WotAssistantHQ:
             launcher2 = os.path.join(base, "SM WoT Assistant Launcher.exe")
             if os.path.exists(launcher2):
                 return launcher2
+        launcher3 = os.path.join(config.BASE_DIR, "SM WoT Assistant Launcher.exe")
+        if os.path.exists(launcher3):
+            return launcher3
         return None
 
     def _get_tray_watcher_exe(self):
@@ -432,6 +445,9 @@ class WotAssistantHQ:
             tray2 = os.path.join(base, "SM WoT Assistant Tray Watcher.exe")
             if os.path.exists(tray2):
                 return tray2
+        tray3 = os.path.join(config.BASE_DIR, "SM WoT Assistant Tray Watcher.exe")
+        if os.path.exists(tray3):
+            return tray3
         return None
 
     def _set_windows_startup(self, enable):

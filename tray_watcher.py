@@ -39,6 +39,10 @@ def _find_launcher_exe():
     launcher2 = os.path.join(exe_dir, "SM WoT Assistant Launcher.exe")
     if os.path.exists(launcher2):
         return launcher2
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    launcher3 = os.path.join(src_dir, "SM WoT Assistant Launcher.exe")
+    if os.path.exists(launcher3):
+        return launcher3
     return None
 
 def _is_wot_running():
