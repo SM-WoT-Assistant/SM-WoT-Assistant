@@ -22,6 +22,9 @@
     },
     "user_groups": {
       ".indexOn": [""]
+    },
+    "users": {
+      ".indexOn": ["nickname_lower"]
     }
   }
 }
