@@ -850,10 +850,17 @@ class UIManager:
             if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
                 self.app.drawing_palette.withdraw()
             self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
+            stats = getattr(self.app, 'stats_ai_module', None)
+            if stats:
+                cw = self.app.root.winfo_width() - 20
+                if cw > 100:
+                    expected = max(1, cw // 171)
+                    if stats._last_cols != expected:
+                        stats._last_cols = expected
+                stats.refresh_ai_view()
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
             self.app.root.update_idletasks()
             self.app.status_label.pack(side="bottom", fill="x")
-            if hasattr(self.app, 'stats_ai_module'): self.app.stats_ai_module.refresh_ai_view()
 
     def build_filters(self):
         for w in self.app.filter_panel.winfo_children(): w.destroy()
