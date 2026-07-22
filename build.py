@@ -463,6 +463,46 @@ def build_tray_watcher():
     return tray_exe
 
 
+def generate_verify_json(version):
+    """Згенерувати public/verify.json з популярними танками."""
+    import datetime
+    verify_path = os.path.join(BASE_DIR, "public", "verify.json")
+    try:
+        # Спробувати взяти список з локального кешу
+        popular = ["Super Conqueror", "Leopard 1", "Object 277", "IS-7",
+                   "Vz. 55", "Progetto 65", "CS-63", "STB-1", "Kranvagn",
+                   "Object 907", "T110E5", "AMX 50 B", "E 100", "Maus",
+                   "T57 Heavy", "TVP T 50/51", "Batchat 25t", "AMX 13 105",
+                   "Udes 15/16", "Manticore", "EBR 105", "WZ-132-1",
+                   "T-100 LT", "Sheridan", "Rhino", "Pz.Kpfw. VII",
+                   "Strv 103B", "Object 268 Version 4", "T110E3",
+                   "Object 277"]
+        try:
+            cache_path = os.path.join(os.environ.get("APPDATA", ""),
+                                       "SM WoT Assistant", "popular_tanks_cache.json")
+            if os.path.exists(cache_path):
+                import json as _json
+                with open(cache_path, "r", encoding="utf-8") as _f:
+                    _cd = _json.load(_f)
+                cached = [t.get("name", "") for t in _cd.get("tanks", []) if t.get("name")]
+                if cached:
+                    popular = cached
+        except Exception:
+            pass
+        vdata = {
+            "status": "ok",
+            "version": version,
+            "updated_at": datetime.date.today().strftime("%Y-%m-%d"),
+            "popular_tanks": popular,
+            "prompt_date_format": f"{datetime.date.today().year} year"
+        }
+        with open(verify_path, "w", encoding="utf-8") as f:
+            json.dump(vdata, f, indent=2, ensure_ascii=False)
+        print(f"[BUILD] verify.json generated: {len(popular)} tanks")
+    except Exception as e:
+        print(f"[BUILD] WARNING: verify.json generation failed: {e}")
+
+
 def run_nsis(version, makensis_exe, is_beta=False):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
@@ -943,6 +983,7 @@ def main():
     create_git_tag(version)
     run_pyinstaller()
     data_count = copy_data_files()
+    generate_verify_json(version)
     build_launcher()
     build_tray_watcher()
 

@@ -30,6 +30,7 @@ Section "Install"
     ; Вбити запущений трей-вочер, бо Windows блокує перезапис .exe
     ExecWait 'taskkill /f /im "SM WoT Assistant Tray Watcher.exe"'
     File /r "dist\SM WoT Assistant\*.*"
+    WriteRegStr HKCU "Software\SM WoT Assistant" "installed" "1"
 
     CreateDirectory "$SMPROGRAMS\${PRODUCT_NAME}"
     Delete "$DESKTOP\SM WoT Assistant v*.lnk"

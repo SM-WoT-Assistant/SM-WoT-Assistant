@@ -35,6 +35,20 @@ LOCALES_FILE = os.path.join(USER_DATA_DIR, "locales.json")
 DEFAULT_FILES = ["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]
 GROUP_CACHE_FILE = os.path.join(USER_DATA_DIR, "group_schemes_cache.json")
 
+# Verification system
+VERIFY_URL = "https://sm-wot-assistant.web.app/verify.json"
+VERIFY_CACHE_FILE = os.path.join(USER_DATA_DIR, "popular_tanks_cache.json")
+VERIFY_CACHE_DAYS = 7
+VERIFIED_MARKER = os.path.join(USER_DATA_DIR, "verified.marker")
+INSTALL_REG_KEY = r"Software\SM WoT Assistant"
+
+CRITICAL_BUNDLE_FILES = [
+    "tank_db.json", "tank_tth.json", "crew_builds.json",
+    "game_entities_english.json", "game_entities.json", "tank_slots_full.json",
+    "VERSION",
+    "xvmsymbol.ttf", "fontawesome-webfont.ttf",
+]
+
 BG_COLOR = "#000000"
 
 HEADERS = {

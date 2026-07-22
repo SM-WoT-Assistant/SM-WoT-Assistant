@@ -83,20 +83,31 @@ def _post(path, data, timeout=8):
         return False
 
 
-def report_error(error_type, message, stack_trace="", version=""):
-    ver = version or config.load_version()
-    payload = {
-        "version": ver,
-        "os": platform.system() + " " + platform.release(),
-        "error_type": error_type,
-        "message": message[:1000],
-        "stack_trace": (stack_trace or "")[:5000],
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
-        "install_id": _get_install_id(),
-    }
-    result = _post("error_reports", payload)
-    if not result:
-        print(f"[REPORTER] Помилка відправки: {error_type}: {message[:80]}")
+def report_error(error_type, stage, error_text, blocked=False, details=None, message="", stack_trace=""):
+    """Відправити помилку в RTDB error_reports/. Повертає True якщо успішно."""
+    try:
+        report = {
+            "type": error_type,
+            "version": config.load_version(),
+            "stage": stage,
+            "blocked": blocked,
+            "error": (error_text or message or "")[:500],
+            "details": details or {},
+            "uid": _get_install_id() or "anon",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "app": {
+                "os": platform.system() + " " + platform.release(),
+                "frozen": getattr(sys, 'frozen', False),
+            }
+        }
+        if stack_trace:
+            report["stack_trace"] = stack_trace[:5000]
+        result = _post("error_reports", report)
+        if not result:
+            print(f"[REPORTER] Помилка відправки: {error_type}: {error_text[:80]}")
+        return result
+    except Exception:
+        return False
     return result
 
 
@@ -163,7 +174,8 @@ def setup_global_excepthook(app):
             msg = str(exc_value)
             report_error(
                 error_type=exc_type.__name__,
-                message=msg[:500],
+                stage="runtime",
+                error_text=msg[:500],
                 stack_trace=tb_str[:5000],
             )
         except Exception:
@@ -256,3 +268,5 @@ def compare_versions(current, latest):
         return _parts(latest) > _parts(current)
     except Exception:
         return False
+
+

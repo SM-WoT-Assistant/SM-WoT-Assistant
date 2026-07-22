@@ -110,6 +110,8 @@ class WotAssistantHQ:
         self.map_mgr.auto_detect_wot_path()
         self.custom_names = self.data_mgr.load_json(config.CUSTOM_NAMES_FILE)
         
+        self._run_verification()
+        
         import language_module
         self.lang = language_module.setup(
             self.settings.get("wot_path", ""),
@@ -503,6 +505,127 @@ class WotAssistantHQ:
             winreg.CloseKey(key)
         except Exception as e:
             print(f"[INIT] Failed to set Windows startup: {e}")
+
+    def _show_verification_error(self, title, message):
+        """Показати діалог помилки верифікації і вийти."""
+        try:
+            from dialog_utils import dark_messagebox
+            dark_messagebox(title, message, parent=self.root)
+        except Exception:
+            import tkinter.messagebox as mb
+            mb.showerror(title, message)
+        sys.exit(0)
+
+    def _run_verification(self):
+        """Перевірити цілісність бандла, маркер інсталяції, verify.json.
+        При критичній помилці — діалог + report + exit."""
+        import json, time, requests
+        from firebase_reporter import report_error
+
+        # ── Фаза 0: Bundle Integrity ──────────────────────────────
+        missing = []
+        for fname in config.CRITICAL_BUNDLE_FILES:
+            fpath = os.path.join(config.BUNDLE_DIR, fname)
+            if not os.path.exists(fpath):
+                missing.append(fname)
+        # Додатково: extracted_maps
+        maps_dir = os.path.join(config.BUNDLE_DIR, "extracted_maps")
+        map_data_path = os.path.join(maps_dir, "map_data.json")
+        map_dict_path = os.path.join(maps_dir, "map_dictionary.json")
+        if not os.path.exists(map_data_path):
+            missing.append("extracted_maps/map_data.json")
+        if not os.path.exists(map_dict_path):
+            missing.append("extracted_maps/map_dictionary.json")
+        if missing:
+            details = {"missing_files": missing}
+            report_error("bundle_integrity", "startup",
+                         f"Missing critical files: {', '.join(missing)}",
+                         blocked=True, details=details)
+            self._show_verification_error(
+                "Помилка встановлення",
+                "Файли програми пошкоджені. Зверніться в службу підтримки.\n\n"
+                f"Відсутні: {', '.join(missing[:5])}"
+            )
+
+        # ── Фаза 1: Install Marker ───────────────────────────────
+        if getattr(sys, 'frozen', False):
+            import winreg
+            try:
+                key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, config.INSTALL_REG_KEY, 0,
+                                     winreg.KEY_READ)
+                installed = winreg.QueryValueEx(key, "installed")[0]
+                winreg.CloseKey(key)
+                if not installed:
+                    raise ValueError("installed=0")
+            except Exception as e:
+                report_error("install_marker", "startup",
+                             f"Install marker not found: {e}",
+                             blocked=True)
+                self._show_verification_error(
+                    "Помилка встановлення",
+                    "Програма не знайдена в системі. Перевстановіть програму "
+                    "або зверніться в службу підтримки."
+                )
+
+        # ── Фаза 2: Network Verify (тільки перший запуск) ────────
+        if not os.path.exists(config.VERIFIED_MARKER):
+            try:
+                resp = requests.get(config.VERIFY_URL, timeout=15,
+                                    headers=config.HEADERS)
+                if resp.status_code != 200:
+                    raise ValueError(f"HTTP {resp.status_code}")
+                vdata = resp.json()
+                if vdata.get("status") != "ok":
+                    raise ValueError(f"status={vdata.get('status')}")
+                # Зберегти popular_tanks в кеш
+                popular_names = vdata.get("popular_tanks", [])
+                if popular_names:
+                    cache_data = {
+                        "tanks": [{"name": n, "tag": n} for n in popular_names],
+                        "updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                        "fail_count": 0,
+                    }
+                    try:
+                        with open(config.VERIFY_CACHE_FILE, "w", encoding="utf-8") as f:
+                            json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                # Створити маркер
+                try:
+                    with open(config.VERIFIED_MARKER, "w") as f:
+                        f.write(vdata.get("version", "unknown"))
+                except Exception:
+                    pass
+            except Exception as e:
+                report_error("verify_failed", "startup",
+                             f"verify.json fetch failed: {e}",
+                             blocked=True)
+                self._show_verification_error(
+                    "Помилка підключення",
+                    "Не вдалося перевірити ліцензію програми. "
+                    "Перевірте підключення до інтернету або зверніться "
+                    "в службу підтримки."
+                )
+
+        # ── Фаза 3: Game Client (non-blocking) ───────────────────
+        try:
+            wot_path = self.settings.get("wot_path", "")
+            if wot_path and os.path.isdir(wot_path):
+                vxml = os.path.join(wot_path, "version.xml")
+                scripts_pkg = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+                issues = []
+                if not os.path.exists(vxml):
+                    issues.append("version.xml")
+                if not os.path.exists(scripts_pkg):
+                    issues.append("scripts.pkg")
+                if issues:
+                    report_error("game_client", "startup",
+                                 f"Game client files missing: {', '.join(issues)}",
+                                 blocked=False)
+        except Exception as e:
+            report_error("game_client", "startup",
+                         f"Game client check error: {e}",
+                         blocked=False)
 
     def reload_tank_data(self):
         self.tank_db = self.data_mgr.load_tank_db()
