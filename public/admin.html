@@ -315,9 +315,9 @@ function getSelectedKeys(cls) {
 }
 function toggleSection(hdr) {
     const body = hdr.nextElementSibling;
-    const collapsed = body.style.display === 'none';
-    body.style.display = collapsed ? '' : 'none';
-    hdr.innerHTML = (collapsed ? '▼' : '▶') + hdr.innerHTML.slice(1);
+    const isHidden = body.style.display === 'none' || (!body.style.display && window.getComputedStyle(body).display === 'none');
+    body.style.display = isHidden ? 'block' : 'none';
+    hdr.innerHTML = (isHidden ? '▼' : '▶') + hdr.innerHTML.slice(1);
 }
 
 function deleteSelectedSchemes() {
