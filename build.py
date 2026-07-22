@@ -922,15 +922,17 @@ def main():
         else:
             new_version = a
 
-    if new_version:
-        write_version(new_version)
-
-    version = read_version()
+    version = new_version if new_version else read_version()
     is_beta_suffix = " Beta" if is_beta else ""
     display_ver = version + is_beta_suffix
 
     # Phase 0: Pre-flight checks
     makensis_exe = preflight(version)
+
+    # Write VERSION after preflight (git must be clean during check)
+    if new_version:
+        write_version(new_version)
+        version = read_version()
 
     # Phase 1: Clean previous intermediate build
     clean_dist()
