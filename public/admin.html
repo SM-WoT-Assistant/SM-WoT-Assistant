@@ -181,6 +181,9 @@ function login() {
 }
 
 function loadDashboard() {
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
     renderAdminSchemes();
     loadStats();
     loadErrors();
@@ -238,6 +241,10 @@ function loadErrors() {
 }
 
 function pollErrorReports() {
+    if (Notification.permission === 'denied') {
+        console.warn('[ERROR_POLL] Notifications denied');
+        return;
+    }
     db.ref("error_reports").orderByChild("timestamp").limitToLast(5).once("value")
         .then(snap => {
             const data = snap.val();
@@ -264,10 +271,7 @@ function pollErrorReports() {
 }
 
 function startErrorPolling() {
-    if (Notification.permission === 'default') {
-        Notification.requestPermission();
-    }
-    pollErrorReports();
+    setTimeout(pollErrorReports, 3000);
     setInterval(pollErrorReports, 30000);
 }
 
