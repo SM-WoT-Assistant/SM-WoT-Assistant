@@ -130,7 +130,7 @@ def login(nickname, pin):
         if not pin.isdigit() or len(pin) != 4:
             return False, "PIN must be 4 digits."
 
-        data = _rtdb_get(f'users?orderBy="nickname"&equalTo="{nickname}"')
+        data = _rtdb_get(f'users?orderBy="nickname_lower"&equalTo="{nickname.lower()}"')
         if not data:
             return False, "User not found. Check your nickname."
 
@@ -148,6 +148,7 @@ def login(nickname, pin):
             "pin_text": pin,
             "pin_hash": entry["pin_hash"],
             "created_at": entry.get("created_at", ""),
+            "connected": True,
         }
         _save(local)
         return True, entry["nickname"]
