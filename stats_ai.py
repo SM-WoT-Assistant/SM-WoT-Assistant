@@ -781,6 +781,8 @@ class StatsAI:
 
     def toggle_tier_filter(self, t):
         self._show_grid_if_needed()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = False
         was_active = self.tier_filters[t]["active"]
         for key, item in self.tier_filters.items():
             item["active"] = False
@@ -788,9 +790,7 @@ class StatsAI:
         if not was_active:
             self.tier_filters[t]["active"] = True
             self.tier_filters[t]["btn"].config(bg="#444444", fg="#ffffff")
-        self._filter_active = False
         self.root.update_idletasks()
-        self._filter_version = getattr(self, '_filter_version', 0) + 1
         self._filter_active = True
         self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
@@ -802,6 +802,8 @@ class StatsAI:
         
     def toggle_class_filter(self, c):
         self._show_grid_if_needed()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = False
         was_active = self.class_filters[c]["active"]
         for key, item in self.class_filters.items():
             item["active"] = False
@@ -809,9 +811,7 @@ class StatsAI:
         if not was_active:
             self.class_filters[c]["active"] = True
             self.class_filters[c]["btn"].config(bg="#444444", fg="#ffffff")
-        self._filter_active = False
         self.root.update_idletasks()
-        self._filter_version = getattr(self, '_filter_version', 0) + 1
         self._filter_active = True
         self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
@@ -823,6 +823,8 @@ class StatsAI:
         
     def toggle_nation_filter(self, n):
         self._show_grid_if_needed()
+        self._filter_version = getattr(self, '_filter_version', 0) + 1
+        self._filter_active = False
         was_active = self.nation_filters[n]["active"]
         for key, item in self.nation_filters.items():
             item["active"] = False
@@ -830,9 +832,7 @@ class StatsAI:
         if not was_active:
             self.nation_filters[n]["active"] = True
             self.nation_filters[n]["btn"].config(bg="#444444")
-        self._filter_active = False
         self.root.update_idletasks()
-        self._filter_version = getattr(self, '_filter_version', 0) + 1
         self._filter_active = True
         self.filter_progress_canvas.pack(fill="both", expand=True)
         self.filter_progress_canvas.coords(self._progress_rect, 0, 0, 0, 4)
@@ -1164,10 +1164,11 @@ class StatsAI:
 
     def _finish_filter_with_items(self, items_to_show):
         """Build new grid in background, then swap instantly to avoid black flash."""
+        fv_at_start = getattr(self, '_filter_version', 0)
         max_cols = self._last_cols if self._last_cols > 0 else 5
-        
+
         new_grid = tk.Frame(self.ai_canvas, bg="#000", padx=0.5, pady=0.5)
-        
+
         if not items_to_show:
             msg_text = self.t("no_tanks_found", "NO TANKS FOUND")
             msg_label = tk.Label(
@@ -1247,6 +1248,10 @@ class StatsAI:
                 col += 1
                 if col >= max_cols: col = 0; row += 1
             
+        if getattr(self, '_filter_version', 0) != fv_at_start:
+            new_grid.destroy()
+            return
+        
         for c in range(max_cols):
             new_grid.columnconfigure(c, weight=1)
         for c in range(max_cols, max_cols + 15):
