@@ -136,6 +136,10 @@ class WotAssistantHQ:
         else:
             self._set_windows_startup(False)
         
+        # Відновити стан входу — якщо користувач був підключений, підключити автоматично
+        if firebase_identity.get_identity() and firebase_identity.get_identity().get("connected"):
+            firebase_identity.connect()
+        
         self.win_mgr = window_manager.WindowManager(self)
         self.win_mgr.initialize_window()
         
@@ -1243,7 +1247,6 @@ class WotAssistantHQ:
             self._tray_icon = None
         if hasattr(self, 'stats_ai_module'):
             self.stats_ai_module.stop_browser()
-        firebase_identity.disconnect()
         self._save_group_schemes_to_cache()
         self.save_settings()
         firebase_identity._save(firebase_identity._load())
