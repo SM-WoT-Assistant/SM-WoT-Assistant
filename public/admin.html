@@ -396,10 +396,11 @@ function renderUsers() {
         container.innerHTML = '<div class="empty">No users found</div>';
         return;
     }
-    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'user-check\', \'delete-users-btn\')" title="Select all"></th><th>Nickname</th><th>User ID</th><th>Status</th><th>Registered</th></tr>';
+    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'user-check\', \'delete-users-btn\')" title="Select all"></th><th>Nickname</th><th>User ID</th><th>PIN</th><th>Status</th><th>Registered</th></tr>';
     filtered.forEach(u => {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
         const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
+        const pinDisplay = u.pin_hash ? "✅" : "❌";
         const status = u.connected ? '<span class="badge badge-success">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
@@ -407,6 +408,7 @@ function renderUsers() {
             <td><input type="checkbox" class="user-check" value="${u._key}" onchange="updateDeleteCount('user-check', 'delete-users-btn')"></td>
             <td style="color:#ffaa00">${nickDisplay}</td>
             <td style="font-family:monospace;font-size:11px;color:#888">${uid}</td>
+            <td style="text-align:center">${pinDisplay}</td>
             <td>${status}</td>
             <td>${date}</td>
         </tr>`;
