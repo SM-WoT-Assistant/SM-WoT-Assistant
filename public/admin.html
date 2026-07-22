@@ -188,6 +188,7 @@ function loadDashboard() {
     loadAdminSchemes();
     loadAdminReleases();
     loadUsers();
+    startErrorPolling();
 }
 
 function objSize(obj) { return obj ? Object.keys(obj).length : 0; }
@@ -204,6 +205,8 @@ function loadStats() {
     });
 }
 
+let _lastErrorTimestamp = localStorage.getItem("admin_last_error_ts") || "1970-01-01T00:00:00Z";
+
 function loadErrors() {
     db.ref("error_reports").orderByChild("timestamp").limitToLast(30).once("value")
         .then(snap => {
@@ -214,21 +217,58 @@ function loadErrors() {
                 return;
             }
             const items = Object.values(data).reverse();
-            let html = '<table><tr><th>Date</th><th>Version</th><th>Type</th><th>Message</th><th>OS</th></tr>';
+            let html = '<table><tr><th>Date</th><th>Version</th><th>Type</th><th>Blocked</th><th>Message</th><th>OS</th></tr>';
             items.forEach(d => {
-                const levelClass = d.error_type === 'crash' ? 'badge-error' :
-                    (d.error_type || '').includes('Warning') ? 'badge-warning' : 'badge-info';
+                const errorType = d.type || d.error_type || '';
+                const isBlocked = d.blocked === true;
+                const levelClass = errorType === 'crash' || isBlocked ? 'badge-error' :
+                    errorType.includes('Warning') ? 'badge-warning' : 'badge-info';
                 html += `<tr>
                     <td>${(d.timestamp || '').slice(0,19)}</td>
                     <td>${d.version || ''}</td>
-                    <td><span class="badge ${levelClass}">${d.error_type || ''}</span></td>
-                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.message || ''}</td>
-                    <td>${d.os || ''}</td>
+                    <td><span class="badge ${levelClass}">${errorType}</span></td>
+                    <td>${isBlocked ? '🔴' : '—'}</td>
+                    <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.error || d.message || ''}</td>
+                    <td>${(d.app && d.app.os) || d.os || ''}</td>
                 </tr>`;
             });
             html += '</table>';
             container.innerHTML = html;
         });
+}
+
+function pollErrorReports() {
+    db.ref("error_reports").orderByChild("timestamp").limitToLast(5).once("value")
+        .then(snap => {
+            const data = snap.val();
+            if (!data) return;
+            const items = Object.values(data);
+            items.forEach(d => {
+                const ts = d.timestamp || '';
+                if (ts > _lastErrorTimestamp) {
+                    _lastErrorTimestamp = ts;
+                    localStorage.setItem("admin_last_error_ts", ts);
+                    const errorType = d.type || d.error_type || 'unknown';
+                    const isBlocked = d.blocked === true;
+                    const title = isBlocked
+                        ? `🔴 BLOCKED: ${errorType} v${d.version || '?'}`
+                        : `⚠️ ${errorType} v${d.version || '?'}`;
+                    const body = (d.error || d.message || '').slice(0, 120);
+                    if (Notification.permission === 'granted') {
+                        new Notification(title, { body, icon: '/logo.png' });
+                    }
+                }
+            });
+        })
+        .catch(() => {});
+}
+
+function startErrorPolling() {
+    if (Notification.permission === 'default') {
+        Notification.requestPermission();
+    }
+    pollErrorReports();
+    setInterval(pollErrorReports, 30000);
 }
 
 function loadInstallations() {

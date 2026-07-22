@@ -510,7 +510,7 @@ class WotAssistantHQ:
         """Показати діалог помилки верифікації і вийти."""
         try:
             from dialog_utils import dark_messagebox
-            dark_messagebox(title, message, parent=self.root)
+            dark_messagebox(self.root, title, message, is_error=True)
         except Exception:
             import tkinter.messagebox as mb
             mb.showerror(title, message)
