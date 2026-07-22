@@ -1,4 +1,4 @@
-            
+                        
 
 import os, sys, json, ctypes, re
 
@@ -1757,10 +1757,58 @@ class WotAssistantHQ:
         self.root.after(500, lambda: self.finish_startup_splash())
 
     def _check_pending_tactic_maps(self):
-        pass
+        """HEAD-перевірка pending мап на сайті. Chrome не використовується."""
+        pending = self.map_mgr._load_pending_tactic_maps()
+        sync_needed = self.map_mgr._tactic_sync_needed
+        if not pending and not sync_needed:
+            return
+        print(f"[INIT] {len(pending)} pending TACTIC maps — HEAD-checking website...")
+        def _bg_sync():
+            try:
+                import requests
+                import map_updater
+                remaining = list(pending)
+                for i, eng_name in enumerate(pending):
+                    clean = eng_name.replace('?', '').replace(':', '').replace('|', '')
+                    safe = clean.replace(' - ', '_').replace(' ', '_').lower()
+                    url = f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
+                    try:
+                        r = requests.head(url, timeout=5)
+                        if r.status_code == 200:
+                            map_updater.download_single_map(eng_name, url)
+                            print(f"[TACTIC] Downloaded: {eng_name}")
+                            remaining.remove(eng_name)
+                        else:
+                            print(f"[TACTIC] Not found on site: {eng_name} ({r.status_code})")
+                    except Exception as e:
+                        print(f"[TACTIC] HEAD check error for {eng_name}: {e}")
+                if len(remaining) != len(pending):
+                    self.map_mgr._save_pending_tactic_maps(remaining)
+                self.map_mgr._tactic_sync_needed = False
+                self.root.after(0, self._refresh_pending_tactic_maps)
+            except Exception as e:
+                print(f"[TACTIC] Background check error: {e}")
+        threading.Thread(target=_bg_sync, daemon=True).start()
 
     def _refresh_pending_tactic_maps(self):
-        pass
+        """Оновити стан pending після HEAD-перевірки."""
+        self.map_mgr._tactic_sync_needed = False
+        pending = self.map_mgr._load_pending_tactic_maps()
+        if not pending:
+            return
+        remaining = []
+        for eng_name in pending:
+            folder = self.map_mgr._resolve_tactic_folder(eng_name)
+            safe = folder.replace('?', '').replace(':', '').replace('|', '').replace(' - ', '_').replace(' ', '_')
+            img_path = os.path.join(config.MAPS_DIR, safe, "map.webp")
+            if os.path.exists(img_path) and os.path.getsize(img_path) > 1000:
+                print(f"[TACTIC] Map now available: {eng_name}")
+            else:
+                remaining.append(eng_name)
+        if len(remaining) != len(pending):
+            self.map_mgr._save_pending_tactic_maps(remaining)
+            if hasattr(self, 'painter'):
+                self.painter.redraw()
 
     def _cancel_ai_timers(self):
         self._startup_creep_active = False

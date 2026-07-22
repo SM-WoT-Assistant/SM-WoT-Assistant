@@ -32,6 +32,8 @@ class MapManager:
         self._update_in_progress = False
         self._last_changed_ids = []
         self._unavailable_maps = set(self._load_unavailable())
+        self._tactic_sync_needed = False
+        self._pending_tactic_path = os.path.join(config.USER_DATA_DIR, "pending_tactic_maps.json")
 
     def _load_unavailable(self):
         try:
@@ -406,6 +408,22 @@ class MapManager:
                 print(f"[MAP_MGR] HEAD error for {eng}: {e}")
         self._save_unavailable()
         self._last_changed_ids = []
+
+    def _load_pending_tactic_maps(self):
+        if not os.path.exists(self._pending_tactic_path):
+            return []
+        try:
+            with open(self._pending_tactic_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    def _save_pending_tactic_maps(self, pending):
+        try:
+            with open(self._pending_tactic_path, "w", encoding="utf-8") as f:
+                json.dump(pending, f)
+        except Exception:
+            pass
 
     def run_map_updater(self):
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
