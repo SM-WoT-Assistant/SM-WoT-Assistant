@@ -861,6 +861,7 @@ class UIManager:
             self.app.status_label.pack(side="bottom", fill="x")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
             self.app.root.update_idletasks()
+            self.app.root.update_idletasks()
 
     def build_filters(self):
         for w in self.app.filter_panel.winfo_children(): w.destroy()
