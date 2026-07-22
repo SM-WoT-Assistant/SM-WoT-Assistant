@@ -769,28 +769,7 @@ class UIManager:
         self.app.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
-
-        if view_name == "maps":
-            mode = kwargs.get('mode', 1)
-            self.app.map_mode = mode
-            if mode == 1:
-                self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
-            else:
-                self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
-        elif view_name == "ai_stats":
-            self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
-
-        if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists():
-            self.app._po_win.withdraw()
-        if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
-            self.app.drawing_palette.withdraw()
-
-        self.app.root.after(0, lambda vn=view_name, kw=kwargs: self._deferred_show_view(vn, **kw))
-
-    def _deferred_show_view(self, view_name, **kwargs):
-        if self.app.active_view != view_name:
-            return
-
+        
         self.app.browser_frame.pack_forget()
         self.app.canvas.pack_forget() 
         self.app.filter_panel.pack_forget()
@@ -815,6 +794,12 @@ class UIManager:
             )
             if show_second:
                 self.app.second_row.pack(side="top", fill="x")
+            mode = kwargs.get('mode', 1)
+            self.app.map_mode = mode
+            if mode == 1:
+                self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
+            else:
+                self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
             self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
             self.app.filter_panel.pack(side="bottom", fill="x")
             self.app.status_label.pack(side="bottom", fill="x")
@@ -824,6 +809,7 @@ class UIManager:
             self.app.map_mgr.load_map_list()
 
             if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists():
+                self.app._po_win.withdraw()
                 self.app.root.update_idletasks()
                 if not self.app._hidden_by_f10:
                     self.app._po_win.deiconify()
@@ -844,6 +830,10 @@ class UIManager:
                 self.app.drawing_palette._refresh_linked_schemes_list()
 
         elif view_name == "stats":
+            if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
+                self.app._po_win.withdraw()
+            if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
+                self.app.drawing_palette.withdraw()
             self.app.status_label.pack(side="bottom", fill="x")
             self.app.browser_frame.pack(side="top", fill="both", expand=True)
             
@@ -855,6 +845,11 @@ class UIManager:
             loading_label.pack(expand=True)
 
         elif view_name == "ai_stats":
+            if hasattr(self.app, '_po_win') and self.app._po_win.winfo_exists() and self.app._po_win.state() != "withdrawn":
+                self.app._po_win.withdraw()
+            if hasattr(self.app, 'drawing_palette') and self.app.drawing_palette.winfo_viewable():
+                self.app.drawing_palette.withdraw()
+            self.app.btn_mode_ai_stats.config(bg="#ffaa00", fg="black")
             self.app.ai_frame.pack(side="top", fill="both", expand=True)
             self.app.root.update_idletasks()
             self.app.status_label.pack(side="bottom", fill="x")
