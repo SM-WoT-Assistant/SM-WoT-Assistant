@@ -370,7 +370,7 @@ def build_launcher():
         PYTHON_EXE, "-m", "PyInstaller",
         "--onefile", "--windowed",
         "--hidden-import", "unicodedata",
-        "--hidden-import", "PIL._imaging",
+        "--collect-all", "PIL",
         "--collect-all", "unicodedata",
         "--add-data", f"{logo}{sep}.",
         "--add-data", f"{ver}{sep}.",
@@ -401,7 +401,7 @@ def build_launcher():
 def verify_launcher_bundle(launcher_exe):
     """Перевіряє що launcher --onefile містить Tcl/Tk DLL та _tkinter.pyd.
     PyInstaller onefile зберігає імена файлів як plain text в TOC архіву."""
-    required = [b"tcl86t.dll", b"tk86t.dll", b"_tkinter.pyd"]
+    required = [b"tcl86t.dll", b"tk86t.dll", b"_tkinter.pyd", b"_imaging"]
     missing = []
     try:
         with open(launcher_exe, "rb") as f:
