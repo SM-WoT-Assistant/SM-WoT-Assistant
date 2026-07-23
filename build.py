@@ -783,7 +783,7 @@ def create_github_release(version, is_beta=False):
     display_tag = f"v{version} Beta" if is_beta else tag
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
-    pr_flag = ["--prerelease"] if is_beta else []
+    pr_flag = ["--prerelease"]  # всі релізи prerelease до скасування
 
     print(f"[BUILD] Creating GitHub release {tag}...")
     cmd = ["gh", "release", "create", tag] + assets + ["--title", display_tag] + pr_flag + notes_flag
@@ -952,13 +952,11 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
 def main():
     new_version = None
     release_date = None
-    is_beta = False
+    is_beta = True  # всі релізи Beta до скасування
 
     for a in sys.argv[1:]:
         if a.startswith("--date="):
             release_date = a.split("=", 1)[1]
-        elif a == "--beta":
-            is_beta = True
         else:
             new_version = a
 
