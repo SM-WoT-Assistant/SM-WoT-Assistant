@@ -547,7 +547,19 @@ class WotAssistantHQ:
                 f"Відсутні: {', '.join(missing[:5])}"
             )
 
-        # ── Фаза 1: Install Marker ───────────────────────────────
+        # ── Фаза 1: Seed popular_tanks з бандла ──────────────────
+        seed_file = os.path.join(config.BUNDLE_DIR, "popular_tanks_seed.json")
+        if os.path.exists(seed_file):
+            cache_file = config.VERIFY_CACHE_FILE
+            if not os.path.exists(cache_file):
+                try:
+                    import shutil
+                    shutil.copy2(seed_file, cache_file)
+                    print(f"[INIT] Seeded popular_tanks_cache.json from bundle")
+                except Exception:
+                    pass
+
+        # ── Фаза 2: Install Marker ───────────────────────────────
         if getattr(sys, 'frozen', False):
             import winreg
             try:
@@ -567,7 +579,7 @@ class WotAssistantHQ:
                     "або зверніться в службу підтримки."
                 )
 
-        # ── Фаза 2: Network Verify (тільки перший запуск) ────────
+        # ── Фаза 3: Network Verify (тільки перший запуск) ────────
         if not os.path.exists(config.VERIFIED_MARKER):
             try:
                 resp = requests.get(config.VERIFY_URL, timeout=15,
@@ -607,7 +619,7 @@ class WotAssistantHQ:
                     "в службу підтримки."
                 )
 
-        # ── Фаза 3: Game Client (non-blocking) ───────────────────
+        # ── Фаза 4: Game Client (non-blocking) ───────────────────
         try:
             wot_path = self.settings.get("wot_path", "")
             if wot_path and os.path.isdir(wot_path):

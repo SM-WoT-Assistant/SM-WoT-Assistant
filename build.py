@@ -499,6 +499,17 @@ def generate_verify_json(version):
         with open(verify_path, "w", encoding="utf-8") as f:
             json.dump(vdata, f, indent=2, ensure_ascii=False)
         print(f"[BUILD] verify.json generated: {len(popular)} tanks")
+
+        # Також зберегти popular_tanks_seed.json в корінь для бандла
+        seed_path = os.path.join(BASE_DIR, "popular_tanks_seed.json")
+        seed_data = {
+            "tanks": [{"name": n, "tag": n} for n in popular],
+            "updated": datetime.date.today().strftime("%Y-%m-%d"),
+            "fail_count": 0,
+        }
+        with open(seed_path, "w", encoding="utf-8") as f:
+            json.dump(seed_data, f, indent=2, ensure_ascii=False)
+        print(f"[BUILD] popular_tanks_seed.json saved ({len(popular)} tanks)")
     except Exception as e:
         print(f"[BUILD] WARNING: verify.json generation failed: {e}")
 
