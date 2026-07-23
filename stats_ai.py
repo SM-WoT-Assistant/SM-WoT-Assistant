@@ -363,6 +363,10 @@ class StatsAI:
             if hasattr(self, 'ai_status_bar'):
                 self.ai_status_bar.grid_forget()
 
+    def _back_from_detail(self):
+        self._show_grid_if_needed()
+        self.refresh_ai_view()
+
     def _parse_search_query(self):
         raw_q = self.ai_search_var.get() or ""
         q = raw_q.strip()
@@ -581,6 +585,14 @@ class StatsAI:
         
         self.ai_title_frame = tk.Frame(self.detail_inner, bg="#111111")
         self.ai_title_frame.pack(side="top", anchor="center", pady=(2, 2))
+
+        self._back_top_f = tk.Frame(self.detail_inner, bg="#111111")
+        self._back_top_f.pack(side="top", fill="x", anchor="w", before=self.ai_title_frame)
+        back_btn = tk.Button(self._back_top_f, text=chr(0xF112), font=("FontAwesome", 21),
+                             bg="#111111", fg="#cccccc", bd=0, cursor="hand2",
+                             activebackground="#333", activeforeground="white",
+                             command=self._back_from_detail)
+        back_btn.pack(side="left", padx=(8, 0))
 
         self.ai_image_frame = tk.Frame(self.detail_inner, bg="#111111")
         self.ai_tank_icon_lf = tk.Label(self.ai_image_frame, bg="#111111")
@@ -1917,6 +1929,8 @@ class StatsAI:
         if not tank_info:
             return
         
+        if self.active_tank is None:
+            return
         tag = tank_info['tag']
         data = tank_info['data']
         img = tank_info['img']
