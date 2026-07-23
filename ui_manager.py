@@ -418,6 +418,10 @@ class UIManager:
         def _on_launch_on_game_start():
             enabled = self.app._launch_on_game_start_var.get()
             self.app._set_windows_startup(enabled)
+            if enabled:
+                self.app._ensure_tray_watcher_running()
+            else:
+                self.app._stop_tray_watcher()
             self.app.save_settings()
 
         chk_launch_game.configure(command=_on_launch_on_game_start)

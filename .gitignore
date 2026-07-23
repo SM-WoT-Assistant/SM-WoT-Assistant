@@ -97,3 +97,5 @@ temp_scripts.zip
 # Magic Context
 .cortexkit/
 magic-context.jsonc.MOVED_READPLEASE
+
+popular_tanks_seed.json

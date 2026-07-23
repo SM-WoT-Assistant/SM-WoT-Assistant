@@ -155,6 +155,7 @@ class WotAssistantHQ:
         # замінився на tray_watcher.exe після оновлення
         if self._launch_on_game_start_var.get():
             self._set_windows_startup(True)
+            self._ensure_tray_watcher_running()
         else:
             self._set_windows_startup(False)
         
@@ -505,6 +506,26 @@ class WotAssistantHQ:
             winreg.CloseKey(key)
         except Exception as e:
             print(f"[INIT] Failed to set Windows startup: {e}")
+
+    def _ensure_tray_watcher_running(self):
+        import subprocess
+        tray = self._get_tray_watcher_exe()
+        if not tray:
+            print("[INIT] Tray watcher EXE not found, cannot start")
+            return
+        result = subprocess.run(
+            ['tasklist', '/fi', f'IMAGENAME eq {os.path.basename(tray)}'],
+            capture_output=True, text=True, timeout=5
+        )
+        if os.path.basename(tray).lower() not in result.stdout.lower():
+            subprocess.Popen([tray], creationflags=0x08000000)
+            print(f"[INIT] Tray watcher started: {tray}")
+
+    def _stop_tray_watcher(self):
+        import subprocess
+        subprocess.run(['taskkill', '/f', '/im', 'SM WoT Assistant Tray Watcher.exe'],
+                       capture_output=True, timeout=5)
+        print("[INIT] Tray watcher stopped")
 
     def _show_verification_error(self, title, message):
         """Показати діалог помилки верифікації і вийти."""
