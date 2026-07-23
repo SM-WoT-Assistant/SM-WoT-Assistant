@@ -406,6 +406,8 @@ class UIManager:
         make_chk(self.app.t('ui', 'auto_mode_filter'), self.app.auto_mode_filter_var)
         make_chk(self.app.t('ui', 'auto_vehicle_filter'), self.app.auto_vehicle_filter_var)
         make_chk(self.app.t('ui', 'auto_battle'), self.app.auto_battle_var)
+        chk_auto_size = make_chk(self.app.t('ui', 'auto_window_size'), self.app._auto_window_size_var)
+        chk_auto_size.configure(command=self.app._on_auto_window_size_toggle)
         sep()
         make_chk(self.app.t('ui', 'auto_update'), self.app.auto_update_var)
         sep()

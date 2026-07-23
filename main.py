@@ -150,6 +150,7 @@ class WotAssistantHQ:
         self._launch_on_game_start_var = tk.BooleanVar(value=self.settings.get("launch_on_game_start", False))
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
+        self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
         
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення
@@ -1197,26 +1198,55 @@ class WotAssistantHQ:
         self._po_win.lift()
 
     def _handle_ctrl_up(self):
-        import time
-        now = time.time()
-        if hasattr(self, '_last_ctrl_up_time') and now - self._last_ctrl_up_time < 0.15:
-            return
-        self._last_ctrl_up_time = now
         if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
             self.painter.resize_selected(1)
         else:
             self.win_mgr.resize_up_hotkey()
 
     def _handle_ctrl_down(self):
-        import time
-        now = time.time()
-        if hasattr(self, '_last_ctrl_down_time') and now - self._last_ctrl_down_time < 0.15:
-            return
-        self._last_ctrl_down_time = now
         if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
             self.painter.resize_selected(-1)
         else:
             self.win_mgr.resize_down_hotkey()
+
+    def _handle_up_key_noctrl(self):
+        if not self.win_mgr.format_mode_enabled:
+            return
+        try:
+            import keyboard as _kb
+            if _kb.is_pressed('ctrl'):
+                return
+        except:
+            pass
+        if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
+            self.painter.resize_selected(1)
+        else:
+            self.win_mgr.resize_up_hotkey()
+
+    def _handle_down_key_noctrl(self):
+        if not self.win_mgr.format_mode_enabled:
+            return
+        try:
+            import keyboard as _kb
+            if _kb.is_pressed('ctrl'):
+                return
+        except:
+            pass
+        if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
+            self.painter.resize_selected(-1)
+        else:
+            self.win_mgr.resize_down_hotkey()
+
+    def _get_drawing_scale(self):
+        if self._auto_window_size_var.get():
+            sh = self.root.winfo_screenheight()
+            return max(0.5, min(3.0, sh / 1080.0))
+        return 1.0
+
+    def _on_auto_window_size_toggle(self):
+        if hasattr(self, 'painter'):
+            self.painter.redraw()
+        self.save_settings()
 
     def set_painter_tool(self, tool):
         if hasattr(self, 'drawing_palette'):
@@ -1822,22 +1852,20 @@ class WotAssistantHQ:
             keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
         except Exception as e:
             keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
-        keyboard.add_hotkey('ctrl+up', lambda: self.safe_execute(self._handle_ctrl_up), suppress=False)
-        keyboard.add_hotkey('ctrl+down', lambda: self.safe_execute(self._handle_ctrl_down), suppress=False)
         keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
         # Без Ctrl — працюють тільки коли format_mode_enabled (замок відчинено)
-        keyboard.add_hotkey('up', lambda: self.safe_execute(self._handle_ctrl_up), suppress=False)
-        keyboard.add_hotkey('down', lambda: self.safe_execute(self._handle_ctrl_down), suppress=False)
+        keyboard.add_hotkey('up', lambda: self.safe_execute(self._handle_up_key_noctrl), suppress=False)
+        keyboard.add_hotkey('down', lambda: self.safe_execute(self._handle_down_key_noctrl), suppress=False)
         keyboard.add_hotkey('left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
         keyboard.add_hotkey('right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
         keyboard.add_hotkey('shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
         keyboard.add_hotkey('shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=True)
-        self.root.bind_all("<Control-Up>", lambda e: self.safe_execute(self._handle_ctrl_up))
-        self.root.bind_all("<Control-Down>", lambda e: self.safe_execute(self._handle_ctrl_down))
+        self.root.bind_all("<Control-Up>", lambda e: self._handle_ctrl_up())
+        self.root.bind_all("<Control-Down>", lambda e: self._handle_ctrl_down())
         self.win_mgr.bind_controls(self.top_bar, self.canvas)
 
     def load_logo(self):

@@ -94,7 +94,6 @@ class MapPainter:
         for k in list(self.drawings.keys()):
             self.drawings[k] = self._strip_duplicates(self.drawings[k])
         self.data_mgr.save_drawings(self.drawings)
-        self._editing_idx = -1
 
     def bind_events_to(self, target_canvas):
         """Прив'язка подій малювання до конкретного канвасу."""
@@ -763,7 +762,7 @@ class MapPainter:
                 
         return True
 
-    def _render_elements(self, canvas, elements, cw, ch, offset_x=0, offset_y=0, img_w=None, img_h=None):
+    def _render_elements(self, canvas, elements, cw, ch, offset_x=0, offset_y=0, img_w=None, img_h=None, screen_scale=1.0):
         """Render elements on a given canvas. No visibility filtering — renders all.
         offset_x/offset_y: image offset within canvas (for preview).
         img_w/img_h: if set, use as reference dimensions instead of cw/ch."""
@@ -772,7 +771,7 @@ class MapPainter:
             return
         if img_w is not None and img_h is not None:
             cw, ch = img_w, img_h
-        sc = min(cw, ch) / 800.0
+        sc = min(cw, ch) / 800.0 * screen_scale
 
         for obj in elements:
             obj_sc = obj.get("scale", 1.0)
@@ -954,5 +953,6 @@ class MapPainter:
             self.app._lift_overlay()
             return
 
-        self._render_elements(self.canvas, all_visible, cw, ch)
+        screen_scale = getattr(self.app, '_get_drawing_scale', lambda: 1.0)()
+        self._render_elements(self.canvas, all_visible, cw, ch, screen_scale=screen_scale)
         self.app._lift_overlay()

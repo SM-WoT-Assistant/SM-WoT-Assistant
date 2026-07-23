@@ -65,6 +65,7 @@ TRANSLATIONS = {
             "auto_battle": "Auto-switch to battle mode",
             "unhide_on_battle": "Automatically show on battle start",
             "auto_update": "Auto-check updates",
+            "auto_window_size": "Scale drawing to screen (DPI)",
             "help_btn": "Help (F1)",
             "hangar_status": "[HANGAR]",
             "stats_loading": "[STATS] Launching browser...",
