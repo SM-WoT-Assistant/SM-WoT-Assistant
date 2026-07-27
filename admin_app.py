@@ -37,6 +37,44 @@ _GUID = "{4A2C4E6B-3B1A-4B8A-9E1F-7D3A5F8C2B6E}"
 
 # ── Auto-update ──────────────────────────────────
 _ADMIN_VER_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app/versions/admin/latest.json?auth=AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+_ADMIN_SETTINGS_PATH = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "admin_settings.json")
+
+def _load_admin_settings():
+    defaults = {"start_with_windows": False, "start_minimized": False, "wot_path": ""}
+    try:
+        if os.path.exists(_ADMIN_SETTINGS_PATH):
+            with open(_ADMIN_SETTINGS_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                defaults.update(data)
+    except:
+        pass
+    return defaults
+
+def _save_admin_settings(settings):
+    try:
+        os.makedirs(os.path.dirname(_ADMIN_SETTINGS_PATH), exist_ok=True)
+        with open(_ADMIN_SETTINGS_PATH, "w", encoding="utf-8") as f:
+            json.dump(settings, f, indent=2)
+    except:
+        pass
+
+def _set_windows_startup(enable):
+    """Add/remove HKCU\\Run entry for admin app."""
+    import winreg
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE | winreg.KEY_READ)
+        if enable:
+            exe_path = sys.executable if getattr(sys, 'frozen', False) else __file__
+            winreg.SetValueEx(key, "SM WoT Assistant Admin", 0, winreg.REG_SZ, f'"{exe_path}" --tray')
+        else:
+            try:
+                winreg.DeleteValue(key, "SM WoT Assistant Admin")
+            except:
+                pass
+        winreg.CloseKey(key)
+    except:
+        pass
 
 def _read_admin_version():
     try:
@@ -204,7 +242,7 @@ class AdminTray:
 class AdminApp:
     def __init__(self, root, wot_path=None):
         self.root = root
-        self.wot_path = wot_path
+        self._wot_path = wot_path
         self._running = True
         self._scanning = False
         self._generating = False
@@ -213,6 +251,8 @@ class AdminApp:
         self._wg_ver = ""
         self._queue = []
         self._last_detected = []
+        self._admin_settings = _load_admin_settings()
+        self._wot_path = wot_path or self._admin_settings.get("wot_path", "")
 
         self.tank_db = load_tank_db()
         self.prompts = load_prompts()
@@ -247,6 +287,9 @@ class AdminApp:
                  fg=ACCENT, bg=BG).pack(side="left")
         tk.Label(top, text="Admin", font=("Segoe UI", 16, "bold"),
                  fg="#ff4500", bg=BG).pack(side="left")
+
+        tk.Button(top, text="⚙", font=("Segoe UI", 14), bg=BG, fg="#aaa", bd=0,
+                  command=self._show_settings).pack(side="right", padx=(0, 4))
 
         # Status bar
         self.status_lbl = tk.Label(self.root, text="Initializing...", font=("Segoe UI", 10),
@@ -312,11 +355,59 @@ class AdminApp:
 
     def _update_cards(self):
         self._card_wg.config(text=self._wg_ver or "—")
-        status = "OK" if os.path.exists(os.path.join(self.wot_path or "", "version.xml")) else "No WoT"
+        status = "OK" if os.path.exists(os.path.join(self._wot_path or "", "version.xml")) else "No WoT"
         self._card_status.config(text=status, fg=GREEN if status == "OK" else RED)
         q = len(self._queue)
         self._card_queue.config(text=str(q), fg=ACCENT if q > 0 else "#888")
         self._card_last.config(text=time.strftime("%H:%M") if self._last_scan > 0 else "—")
+
+    def _show_settings(self):
+        dlg = tk.Toplevel(self.root)
+        dlg.configure(bg=BG)
+        dlg.title("Admin Settings")
+        dlg.geometry("400x250")
+        dlg.resizable(False, False)
+        dlg.transient(self.root)
+        dlg.grab_set()
+
+        tk.Label(dlg, text="Admin Settings", font=("Segoe UI", 12, "bold"),
+                 fg=ACCENT, bg=BG).pack(pady=(12, 8))
+
+        sw = tk.BooleanVar(value=self._admin_settings.get("start_with_windows", False))
+        cb1 = tk.Checkbutton(dlg, text="Start with Windows", variable=sw,
+                              bg=BG, fg=FG, selectcolor="#333",
+                              command=lambda: self._on_settings_change("start_with_windows", sw.get()))
+        cb1.pack(anchor="w", padx=20, pady=4)
+
+        sm = tk.BooleanVar(value=self._admin_settings.get("start_minimized", False))
+        cb2 = tk.Checkbutton(dlg, text="Start minimized to tray", variable=sm,
+                              bg=BG, fg=FG, selectcolor="#333",
+                              command=lambda: self._on_settings_change("start_minimized", sm.get()))
+        cb2.pack(anchor="w", padx=20, pady=4)
+
+        tk.Label(dlg, text="WoT Path:", bg=BG, fg="#aaa",
+                 font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 2))
+        wp = tk.Entry(dlg, bg="#222", fg=FG, bd=0, insertbackground=FG,
+                       font=("Segoe UI", 9))
+        wp.insert(0, self._admin_settings.get("wot_path", self._wot_path or ""))
+        wp.pack(fill="x", padx=20, pady=(0, 4))
+
+        def _save_wp():
+            val = wp.get().strip()
+            self._admin_settings["wot_path"] = val
+            self._wot_path = val
+            _save_admin_settings(self._admin_settings)
+            self._log(f"WoT path set to: {val}")
+
+        tk.Button(dlg, text="Save", bg="#333", fg=FG, bd=0, padx=20, pady=4,
+                  command=lambda: [_save_wp(), dlg.destroy()]).pack(pady=10)
+
+    def _on_settings_change(self, key, value):
+        self._admin_settings[key] = value
+        _save_admin_settings(self._admin_settings)
+        if key == "start_with_windows":
+            _set_windows_startup(value)
+            self._log(f"Start with Windows: {'ON' if value else 'OFF'}")
 
     def _scan_now(self):
         if self._scanning:
@@ -329,7 +420,7 @@ class AdminApp:
         self._scan_btn.config(state="disabled")
         self._log("Scanning scripts.pkg for changes...")
         try:
-            changed = detect_changed_tanks(self.wot_path) if self.wot_path else []
+            changed = detect_changed_tanks(self._wot_path) if self._wot_path else []
             self._last_scan = time.time()
             if changed:
                 self._queue = changed
@@ -428,8 +519,8 @@ class AdminApp:
                             if ts != stored:
                                 _put_json(_rtdb_url("builds/tanks_updated_at"), ts)
                                 self._log(f"WG tanks_updated_at changed: {ts}")
-                                if self.wot_path:
-                                    changed = detect_changed_tanks(self.wot_path)
+                                if self._wot_path:
+                                    changed = detect_changed_tanks(self._wot_path)
                                     if changed:
                                         self._queue = changed
                                         self.root.after(0, self._update_cards)
@@ -437,9 +528,9 @@ class AdminApp:
                                         self.tray.show_notification(
                                             "Auto-Detected", f"{len(changed)} tanks changed via WG API")
                                         self._do_generate(changed)
-                    if self.wot_path and now - self._last_scan > 3600:
+                    if self._wot_path and now - self._last_scan > 3600:
                         self._last_scan = now
-                        changed = detect_changed_tanks(self.wot_path)
+                        changed = detect_changed_tanks(self._wot_path)
                         if changed:
                             self._queue = changed
                             self.root.after(0, self._update_cards)
@@ -468,12 +559,19 @@ def main():
     import argparse
     parser = argparse.ArgumentParser(description="SM WoT Assistant Admin App")
     parser.add_argument("--wot-path", type=str, default=None, help="Path to WoT installation")
+    parser.add_argument("--tray", action="store_true", help="Start minimized to tray")
     args = parser.parse_args()
 
     root = tk.Tk()
     root.withdraw()
     app = AdminApp(root, wot_path=args.wot_path)
-    root.deiconify()
+    # Check if should start minimized
+    settings = _load_admin_settings()
+    if args.tray or settings.get("start_minimized", False):
+        # Start in tray - window stays withdrawn, tray icon is visible
+        app.root.after(100, app._log, "Started minimized to tray")
+    else:
+        root.deiconify()
     app.run()
 
 if __name__ == "__main__":
