@@ -19,7 +19,8 @@ from admin_build_generator import (
     load_tank_db, load_prompts, _create_driver,
     _put_json, _get_json, _rtdb_url, _update_builds_version,
     _update_pending_status, check_wg_tanks_version,
-    _WG_API_URL, _is_build_complete
+    _WG_API_URL, _is_build_complete,
+    check_wg_game_version
 )
 
 BG = "#1a1a1a"
@@ -418,7 +419,10 @@ class AdminApp:
                     now = time.time()
                     if now - self._last_wg > 1800:  # 30 min
                         self._last_wg = now
-                        ts = check_wg_tanks_version()
+                        wg_ver, ts = check_wg_game_version()
+                        if wg_ver:
+                            self._wg_ver = wg_ver
+                            self.root.after(0, self._update_cards)
                         if ts:
                             stored = _get_json(_rtdb_url("builds/tanks_updated_at")) or 0
                             if ts != stored:

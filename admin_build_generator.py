@@ -140,6 +140,21 @@ def check_wg_tanks_version():
         pass
     return None
 
+def check_wg_game_version():
+    """Return (game_version, tanks_updated_at) from WG API, or (None, None)."""
+    import requests
+    try:
+        r = requests.get(_WG_API_URL, timeout=10)
+        if r.status_code == 200:
+            data = r.json()
+            if data.get("status") == "ok":
+                ver = data["data"].get("game_version")
+                ts = data["data"].get("tanks_updated_at")
+                return (ver, ts)
+    except Exception:
+        pass
+    return (None, None)
+
 # ── Selenium engine ─────────────────────────────────
 def _create_driver():
     from selenium import webdriver
