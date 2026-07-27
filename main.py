@@ -516,7 +516,8 @@ class WotAssistantHQ:
             return
         result = subprocess.run(
             ['tasklist', '/fi', f'IMAGENAME eq {os.path.basename(tray)}'],
-            capture_output=True, text=True, timeout=5
+            capture_output=True, text=True, timeout=5,
+            creationflags=0x08000000,
         )
         if os.path.basename(tray).lower() not in result.stdout.lower():
             subprocess.Popen([tray], creationflags=0x08000000)
@@ -525,7 +526,8 @@ class WotAssistantHQ:
     def _stop_tray_watcher(self):
         import subprocess
         subprocess.run(['taskkill', '/f', '/im', 'SM WoT Assistant Tray Watcher.exe'],
-                       capture_output=True, timeout=5)
+                       capture_output=True, timeout=5,
+                       creationflags=0x08000000)
         print("[INIT] Tray watcher stopped")
 
     def _show_verification_error(self, title, message):
