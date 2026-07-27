@@ -42,6 +42,49 @@ EQUIP_MAP = {
     "Tactical Concealment Net": "camouflageNet",
 }
 
+EQUIP_SLOT_TAGS = {
+    # Firepower
+    "rammer": ["firepower"],
+    "aimingStabilizer": ["firepower"],
+    "enhancedAimDrives": ["firepower"],
+    "improvedSights": ["firepower"],
+    # Mobility
+    "turbocharger": ["mobility"],
+    "modernizedTurbochargerRotationMechanism": ["mobility"],
+    "grousers": ["mobility"],
+    "improvedRotationMechanism": ["mobility"],
+    # Survivability
+    "extraHealthReserve": ["survivability"],
+    "antifragmentationLining": ["survivability"],
+    "improvedConfiguration": ["survivability"],
+    # Stealth / Reconnaissance
+    "additionalInvisibilityDevice": ["stealth"],
+    "camouflageNet": ["stealth", "camouflage"],
+    "stereoscope": ["reconnaissance"],
+    "coatedOptics": ["reconnaissance"],
+    "commandersView": ["reconnaissance"],
+    # Universal
+    "improvedVentilation": ["universal"],
+}
+
+SLOT_TYPE_NAMES = {
+    1: "universal",
+    2: "mobility",
+    3: "stealth",
+    4: "firepower",
+    5: "survivability",
+}
+
+# Default slot 2 type by vehicle class (when roleSlot field mod is applied)
+# Assumes the optimal choice for AI builds
+SLOT2_DEFAULT = {
+    "HT": "survivability",   # heavies: slot 1=survivability, slot 2 can be firepower or mobility
+    "MT": "firepower",       # mediums: slot 1=mobility, slot 2 can be firepower or survivability
+    "TD": "survivability",   # TDs: slot 1=firepower, slot 2 can be survivability
+    "LT": "firepower",       # lights: slot 1=stealth, slot 2 can be firepower or mobility
+    "SPG": "survivability",  # SPGs: slot 1=firepower, slot 2 can be survivability
+}
+
 CONS_MAP = {
     "Small Repair Kit": "smallRepairkit",
     "Large Repair Kit": "largeRepairkit",

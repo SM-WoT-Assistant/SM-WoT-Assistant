@@ -47,6 +47,23 @@ class MapPainter:
         self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
         self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
+        self._thickness = 3
+
+    def apply_thickness_to_all(self, value):
+        """Apply thickness to ALL existing drawings on current map."""
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id or map_id not in self.drawings:
+            return
+        changed = 0
+        for obj in self.drawings[map_id]:
+            if obj.get("type") in ("marker", "arrow", "brush"):
+                old = obj.get("thickness", 3)
+                if old != value:
+                    obj["thickness"] = value
+                    changed += 1
+        if changed:
+            self.save_drawings()
+            self.redraw()
 
     def _coords_match(self, c1, c2):
         if len(c1) != len(c2):
@@ -238,13 +255,13 @@ class MapPainter:
                 self.start_x = snap_x
                 self.start_y = snap_y
 
-            self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=3, dash=(5, 5), tags="temp_draw")
+            self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=self._thickness, dash=(5, 5), tags="temp_draw")
             if self.active_tool == "marker":
-                self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=2, tags="temp_draw")
+                self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=max(1, self._thickness-1), tags="temp_draw")
                 self.canvas.create_oval(self.start_x-4, self.start_y-4, self.start_x+4, self.start_y+4, fill="white", outline="white", tags="temp_draw")
         elif self.active_tool == "brush":
             self._brush_points = [(event.x, event.y)]
-            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=3, dash=(5, 5), tags="temp_draw")
+            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=self._thickness, dash=(5, 5), tags="temp_draw")
         elif self.active_tool == "text":
             self.temp_item = self.canvas.create_text(event.x, event.y, text="📍", fill=self.default_color, font=("Arial", 16), tags="temp_draw")
 
@@ -579,6 +596,7 @@ class MapPainter:
             "text": "",
             "poi": [],
             "color": "#00ff00" if self.active_tool == "text" else self.default_color,
+            "thickness": self._thickness,
             "_source": getattr(self.app, "active_group_id", "public") or "public",
         }
         if self.active_tool == "brush":
@@ -778,7 +796,7 @@ class MapPainter:
             sc_eff = sc * obj_sc
             r12 = max(3, int(12 * sc_eff))
             r4 = max(2, int(4 * sc_eff))
-            lw = max(1, int(3 * sc_eff))
+            lw = max(1, int(obj.get("thickness", 3) * sc_eff))
             mt_sz = max(6, int(9 * sc_eff))
             poi_base = max(12, int(48 * sc_eff))
             tt_sz = max(6, int(10 * sc_eff))

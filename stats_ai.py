@@ -1,7 +1,6 @@
 import os
 import re
 import json
-import tempfile
 import random
 import time
 import tkinter as tk
@@ -9,7 +8,6 @@ from tkinter import ttk
 from PIL import Image, ImageTk, ImageOps, ImageDraw
 import io
 import threading
-import subprocess
 import sys
 from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
@@ -29,31 +27,61 @@ def _load_ai_build_cache():
         try:
             with open(_AI_BUILD_CACHE_PATH, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                return data.get("builds", {}), data.get("updated", {}), data.get("fail_count", 0)
+                return (
+                    data.get("builds", {}),
+                    data.get("updated", {}),
+                    data.get("fail_count", 0),
+                    data.get("version", 0),
+                    data.get("scripts_fingerprint", ""),
+                )
         except Exception:
             pass
-    return {}, {}, 0
+    return {}, {}, 0, 0, ""
 
 
-def _save_ai_build_cache(tag, build_data, fail_count=None):
-    builds, updated, cur_fc = _load_ai_build_cache()
+def _save_ai_build_cache(tag, build_data, fail_count=None, version=0, scripts_fingerprint=""):
+    builds, updated, cur_fc, cur_ver, cur_fp = _load_ai_build_cache()
     builds[tag] = build_data
     updated[tag] = time.strftime("%Y-%m-%dT%H:%M:%S")
     if fail_count is not None:
         cur_fc = fail_count
+    if version:
+        cur_ver = version
+    if scripts_fingerprint:
+        cur_fp = scripts_fingerprint
     try:
         with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"builds": builds, "updated": updated, "fail_count": cur_fc}, f, ensure_ascii=False, indent=2)
+            json.dump({
+                "builds": builds, "updated": updated, "fail_count": cur_fc,
+                "version": cur_ver, "scripts_fingerprint": cur_fp
+            }, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def _save_ai_build_cache_bulk(builds_dict, updated_dict, fail_count=0, version=0, scripts_fingerprint=""):
+    try:
+        with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump({
+                "builds": builds_dict,
+                "updated": updated_dict,
+                "fail_count": fail_count,
+                "version": version,
+                "scripts_fingerprint": scripts_fingerprint
+            }, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
 
 
 def _handle_ai_build_failure(tag):
-    builds, updated, fc = _load_ai_build_cache()
+    builds, updated, fc, cur_ver, cur_fp = _load_ai_build_cache()
     fc = fc + 1
     try:
         with open(_AI_BUILD_CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"builds": builds, "updated": updated, "fail_count": fc}, f, ensure_ascii=False, indent=2)
+            json.dump({
+                "builds": builds, "updated": updated, "fail_count": fc,
+                "version": cur_ver, "scripts_fingerprint": cur_fp
+            }, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
     if fc > 0 and fc % 3 == 0:
@@ -96,21 +124,31 @@ class StatsAI:
     def __init__(self, ai_frame, tank_db, popular_tanks, main_app):
         self.ai_frame = ai_frame
         self.tank_db = tank_db
-        self._cache_data = None
-        self._cache_fresh = False
+        self._cache_version = 0
+        _, _, _, bc_ver, bc_fp = _load_ai_build_cache()
+        self._builds_cache_version = bc_ver
+        self._builds_scripts_fingerprint = bc_fp
         if ENABLE_POPULAR_TANK_CACHE:
             cached_tanks, updated, fail_count = _load_popular_tank_cache()
             if cached_tanks:
-                self._cache_data = {"tanks": [{"tag": t} for t in cached_tanks], "updated": updated, "fail_count": fail_count}
-                self.popular_tanks = cached_tanks
-                self._cache_fresh = not _is_cache_expired(updated, max_days=30)
-                if self._cache_fresh:
-                    print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу (оновлено: {updated})")
+                name_to_tag = self._build_name_to_tag_lookup()
+                resolved = []
+                for t in cached_tanks:
+                    if t in tank_db:
+                        resolved.append(t)
+                    else:
+                        found = self._find_tank_tag(t, name_to_tag)
+                        if found:
+                            resolved.append(found)
+                if len(resolved) < 5:
+                    print(f"[AI Browser] Кеш має {len(cached_tanks)} танків, але тільки {len(resolved)} валідні — ігнорую")
+                    self.popular_tanks = []
                 else:
-                    print(f"[AI Browser] Завантажено {len(cached_tanks)} танків з кешу (потрібне оновлення: {updated})")
+                    self._cache_version = 1
+                    self.popular_tanks = resolved
+                    print(f"[AI Browser] Завантажено {len(resolved)} танків з кешу")
             else:
                 self.popular_tanks = []
-                print(f"[AI Browser] Кеш відсутній, запуск AI...")
         else:
             self.popular_tanks = []
         self.main_app = main_app  # Reference to WotAssistantHQ
@@ -1584,7 +1622,7 @@ class StatsAI:
 
         return {}
 
-    def get_tth_icon(self, icon_name, size=(16, 16)):
+    def get_tth_icon(self, icon_name, size=(16, 16), disabled=False):
         cache_key = f"{icon_name}_{size[0]}x{size[1]}"
         if cache_key in self.tth_icon_cache:
             return self.tth_icon_cache[cache_key]
@@ -2068,7 +2106,7 @@ class StatsAI:
         _ai_cache_build = {}
         if ENABLE_AI_BUILD_CACHE:
             try:
-                _builds, _, _ = _load_ai_build_cache()
+                _builds, _, _, _, _ = _load_ai_build_cache()
                 if tag in _builds:
                     _ai_cache_build = _builds[tag]
             except Exception:
@@ -2132,6 +2170,31 @@ class StatsAI:
                 equipment_1 = cached_data.get("equipment_1", [])
             if not equipment_2:
                 equipment_2 = cached_data.get("equipment_2", [])
+            
+            # Sort equipment by slot priority
+            if equipment_1:
+                try:
+                    _tank_slots = json.load(open(os.path.join(os.path.dirname(__file__), "tank_slots_full.json"), encoding="utf-8"))
+                    slot_info = _tank_slots.get(tag, {})
+                    slot_types = slot_info.get("equipment_slot_types", [])
+                    if slot_types:
+                        from stats_data import EQUIP_SLOT_TAGS, SLOT_TYPE_NAMES
+                        def _slot_score(item, slot_type_code):
+                            tags = EQUIP_SLOT_TAGS.get(item, [])
+                            if not tags:
+                                return 2
+                            slot_name = SLOT_TYPE_NAMES.get(slot_type_code, "universal")
+                            if slot_name in tags or "universal" in tags:
+                                return 0
+                            return 1
+                        max_len = min(len(slot_types), len(equipment_1), 3)
+                        def _sort_key(item):
+                            scores = tuple(_slot_score(item, slot_types[i]) for i in range(max_len))
+                            return scores
+                        equipment_1.sort(key=_sort_key)
+                        equipment_2.sort(key=_sort_key)
+                except Exception:
+                    pass
             if not consumables_1:
                 consumables_1 = cached_data.get("consumables_1", [])
             if not consumables_2:
@@ -2375,7 +2438,7 @@ class StatsAI:
         
         crew_member_count = len(crew_rows)
         
-        for role, skills in build_data.get("crew", []):
+        for role, skills in (build_data.get("crew") or []):
             r_lower = role.lower()
             
             if role == "loader_radio":
@@ -2615,10 +2678,8 @@ class StatsAI:
         pass
 
     def needs_ai_refresh(self):
-        """Returns True if AI needs to run — only when cache is expired or missing."""
-        if not ENABLE_POPULAR_TANK_CACHE:
-            return True
-        return not self._cache_fresh
+        """AI не використовується — всі дані з Firebase."""
+        return False
 
     def _parse_ai_tank_build(self, text):
         """Parse AI response for a tank build. Returns updated build_data dict.
@@ -2763,8 +2824,12 @@ class StatsAI:
         build_data['consumables_1'] = loadout1_cons
         build_data['consumables_2'] = loadout2_cons
         build_data['ammo'] = ammo1 or ammo2
-        build_data['crew'] = crew if crew else None
+        build_data['crew'] = crew if crew else []
         build_data['field_mods'] = field_mods
+        if not loadout1_eq and not loadout2_eq:
+            return {}
+        if not loadout1_cons and not loadout2_cons:
+            return {}
         return build_data
 
     def _generate_tank_build_prompt(self, tag, tank_name):
@@ -2775,105 +2840,26 @@ class StatsAI:
         from generate_prompt_v2 import generate_prompt
         return generate_prompt(tag, tank_name)
 
+    @staticmethod
+    def _is_build_complete(build_data):
+        """Перевіряє чи білд містить всі обов'язкові секції."""
+        required = ['equipment_1', 'consumables_1']
+        for k in required:
+            if not build_data.get(k):
+                return False
+        return True
+
     def _launch_ai_tank_build(self, tag, tank_name):
-        """Запускає AI браузер для отримання build для конкретного танка.
-        Якщо є свіжий кеш — використовує його, AI не запускає.
-        Якщо попередній запит ще виконується — завершує його."""
+        """Використовує кеш для build. AI WebView більше не потрібен — всі білди з Firebase."""
         if ENABLE_AI_BUILD_CACHE:
-            builds, updated, _ = _load_ai_build_cache()
+            builds, updated, _, _, _ = _load_ai_build_cache()
             if tag in builds:
-                if tag in updated and not _is_cache_expired(updated[tag], max_days=30):
-                    print(f"[AI Tank Build] Свіжий кеш для {tag} — скіп, вже відрендерено")
+                if self._is_build_complete(builds[tag]):
+                    print(f"[AI Tank Build] Build для {tag} з кешу")
                     return
-                # Stale cache: show stale data while AI updates
-                self.root.after(0, lambda bd=builds[tag]: self._update_ai_setup_ui(
-                    bd, *self._current_bodies
-                ) if hasattr(self, '_current_bodies') else None)
-                print(f"[AI Tank Build] Кеш для {tag} прострочений, запускаю AI оновлення")
+                print(f"[AI Tank Build] Build для {tag} неповний, пропускаю")
             else:
-                print(f"[AI Tank Build] Немає кешу для {tag}, запускаю AI")
-
-        if hasattr(self, '_ai_build_proc') and self._ai_build_proc and self._ai_build_proc.poll() is None:
-            try:
-                self._ai_build_proc.terminate()
-                self._ai_build_proc.wait(timeout=3)
-            except Exception:
-                try: self._ai_build_proc.kill()
-                except: pass
-            self._ai_build_proc = None
-            print(f"[AI Tank Build] terminated previous request")
-
-        self._current_build_tag = tag
-        prompt = self._generate_tank_build_prompt(tag, tank_name)
-        prompt_bytes = prompt.encode('utf-8', errors='replace')
-        tag_bytes = str(tag).encode('utf-8', errors='replace')
-        sys.stdout.buffer.write(b"[AI Tank Build] PROMPT FOR " + tag_bytes + b":\n")
-        sys.stdout.buffer.write(prompt_bytes)
-        sys.stdout.buffer.write(b"\n[AI Tank Build] END PROMPT\n")
-        sys.stdout.buffer.flush()
-
-        def run_build_process():
-            proc = None
-            try:
-                if getattr(sys, 'frozen', False):
-                    cmd = [sys.executable, "--ai-webview", "--prompt", prompt]
-                else:
-                    script = os.path.join(_DATA_DIR, "main.py")
-                    cmd = [sys.executable, script, "--ai-webview", "--prompt", prompt]
-                print(f"[AI Tank Build] running for {tag}")
-                proc = subprocess.Popen(
-                    cmd,
-                    cwd=_DATA_DIR,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    encoding='utf-8', errors='replace',
-                )
-                self._ai_build_proc = proc
-                out = ""
-                try:
-                    out, _ = proc.communicate(timeout=120)
-                except subprocess.TimeoutExpired:
-                    print(f"[AI Tank Build] TIMEOUT (120s) for {tag} — killing subprocess", flush=True)
-                    proc.kill()
-                    out, _ = proc.communicate()
-
-                lines = []
-                for line in out.split('\n'):
-                    line = line.strip()
-                    if 'RESPONSE_READY' in line:
-                        break
-                    if line and not line.startswith('[AI Browser]'):
-                        lines.append(line)
-
-                if lines and len(lines) >= 3:
-                    combined = '\n'.join(lines)
-                    print(f"[AI Tank Build] response for {tag} ({len(lines)} lines):")
-                    print(combined)
-                    if self._current_build_tag == tag:
-                        build_data = self._parse_ai_tank_build(combined)
-                        if build_data and hasattr(self, 'ai_equipment_frame') and self.ai_equipment_frame.winfo_exists():
-                            self.root.after(0, lambda bd=build_data: self._apply_ai_build(bd))
-                else:
-                    print(f"[AI Tank Build] insufficient response for {tag} ({len(lines)} lines)")
-                    _handle_ai_build_failure(tag)
-
-            except Exception as e:
-                print(f"[AI Tank Build] ERROR for {tag}: {e}")
-                try:
-                    _handle_ai_build_failure(tag)
-                except: pass
-            finally:
-                if proc and proc.poll() is None:
-                    try:
-                        proc.terminate()
-                        proc.wait(timeout=5)
-                    except Exception:
-                        try: proc.kill()
-                        except: pass
-                if self._ai_build_proc is proc:
-                    self._ai_build_proc = None
-
-        threading.Thread(target=run_build_process, daemon=True).start()
+                print(f"[AI Tank Build] Build для {tag} відсутній — буде завантажено при _check_build_updates")
 
     def _apply_ai_build(self, build_data):
         """Apply AI build data to the current tank detail UI."""
@@ -2896,225 +2882,100 @@ class StatsAI:
         if ENABLE_AI_BUILD_CACHE:
             tag = self._current_build_tag if hasattr(self, '_current_build_tag') else None
             if tag:
-                _save_ai_build_cache(tag, build_data, fail_count=0)
-
-    def _handle_ai_failure(self):
-        """Called on main thread when AI fetch failed. Increments fail_count and logs on 3rd failure."""
-        fc = 0
-        if self._cache_data:
-            fc = self._cache_data.get('fail_count', 0) + 1
-            self._cache_data['fail_count'] = fc
-            try:
-                with open(_CACHE_PATH, 'r', encoding='utf-8') as f:
-                    cur = json.load(f)
-                cur['fail_count'] = fc
-                with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(cur, f, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
-        if not self.popular_tanks and self._cache_data and self._cache_data.get('tanks'):
-            cached_tanks = [t['tag'] for t in self._cache_data['tanks'] if t.get('tag') in self.tank_db]
-            if cached_tanks:
-                self.popular_tanks = cached_tanks
-                self.refresh_ai_view()
-                print(f"[AVISO] Завантажено з кешу (спроба {fc})")
-        if fc > 0 and fc % 3 == 0:
-                    from service_messages import log_event
-                    log_event(
-                        "popular_tanks",
-                        f"Не вдалося оновити популярні танки після {fc} спроб поспіль.",
-                        level="warning"
-                    )
+                if self._is_build_complete(build_data):
+                    _save_ai_build_cache(tag, build_data, fail_count=0)
+                else:
+                    print(f"[AI Tank Build] build_data incomplete for {tag}, not caching")
 
     def stop_browser(self):
-        """Зупиняє процес браузера при виході з програми."""
-        proc = getattr(self, '_ai_browser_process', None)
-        if proc and proc.poll() is None:
-            print("[AI Browser] stopping browser process")
-            proc.terminate()
-            try:
-                proc.wait(timeout=3)
-            except Exception:
-                proc.kill()
+        """AI WebView більше не використовується."""
+        pass
 
-    def launch_ai_browser(self, prompt=None, progress_cb=None, done_cb=None):
-        """Запускає AI браузер (ai_webview_gui.py) для отримання популярних танків"""
-        print("[AI Browser] launch_ai_browser called")
-        if not hasattr(self, '_ai_fetch_in_progress'):
-            self._ai_fetch_in_progress = False
-        if self._ai_fetch_in_progress:
-            print("[AI Browser] fetch in progress, returning")
-            return
-        self._ai_fetch_in_progress = True
+    def _rtdb_url(self, path):
+        return f"https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app/{path}.json?auth=AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
 
-        if prompt:
-            ai_prompt = prompt
-        else:
-            today_str = date.today().strftime("%Y-%m-%d")
-            ai_prompt = f"{today_str}. In World of Tanks, compile a list of the 50 most popular tanks for tiers 8-11, using the exact tank names as they appear in the game client. List only the tank names, one per line."
-
-        def run_browser_process():
-            try:
-                if getattr(sys, 'frozen', False):
-                    cmd = [sys.executable, "--ai-webview", "--prompt", ai_prompt]
-                else:
-                    script = os.path.join(_DATA_DIR, "main.py")
-                    cmd = [sys.executable, script, "--ai-webview", "--prompt", ai_prompt]
-                print(f"[AI Browser] running: {' '.join(cmd)}")
-                if progress_cb:
-                    progress_cb(10, self.locale_manager.t_ui('data_updating'))
-                self._ai_browser_process = subprocess.Popen(
-                    cmd,
-                    cwd=_DATA_DIR,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    encoding='utf-8', errors='replace',
-                )
-                proc = self._ai_browser_process
-                if progress_cb:
-                    progress_cb(25, self.locale_manager.t_ui('fetching_info'))
-
-                out = ""
-                try:
-                    out, _ = proc.communicate(timeout=45)
-                except subprocess.TimeoutExpired:
-                    print("[AI Browser] TIMEOUT (45s) — killing subprocess", flush=True)
-                    proc.kill()
-                    out, _ = proc.communicate()
-
-                resp_file = os.path.join(tempfile.gettempdir(), "wot_ai_response.txt")
-                if os.path.exists(resp_file):
-                    with open(resp_file, 'r', encoding='utf-8') as f:
-                        file_out = f.read()
-                    try:
-                        os.remove(resp_file)
-                    except Exception:
-                        pass
-                    if file_out:
-                        out = file_out
-
-                tank_lines = []
-                for line in out.split('\n'):
-                    line = line.strip()
-                    if 'RESPONSE_READY' in line:
-                        break
-                    if line and not line.startswith('[AI Browser]') and not line.startswith('ERROR:'):
-                        tank_lines.append(line)
-
-                if tank_lines:
-                    combined = '\n'.join(tank_lines)
-                    if progress_cb:
-                        progress_cb(70, self.locale_manager.t_ui('processing'))
-                    parse_event = threading.Event()
-                    self.root.after(0, lambda t=combined, ev=parse_event: [
-                        self.process_ai_response(t),
-                        ev.set()
-                    ])
-                    parse_event.wait(timeout=30)
-                    if progress_cb:
-                        progress_cb(95, self.locale_manager.t_ui('ready'))
-                else:
-                    pass
-
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=5)
-                except Exception:
-                    pass
-
-            except Exception as e:
-                print(f"[AI Browser] ERROR: {e}")
-            finally:
-                proc = getattr(self, '_ai_browser_process', None)
-                if proc:
-                    try:
-                        proc.kill()
-                    except Exception:
-                        pass
-                self._ai_browser_process = None
-                self.root.after(0, self._re_enable_ui)
-                self.root.after(0, self._handle_ai_failure)
-                if done_cb:
-                    done_cb()
-
-        threading.Thread(target=run_browser_process, daemon=True).start()
-
-    def _re_enable_ui(self):
-        self._ai_fetch_in_progress = False
-
-    def process_ai_response(self, response_text):
-        """Обробляє відповідь від AI і оновлює популярні танки"""
+    def _get_remote_json(self, url, timeout=10):
         try:
-            tank_names = []
-            lines = response_text.split('\n')
-            print(f"[AI Response] Received {len(lines)} lines")
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                clean = re.sub(r'^[\d\*\-•]+\s*[\.\)\-\s]*\s*', '', line).strip()
-                clean = clean.replace('**', '').replace('*', '').replace('__', '')
-                clean = re.sub(r'\s*\(.*?\)\s*$', '', clean).strip()
-                low = clean.lower()
+            import requests
+            r = requests.get(url, timeout=timeout)
+            if r.status_code == 200:
+                return r.json()
+        except Exception:
+            pass
+        return None
 
-                skip_words = [
-                    'перейти', 'справка', 'оставить', 'войти', 'режим ии',
-                    'результаты поиска', 'все', 'картинки', 'видео', 'новости',
-                    'google', 'форум', 'account', 'поиск', 'настройки',
-                    'list the most popular', 'output only', 'sorted by',
-                    'here are', 'here is', 'as of', 'based on', 'these are',
-                    'the most', 'popular tanks', 'tiers 6', 'tier 6', 'tier 7',
-                    'tier 8', 'tier 9', 'tier 10', 'tier 11',
-                    'note:', 'please note', 'disclaimer',
-                    'i hope', 'let me', 'do you', 'would you', 'could you',
-                    'reddit', 'www.', '.com', '.org', 'sign in', 'sign up',
-                    'world of tanks', 'worldoftanks',
-                ]
-                blocked = False
-                for sw in skip_words:
-                    if sw in low:
-                        blocked = True
-                        break
-                if blocked:
-                    continue
-                if len(clean) < 3 or len(clean) > 60:
-                    continue
-                if re.match(r'^[\w\s\'\-\.\/\,\:\(\)\&]+$', clean):
-                    tank_names.append(clean)
+    def _put_remote_json(self, url, data, timeout=10):
+        try:
+            import requests
+            r = requests.put(url, json=data, timeout=timeout)
+            return r.status_code in (200, 204)
+        except Exception:
+            pass
+        return False
 
-            print(f"[AI Response] After filtering: {len(tank_names)} tank candidates")
-            if tank_names:
-                name_to_tag = self._build_name_to_tag_lookup()
-                raw_tanks = []
-                seen = set()
-                for n in tank_names:
-                    tag = self._find_tank_tag(n, name_to_tag)
-                    if tag is None:
-                        tag = n.lower().replace(' ', '_').replace("'", "").replace(".", "").replace("/", "_").replace(",", "")
-                    if tag not in seen:
-                        seen.add(tag)
-                        raw_tanks.append({"name": n, "tag": tag})
-                raw_tanks = raw_tanks[:50]
-                valid_tanks = [t for t in raw_tanks if t['tag'] in self.tank_db]
-                print(f"[AI Response] {len(raw_tanks)} raw, {len(valid_tanks)} valid (found in DB)")
-                tanks = valid_tanks[:30]
-                for t in tanks:
-                    t_tag = t.get('tag')
-                    t['tier'] = self.tank_db.get(t_tag, {}).get('tier', 0)
-                tanks.sort(key=lambda x: x.get('tier', 0), reverse=True)
-                for t in tanks:
-                    t.pop('tier', None)
-                cache_data = {"tanks": tanks, "updated": time.strftime("%Y-%m-%dT%H:%M:%S"), "fail_count": 0}
-                if ENABLE_POPULAR_TANK_CACHE:
-                    with open(_CACHE_PATH, 'w', encoding='utf-8') as f:
-                        json.dump(cache_data, f, ensure_ascii=False, indent=2)
-                self.popular_tanks = [t['tag'] for t in tanks]
-                self.refresh_ai_view()
-                pass
-            else:
-                pass
-            self._re_enable_ui()
-        except Exception as e:
-            import traceback
-            traceback.print_exc()
-            self._re_enable_ui()
+    def _sync_popular_tanks(self):
+        """Fetch popular tanks from Firebase and cache locally."""
+        url = self._rtdb_url("popular_tanks/version")
+        remote_version = self._get_remote_json(url)
+        if not remote_version or remote_version <= self._cache_version:
+            return
+        url = self._rtdb_url("popular_tanks/data")
+        data = self._get_remote_json(url, timeout=15)
+        if not isinstance(data, list):
+            return
+        valid = [t for t in data if t in self.tank_db]
+        if len(valid) < 5:
+            print(f"[Firebase] Popular tanks: only {len(valid)} valid, ignoring")
+            return
+        cache_data = {
+            "tanks": [{"tag": t, "name": self.tank_db.get(t, {}).get("name", t)} for t in valid],
+            "updated": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "version": remote_version
+        }
+        try:
+            with open(_CACHE_PATH, "w", encoding="utf-8") as f:
+                json.dump(cache_data, f, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+        self.popular_tanks = valid
+        self._cache_version = remote_version
+        self.root.after(0, self.refresh_ai_view)
+        print(f"[Firebase] Popular tanks updated: {len(valid)} tanks (v{remote_version})")
+
+    def _sync_builds(self):
+        """Fetch build updates from Firebase and cache locally."""
+        url = self._rtdb_url("builds/version")
+        remote_version = self._get_remote_json(url)
+        if not remote_version or remote_version <= self._builds_cache_version:
+            return
+        url = self._rtdb_url("builds/scripts_fingerprint")
+        remote_fp = self._get_remote_json(url) or ""
+        url = self._rtdb_url("builds/tanks")
+        remote_tanks = self._get_remote_json(url, timeout=30)
+        if not isinstance(remote_tanks, dict):
+            return
+        builds, updated, fc, local_ver, local_fp = _load_ai_build_cache()
+        force = remote_version != local_ver  # version change = force re-sync all
+        changed = 0
+        for tag, val in remote_tanks.items():
+            if not isinstance(val, dict):
+                continue
+            remote_updated = val.get("updated", "")
+            local_updated = updated.get(tag, "")
+            update = False
+            if force:
+                update = True
+            elif remote_updated > local_updated:
+                update = True
+            if update and "data" in val:
+                builds[tag] = val["data"]
+                updated[tag] = remote_updated
+                changed += 1
+        if changed > 0:
+            _save_ai_build_cache_bulk(builds, updated, fc, remote_version, remote_fp)
+            print(f"[Firebase] Builds updated: {changed} changed (v{remote_version})")
+        else:
+            _save_ai_build_cache_bulk(builds, updated, fc, remote_version, remote_fp)
+            print(f"[Firebase] Builds check: no changes (v{remote_version})")
+        self._builds_cache_version = remote_version
+        self._builds_scripts_fingerprint = remote_fp

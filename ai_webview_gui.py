@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 ai_webview_gui.py - WebView для отримання даних через Google AI Mode.
-Чиста сторінка → JS injection промту → читання відповіді.
+Multi-selector approach — пробує кілька селекторів для пошуку textarea та контейнера відповіді.
 """
 import sys
 import os
@@ -15,6 +15,8 @@ from PyQt6.QtWebEngineCore import QWebEngineSettings, QWebEngineProfile
 
 
 REAL_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+MAX_POLLS = 300
+POLL_INTERVAL_MS = 500
 
 
 def _read_version():
@@ -30,14 +32,13 @@ class AIBrowserWindow(QWidget):
         super().__init__()
         self.prompt = prompt
         self._poll_count = 0
-        self._max_polls = 200
         self._response_found = False
+        self._url_tried = 0
 
         self.setWindowTitle(f"SM WoT Assistant v{_read_version()} — Data Update")
         self.setGeometry(100, 100, 1000, 700)
         self.setStyleSheet("background-color: white;")
 
-        # Hide taskbar icon via Windows API after window is created
         QTimer.singleShot(200, self._hide_taskbar_icon)
 
         profile = QWebEngineProfile.defaultProfile()
@@ -55,7 +56,21 @@ class AIBrowserWindow(QWidget):
         layout.addWidget(self.browser)
 
         self.browser.loadFinished.connect(self.on_loaded)
-        self.browser.setUrl(QUrl("https://www.google.com/search?q=&udm=50"))
+        self._navigate()
+
+    def _navigate(self):
+        urls = [
+            "https://www.google.com/search?q=&udm=50&aep=46",
+            "https://www.google.com/search?q=&udm=50",
+        ]
+        if self._url_tried < len(urls):
+            url = urls[self._url_tried]
+            self._url_tried += 1
+            print(f"[AI Browser] Navigating to: {url}", flush=True)
+            self.browser.setUrl(QUrl(url))
+        else:
+            print("ERROR:All URLs failed", flush=True)
+            QTimer.singleShot(1000, self.close)
 
     def _hide_taskbar_icon(self):
         try:
@@ -81,8 +96,8 @@ class AIBrowserWindow(QWidget):
 
     def on_loaded(self, ok):
         if not ok:
-            print("ERROR:Page load failed", flush=True)
-            QTimer.singleShot(1000, self.close)
+            print(f"ERROR:Page load failed (attempt {self._url_tried})", flush=True)
+            self._navigate()
             return
         QTimer.singleShot(3000, self.inject_prompt)
 
@@ -90,9 +105,19 @@ class AIBrowserWindow(QWidget):
         js_prompt = self.prompt.replace('\\', '\\\\').replace("'", "\\'").replace('\n', '\\n')
         js = f"""
         (function() {{
-            var ta = document.querySelector('div.Txyg0d textarea');
-            if (!ta) ta = document.querySelector('div.AgWCw textarea');
-            if (!ta) ta = document.querySelector('textarea');
+            var selectors = [
+                'textarea[jsname]',
+                'textarea[aria-label]',
+                'div[role="dialog"] textarea',
+                'div.AgWCw textarea',
+                'div.Txyg0d textarea',
+                'textarea'
+            ];
+            var ta = null;
+            for (var i = 0; i < selectors.length; i++) {{
+                var el = document.querySelector(selectors[i]);
+                if (el) {{ ta = el; break; }}
+            }}
             if (!ta) return;
             var nativeInputValueSetter = Object.getOwnPropertyDescriptor(
                 window.HTMLTextAreaElement.prototype, 'value'
@@ -108,11 +133,11 @@ class AIBrowserWindow(QWidget):
         }})();
         """
         self.browser.page().runJavaScript(js)
-        QTimer.singleShot(2000, self.poll_response)
+        QTimer.singleShot(4000, self.poll_response)
 
     def poll_response(self):
         self._poll_count += 1
-        if self._poll_count > self._max_polls:
+        if self._poll_count > MAX_POLLS:
             print("ERROR:Timeout waiting for AI response", flush=True)
             QTimer.singleShot(1000, self.close)
             return
@@ -120,10 +145,16 @@ class AIBrowserWindow(QWidget):
         if self._poll_count <= 60:
             js = """
             (function() {
-                var div = document.querySelector('div.jUiaTd');
-                if (div) return div.textContent.trim();
-                var container = document.querySelector('div.AgWCw');
-                if (container) return container.textContent.trim();
+                var selectors = [
+                    '[data-session-thread-id]',
+                    'div[aria-label*="AI Overview"]',
+                    'div.jUiaTd',
+                    'div.AgWCw'
+                ];
+                for (var i = 0; i < selectors.length; i++) {
+                    var el = document.querySelector(selectors[i]);
+                    if (el) return el.textContent.trim();
+                }
                 return '';
             })();
             """
@@ -154,7 +185,7 @@ class AIBrowserWindow(QWidget):
             print("[AI Browser] RESPONSE_READY", flush=True)
             os._exit(0)
         else:
-            QTimer.singleShot(500, self.poll_response)
+            QTimer.singleShot(POLL_INTERVAL_MS, self.poll_response)
 
 
 def main():

@@ -34,6 +34,15 @@
         .badge-success { background: #335533; color: #66cc66; }
         .section-body { display: none; }
         .section-header:hover { color: #ffcc66; }
+        .section-header.has-new { color: #ffaa00; }
+        .section-header.has-new::after { content: ' ✦'; color: #ff4500; font-size: 11px; }
+        @keyframes row-flash { 0% { background: #332200; } 100% { background: transparent; } }
+        tr.row-new { animation: row-flash 10s ease-out; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: #ffaa00; }
+        .ctx-menu { position: fixed; background: #2a2a2a; border: 1px solid #444; border-radius: 4px; padding: 4px 0; z-index: 999; min-width: 140px; }
+        .ctx-menu div { padding: 6px 14px; font-size: 12px; color: #ccc; cursor: pointer; }
+        .ctx-menu div:hover { background: #444; }
         #login-screen { text-align: center; padding: 60px; }
         #login-screen input { background: #222; color: #ccc; border: 1px solid #333; padding: 8px 12px; border-radius: 4px; font-size: 14px; margin: 6px; }
         #dashboard { display: none; }
@@ -108,6 +117,28 @@
                 <div id="users-container"><div class="empty">Loading...</div></div>
             </div>
         </div>
+
+        <div class="card">
+            <h2 class="section-header" onclick="toggleSection(this)">▶ AI Builds (RTDB builds/ + popular_tanks/)</h2>
+            <div class="section-body">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                    <div class="stat-box"><div class="num" id="builds-version">—</div><div class="label">Builds Version</div></div>
+                    <div class="stat-box"><div class="num" id="builds-count">—</div><div class="label">Tanks</div></div>
+                    <div class="stat-box"><div class="num" id="popular-version">—</div><div class="label">Popular Version</div></div>
+                    <div class="stat-box"><div class="num" id="builds-fingerprint">—</div><div class="label">Fingerprint</div></div>
+                </div>
+                <div id="pending-status" style="margin-bottom:10px;"></div>
+                <div style="font-size:12px;color:#666;margin-top:4px;">
+                    Build generation runs via desktop admin_app.py — <a href="#" onclick="loadBuildsData();return false">refresh stats</a>
+                </div>
+
+        </div>
+
+        <div class="card">
+            <h2 class="section-header" onclick="toggleSection(this)">▶ Admin App (Desktop)</h2>
+            <div class="section-body" id="admin-app-container"><div class="empty">Loading...</div></div>
+        </div>
+        </div>
     </div>
 </main>
 
@@ -180,10 +211,13 @@ function login() {
         });
 }
 
+let _lastVisit = localStorage.getItem("admin_last_visit") || "2000-01-01T00:00:00Z";
+
 function loadDashboard() {
     if (Notification.permission === 'default') {
         Notification.requestPermission();
     }
+    _lastVisit = localStorage.getItem("admin_last_visit") || "2000-01-01T00:00:00Z";
     renderAdminSchemes();
     loadStats();
     loadErrors();
@@ -191,10 +225,108 @@ function loadDashboard() {
     loadAdminSchemes();
     loadAdminReleases();
     loadUsers();
+    loadBuildsData();
+    pollPendingUpdates();
     startErrorPolling();
+    loadAdminAppData();
+    // Update last visit after all data loaded
+    setTimeout(() => {
+        localStorage.setItem("admin_last_visit", new Date().toISOString());
+    }, 5000);
 }
 
 function objSize(obj) { return obj ? Object.keys(obj).length : 0; }
+
+function isFresh(dateStr) {
+    return dateStr && dateStr > _lastVisit;
+}
+
+function expandSection(hdr) {
+    const body = hdr.nextElementSibling;
+    if (!body || body.style.display === 'block') return;
+    body.style.display = 'block';
+    hdr.innerHTML = '▼' + hdr.innerHTML.slice(1);
+    hdr.classList.remove('has-new');
+}
+
+function markNewCell(cell) {
+    cell.classList.add('row-new');
+}
+
+// ═══ Sorting ═══
+let _sortState = {};
+
+function sortTable(tableId, col, type, renderFn) {
+    const key = tableId + '_sort';
+    const cur = _sortState[key] || {col: 0, asc: type === 'date' ? false : true};
+    cur.asc = (cur.col === col) ? !cur.asc : (type === 'date' ? false : true);
+    cur.col = col;
+    cur.type = type;
+    _sortState[key] = cur;
+    if (renderFn) renderFn();
+}
+
+function arrow(col, state) {
+    if (!state || state.col !== col) return '';
+    return state.asc ? ' ▲' : ' ▼';
+}
+
+// ═══ Read state ═══
+function isMarkedRead(section, id) {
+    try {
+        const data = JSON.parse(localStorage.getItem('admin_read_items') || '{}');
+        return data[section + '_' + id] === true;
+    } catch(e) { return false; }
+}
+
+function markRead(section, id) {
+    try {
+        const data = JSON.parse(localStorage.getItem('admin_read_items') || '{}');
+        data[section + '_' + id] = true;
+        localStorage.setItem('admin_read_items', JSON.stringify(data));
+        updateFreshness();
+    } catch(e) {}
+}
+
+function markSectionRead(section, containerId, items, idGetter) {
+    try {
+        const data = JSON.parse(localStorage.getItem('admin_read_items') || '{}');
+        items.forEach(item => {
+            data[section + '_' + idGetter(item)] = true;
+        });
+        localStorage.setItem('admin_read_items', JSON.stringify(data));
+        updateFreshness();
+        const renderFn = window['render_' + section];
+        if (renderFn) renderFn();
+    } catch(e) {}
+}
+
+function updateFreshness() {
+    document.querySelectorAll('.row-new').forEach(el => {
+        el.classList.remove('row-new');
+    });
+    document.querySelectorAll('.section-header.has-new').forEach(el => {
+        el.classList.remove('has-new');
+    });
+}
+
+// ═══ Context menu ═══
+let _ctxMenu = null;
+function showCtxMenu(e, section, id) {
+    e.preventDefault();
+    hideCtxMenu();
+    const menu = document.createElement('div');
+    menu.className = 'ctx-menu';
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+    menu.innerHTML = '<div onclick="hideCtxMenu();markRead(\'' + section + '\',\'' + id + '\')">✓ Mark as read</div>';
+    document.body.appendChild(menu);
+    _ctxMenu = menu;
+    document.addEventListener('click', hideCtxMenu, {once: true});
+}
+function hideCtxMenu() {
+    if (_ctxMenu) { _ctxMenu.remove(); _ctxMenu = null; }
+}
 
 function loadStats() {
     Promise.all([
@@ -219,14 +351,30 @@ function loadErrors() {
                 container.innerHTML = '<div class="empty">No errors — great!</div>';
                 return;
             }
-            const items = Object.values(data).reverse();
-            let html = '<table><tr><th>Date</th><th>Version</th><th>Type</th><th>Blocked</th><th>Message</th><th>OS</th></tr>';
+            let items = Object.values(data);
+            // Sort
+            const st = _sortState['errors_sort'] || {col: 0, asc: false, type: 'date'};
+            const fields = ['timestamp', 'version', 'type', 'blocked', 'error', 'os'];
+            const sorters = {
+                'timestamp': (a,b) => (a.timestamp||'').localeCompare(b.timestamp||''),
+                'version': (a,b) => (a.version||'').localeCompare(b.version||''),
+                'type': (a,b) => ((a.type||a.error_type||'')).localeCompare((b.type||b.error_type||'')),
+                'blocked': (a,b) => ((a.blocked === true) - (b.blocked === true)),
+                'error': (a,b) => ((a.error||a.message||'')).localeCompare((b.error||b.message||'')),
+                'os': (a,b) => (((a.app&&a.app.os)||a.os||'')).localeCompare(((b.app&&b.app.os)||b.os||'')),
+            };
+            const sf = sorters[fields[st.col]];
+            if (sf) items.sort(st.asc ? sf : (a,b) => -sf(a,b));
+            const hasNew = items.some(d => isFresh(d.timestamp));
+            let html = '<div style="margin-bottom:4px;"><button class="btn" onclick="markSectionRead(\'errors\',\'errors-container\',items,i=>i.timestamp||i.error)">✓ Mark all read</button></div>';
+            html += '<table><tr><th class="sortable" onclick="sortTable(\'errors\',0,\'date\',loadErrors)">Date' + arrow(0,st) + '</th><th class="sortable" onclick="sortTable(\'errors\',1,\'string\',loadErrors)">Version' + arrow(1,st) + '</th><th class="sortable" onclick="sortTable(\'errors\',2,\'string\',loadErrors)">Type' + arrow(2,st) + '</th><th class="sortable" onclick="sortTable(\'errors\',3,\'boolean\',loadErrors)">Blocked' + arrow(3,st) + '</th><th class="sortable" onclick="sortTable(\'errors\',4,\'string\',loadErrors)">Message' + arrow(4,st) + '</th><th class="sortable" onclick="sortTable(\'errors\',5,\'string\',loadErrors)">OS' + arrow(5,st) + '</th></tr>';
             items.forEach(d => {
                 const errorType = d.type || d.error_type || '';
                 const isBlocked = d.blocked === true;
+                const isNew = isFresh(d.timestamp) && !isMarkedRead('errors', d.timestamp || d.error || '');
                 const levelClass = errorType === 'crash' || isBlocked ? 'badge-error' :
                     errorType.includes('Warning') ? 'badge-warning' : 'badge-info';
-                html += `<tr>
+                html += `<tr class="${isNew ? 'row-new' : ''}" oncontextmenu="showCtxMenu(event,'errors','${(d.timestamp||d.error||'').replace(/'/g,"\\'")}")">
                     <td>${(d.timestamp || '').slice(0,19)}</td>
                     <td>${d.version || ''}</td>
                     <td><span class="badge ${levelClass}">${errorType}</span></td>
@@ -237,8 +385,16 @@ function loadErrors() {
             });
             html += '</table>';
             container.innerHTML = html;
+            if (hasNew) {
+                const hdr = container.closest('.card').querySelector('.section-header');
+                hdr.classList.add('has-new');
+                expandSection(hdr);
+            }
         });
 }
+
+// Store render functions for markSectionRead
+window.render_errors = loadErrors;
 
 function pollErrorReports() {
     if (Notification.permission === 'denied') {
@@ -284,8 +440,18 @@ function loadInstallations() {
                 container.innerHTML = '<div class="empty">No data</div>';
                 return;
             }
-            const items = Object.values(data).reverse();
-            let html = '<table><tr><th>ID</th><th>Version</th><th>Last Seen</th><th>OS</th></tr>';
+            let items = Object.values(data);
+            const st = _sortState['installs_sort'] || {col: 2, asc: false, type: 'date'};
+            const fields = ['install_id', 'version', 'last_seen', 'os'];
+            const sorters = {
+                'install_id': (a,b) => (a.install_id||'').localeCompare(b.install_id||''),
+                'version': (a,b) => (a.version||'').localeCompare(b.version||''),
+                'last_seen': (a,b) => (a.last_seen||'').localeCompare(b.last_seen||''),
+                'os': (a,b) => (a.os||'').localeCompare(b.os||''),
+            };
+            const sf = sorters[fields[st.col]];
+            if (sf) items.sort(st.asc ? sf : (a,b) => -sf(a,b));
+            let html = '<table><tr><th class="sortable" onclick="sortTable(\'installs\',0,\'string\',loadInstallations)">ID' + arrow(0,st) + '</th><th class="sortable" onclick="sortTable(\'installs\',1,\'string\',loadInstallations)">Version' + arrow(1,st) + '</th><th class="sortable" onclick="sortTable(\'installs\',2,\'date\',loadInstallations)">Last Seen' + arrow(2,st) + '</th><th class="sortable" onclick="sortTable(\'installs\',3,\'string\',loadInstallations)">OS' + arrow(3,st) + '</th></tr>';
             items.forEach(d => {
                 html += `<tr>
                     <td>${(d.install_id || '').slice(0,8)}...</td>
@@ -329,10 +495,24 @@ function renderAdminSchemes() {
         container.innerHTML = '<div class="empty">No schemes</div>';
         return;
     }
-    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'scheme-check\', \'delete-schemes-btn\')" title="Select all"></th><th>Map ID</th><th>Map Name</th><th>Author</th><th>Scheme Name</th><th>Date</th><th>PIN?</th></tr>';
-    allAdminSchemes.forEach(s => {
+    const st = _sortState['schemes_sort'] || {col: 1, asc: false, type: 'date'};
+    const fields = ['map_id', 'created_at', 'author_nickname', 'title', 'pin_hash'];
+    const sorters = {
+        'map_id': (a,b) => (a.map_id||'').localeCompare(b.map_id||''),
+        'created_at': (a,b) => (a.created_at||'').localeCompare(b.created_at||''),
+        'author_nickname': (a,b) => (a.author_nickname||'').localeCompare(b.author_nickname||''),
+        'title': (a,b) => (a.title||'').localeCompare(b.title||''),
+        'pin_hash': (a,b) => (!!a.pin_hash - !!b.pin_hash),
+    };
+    const sf = sorters[fields[st.col]];
+    const sorted = sf ? [...allAdminSchemes].sort(st.asc ? sf : (a,b) => -sf(a,b)) : allAdminSchemes;
+    const hasNew = sorted.some(s => isFresh(s.created_at));
+    let html = '<div style="margin-bottom:4px;"><button class="btn" onclick="markSectionRead(\'schemes\',\'schemes-container\',allAdminSchemes,s=>s._key)">✓ Mark all read</button></div>';
+    html += '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'scheme-check\', \'delete-schemes-btn\')" title="Select all"></th><th class="sortable" onclick="sortTable(\'schemes\',0,\'string\',renderAdminSchemes)">Map ID' + arrow(0,st) + '</th><th class="sortable" onclick="sortTable(\'schemes\',1,\'date\',renderAdminSchemes)">Map Name' + arrow(1,st) + '</th><th class="sortable" onclick="sortTable(\'schemes\',2,\'string\',renderAdminSchemes)">Author' + arrow(2,st) + '</th><th class="sortable" onclick="sortTable(\'schemes\',3,\'string\',renderAdminSchemes)">Scheme Name' + arrow(3,st) + '</th><th class="sortable" onclick="sortTable(\'schemes\',4,\'date\',renderAdminSchemes)">Date' + arrow(4,st) + '</th><th class="sortable" onclick="sortTable(\'schemes\',5,\'boolean\',renderAdminSchemes)">PIN?' + arrow(5,st) + '</th></tr>';
+    sorted.forEach(s => {
+        const isNew = isFresh(s.created_at) && !isMarkedRead('schemes', s._key);
         const hasPin = s.pin_hash ? "✅" : "❌";
-        html += `<tr>
+        html += `<tr class="${isNew ? 'row-new' : ''}" oncontextmenu="showCtxMenu(event,'schemes','${s._key.replace(/'/g,"\\'")}")">
             <td><input type="checkbox" class="scheme-check" value="${s._key}" onchange="updateDeleteCount('scheme-check', 'delete-schemes-btn')"></td>
             <td style="font-family:monospace;font-size:11px;color:#888">${s.map_id || ''}</td>
             <td style="color:#ffaa00">${mapLabel(s.map_id) || (s.map_name || '')}</td>
@@ -344,7 +524,13 @@ function renderAdminSchemes() {
     });
     html += '</table>';
     container.innerHTML = html;
+    if (hasNew) {
+        const hdr = container.closest('.card').querySelector('.section-header');
+        hdr.classList.add('has-new');
+        expandSection(hdr);
+    }
 }
+window.render_schemes = renderAdminSchemes;
 
 function toggleSelectAll(master, cls, btnId) {
     document.querySelectorAll("." + cls).forEach(cb => cb.checked = master.checked);
@@ -463,16 +649,29 @@ function renderUsers() {
         container.innerHTML = '<div class="empty">No users found</div>';
         return;
     }
-    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'user-check\', \'delete-users-btn\')" title="Select all"></th><th>Nickname</th><th>User ID</th><th>PIN</th><th>Status</th><th>Registered</th></tr>';
-    filtered.forEach(u => {
+    const st = _sortState['users_sort'] || {col: 0, asc: true, type: 'string'};
+    const fields = ['nickname', '_key', 'pin_hash', 'connected', 'created_at'];
+    const sorters = {
+        'nickname': (a,b) => (a.nickname||'').localeCompare(b.nickname||''),
+        '_key': (a,b) => (a._key||'').localeCompare(b._key||''),
+        'pin_hash': (a,b) => (!!a.pin_hash - !!b.pin_hash),
+        'connected': (a,b) => (!!a.connected - !!b.connected),
+        'created_at': (a,b) => (a.created_at||'').localeCompare(b.created_at||''),
+    };
+    const sf = sorters[fields[st.col]];
+    const sorted = sf ? [...filtered].sort(st.asc ? sf : (a,b) => -sf(a,b)) : filtered;
+    let html = '<div style="margin-bottom:4px;"><button class="btn" onclick="markSectionRead(\'users\',\'users-container\',allAdminUsers,u=>u._key)">✓ Mark all read</button></div>';
+    html += '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'user-check\', \'delete-users-btn\')" title="Select all"></th><th class="sortable" onclick="sortTable(\'users\',0,\'string\',renderUsers)">Nickname' + arrow(0,st) + '</th><th class="sortable" onclick="sortTable(\'users\',1,\'string\',renderUsers)">User ID' + arrow(1,st) + '</th><th class="sortable" onclick="sortTable(\'users\',2,\'boolean\',renderUsers)">PIN' + arrow(2,st) + '</th><th class="sortable" onclick="sortTable(\'users\',3,\'boolean\',renderUsers)">Status' + arrow(3,st) + '</th><th class="sortable" onclick="sortTable(\'users\',4,\'date\',renderUsers)">Registered' + arrow(4,st) + '</th></tr>';
+    sorted.forEach(u => {
         const isDup = dupNicks.has((u.nickname || "").toLowerCase());
+        const isNew = isFresh(u.created_at) && !isMarkedRead('users', u._key);
         const nickDisplay = isDup ? `<span style="color:#ff6666">⚠</span> ${u.nickname || '?'}` : (u.nickname || '?');
         const pinDisplay = u.pin_hash ? '<span style="font-family:monospace;font-size:11px;color:#888">' + u.pin_hash.slice(0, 10) + '...</span>' : '<span style="color:#666">—</span>';
         const resetBtn = u.pin_hash ? `<button class="btn" onclick="resetUserPin('${u._key}','${(u.nickname||'?').replace(/'/g,"\\'")}')" style="font-size:10px;padding:2px 6px;margin-left:4px">Reset</button>` : '';
         const status = u.connected ? '<span class="badge badge-success">connected</span>' : '<span style="color:#666">○</span>';
         const date = (u.created_at || "").slice(0, 10);
         const uid = (u._key || "").slice(0, 8) + "...";
-        html += `<tr>
+        html += `<tr class="${isNew ? 'row-new' : ''}" oncontextmenu="showCtxMenu(event,'users','${u._key.replace(/'/g,"\\'")}')">
             <td><input type="checkbox" class="user-check" value="${u._key}" onchange="updateDeleteCount('user-check', 'delete-users-btn')"></td>
             <td style="color:#ffaa00">${nickDisplay}</td>
             <td style="font-family:monospace;font-size:11px;color:#888">${uid}</td>
@@ -484,6 +683,7 @@ function renderUsers() {
     html += '</table>';
     container.innerHTML = html;
 }
+window.render_users = renderUsers;
 
 function deleteSelectedUsers() {
     const keys = getSelectedKeys("user-check");
@@ -551,9 +751,22 @@ function renderAdminReleases() {
         container.innerHTML = '<div class="empty">No releases</div>';
         return;
     }
-    let html = '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'release-check\', \'delete-releases-btn\')" title="Select all"></th><th>Version</th><th>Date</th><th>Size</th><th>URL</th></tr>';
-    allAdminReleases.forEach(r => {
-        html += `<tr>
+    const st = _sortState['releases_sort'] || {col: 2, asc: false, type: 'date'};
+    const fields = ['version', 'release_date', 'build_size', 'download_url'];
+    const sorters = {
+        'version': (a,b) => compareVersions(a.version||'0', b.version||'0'),
+        'release_date': (a,b) => (a.release_date||'').localeCompare(b.release_date||''),
+        'build_size': (a,b) => (a.build_size||'').localeCompare(b.build_size||''),
+        'download_url': (a,b) => (a.download_url||'').localeCompare(b.download_url||''),
+    };
+    const sf = sorters[fields[st.col]];
+    const sorted = sf ? [...allAdminReleases].sort(st.asc ? sf : (a,b) => -sf(a,b)) : allAdminReleases;
+    const hasNew = sorted.some(r => isFresh(r.release_date));
+    let html = '<div style="margin-bottom:4px;"><button class="btn" onclick="markSectionRead(\'releases\',\'releases-container\',allAdminReleases,r=>r.version)">✓ Mark all read</button></div>';
+    html += '<table><tr><th><input type="checkbox" onchange="toggleSelectAll(this, \'release-check\', \'delete-releases-btn\')" title="Select all"></th><th class="sortable" onclick="sortTable(\'releases\',0,\'string\',renderAdminReleases)">Version' + arrow(0,st) + '</th><th class="sortable" onclick="sortTable(\'releases\',1,\'date\',renderAdminReleases)">Date' + arrow(1,st) + '</th><th class="sortable" onclick="sortTable(\'releases\',2,\'string\',renderAdminReleases)">Size' + arrow(2,st) + '</th><th class="sortable" onclick="sortTable(\'releases\',3,\'string\',renderAdminReleases)">URL' + arrow(3,st) + '</th></tr>';
+    sorted.forEach(r => {
+        const isNew = isFresh(r.release_date) && !isMarkedRead('releases', r.version || r._key);
+        html += `<tr class="${isNew ? 'row-new' : ''}" oncontextmenu="showCtxMenu(event,'releases','${(r.version||r._key||'').replace(/'/g,"\\'")}")">
             <td><input type="checkbox" class="release-check" value="${r._key}" onchange="updateDeleteCount('release-check', 'delete-releases-btn')"></td>
             <td style="color:#ff4500;font-weight:bold">v${r.version || ''}</td>
             <td>${(r.release_date || '').slice(0,10)}</td>
@@ -563,8 +776,153 @@ function renderAdminReleases() {
     });
     html += '</table>';
     container.innerHTML = html;
+    if (hasNew) {
+        const hdr = container.closest('.card').querySelector('.section-header');
+        hdr.classList.add('has-new');
+        expandSection(hdr);
+    }
+}
+window.render_releases = renderAdminReleases;
+// ═══ AI Builds management ═══
+let _buildsPollTimer = null;
+let _lastBuildsVersion = localStorage.getItem("admin_last_builds_ver") || "0";
+
+function _checkBuildsNew(ver) {
+    if (ver && ver !== _lastBuildsVersion) {
+        localStorage.setItem("admin_last_builds_ver", ver);
+        _lastBuildsVersion = ver;
+        return true;
+    }
+    return false;
 }
 
+function loadBuildsData() {
+    // Builds version
+    db.ref("builds/version").once("value").then(s => {
+        const ver = s.val();
+        document.getElementById("builds-version").textContent = ver || '—';
+        if (_checkBuildsNew(String(ver || '0'))) {
+            const hdr = document.querySelector('#dashboard .card:last-child .section-header');
+            if (hdr) { hdr.classList.add('has-new'); expandSection(hdr); }
+        }
+    }).catch(() => {});
+    // Builds count
+    db.ref("builds/tanks").once("value").then(s => {
+        const data = s.val();
+        const count = data ? Object.keys(data).length : 0;
+        document.getElementById("builds-count").textContent = count || '—';
+    }).catch(() => {});
+    // Fingerprint
+    db.ref("builds/scripts_fingerprint").once("value").then(s => {
+        const fp = s.val() || '';
+        document.getElementById("builds-fingerprint").textContent = fp ? fp.slice(0,12)+'...' : '—';
+    }).catch(() => {});
+    // Popular version
+    db.ref("popular_tanks/version").once("value").then(s => {
+        document.getElementById("popular-version").textContent = s.val() || '—';
+    }).catch(() => {});
+}
+
+function renderPendingStatus(data, type) {
+    const el = document.getElementById("pending-status");
+    if (!data || data.status === "idle" || data.status === null || data.status === undefined) {
+        el.innerHTML = '';
+        return;
+    }
+    const isBuilding = type === 'builds';
+    const msg = data.message || '';
+    const progress = data.progress || {};
+    let html = `<div style="padding:8px 12px;border-radius:6px;margin-bottom:8px;font-size:13px;`;
+    if (data.status === "generating") {
+        html += `background:#223322;color:#88cc88;border:1px solid #448844;">`;
+        html += `⏳ <b>${isBuilding ? 'Builds' : 'Popular Tanks'}</b> generating...`;
+        if (progress.done !== undefined && progress.total > 0) {
+            const pct = Math.round(progress.done / progress.total * 100);
+            html += `<br><span style="font-size:11px;">Progress: ${progress.done}/${progress.total} (${pct}%)</span>`;
+            html += `<div style="background:#1a1a1a;border-radius:3px;margin-top:4px;height:8px;width:200px;"><div style="background:#44aa44;border-radius:3px;height:8px;width:${pct}%;"></div></div>`;
+        }
+        if (progress.current) {
+            html += `<br><span style="font-size:11px;color:#88aa88;">Current: ${progress.current}</span>`;
+        }
+    } else if (data.status === "done") {
+        html += `background:#224422;color:#66cc66;">`;
+        html += `✅ <b>${isBuilding ? 'Builds' : 'Popular Tanks'}</b> generation complete!`;
+        if (msg) html += `<br><span style="font-size:11px;">${msg}</span>`;
+    } else if (data.status === "error") {
+        html += `background:#442222;color:#cc6666;">`;
+        html += `❌ <b>${isBuilding ? 'Builds' : 'Popular Tanks'}</b> generation failed!`;
+        if (msg) html += `<br><span style="font-size:11px;">${msg}</span>`;
+    }
+    html += `</div>`;
+    el.innerHTML = html;
+}
+
+function pollPendingUpdates() {
+    if (_buildsPollTimer) clearTimeout(_buildsPollTimer);
+    db.ref("pending_updates").once("value").then(snap => {
+        const data = snap.val();
+        if (!data) {
+            document.getElementById("pending-status").innerHTML = '';
+            return;
+        }
+        const pop = data.popular_tanks;
+        const bui = data.builds;
+        const active = (pop && (pop.status === "generating" || pop.status === "done" || pop.status === "error"))
+                     || (bui && (bui.status === "generating" || bui.status === "done" || bui.status === "error"));
+        const hadChange = (bui && bui.status === "done") || (pop && pop.status === "done");
+        if (pop) renderPendingStatus(pop, 'popular');
+        if (bui) renderPendingStatus(bui, 'builds');
+        // Auto-expand AI Builds section if status changed
+        if (active || hadChange) {
+            const hdr = document.querySelector('#dashboard .card:last-child .section-header');
+            if (hdr) { hdr.classList.add('has-new'); expandSection(hdr); }
+        }
+        // Re-enable buttons if generation complete
+        if (!active || hadChange) {
+            loadBuildsData();
+        }
+        // Poll again if generation is active
+        if (pop && pop.status === "generating") {
+            _buildsPollTimer = setTimeout(pollPendingUpdates, 5000);
+        } else if (bui && bui.status === "generating") {
+            _buildsPollTimer = setTimeout(pollPendingUpdates, 5000);
+        }
+    }).catch(() => {});
+}
+
+function loadAdminAppData() {
+    db.ref("versions/admin/latest").once("value").then(s => {
+        const data = s.val();
+        const container = document.getElementById("admin-app-container");
+        if (!data || !data.version) {
+            container.innerHTML = '<div class="empty">No admin release data</div>';
+            return;
+        }
+        const hasNew = isFresh(data.release_date);
+        container.innerHTML = `
+            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
+                <div class="stat-box"><div class="num">v${data.version}</div><div class="label">Latest Version</div></div>
+                <div class="stat-box"><div class="num">${data.release_date || '—'}</div><div class="label">Release Date</div></div>
+            </div>
+            <div style="padding:10px 14px;background:#1a1a1a;border-radius:6px;font-size:13px;line-height:1.6;">
+                <b style="color:#ffaa00;">Usage:</b>
+                <code style="display:block;background:#111;padding:8px 12px;margin:6px 0;border-radius:4px;color:#88cc88;">
+                python admin_app.py --wot-path="C:/Games/World_of_Tanks_EU"
+                </code>
+                <span style="color:#888;">Run from the project folder. Requires Python 3.12. Update via <code style="color:#88cc88;">git pull</code></span>
+                <br><br>
+                <a href="https://github.com/nkcgml-boop/SM-WoT-Assistant/blob/main/admin_app.py" style="color:#6699cc;">View source on GitHub →</a>
+            </div>
+        `;
+        if (hasNew) {
+            const hdr = container.closest('.card').querySelector('.section-header');
+            hdr.classList.add('has-new');
+            expandSection(hdr);
+        }
+    }).catch(() => {
+        document.getElementById("admin-app-container").innerHTML = '<div class="empty">Loading error</div>';
+    });
+}
 
 </script>
 

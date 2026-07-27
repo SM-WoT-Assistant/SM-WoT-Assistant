@@ -54,6 +54,9 @@ class DrawingPalette(tk.Toplevel):
             "TD": tk.BooleanVar(value=False),
             "SPG": tk.BooleanVar(value=False),
         }
+        self._thickness_var = tk.IntVar(value=3)
+        self._apply_all_var = tk.BooleanVar(value=False)
+        self._thickness_var.trace_add("write", self._on_thickness_change)
 
         self.text_var = tk.StringVar(value="")
         self.text_var.trace("w", self._validate_text)
@@ -186,6 +189,22 @@ class DrawingPalette(tk.Toplevel):
         self._brush_frame.pack(fill="x")
         self._brush_frame.pack_forget()
 
+        # Thickness control
+        thf = tk.Frame(self, bg=bg)
+        tk.Label(thf, text=self.app.t('ui', 'thickness_label'), font=("Arial", 8, "bold"),
+                 bg=bg, fg="#aaa").pack(side="left", padx=(8, 4))
+        tk.Scale(thf, from_=1, to=10, orient="horizontal", variable=self._thickness_var,
+                 showvalue=True, bg=bg, fg="#cccccc", troughcolor="#333333", bd=0,
+                 highlightthickness=0, sliderlength=16, width=10,
+                 length=120).pack(side="left", padx=(0, 6))
+        tk.Label(thf, textvariable=self._thickness_var, font=("Arial", 9, "bold"),
+                 bg=bg, fg="#ffaa00", width=2).pack(side="left")
+        self._apply_all_cb = tk.Checkbutton(thf, text=self.app.t('ui', 'apply_all'),
+                                            variable=self._apply_all_var, bg=bg, fg="#cccccc",
+                                            selectcolor="#333333", font=("Arial", 8))
+        self._apply_all_cb.pack(side="left", padx=(4, 0))
+        thf.pack(fill="x", padx=4, pady=(2, 0))
+
         self._sep4 = tk.Frame(self, bg="#333", height=1)
         self._sep4.pack(fill="x", padx=6, pady=2)
 
@@ -313,7 +332,7 @@ class DrawingPalette(tk.Toplevel):
         m = re.match(r'^(\d+)x(\d+)(.*)', g)
         if not m:
             return
-        w, _, rest = m.group(1), m.group(2), m.group(3)
+        w, rest = m.group(1), m.group(3)
         target_h = self.winfo_reqheight()
         current_h = int(m.group(2))
         if abs(target_h - current_h) > 10:
@@ -703,6 +722,13 @@ class DrawingPalette(tk.Toplevel):
             self.lift(aboveThis=po)
         except:
             pass
+
+    def _on_thickness_change(self, *args):
+        self.painter._thickness = self._thickness_var.get()
+        if self._apply_all_var.get():
+            self.painter.apply_thickness_to_all(self._thickness_var.get())
+        elif self._edit_obj:
+            self._on_any_change()
 
     def _on_any_change(self, *args):
         if getattr(self, '_loading_obj', False):
@@ -1275,6 +1301,7 @@ class DrawingPalette(tk.Toplevel):
         self._sync_tool_state()
         self.after(100, self._lift_self)
 
+
     def _sync_tool_state(self):
         active = self.painter.active_tool
         if not active:
@@ -1320,8 +1347,8 @@ class DrawingPalette(tk.Toplevel):
         try:
             px = self.app.settings.get("palette_x", 100)
             py = self.app.settings.get("palette_y", 100)
-            self.geometry(f"580x480+{px}+{py}")
-            self._saved_pos = f"580x480+{px}+{py}"
+            self.geometry(f"580x520+{px}+{py}")
+            self._saved_pos = f"580x520+{px}+{py}"
         except Exception:
             self.geometry("+100+100")
 
@@ -1342,6 +1369,7 @@ class DrawingPalette(tk.Toplevel):
             self.text_var.set(obj.get("text", ""))
             self.current_color = obj.get("color", "#ffaa00")
             self._color_preview.config(fg=self.current_color)
+            self._thickness_var.set(obj.get("thickness", 3))
             self._update_color_buttons()
 
             if obj["type"] == "text":
@@ -1401,6 +1429,7 @@ class DrawingPalette(tk.Toplevel):
         obj["classes"] = [k for k, v in self.class_vars.items() if v.get()]
         obj["text"] = self.text_var.get()
         obj["color"] = self.current_color
+        obj["thickness"] = self._thickness_var.get()
         if obj.get("type") == "text":
             if self._active_tool_code == "tree":
                 obj["poi"] = ["tree"]

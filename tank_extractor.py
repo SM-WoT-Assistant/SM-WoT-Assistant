@@ -347,6 +347,7 @@ class TankExtractor:
 
     def _clean_xml(self, content):
         content = content.strip()
+        content = re.sub(r'^<\?xml[^>]*\?>', '', content).strip()
         content = re.sub(r'^<[^>]+>', '<root>', content, count=1)
         content = re.sub(r'</[^>]+>\s*$', '</root>', content)
         content = re.sub(r'\s*<xmlns:[^>]+>[^<]*</xmlns:[^>]+>', '', content)
@@ -709,7 +710,6 @@ class TankExtractor:
     def repair_missing_tth_with_python(self, batch_size=25, timeout_sec=60):
         """Ремонтує відсутні TTH через Python декодер батчами"""
         from pathlib import Path
-        from decode_xml import WotXmlParser
         
         decoder = WotXmlParser()
         
@@ -778,7 +778,6 @@ class TankExtractor:
 
         print("[DECODER] Запуск Python декодера...")
         
-        from decode_xml import WotXmlParser
         decoder = WotXmlParser()
 
         decode_jobs = [p for p in targets if os.path.isdir(p)]

@@ -138,6 +138,23 @@ class MapManager:
                             version_changed = True
                     except Exception as e:
                         print(f"[MAP_MGR] has_changed error: {e}")
+
+                if version_changed:
+                    try:
+                        import firebase_reporter
+                        ts = __import__('time').strftime("%Y-%m-%dT%H:%M:%S")
+                        threading.Thread(target=firebase_reporter._put, args=(
+                            "pending_updates/builds", {
+                                "status": "idle",
+                                "version": current_v or saved_v or "?",
+                                "scripts_pkg_changed": True,
+                                "triggered_at": ts,
+                                "message": f"Game data changed (v{current_v})"
+                            }
+                        ), daemon=True).start()
+                        print(f"[MAP_MGR] pending_updates/builds signaled")
+                    except Exception:
+                        pass
                 required_tth_schema = 2
                 current_tth_schema = int(self.app.settings.get("tth_schema_version", 0) or 0)
                 tth_has_data = False

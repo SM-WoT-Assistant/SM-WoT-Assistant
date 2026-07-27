@@ -293,6 +293,8 @@ TRANSLATIONS = {
             "text_type": "Text/Sign",
             "arrow_start": "Arrow start",
             "arrow_end": "Arrow end",
+            "thickness_label": "Thickness",
+            "apply_all": "Apply to all",
             "editing_label": "EDITING: {label}",
             "publish_what": "Publish what?",
             "save_what": "Save what?",

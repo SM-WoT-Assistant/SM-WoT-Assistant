@@ -99,3 +99,16 @@ temp_scripts.zip
 magic-context.jsonc.MOVED_READPLEASE
 
 popular_tanks_seed.json
+
+# Decoded temp files
+temp_decoded_*.xml
+
+# Session test/temp files
+_cookie_test*
+_diff_*
+_gen_*.py
+_prompt_*.txt
+_run_*.bat
+_temp_*.txt
+_v*_generate_*.txt
+_decoded_*.txt

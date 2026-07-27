@@ -10,9 +10,9 @@
 3. КОЖНЕ твердження "це з клієнта" має супроводжуватись доказом: файл + рядок коду.
 
 ## Картка танка
-1. Вся інформація про білд — тільки з відповіді ШІ.
-2. Якщо ШІ не відповів — показувати пусті секції (без фалбеків).
-3. Запит до ШІ формується на основі даних з game_entities_english.json + decoded XML клієнта.
+1. Вся інформація про білд — з Firebase RTDB (`builds/tanks/{tag}`), кешується локально в `ai_builds_cache.json`.
+2. Якщо Firebase недоступний і кеш порожній — показувати пусті секції (без фалбеків).
+3. Промпти для генерації білдів зберігаються на Firebase (`prompts/tanks/{tag}`), використовуються адміном.
 4. Кешування включаємо тільки за прямим наказом і документуємо у цей файл всі кеші які працюють у проекті.
 
 ## Painter (30.05.2026)
@@ -24,6 +24,13 @@
 6. **Іконка "Зламане дерево"** (06.06.2026): FontAwesome символ `chr(0xF18C)` (fontawesome-webfont.ttf). Рендериться через `canvas.create_text` з шрифтом FontAwesome, колір через fill=. SVG-рендеринг через PyQt6 видалено. Кешування не потрібне (шрифтовий символ).
 7. **DrawingPalette** (painting_palette.py) — плаваюча палітра замість старого `draw_menu` + `PainterDialog`. Авто-deactivate після створення об'єкта. Ctrl+Z undo через keyboard хук. Ctrl+↑/↓ resize в edit mode (debounce 150ms від double-fire keyboard+bind_all).
 8. **PainterDialog** (painter.py) — ВИДАЛЕНО (06.06.2026). Замінено на DrawingPalette.
+
+## Cache validation rules (25.07.2026, дійсні для Firebase архітектури)
+1. **stats_ai.py:_is_build_complete()** — статична валідація: перевіряє `equipment_1` та `consumables_1` не пусті.
+2. **stats_ai.py:_apply_ai_build()** — кешує білд тільки якщо `_is_build_complete(build_data) == True`. Інакше — `not caching`.
+3. **stats_ai.py:_parse_ai_tank_build()** — якщо `loadout1_eq` та `loadout2_eq` обидва пусті → `return {}`. Те саме для consumables.
+4. **stats_ai.py:process_ai_response()** — видалено. Валідація на `len(valid_tanks) < 5` тепер у `_sync_popular_tanks()`.
+5. **stats_ai.py:__init__** — при завантаженні кешу теги, що не знайдені в `tank_db`, матчаться через `_build_name_to_tag_lookup()`. Якщо після резолву <5 валідних — кеш ігнорується.
 
 ## Активні кеші проекту (станом на 27.05.2026)
 1. `popular_tanks_cache.json` — дисковий кеш популярних танків з відповіді ШІ (stats_ai.py:18, 7 днів, fail_count)
@@ -194,6 +201,37 @@ build.py автоматично комітить VERSION та installer.nsi пі
 3. **tray_watcher.py:** `_find_dev_pid()` — читає dev_pid.txt, валідує що PID живий і це `python.exe`/`pythonw.exe` (через CreateToolhelp32Snapshot, не `OpenProcess`). `_get_main_pids()` об'єднує frozen EXE + dev PID. `_launch_app()` пропускає запуск якщо `_get_main_pids()` не пустий (dev вже працює). `_close_main_app()` вбиває всі PID з `_get_main_pids()` включно з dev.
 4. **Безпека:** stale PID-файл після hard crash не шкодить — `_find_dev_pid()` валідує що PID живий і це саме python. Жодних змін в `launcher.py`, `build.py`, HKCU\Run.
 5. **PE_SIZE fix:** `PE_SIZE` (sizeof PROCESSENTRY32W) змінено з hardcoded 556 на 568/556 залежно від бітності (`ctypes.sizeof(ctypes.c_void_p)`). 556 — для 32-bit, 568 — для 64-bit. Це виправляє баг через який `Process32FirstW` падав з `ERROR_BAD_LENGTH` на 64-bit Windows, роблячи всі функції сканування процесів (`_is_wot_running`, `_find_main_pids`, `_find_dev_pid`) повністю несправними.
+
+## Firebase Distribution Architecture (25.07.2026)
+1. **Всі AI білди та промпти** зберігаються на Firebase RTDB — клієнт більше НЕ запускає AI WebView.
+2. **Білди:** `builds/tanks/{tag}`, версія `builds/version`, склад `builds/scripts_fingerprint`.
+3. **Промпти:** `prompts/tanks/{tag}`, `prompts/popular_tanks` — для адміна (генерація).
+4. **Popular tanks:** `popular_tanks/data`, `popular_tanks/version`.
+5. **Pending updates:** `pending_updates/popular_tanks/` та `pending_updates/builds/` — тригери для адміна.
+6. **stats_ai.py:** AI WebView ВИДАЛЕНО (`launch_ai_browser`, `process_ai_response`, `_handle_ai_failure`, `_re_enable_ui`). Замінено на `_sync_popular_tanks()` та `_sync_builds()` — Firebase fetch при старті.
+7. **stats_ai.py `needs_ai_refresh()`** — завжди повертає `False` (AI не використовується).
+8. **stats_ai.py `stop_browser()`** — no-op.
+9. **main.py:** AI стартап видалено (`_start_ai_phase`, `_ai_progress_creep`, `_on_ai_ready`, `_cancel_ai_timers`, `_ai_safety_timeout`). `_on_startup_ready()` → `finish_startup_splash()` → фоновий `_start_firebase_sync()`.
+10. **main.py:** `--ai-webview` CLI handling ВИДАЛЕНО.
+11. **Кеші залишаються:** `ai_builds_cache.json` (994 білди, включено в бандл), `popular_tanks_cache.json` (сідається з `popular_tanks_seed.json`).
+12. **`_load_ai_build_cache()`** тепер повертає 5 значень: `(builds, updated, fail_count, version, scripts_fingerprint)`.
+13. **`_save_ai_build_cache_bulk()`** — новий bulk save для Firebase.
+14. **builds_table.py** — one-time скрипт для початкової заливки всіх білдів + промптів + популярних танків у Firebase.
+15. **prompts_cache.json** — 994 промпти, згенеровані `builds_table.py`, включено в бандл (не в DEFAULT_FILES — використовується тільки адміном).
+
+## Rebalance detection chain (27.07.2026)
+1. **map_manager.py:check_game_version()** — при виявленні зміни версії гри (`version_changed=True`) або зміни вмісту `scripts.pkg` (`ext.has_changed()`) записує тригер у Firebase: `firebase_reporter._put("pending_updates/builds", {status:"idle", version, scripts_pkg_changed:true})`.
+2. **admin_build_generator.py --listen** — полінг `pending_updates/builds` кожні 10с. При появі `status=="generating"` запускає `generate_builds(driver, tank_db, prompts, force=True)` — генерація ВСІХ танків з ігноруванням кешу.
+3. **`_update_builds_version()`** — після генерації оновлює `builds/version` (інкремент) та `builds/scripts_fingerprint` (MD5 від `{ver, ts}`).
+4. **stats_ai.py:_sync_builds()** — при старті клієнта порівнює `remote_version != local_version` → force re-sync ALL танків.
+5. **Повний ланцюжок:** `scripts.pkg змінився → client detect → pending_updates → admin --listen pick up → generate_all → bump version+fingerprint → client sync`.
+
+## admin.html changes (27.07.2026)
+1. **Видалено**: кнопка "Regenerate All Builds" (непрактично — 994 танки через AI).
+2. **Видалено**: `#builds-table-container` (незавершений placeholder "Loading...").
+3. **Auto-expand**: секції (Errors, Schemes, Releases, AI Builds) з новими даними відкриваються автоматично, заголовок отримує `✦` та колір `#ff4500`.
+4. **Highlight**: нові рядки (`isFresh()` перевірка по `admin_last_visit`) отримують CSS клас `row-new` з анімацією затемнення 3s.
+5. **`_lastBuildsVersion`** — зберігається в `localStorage`, при зміні секція AI Builds авто-розкривається.
 
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.

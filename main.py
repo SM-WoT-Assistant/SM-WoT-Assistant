@@ -990,8 +990,6 @@ class WotAssistantHQ:
         self._stop_group_sync()
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
             self._po_win.withdraw()
-        if hasattr(self, 'stats_ai_module'):
-            self.stats_ai_module.stop_browser()
         self.save_settings()
         if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn':
             self.drawing_palette._close()
@@ -1456,8 +1454,6 @@ class WotAssistantHQ:
         if self._tray_icon:
             self._tray_icon.remove()
             self._tray_icon = None
-        if hasattr(self, 'stats_ai_module'):
-            self.stats_ai_module.stop_browser()
         self._save_group_schemes_to_cache()
         self.save_settings()
         firebase_identity._save(firebase_identity._load())
@@ -1910,77 +1906,37 @@ class WotAssistantHQ:
         self.update_startup_progress(percent, text)
 
     def _on_startup_ready(self):
-        """Startup data checks complete → launch AI → then close splash."""
+        """Startup data checks complete → close splash → background Firebase sync."""
         self._startup_ready_at = time.time()
         self.root.after(0, self._check_pending_tactic_maps)
-        if hasattr(self, 'stats_ai_module') and not self.stats_ai_module.needs_ai_refresh():
-            print("[INIT] Кеш свіжий, AI не потрібен")
-            try:
-                sw = int(self.splash_canvas["width"])
-                sh = int(self.splash_canvas["height"])
-                self.splash_canvas.coords(self.pbar, 0, sh - 8, sw, sh)
-                self.splash_canvas.itemconfigure(self.splash_percent_text, text="100%")
-            except Exception:
-                pass
-            self._startup_display_percent = 100
-            self._startup_target_percent = 100
-            self.root.after(200, self.finish_startup_splash)
-            return
-        self._startup_ai_base = max(30, getattr(self, '_startup_display_percent', 30))
-        self._startup_ai_base = min(self._startup_ai_base, 80)
-        self.update_startup_progress(self._startup_ai_base, self.t('ui', 'data_updating'))
-        self.root.after(100, self._start_ai_phase)
-
-    def _start_ai_phase(self):
-        if hasattr(self, 'stats_ai_module'):
-            self._startup_ai_base = max(30, getattr(self, '_startup_display_percent', 30))
-            self._startup_ai_base = min(self._startup_ai_base, 80)
-            self._startup_ai_start = time.time()
-            self.stats_ai_module.launch_ai_browser(
-                progress_cb=self._on_ai_progress,
-                done_cb=self._on_ai_ready,
-            )
-            self._ai_creep_id = self.root.after(1000, self._ai_progress_creep)
-            self._ai_timeout_id = self.root.after(60000, self._ai_safety_timeout)
-        else:
-            self.finish_startup_splash()
-
-    def _ai_progress_creep(self):
-        if not hasattr(self, '_startup_ai_start'):
-            return
-        elapsed = time.time() - self._startup_ai_start
-        base = getattr(self, '_startup_ai_base', 40)
-        if elapsed < 20:
-            pct = base + (93 - base) * elapsed / 20
-        else:
-            pct = 93 + 6 * min(elapsed - 20, 30) / 30
-        pct = min(99, pct)
-        self._startup_target_percent = int(pct)
         try:
-            self._startup_creep_active = True
             sw = int(self.splash_canvas["width"])
             sh = int(self.splash_canvas["height"])
-            x2 = int((sw * pct) / 100)
-            self.splash_canvas.coords(self.pbar, 0, sh - 8, x2, sh)
-            self.splash_canvas.itemconfigure(
-                self.splash_percent_text, text=f"{int(pct)}%"
-            )
+            self.splash_canvas.coords(self.pbar, 0, sh - 8, sw, sh)
+            self.splash_canvas.itemconfigure(self.splash_percent_text, text="100%")
         except Exception:
             pass
-        if pct < 100:
-            self._ai_creep_id = self.root.after(100, self._ai_progress_creep)
+        self._startup_display_percent = 100
+        self._startup_target_percent = 100
+        self.root.after(200, self.finish_startup_splash)
+        # Start background Firebase sync
+        self.root.after(1000, self._start_firebase_sync)
 
-    def _on_ai_progress(self, percent, text):
-        self.root.after(0, lambda t=text: self.update_startup_progress(
-            getattr(self, '_startup_target_percent', 40), t
-        ))
+    def _start_firebase_sync(self):
+        """Background sync of popular tanks + builds from Firebase."""
+        if not hasattr(self, 'stats_ai_module') or not self.stats_ai_module:
+            return
+        threading.Thread(target=self._run_firebase_sync, daemon=True).start()
 
-    def _on_ai_ready(self):
-        self.root.after(0, lambda: self.update_startup_progress(
-            100, self.t('ui', 'ready')
-        ))
-        self.root.after(500, self._cancel_ai_timers)
-        self.root.after(500, lambda: self.finish_startup_splash())
+    def _run_firebase_sync(self):
+        try:
+            self.stats_ai_module._sync_popular_tanks()
+        except Exception as e:
+            print(f"[Firebase] Popular tanks sync error: {e}")
+        try:
+            self.stats_ai_module._sync_builds()
+        except Exception as e:
+            print(f"[Firebase] Builds sync error: {e}")
 
     def _check_pending_tactic_maps(self):
         """HEAD-перевірка pending мап на сайті. Chrome не використовується."""
@@ -2035,22 +1991,6 @@ class WotAssistantHQ:
             self.map_mgr._save_pending_tactic_maps(remaining)
             if hasattr(self, 'painter'):
                 self.painter.redraw()
-
-    def _cancel_ai_timers(self):
-        self._startup_creep_active = False
-        if hasattr(self, '_ai_creep_id') and self._ai_creep_id:
-            try: self.root.after_cancel(self._ai_creep_id)
-            except: pass
-            self._ai_creep_id = None
-        if hasattr(self, '_ai_timeout_id') and self._ai_timeout_id:
-            try: self.root.after_cancel(self._ai_timeout_id)
-            except: pass
-            self._ai_timeout_id = None
-
-    def _ai_safety_timeout(self):
-        print("[AI Browser] SAFETY TIMEOUT — closing splash")
-        self.root.after(0, self._cancel_ai_timers)
-        self.root.after(0, self.finish_startup_splash)
 
     def update_startup_progress(self, percent, text=None):
         if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
@@ -2505,10 +2445,6 @@ if __name__ == "__main__":
                 except Exception:
                     pass
 
-    if "--ai-webview" in sys.argv:
-        from ai_webview_gui import main as webview_main
-        webview_main()
-        sys.exit(0)
     splash_geometry = None
     for arg in sys.argv[1:]:
         if arg.startswith("--splash-geometry="):
