@@ -11,8 +11,13 @@ from tkinter import ttk, scrolledtext
 import ctypes
 from ctypes import wintypes
 
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+if getattr(sys, 'frozen', False):
+    _BUNDLE_DIR = sys._MEIPASS
+else:
+    _BUNDLE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+os.chdir(_BUNDLE_DIR)
+sys.path.insert(0, _BUNDLE_DIR)
 
 from admin_build_generator import (
     detect_changed_tanks, generate_builds, generate_popular,
@@ -78,7 +83,7 @@ def _set_windows_startup(enable):
 
 def _read_admin_version():
     try:
-        with open("VERSION", "r") as f:
+        with open(os.path.join(_BUNDLE_DIR, "VERSION"), "r") as f:
             return f.read().strip()
     except:
         return "0.0.0"
@@ -149,7 +154,7 @@ class AdminTray:
         self._hwnd = ctypes.windll.user32.CreateWindowExW(0, cls_name, "", 0, 0, 0, 0, 0, 0, 0, hinst, None)
 
     def _add_icon(self):
-        icon_path = os.path.join(os.path.dirname(__file__), "icon.ico")
+        icon_path = os.path.join(_BUNDLE_DIR, "icon.ico")
         hicon = 0
         if os.path.exists(icon_path):
             hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
@@ -276,7 +281,7 @@ class AdminApp:
         self.root.configure(bg=BG)
         self.root.minsize(600, 400)
         try:
-            self.root.iconbitmap(default="icon.ico")
+            self.root.iconbitmap(default=os.path.join(_BUNDLE_DIR, "icon.ico"))
         except Exception:
             pass
 

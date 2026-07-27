@@ -44,6 +44,10 @@ def build_admin_exe(version):
         "--add-data", f"{os.path.join(BASE_DIR, 'tank_tth.json')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, 'tank_slots_full.json')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, 'translations.py')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(BASE_DIR, 'game_entities_english.json')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(BASE_DIR, 'crew_builds.json')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(BASE_DIR, 'prompts_cache.json')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(BASE_DIR, 'game_entities.json')}{os.pathsep}.",
         "--hidden-import", "PIL",
         "--hidden-import", "PIL._tkinter_finder",
         "--hidden-import", "requests",
@@ -83,7 +87,7 @@ def write_version_to_rtdb(version):
     """Write admin version metadata to RTDB."""
     import urllib.request
 
-    size = os.path.getsize(os.path.join(PUBLIC_ADMIN_DIR, f"SM_WoT_Assistant_Admin_v{version}.exe"))
+    size = os.path.getsize(os.path.join(DIST_DIR, "SM WoT Assistant Admin.exe"))
     size_str = f"{size / (1024 * 1024):.0f} MB"
     today = time.strftime("%Y-%m-%d")
     dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Admin.exe"
