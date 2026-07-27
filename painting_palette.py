@@ -37,14 +37,16 @@ class DrawingPalette(tk.Toplevel):
         self.mode_vars = {
             "Standard": tk.BooleanVar(value=False),
             "Encounter": tk.BooleanVar(value=False),
-            "Assault": tk.BooleanVar(value=False),
+            "Storm": tk.BooleanVar(value=False),
             "Onslaught": tk.BooleanVar(value=False),
+            "OnslaughtLight": tk.BooleanVar(value=False),
         }
         self.mode_labels = {
             "Standard": "Standard",
             "Encounter": "Encounter",
-            "Assault": "Assault",
+            "Storm": "Storm",
             "Onslaught": "Onslaught",
+            "OnslaughtLight": "Onslaught Light",
         }
 
         self.class_vars = {
@@ -135,8 +137,9 @@ class DrawingPalette(tk.Toplevel):
         _mode_mo_keys = {
             "Standard": "type/ctf/name",
             "Encounter": "type/domination/name",
-            "Assault": "type/assault/name",
+            "Storm": "type/assault/name",
             "Onslaught": "type/comp7/name",
+            "OnslaughtLight": "type/comp7/name",
         }
         lm = language_module.get_lang_module()
         for k, v in self.mode_vars.items():

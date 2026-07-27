@@ -485,8 +485,9 @@ class MapManager:
         mode_mapping = {
             "Standard": "ctf",
             "Encounter": "domination",
-            "Assault": "assault",
-            "Onslaught": "comp7"
+            "Storm": "assault",
+            "Onslaught": "comp7",
+            "OnslaughtLight": "comp7",
         }
         internal_mode = mode_mapping.get(ui_mode, "ctf")
         is_tactic = self.app.btn_mode_maps_1.cget("bg") == "#ff4500"
@@ -508,15 +509,14 @@ class MapManager:
                     continue
                 if m in _EVENT_MAP_IDS:
                     continue
-                if m in self.app.map_data:
+                if is_tactic and m in self.app.map_data:
                     gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
                     has_mode = internal_mode in gameplay_types
                     if internal_mode == "assault" and "assault2" in gameplay_types:
                         has_mode = True
-                    if has_mode:
-                        filtered_maps.append(m)
-                else:
-                    filtered_maps.append(m)
+                    if not has_mode:
+                        continue
+                filtered_maps.append(m)
             self.app.map_list_eng = filtered_maps
         else:
             self.app.extractor_names = {}

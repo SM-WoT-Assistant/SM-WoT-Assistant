@@ -123,17 +123,19 @@ class LogWatcher:
                                     if self._last_arena_id != map_id:
                                         self._countdown_fired_for_arena = None
                                     self._last_arena_id = map_id  # Зберігаємо для мініматп
-                                    # Мапінг типу на режим
                                     type_to_mode = {
                                         1: "ctf",      # Standard
                                         2: "domination",  # Encounter
-                                        3: "assault",  # Assault
-                                        4: "comp7"     # Onslaught
+                                        3: "assault",  # Storm
+                                        4: "comp7",    # Onslaught
+                                        5: "comp7",    # Onslaught Light
                                     }
                                     mode = type_to_mode.get(self.last_type, "ctf")
                                     print(f"[LOGWATCHER] Arena detected: map={map_id}, mode={mode}, last_type={self.last_type}")
                                     if self.callback:
                                         self.callback(map_id, mode)
+                            if "comp7_light" in clean_line and "loading" in clean_line.lower():
+                                pass
                 
                 time.sleep(2)
             except Exception:

@@ -94,14 +94,18 @@ class MapRenderer:
         mode_mapping = {
             "Standard": "ctf",
             "Encounter": "domination",
-            "Assault": "assault",
-            "Onslaught": "comp7"
+            "Storm": "assault",
+            "Onslaught": "comp7",
+            "OnslaughtLight": "comp7",
         }
         internal_mode = mode_mapping.get(ui_mode, "ctf")
         
         gameplay_types = data.get("gameplayTypes", {})
         if internal_mode not in gameplay_types:
-            return
+            if internal_mode == "assault" and "assault2" in gameplay_types:
+                internal_mode = "assault2"
+            else:
+                return
 
         mode_data = gameplay_types[internal_mode]
 

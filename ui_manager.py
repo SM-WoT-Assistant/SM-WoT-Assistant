@@ -405,6 +405,7 @@ class UIManager:
         make_chk(self.app.t('ui', 'unhide_on_battle'), self.app._unhide_on_battle_var)
         make_chk(self.app.t('ui', 'auto_mode_filter'), self.app.auto_mode_filter_var)
         make_chk(self.app.t('ui', 'auto_vehicle_filter'), self.app.auto_vehicle_filter_var)
+        make_chk(self.app.t('ui', 'sync_schemes_with_mode'), self.app.sync_schemes_with_mode)
         make_chk(self.app.t('ui', 'auto_battle'), self.app.auto_battle_var)
         chk_auto_size = make_chk(self.app.t('ui', 'auto_window_size'), self.app._auto_window_size_var)
         chk_auto_size.configure(command=self.app._on_auto_window_size_toggle)
@@ -884,14 +885,14 @@ class UIManager:
         self.app.filters_container.pack(expand=True, pady=4)
         m_frame = tk.LabelFrame(self.app.filters_container, text=" " + self.app.t('ui', 'battle_mode_label') + " ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
         m_frame.pack(side="left", padx=5)
-        _mode_mo = {"Standard": "type/ctf/name", "Encounter": "type/domination/name", "Assault": "type/assault/name", "Onslaught": "type/comp7/name"}
+        _mode_mo = {"Standard": "type/ctf/name", "Encounter": "type/domination/name", "Storm": "type/assault/name", "Onslaught": "type/comp7/name", "OnslaughtLight": "type/comp7/name"}
         lm = language_module.get_lang_module()
-        for mode_key, v in [("Standard", "Standard"), ("Encounter", "Encounter"), ("Assault", "Assault"), ("Onslaught", "Onslaught")]:
+        for mode_key, v in [("Standard", "Standard"), ("Encounter", "Encounter"), ("Storm", "Storm"), ("Onslaught", "Onslaught"), ("OnslaughtLight", "OnslaughtLight")]:
             mo_key = _mode_mo.get(mode_key)
             txt = lm.t(mo_key) if mo_key else None
             if not txt:
-                txt = self.app.t('ui', mode_key.lower() + '_battle')
-            clr = "#ffaa00" if v == "Onslaught" else "white"
+                txt = self.app.t('ui', 'mode_' + mode_key.lower())
+            clr = "#ffaa00" if v in ("Onslaught", "OnslaughtLight") else "white"
             tk.Radiobutton(m_frame, text=txt, variable=self.app.selected_battle_mode, value=v, bg="#222", fg=clr, selectcolor="black").pack(side="left", padx=3)
         c_frame = tk.LabelFrame(self.app.filters_container, text=" " + self.app.t('ui', 'vehicle_class_label') + " ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))
         c_frame.pack(side="left", padx=5)

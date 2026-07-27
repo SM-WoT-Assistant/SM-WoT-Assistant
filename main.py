@@ -151,6 +151,7 @@ class WotAssistantHQ:
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
+        self.sync_schemes_with_mode = tk.BooleanVar(value=self.settings.get("sync_schemes_with_mode", True))
         
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення
@@ -301,7 +302,7 @@ class WotAssistantHQ:
 
         self.map_mgr.load_map_list()
 
-        self.selected_battle_mode.trace_add("write", lambda *args: self.map_mgr.load_map_list())
+        self.selected_battle_mode.trace_add("write", lambda *args: self._on_battle_mode_changed())
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
 
@@ -445,6 +446,7 @@ class WotAssistantHQ:
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
         self.settings["close_with_game"] = self._close_with_game_var.get()
+        self.settings["sync_schemes_with_mode"] = self.sync_schemes_with_mode.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
@@ -1344,6 +1346,12 @@ class WotAssistantHQ:
         if self.mode != "norm":
             self.root.after(100, self.toggle_editor)
 
+    def _on_battle_mode_changed(self):
+        if self.btn_mode_maps_1.cget("bg") == "#ff4500":
+            self.map_mgr.load_map_list()
+        else:
+            self.on_map_select()
+
     def on_battle_detected(self, map_id, mode):
         self.last_battle_map = map_id
         self.last_battle_mode = mode
@@ -1360,8 +1368,8 @@ class WotAssistantHQ:
         mode_map = {
             "ctf": "Standard",
             "domination": "Encounter",
-            "assault": "Assault",
-            "comp7": "Onslaught"
+            "assault": "Storm",
+            "comp7": "Onslaught",
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
@@ -1395,8 +1403,8 @@ class WotAssistantHQ:
         mode_map = {
             "ctf": "Standard",
             "domination": "Encounter",
-            "assault": "Assault",
-            "comp7": "Onslaught"
+            "assault": "Storm",
+            "comp7": "Onslaught",
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.safe_battle_sync(map_id, ui_mode)

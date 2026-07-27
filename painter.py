@@ -766,6 +766,9 @@ class MapPainter:
     _UKR_TO_EN = {"ЛТ": "LT", "СТ": "MT", "ТТ": "HT", "ПТ": "TD", "САУ": "SPG"}
 
     def is_visible(self, obj):
+        if hasattr(self.app, 'sync_schemes_with_mode') and not self.app.sync_schemes_with_mode.get():
+            return True
+        
         current_mode = self.app.selected_battle_mode.get()
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
         
