@@ -154,7 +154,7 @@ class AdminTray:
         self._hwnd = ctypes.windll.user32.CreateWindowExW(0, cls_name, "", 0, 0, 0, 0, 0, 0, 0, hinst, None)
 
     def _add_icon(self):
-        icon_path = os.path.join(_BUNDLE_DIR, "icon.ico")
+        icon_path = os.path.join(_BUNDLE_DIR, "admin_icon.ico")
         hicon = 0
         if os.path.exists(icon_path):
             hicon = ctypes.windll.user32.LoadImageW(0, icon_path, 1, 0, 0, 0x00000010)
@@ -281,7 +281,7 @@ class AdminApp:
         self.root.configure(bg=BG)
         self.root.minsize(600, 400)
         try:
-            self.root.iconbitmap(default=os.path.join(_BUNDLE_DIR, "icon.ico"))
+            self.root.iconbitmap(default=os.path.join(_BUNDLE_DIR, "admin_icon.ico"))
         except Exception:
             pass
 
