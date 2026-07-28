@@ -1025,11 +1025,11 @@ def main():
 
     # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
+    generate_verify_json(version)
     commit_version_files(version)
     create_git_tag(version)
     run_pyinstaller()
     data_count = copy_data_files()
-    generate_verify_json(version)
     build_launcher()
     build_tray_watcher()
 
