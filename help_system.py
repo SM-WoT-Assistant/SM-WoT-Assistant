@@ -126,6 +126,7 @@ class HelpManager:
         l_frow(fr, self.app.t('ui', 'help_f8'))
         l_row("TAB", self.app.t('ui', 'help_e'))
         l_row("F1", self.app.t('ui', 'help_f1'))
+        l_row(self.app.t('ui', 'help_size_slider'), "")
 
         l_section(self.app.t('ui', 'help_section_battle'))
         fr_b = tk.Frame(left_col, bg=bg)
@@ -148,6 +149,7 @@ class HelpManager:
         l_row("Ctrl + \u2191", self.app.t('ui', 'help_ctrl_up'))
         l_row("Ctrl + \u2193", self.app.t('ui', 'help_ctrl_down'))
         l_row("Ctrl + Z", self.app.t('ui', 'help_ctrl_z'))
+        l_row("Ctrl + A", self.app.t('ui', 'help_select_all'))
 
         l_section(self.app.t('ui', 'help_section_palette'))
         l_row(self.app.t('ui', 'help_hotkey_row1'), self.app.t('ui', 'help_palette_row1'))
@@ -225,3 +227,8 @@ class HelpManager:
         tk.Label(fr_s9, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
         tk.Label(fr_s9, text=" " + self.app.t('ui', 'close_with_game'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
         r_frow(fr_s9, self.app.t('ui', 'help_setting_close_with_game'))
+        r_sep()
+        fr_warn = tk.Frame(right_col, bg=bg)
+        tk.Label(fr_warn, text="\u26A0", font=("Arial", 10), bg=bg, fg="#ff6b6b").pack(side="left")
+        tk.Label(fr_warn, text=" " + self.app.t('ui', 'borderless_warning'), font=("Arial", 9, "bold"), bg=bg, fg="#ff6b6b").pack(side="left")
+        r_frow(fr_warn, "")

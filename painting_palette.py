@@ -57,8 +57,9 @@ class DrawingPalette(tk.Toplevel):
             "SPG": tk.BooleanVar(value=False),
         }
         self._thickness_var = tk.IntVar(value=3)
-        self._apply_all_var = tk.BooleanVar(value=False)
         self._thickness_var.trace_add("write", self._on_thickness_change)
+        self._size_var = tk.DoubleVar(value=1.0)
+        self._size_var.trace_add("write", self._on_size_change)
 
         self.text_var = tk.StringVar(value="")
         self.text_var.trace("w", self._validate_text)
@@ -68,6 +69,7 @@ class DrawingPalette(tk.Toplevel):
         self._build_ui()
         self._restore_position()
         self.after(0, self._refresh_linked_schemes_list)
+        self.after(50, self._update_sliders_state)
 
     def _build_ui(self):
         bg = "#222"
@@ -192,21 +194,40 @@ class DrawingPalette(tk.Toplevel):
         self._brush_frame.pack(fill="x")
         self._brush_frame.pack_forget()
 
-        # Thickness control
-        thf = tk.Frame(self, bg=bg)
-        tk.Label(thf, text=self.app.t('ui', 'thickness_label'), font=("Arial", 8, "bold"),
+        # Thickness control + Select All button
+        self._thf = tk.Frame(self, bg=bg)
+        self._thf_slider_frame = tk.Frame(self._thf, bg=bg)
+        self._thf_slider_frame.pack(side="left")
+        tk.Label(self._thf_slider_frame, text=self.app.t('ui', 'thickness_label'), font=("Arial", 8, "bold"),
                  bg=bg, fg="#aaa").pack(side="left", padx=(8, 4))
-        tk.Scale(thf, from_=1, to=10, orient="horizontal", variable=self._thickness_var,
+        tk.Scale(self._thf_slider_frame, from_=1, to=10, orient="horizontal", variable=self._thickness_var,
                  showvalue=True, bg=bg, fg="#cccccc", troughcolor="#333333", bd=0,
                  highlightthickness=0, sliderlength=16, width=10,
                  length=120).pack(side="left", padx=(0, 6))
-        tk.Label(thf, textvariable=self._thickness_var, font=("Arial", 9, "bold"),
+        tk.Label(self._thf_slider_frame, textvariable=self._thickness_var, font=("Arial", 9, "bold"),
                  bg=bg, fg="#ffaa00", width=2).pack(side="left")
-        self._apply_all_cb = tk.Checkbutton(thf, text=self.app.t('ui', 'apply_all'),
-                                            variable=self._apply_all_var, bg=bg, fg="#cccccc",
-                                            selectcolor="#333333", font=("Arial", 8))
-        self._apply_all_cb.pack(side="left", padx=(4, 0))
-        thf.pack(fill="x", padx=4, pady=(2, 0))
+        sb = tk.Frame(self._thf, bg=bg, width=50, height=50)
+        sb.pack(side="left", padx=(6, 0))
+        sb.pack_propagate(False)
+        self._select_all_btn = tk.Button(sb, text="ALL", bg="#444", fg="#aaa",
+                                          bd=0, font=("Arial", 9, "bold"),
+                                          command=self._on_select_all_toggle)
+        self._select_all_btn.pack(expand=True, fill="both")
+        self._thf.pack(fill="x", padx=4, pady=(2, 0))
+
+        # Size slider
+        self._szf = tk.Frame(self, bg=bg)
+        self._szf_slider_frame = tk.Frame(self._szf, bg=bg)
+        self._szf_slider_frame.pack(side="left")
+        tk.Label(self._szf_slider_frame, text=self.app.t('ui', 'size_label'), font=("Arial", 8, "bold"),
+                 bg=bg, fg="#aaa").pack(side="left", padx=(8, 4))
+        tk.Scale(self._szf_slider_frame, from_=0.3, to=3.0, resolution=0.1, orient="horizontal",
+                 variable=self._size_var, showvalue=True, bg=bg, fg="#cccccc",
+                 troughcolor="#333333", bd=0, highlightthickness=0, sliderlength=16,
+                 width=10, length=120).pack(side="left", padx=(0, 6))
+        tk.Label(self._szf_slider_frame, textvariable=self._size_var, font=("Arial", 9, "bold"),
+                 bg=bg, fg="#ffaa00", width=4).pack(side="left")
+        self._szf.pack(fill="x", padx=4, pady=(0, 2))
 
         self._sep4 = tk.Frame(self, bg="#333", height=1)
         self._sep4.pack(fill="x", padx=6, pady=2)
@@ -710,6 +731,40 @@ class DrawingPalette(tk.Toplevel):
             btn.config(bg=active_bg if is_active else inactive_bg,
                        fg=active_fg if is_active else inactive_fg)
 
+    def _on_select_all_toggle(self):
+        self.painter.toggle_select_all()
+        if self.painter.select_all_active():
+            self.painter.apply_thickness_to_all(self._thickness_var.get())
+        self._update_select_all_btn()
+        self._update_sliders_state()
+
+    def _update_select_all_btn(self):
+        active = self.painter.select_all_active()
+        self._select_all_btn.config(
+            bg="#ffaa00" if active else "#444",
+            fg="black" if active else "#aaa",
+        )
+
+    def _has_lines_on_map(self):
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id or map_id not in self.painter.drawings:
+            return False
+        return any(obj.get("type") in ("marker", "arrow", "brush") for obj in self.painter.drawings[map_id])
+
+    def _update_sliders_state(self):
+        select_all = self.painter.select_all_active()
+        editing = self._edit_obj is not None
+
+        thick_enabled = select_all or (editing and self._edit_obj.get("type") in ("marker", "arrow", "brush"))
+        size_enabled = select_all or editing
+
+        state_t = "normal" if thick_enabled else "disabled"
+        state_s = "normal" if size_enabled else "disabled"
+        for child in self._thf_slider_frame.winfo_children():
+            child.config(state=state_t) if isinstance(child, (tk.Scale, tk.Label, tk.Button)) else None
+        for child in self._szf_slider_frame.winfo_children():
+            child.config(state=state_s) if isinstance(child, (tk.Scale, tk.Label, tk.Button)) else None
+
     def _validate_text(self, *args):
         t = self.text_var.get()
         if len(t) > 30:
@@ -728,15 +783,34 @@ class DrawingPalette(tk.Toplevel):
 
     def _on_thickness_change(self, *args):
         self.painter._thickness = self._thickness_var.get()
-        if self._apply_all_var.get():
+        if self.painter.select_all_active():
             self.painter.apply_thickness_to_all(self._thickness_var.get())
         elif self._edit_obj:
             self._on_any_change()
+
+    def _on_size_change(self, *args):
+        if self.painter.select_all_active():
+            self.painter.apply_scale_to_all(self._size_var.get())
+        elif self._edit_obj and self.app.current_map_eng:
+            self._edit_obj["scale"] = self._size_var.get()
+            self.painter.save_drawings()
+            self.painter.redraw()
 
     def _on_any_change(self, *args):
         if getattr(self, '_loading_obj', False):
             return
         self._lift_self()
+        if self.painter.select_all_active():
+            map_id = getattr(self.app, "current_map_eng", None)
+            if map_id and map_id in self.painter.drawings:
+                new_modes = [k for k, v in self.mode_vars.items() if v.get()]
+                new_classes = [k for k, v in self.class_vars.items() if v.get()]
+                for obj in self.painter.drawings[map_id]:
+                    obj["modes"] = new_modes
+                    obj["classes"] = new_classes
+                self.painter.redraw()
+                self.painter.save_drawings()
+            return
         if self._edit_obj:
             self._write_to_object(self._edit_obj)
             self.painter.redraw()
@@ -758,6 +832,9 @@ class DrawingPalette(tk.Toplevel):
                            relief="sunken" if is_active else "raised")
 
     def _delete_selected(self):
+        if self.painter.select_all_active():
+            self.painter._delete_all_selected()
+            return
         if self._edit_obj is not None:
             self.app.painter._delete_edited_object()
             self.exit_edit_mode()
@@ -1373,7 +1450,9 @@ class DrawingPalette(tk.Toplevel):
             self.current_color = obj.get("color", "#ffaa00")
             self._color_preview.config(fg=self.current_color)
             self._thickness_var.set(obj.get("thickness", 3))
+            self._size_var.set(obj.get("scale", 1.0))
             self._update_color_buttons()
+            self._update_sliders_state()
 
             if obj["type"] == "text":
                 poi_data = obj.get("poi", [])
@@ -1426,6 +1505,7 @@ class DrawingPalette(tk.Toplevel):
         self._del_btn.config(state="disabled", bg="#555555", fg="#888888")
         self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
+        self._update_sliders_state()
 
     def _write_to_object(self, obj):
         obj["modes"] = [k for k, v in self.mode_vars.items() if v.get()]
@@ -1433,6 +1513,7 @@ class DrawingPalette(tk.Toplevel):
         obj["text"] = self.text_var.get()
         obj["color"] = self.current_color
         obj["thickness"] = self._thickness_var.get()
+        obj["scale"] = self._size_var.get()
         if obj.get("type") == "text":
             if self._active_tool_code == "tree":
                 obj["poi"] = ["tree"]

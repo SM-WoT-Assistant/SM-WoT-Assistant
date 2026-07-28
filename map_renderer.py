@@ -205,7 +205,7 @@ class MapRenderer:
             app.canvas.create_text(map_x + map_w + b2, py, text=row_letters[row],
                 fill=gc, font=("Arial", 9), anchor="center", tags="map")
 
-    def show_main_splash(self):
+    def show_main_splash(self, message=None):
         app = self.app
         app.canvas.delete("map")
         app.root.update_idletasks()
@@ -252,7 +252,9 @@ class MapRenderer:
 
                 
         if not map_drawn:
-            if app.mode == "edit":
+            if message:
+                app.canvas.create_text(cw//2, ch//2, text=message, fill="#888888", font=("Arial", 18), tags="map")
+            elif app.mode == "edit":
                 version = config.load_version()
                 app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
                 line1 = f"LMB: {app.t('ui', 'help_ctrl_lmb')}"
@@ -266,10 +268,12 @@ class MapRenderer:
                 tk.Label(h2_frame, text=chr(0xF09C), font=("FontAwesome", 11), bg="black", fg="white").pack(side="left")
                 tk.Label(h2_frame, text="  " + app.t('ui', 'h2'), font=("Arial", 11, "bold"), bg="black", fg="white").pack(side="left")
                 app.canvas.create_window(cw//2, ch - 115, window=h2_frame, tags="map")
-                app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
-                app.canvas.create_text(cw//2, ch - 127, text=f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps",
-                    fill="#888888", font=("Arial", 8), tags="map")
-                if app.logo_image_object:
+            app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
+            app.canvas.create_text(cw//2, ch - 127, text=f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps",
+                fill="#888888", font=("Arial", 8), tags="map")
+            app.canvas.create_text(cw//2, ch - 155, text=app.t('ui', 'borderless_warning'),
+                fill="#ffaa00", font=("Arial", 8), tags="map")
+            if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110
                         ratio = app.logo_image_object.height / app.logo_image_object.width

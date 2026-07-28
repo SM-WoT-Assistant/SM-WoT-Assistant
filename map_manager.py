@@ -509,7 +509,7 @@ class MapManager:
                     continue
                 if m in _EVENT_MAP_IDS:
                     continue
-                if is_tactic and m in self.app.map_data:
+                if m in self.app.map_data:
                     gameplay_types = self.app.map_data[m].get("gameplayTypes", {})
                     has_mode = internal_mode in gameplay_types
                     if internal_mode == "assault" and "assault2" in gameplay_types:
@@ -518,6 +518,12 @@ class MapManager:
                         continue
                 filtered_maps.append(m)
             self.app.map_list_eng = filtered_maps
+            if is_tactic and ui_mode != "Standard":
+                self.app.map_list_eng = []
+                self.app.map_var.set("")
+                self.app.current_map_eng = None
+                self.app.map_renderer.show_main_splash(message=self.app.t('ui', 'tactic_no_maps'))
+                return
         else:
             self.app.extractor_names = {}
             self.app.map_list_eng = []

@@ -48,6 +48,7 @@ class MapPainter:
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
         self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
         self._thickness = 3
+        self._select_all = False
 
     def apply_thickness_to_all(self, value):
         """Apply thickness to ALL existing drawings on current map."""
@@ -111,6 +112,31 @@ class MapPainter:
         for k in list(self.drawings.keys()):
             self.drawings[k] = self._strip_duplicates(self.drawings[k])
         self.data_mgr.save_drawings(self.drawings)
+
+    def apply_scale_to_all(self, value):
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id or map_id not in self.drawings:
+            return
+        changed = 0
+        for obj in self.drawings[map_id]:
+            old = obj.get("scale", 1.0)
+            if abs(old - value) > 0.01:
+                obj["scale"] = value
+                changed += 1
+        if changed:
+            self.save_drawings()
+            self.redraw()
+
+    def toggle_select_all(self):
+        self._select_all = not self._select_all
+        if self._select_all:
+            palette = getattr(self.app, 'drawing_palette', None)
+            if palette and palette.is_in_edit_mode():
+                palette.exit_edit_mode()
+        self.redraw()
+
+    def select_all_active(self):
+        return self._select_all
 
     def bind_events_to(self, target_canvas):
         """Прив'язка подій малювання до конкретного канвасу."""
@@ -214,6 +240,13 @@ class MapPainter:
     def on_press(self, event):
         if not self.app.current_map_eng or self.app.mode != "edit": return
         if event.state & 0x0004:
+            return
+        if self._select_all:
+            palette = getattr(self.app, 'drawing_palette', None)
+            self._select_all = False
+            if palette:
+                palette._update_select_all_btn()
+            self.redraw()
             return
 
         palette = getattr(self.app, 'drawing_palette', None)
@@ -706,6 +739,27 @@ class MapPainter:
         self.save_drawings()
         self.redraw()
 
+    def _delete_all_selected(self):
+        if not self.app.current_map_eng:
+            return
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+        if not objects:
+            return
+        if not self._confirm_delete(self.app.t('ui', 'select_all')):
+            return
+        palette = getattr(self.app, 'drawing_palette', None)
+        for idx in range(len(objects) - 1, -1, -1):
+            self._deletion_history.append((map_id, idx, copy.deepcopy(objects[idx])))
+        self.drawings[map_id] = []
+        self._creation_history.clear()
+        self._editing_idx = -1
+        self._select_all = False
+        if palette:
+            palette._update_select_all_btn()
+        self.save_drawings()
+        self.redraw()
+
     def _confirm_delete(self, label):
         dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'confirm_title'))
         dialog_utils._DragHelper(dlg, hdr)
@@ -976,4 +1030,29 @@ class MapPainter:
 
         screen_scale = getattr(self.app, '_get_drawing_scale', lambda: 1.0)()
         self._render_elements(self.canvas, all_visible, cw, ch, screen_scale=screen_scale)
+
+        if self._select_all:
+            sel_sc = min(cw, ch) / 800.0
+            margin = max(4, int(8 * sel_sc))
+            for obj in visible:
+                c = obj["coords"]
+                if obj["type"] in ("marker", "arrow"):
+                    if len(c) < 4: continue
+                    x1 = c[0]*cw; y1 = c[1]*ch; x2 = c[2]*cw; y2 = c[3]*ch
+                    l = min(x1, x2) - margin; r = max(x1, x2) + margin
+                    t = min(y1, y2) - margin; b = max(y1, y2) + margin
+                elif obj["type"] == "brush":
+                    if len(c) < 4: continue
+                    xs = [c[i]*cw for i in range(0, len(c), 2)]
+                    ys = [c[i+1]*ch for i in range(0, len(c), 2)]
+                    l = min(xs) - margin; r = max(xs) + margin
+                    t = min(ys) - margin; b = max(ys) + margin
+                elif obj["type"] == "text":
+                    if len(c) < 2: continue
+                    l = c[0]*cw - 30*margin; r = c[0]*cw + 30*margin
+                    t = c[1]*ch - 30*margin; b = c[1]*ch + 30*margin
+                else:
+                    continue
+                self.canvas.create_rectangle(l, t, r, b, outline="yellow", dash=(4, 4), width=max(1, int(2*sel_sc)), tags="painter_obj")
+
         self.app._lift_overlay()

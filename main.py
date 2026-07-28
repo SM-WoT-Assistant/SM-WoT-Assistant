@@ -1347,10 +1347,16 @@ class WotAssistantHQ:
             self.root.after(100, self.toggle_editor)
 
     def _on_battle_mode_changed(self):
-        if self.btn_mode_maps_1.cget("bg") == "#ff4500":
-            self.map_mgr.load_map_list()
-        else:
-            self.on_map_select()
+        self.map_mgr.load_map_list()
+
+    def _toggle_select_all(self):
+        if self.active_view != "maps":
+            return
+        palette = getattr(self, 'drawing_palette', None)
+        if not palette or palette.state() == 'withdrawn':
+            return
+        self.painter.toggle_select_all()
+        palette._update_select_all_btn()
 
     def on_battle_detected(self, map_id, mode):
         self.last_battle_map = map_id
@@ -1870,6 +1876,7 @@ class WotAssistantHQ:
         keyboard.add_hotkey('shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
         keyboard.add_hotkey('shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=True)
+        keyboard.add_hotkey('ctrl+a', lambda: self.safe_execute(self._toggle_select_all), suppress=True)
         self.root.bind_all("<Control-Up>", lambda e: self._handle_ctrl_up())
         self.root.bind_all("<Control-Down>", lambda e: self._handle_ctrl_down())
         self.win_mgr.bind_controls(self.top_bar, self.canvas)
@@ -2143,6 +2150,13 @@ class WotAssistantHQ:
             text=self.t('ui', 'checking_updates'),
             fill="#bbbbbb",
             font=("Arial", 9),
+        )
+        self.splash_canvas.create_text(
+            sw//2,
+            sh - 15,
+            text=self.t('ui', 'borderless_warning'),
+            fill="#ffaa00",
+            font=("Arial", 8),
         )
         self.splash_percent_text = self.splash_canvas.create_text(
             sw - 34,
