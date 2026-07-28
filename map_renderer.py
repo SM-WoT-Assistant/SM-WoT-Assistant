@@ -268,11 +268,6 @@ class MapRenderer:
                 tk.Label(h2_frame, text=chr(0xF09C), font=("FontAwesome", 11), bg="black", fg="white").pack(side="left")
                 tk.Label(h2_frame, text="  " + app.t('ui', 'h2'), font=("Arial", 11, "bold"), bg="black", fg="white").pack(side="left")
                 app.canvas.create_window(cw//2, ch - 115, window=h2_frame, tags="map")
-            app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
-            app.canvas.create_text(cw//2, ch - 127, text=f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps",
-                fill="#888888", font=("Arial", 8), tags="map")
-            app.canvas.create_text(cw//2, ch - 155, text=app.t('ui', 'borderless_warning'),
-                fill="#ffaa00", font=("Arial", 8), tags="map")
             if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110
@@ -284,6 +279,13 @@ class MapRenderer:
                     except: pass
             else: 
                 app.canvas.create_text(cw//2, ch//2, text=f"{app.t('ui', 'battle_mode')}\n{app.t('ui', 'press_e_to_exit')}", fill="#555", font=("Arial", 12, "bold"), justify="center", tags="map")
+            app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
+            app.canvas.create_text(cw//2, ch - 250, text=app.t('ui', 'tactic_maps_source'),
+                fill="#888888", font=("Arial", 12), tags="map")
+            app.canvas.create_text(cw//2, ch - 232, text="wotmapsbyyaya.com/maps",
+                fill="#888888", font=("Arial", 10), tags="map")
+            app.canvas.create_text(cw//2, ch - 165, text=app.t('ui', 'borderless_warning'),
+                fill="red", font=("Arial", 10), tags="map")
             
         if hasattr(app, 'painter'):
             app.painter.redraw(cw, ch)

@@ -892,6 +892,10 @@ class UIManager:
             txt = lm.t(mo_key) if mo_key else None
             if not txt:
                 txt = self.app.t('ui', 'mode_' + mode_key.lower())
+            if mode_key == "Onslaught":
+                txt += " 10"
+            elif mode_key == "OnslaughtLight":
+                txt += " 8"
             clr = "#ffaa00" if v in ("Onslaught", "OnslaughtLight") else "white"
             tk.Radiobutton(m_frame, text=txt, variable=self.app.selected_battle_mode, value=v, bg="#222", fg=clr, selectcolor="black").pack(side="left", padx=3)
         c_frame = tk.LabelFrame(self.app.filters_container, text=" " + self.app.t('ui', 'vehicle_class_label') + " ", bg="#222", fg="#aaa", font=("Arial", 8, "bold"))

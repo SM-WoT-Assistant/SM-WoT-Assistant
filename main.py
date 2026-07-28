@@ -1376,6 +1376,7 @@ class WotAssistantHQ:
             "domination": "Encounter",
             "assault": "Storm",
             "comp7": "Onslaught",
+            "comp7_light": "OnslaughtLight",
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
@@ -1411,6 +1412,7 @@ class WotAssistantHQ:
             "domination": "Encounter",
             "assault": "Storm",
             "comp7": "Onslaught",
+            "comp7_light": "OnslaughtLight",
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.safe_battle_sync(map_id, ui_mode)
@@ -1859,7 +1861,7 @@ class WotAssistantHQ:
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
         keyboard.add_hotkey('F10', lambda: self.safe_execute(self.toggle_visibility))  # F10: Показати/Приховати вікно
-        keyboard.add_hotkey('tab', lambda: self.safe_execute(self.toggle_editor), suppress=False)
+        keyboard.add_hotkey('tab', lambda: self.safe_execute(self.toggle_editor) if self.current_map_eng else None, suppress=False)
         try:
             keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
         except Exception as e:
@@ -2153,7 +2155,7 @@ class WotAssistantHQ:
         )
         self.splash_canvas.create_text(
             sw//2,
-            sh - 15,
+            sh - 35,
             text=self.t('ui', 'borderless_warning'),
             fill="#ffaa00",
             font=("Arial", 8),

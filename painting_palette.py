@@ -149,6 +149,10 @@ class DrawingPalette(tk.Toplevel):
             txt = lm.t(mo_key) if mo_key else None
             if not txt:
                 txt = self.app.t('ui', 'mode_' + k.lower())
+            if k == "Onslaught":
+                txt += " 10"
+            elif k == "OnslaughtLight":
+                txt += " 8"
             cb = tk.Checkbutton(mf, text=txt, variable=v, command=self._on_any_change,
                                 **cb_style, font=("Arial", 8))
             cb.pack(side="left", padx=1)
