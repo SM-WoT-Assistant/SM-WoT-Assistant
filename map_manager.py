@@ -154,7 +154,13 @@ class MapManager:
                         ), daemon=True).start()
                         print(f"[MAP_MGR] pending_updates/builds signaled")
                     except Exception:
-                        pass
+                        try:
+                            import firebase_reporter
+                            firebase_reporter.report_fallback(
+                                "map_manager.check_game_version", "pending_updates/builds",
+                                "Failed to signal Firebase about game version change")
+                        except Exception:
+                            pass
                 required_tth_schema = 2
                 current_tth_schema = int(self.app.settings.get("tth_schema_version", 0) or 0)
                 tth_has_data = False
@@ -295,6 +301,10 @@ class MapManager:
                             ):
                                 tth_pipeline_ran = True
                                 emit(98, "stats_ai_tth_done")
+                                try:
+                                    tex.update_compact_descr()
+                                except Exception as e:
+                                    print(f"[WARN] update_compact_descr: {e}")
                             else:
                                 tanks_ok = False
                         else:
@@ -341,6 +351,17 @@ class MapManager:
                     except Exception as e:
                         print(f"[WARN] equipment_loadouts update failed: {e}")
 
+                    try:
+                        from parse_game_entities import GameEntitiesExtractor
+                        ex = GameEntitiesExtractor()
+                        if ex.run_step1():
+                            ex.save_to_json()
+                            from language_module import regenerate_game_entities
+                            regenerate_game_entities(None)
+                            emit(88, "entity_update_done")
+                    except Exception as e:
+                        print(f"[WARN] parse_game_entities failed: {e}")
+
                 if maps_ok and tanks_ok:
                     if version_changed:
                         self.app.settings["game_version"] = current_v
@@ -379,6 +400,13 @@ class MapManager:
             with open(dict_path, "r", encoding="utf-8") as f:
                 maps_maps = json.load(f)
         except Exception:
+            try:
+                import firebase_reporter
+                firebase_reporter.report_fallback(
+                    "map_manager._detect_pending_tactic_maps", "map_dictionary.json",
+                    "Failed to load map dictionary")
+            except Exception:
+                pass
             return
 
         existing_folders = set()
@@ -527,6 +555,13 @@ class MapManager:
         else:
             self.app.extractor_names = {}
             self.app.map_list_eng = []
+            try:
+                import firebase_reporter
+                firebase_reporter.report_fallback(
+                    "map_manager.load_map_list", "map_dictionary.json",
+                    "Map dictionary empty or missing")
+            except Exception:
+                pass
 
         if is_tactic:
             self.app.map_list_eng = [m for m in self.app.map_list_eng if self._tactic_image_exists(m)]

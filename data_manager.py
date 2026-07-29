@@ -54,18 +54,28 @@ class DataManager:
                 if hp <= 1750: return 9
                 return 10
 
+            _have_report_fallback = False
+            def _rf(source, context, text, level="critical"):
+                nonlocal _have_report_fallback
+                if not _have_report_fallback:
+                    try:
+                        import firebase_reporter
+                        firebase_reporter.report_fallback(source, context, text, level)
+                    except Exception:
+                        pass
+                    _have_report_fallback = True
+
             if os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")):
                 with open(os.path.join(config.BASE_DIR, "tank_db.json"), "r", encoding="utf-8") as f:
                     db = json.load(f)
                     clean_db = {}
-                    # Технічні / евентові / видалені з гри танки
                     bad_tags = [
                         "_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test",
                         "_training", "tutorial", "observer", "r05_kv", "r70_t_50_2",
                         "sherman_crab", "g00_", "_cfe", "auto_s", "auto_test",
-                        "_shxxi", "_bomber", "pillbox", "env_artillery",  # Тех об'єкти
-                        "a08_t23", "a26_t18", "a15_t57",  # USA вилучені танки
-                        "_newonboarding", "_storymode",   # Тренувальні
+                        "_shxxi", "_bomber", "pillbox", "env_artillery",
+                        "a08_t23", "a26_t18", "a15_t57",
+                        "_newonboarding", "_storymode",
                     ]
                     icons_dir = os.path.join(config.BASE_DIR, "extracted_icons")
                     for k, v in db.items():
@@ -78,6 +88,8 @@ class DataManager:
                         clean_db[k] = v
                     if clean_db:
                         return clean_db
+                    _rf("data_manager.load_tank_db", "tank_db.json",
+                        "tank_db.json empty after filtering — falling back to tank_tth.json")
 
             tth_path = os.path.join(config.BASE_DIR, "tank_tth.json")
             tth_db = {}
@@ -109,7 +121,11 @@ class DataManager:
                         }
                     if clean_db:
                         print(f"[DB] Fallback: завантажено {len(clean_db)} танків із tank_tth.json")
+                        _rf("data_manager.load_tank_db", "tank_db.json→tank_tth.json",
+                            f"used tank_tth fallback for {len(clean_db)} tanks", level="warning")
                         return clean_db
+                    _rf("data_manager.load_tank_db", "tank_tth.json",
+                        "tank_db and tank_tth both empty — falling back to extracted_data filenames")
 
             extracted_root = os.path.join(config.BASE_DIR, "extracted_data")
             if os.path.isdir(extracted_root):
@@ -151,7 +167,15 @@ class DataManager:
                     except Exception as e:
                         print(f"[DB] Попередження: не вдалося зберегти fallback tank_db.json: {e}")
                     print(f"[DB] Last-resort fallback: завантажено {len(rough_db)} танків із extracted_data")
+                    _rf("data_manager.load_tank_db", "extracted_data/",
+                        f"last resort fallback from extracted filenames: {len(rough_db)} tanks", level="warning")
                     return rough_db
         except Exception as e:
             print(f"[DB] load_tank_db error: {e}")
+            try:
+                import firebase_reporter
+                firebase_reporter.report_fallback("data_manager.load_tank_db", "all sources",
+                    f"Complete failure: {e}", level="critical")
+            except Exception:
+                pass
         return {}

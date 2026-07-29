@@ -828,9 +828,10 @@ class TankExtractor:
             nation_path = os.path.join(EXTRACT_DIR, nation)
             if not os.path.isdir(nation_path): continue
 
+            nation_base = re.sub(r'_\d+$', '', nation.lower())
             nation_mapping = {"usa": "USA", "ussr": "USSR", "uk": "UK"}
-            display_nation = nation_mapping.get(nation.lower(), nation.capitalize())
-            nation_id = NATION_IDS.get(nation.lower(), -1)
+            display_nation = nation_mapping.get(nation_base, nation_base.capitalize())
+            nation_id = NATION_IDS.get(nation_base, -1)
 
             def _upsert_tank(tag, level_text, tags_text, id_text="", is_premium_hint=False):
                 if not tag:
@@ -985,6 +986,64 @@ class TankExtractor:
             localize_tank_db(self.wot_path)
         except Exception as e:
             print(f"[WARN] Не вдалося підтягнути локалізовані назви: {e}")
+        return True
+
+    def update_compact_descr(self, tank_db_path="tank_db.json"):
+        """Оновлює тільки поле compact_descr у існуючому tank_db.json.
+        Парсить versioned папки (china_4/, usa_9/) зі збереженими XML.
+        Idempotent — не змінює вже заповнені compact_descr,
+        не чіпає інші поля (name, tier, class, nation, icon).
+        """
+        if not os.path.exists(tank_db_path):
+            print(f"[WARN] update_compact_descr: {tank_db_path} не знайдено")
+            return False
+        with open(tank_db_path, "r", encoding="utf-8") as f:
+            tank_db = json.load(f)
+        NATION_IDS = {
+            "ussr": 0, "germany": 1, "usa": 2, "china": 3,
+            "france": 4, "uk": 5, "japan": 6, "czech": 7,
+            "sweden": 8, "poland": 9, "italy": 10,
+        }
+        updated = 0
+        for nation in os.listdir(EXTRACT_DIR):
+            nation_path = os.path.join(EXTRACT_DIR, nation)
+            if not os.path.isdir(nation_path):
+                continue
+            nation_base = re.sub(r'_\d+$', '', nation.lower())
+            nation_id = NATION_IDS.get(nation_base, -1)
+            if nation_id < 0:
+                continue
+            list_xml = os.path.join(nation_path, "list.xml")
+            if not os.path.exists(list_xml):
+                continue
+            try:
+                with open(list_xml, "r", encoding="utf-8", errors="ignore") as f:
+                    xml_text = f.read().strip()
+                xml_text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', xml_text, flags=re.DOTALL)
+                if xml_text.startswith("<"):
+                    xml_text = re.sub(r'^<[^>]+>', '<root>', xml_text, count=1)
+                    xml_text = re.sub(r'</[^>]+>\s*$', '</root>', xml_text)
+                root = ET.fromstring(xml_text)
+                for tank in root:
+                    tag = tank.tag
+                    if tag not in tank_db:
+                        continue
+                    if tank_db[tag].get("compact_descr") is not None:
+                        continue
+                    id_text = tank.findtext("id", "").strip()
+                    if not id_text.isdigit():
+                        continue
+                    cd = (int(id_text) << 8) | (nation_id << 4) | 1
+                    tank_db[tag]["compact_descr"] = cd
+                    updated += 1
+            except Exception:
+                continue
+        if updated:
+            with open(tank_db_path, "w", encoding="utf-8") as f:
+                json.dump(tank_db, f, ensure_ascii=False, indent=4)
+            print(f"[compact_descr] Оновлено {updated} танків")
+        else:
+            print("[compact_descr] Немає танків для оновлення")
         return True
 
 if __name__ == "__main__":

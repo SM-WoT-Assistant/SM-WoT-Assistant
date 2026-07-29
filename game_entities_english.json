@@ -1696,6 +1696,126 @@
     "smokeSignal": {
       "name": "smokeSignal",
       "tags": ""
+    },
+    "commander_coordination": {
+      "name": "commander_coordination",
+      "icon": "commander_coordination",
+      "original_ukr": "Commander Coordination"
+    },
+    "commander_emergency": {
+      "name": "commander_emergency",
+      "icon": "commander_emergency",
+      "original_ukr": "Commander Emergency"
+    },
+    "commander_holdLine": {
+      "name": "commander_holdLine",
+      "icon": "commander_holdLine",
+      "original_ukr": "Commander Holdline"
+    },
+    "commander_staySharp": {
+      "name": "commander_staySharp",
+      "icon": "commander_staySharp",
+      "original_ukr": "Commander Staysharp"
+    },
+    "commander_tutor": {
+      "name": "commander_tutor",
+      "icon": "commander_tutor",
+      "original_ukr": "Commander Tutor"
+    },
+    "driver_bulletproof": {
+      "name": "driver_bulletproof",
+      "icon": "driver_bulletproof",
+      "original_ukr": "Driver Bulletproof"
+    },
+    "driver_motorExpert": {
+      "name": "driver_motorExpert",
+      "icon": "driver_motorExpert",
+      "original_ukr": "Driver Motorexpert"
+    },
+    "driver_reliablePlacement": {
+      "name": "driver_reliablePlacement",
+      "icon": "driver_reliablePlacement",
+      "original_ukr": "Driver Reliableplacement"
+    },
+    "driver_suspensionRepair": {
+      "name": "driver_suspensionRepair",
+      "icon": "driver_suspensionRepair",
+      "original_ukr": "Driver Suspensionrepair"
+    },
+    "gunner_armorer": {
+      "name": "gunner_armorer",
+      "icon": "gunner_armorer",
+      "original_ukr": "Gunner Armorer"
+    },
+    "gunner_loneWolf": {
+      "name": "gunner_loneWolf",
+      "icon": "gunner_loneWolf",
+      "original_ukr": "Gunner Lonewolf"
+    },
+    "gunner_pointBlast": {
+      "name": "gunner_pointBlast",
+      "icon": "gunner_pointBlast",
+      "original_ukr": "Gunner Pointblast"
+    },
+    "gunner_quickAiming": {
+      "name": "gunner_quickAiming",
+      "icon": "gunner_quickAiming",
+      "original_ukr": "Gunner Quickaiming"
+    },
+    "loader_ammunitionImprove": {
+      "name": "loader_ammunitionImprove",
+      "icon": "loader_ammunitionImprove",
+      "original_ukr": "Loader Ammunitionimprove"
+    },
+    "loader_magMastery": {
+      "name": "loader_magMastery",
+      "icon": "loader_magMastery",
+      "original_ukr": "Loader Magmastery"
+    },
+    "loader_melee": {
+      "name": "loader_melee",
+      "icon": "loader_melee",
+      "original_ukr": "Loader Melee"
+    },
+    "loader_perfectCharge": {
+      "name": "loader_perfectCharge",
+      "icon": "loader_perfectCharge",
+      "original_ukr": "Loader Perfectcharge"
+    },
+    "loader_secondChance": {
+      "name": "loader_secondChance",
+      "icon": "loader_secondChance",
+      "original_ukr": "Loader Secondchance"
+    },
+    "radioman_battleTempered": {
+      "name": "radioman_battleTempered",
+      "icon": "radioman_battleTempered",
+      "original_ukr": "Radioman Battletempered"
+    },
+    "radioman_expert": {
+      "name": "radioman_expert",
+      "icon": "radioman_expert",
+      "original_ukr": "Radioman Expert"
+    },
+    "radioman_interference": {
+      "name": "radioman_interference",
+      "icon": "radioman_interference",
+      "original_ukr": "Radioman Interference"
+    },
+    "radioman_sideBySide": {
+      "name": "radioman_sideBySide",
+      "icon": "radioman_sideBySide",
+      "original_ukr": "Radioman Sidebyside"
+    },
+    "radioman_signalInterception": {
+      "name": "radioman_signalInterception",
+      "icon": "radioman_signalInterception",
+      "original_ukr": "Radioman Signalinterception"
+    },
+    "radioman_threatSearch": {
+      "name": "radioman_threatSearch",
+      "icon": "radioman_threatSearch",
+      "original_ukr": "Radioman Threatsearch"
     }
   },
   "field_mods": {
@@ -1758,6 +1878,131 @@
     "noModification": {
       "name": "noModification",
       "type": "standard"
+    },
+    "additionalGrousers": {
+      "name": "additionalGrousers",
+      "icon": "additionalGrousers",
+      "original_ukr": "Additional Grousers"
+    },
+    "betterFriction": {
+      "name": "betterFriction",
+      "icon": "betterFriction",
+      "original_ukr": "Better Friction"
+    },
+    "improvedAimingHandling": {
+      "name": "improvedAimingHandling",
+      "icon": "improvedAimingHandling",
+      "original_ukr": "Improved Aiming Handling"
+    },
+    "improvedCamouflage": {
+      "name": "improvedCamouflage",
+      "icon": "improvedCamouflage",
+      "original_ukr": "Improved Camouflage"
+    },
+    "improvedChassisDurability": {
+      "name": "improvedChassisDurability",
+      "icon": "improvedChassisDurability",
+      "original_ukr": "Improved Chassis Durability"
+    },
+    "improvedChassisStability": {
+      "name": "improvedChassisStability",
+      "icon": "improvedChassisStability",
+      "original_ukr": "Improved Chassis Stability"
+    },
+    "improvedEnginePower": {
+      "name": "improvedEnginePower",
+      "icon": "improvedEnginePower",
+      "original_ukr": "Improved Engine Power"
+    },
+    "improvedGunBreech": {
+      "name": "improvedGunBreech",
+      "icon": "improvedGunBreech",
+      "original_ukr": "Improved Gun Breech"
+    },
+    "improvedLightFilters": {
+      "name": "improvedLightFilters",
+      "icon": "improvedLightFilters",
+      "original_ukr": "Improved Light Filters"
+    },
+    "improvedMuzzleBreak": {
+      "name": "improvedMuzzleBreak",
+      "icon": "improvedMuzzleBreak",
+      "original_ukr": "Improved Muzzle Break"
+    },
+    "improvedObservationDevice": {
+      "name": "improvedObservationDevice",
+      "icon": "improvedObservationDevice",
+      "original_ukr": "Improved Observation Device"
+    },
+    "improvedReflexScopes": {
+      "name": "improvedReflexScopes",
+      "icon": "improvedReflexScopes",
+      "original_ukr": "Improved Reflex Scopes"
+    },
+    "improvedScope": {
+      "name": "improvedScope",
+      "icon": "improvedScope",
+      "original_ukr": "Improved Scope"
+    },
+    "improvedSelfRepairingTracks": {
+      "name": "improvedSelfRepairingTracks",
+      "icon": "improvedSelfRepairingTracks",
+      "original_ukr": "Improved Self Repairing Tracks"
+    },
+    "improvedSelfRepairingWheels": {
+      "name": "improvedSelfRepairingWheels",
+      "icon": "improvedSelfRepairingWheels",
+      "original_ukr": "Improved Self Repairing Wheels"
+    },
+    "improvedSharpnessVisor": {
+      "name": "improvedSharpnessVisor",
+      "icon": "improvedSharpnessVisor",
+      "original_ukr": "Improved Sharpness Visor"
+    },
+    "improvedSpallingResistance": {
+      "name": "improvedSpallingResistance",
+      "icon": "improvedSpallingResistance",
+      "original_ukr": "Improved Spalling Resistance"
+    },
+    "improvedSpeedIndicator": {
+      "name": "improvedSpeedIndicator",
+      "icon": "improvedSpeedIndicator",
+      "original_ukr": "Improved Speed Indicator"
+    },
+    "improvedSpeedIndicatorBackwards": {
+      "name": "improvedSpeedIndicatorBackwards",
+      "icon": "improvedSpeedIndicatorBackwards",
+      "original_ukr": "Improved Speed Indicator Backwards"
+    },
+    "improvedTurretRingStability": {
+      "name": "improvedTurretRingStability",
+      "icon": "improvedTurretRingStability",
+      "original_ukr": "Improved Turret Ring Stability"
+    },
+    "improvedTurretTurningWheels": {
+      "name": "improvedTurretTurningWheels",
+      "icon": "improvedTurretTurningWheels",
+      "original_ukr": "Improved Turret Turning Wheels"
+    },
+    "increasedSensitivityOptics": {
+      "name": "increasedSensitivityOptics",
+      "icon": "increasedSensitivityOptics",
+      "original_ukr": "Increased Sensitivity Optics"
+    },
+    "increasedThickness": {
+      "name": "increasedThickness",
+      "icon": "increasedThickness",
+      "original_ukr": "Increased Thickness"
+    },
+    "reinforcedInteriorModules": {
+      "name": "reinforcedInteriorModules",
+      "icon": "reinforcedInteriorModules",
+      "original_ukr": "Reinforced Interior Modules"
+    },
+    "reinforcedStructure": {
+      "name": "reinforcedStructure",
+      "icon": "reinforcedStructure",
+      "original_ukr": "Reinforced Structure"
     }
   },
   "ammo_types": {}

@@ -1,4 +1,4 @@
-import os
+﻿import os
 import struct
 import base64
 
@@ -45,20 +45,16 @@ class WotXmlParser:
         return True
     
     def read_element(self, name, depth):
-        if self.offset + 6 > len(self.data):
+        if self.offset >= len(self.data):
             return ""
         
         children_count = struct.unpack_from('<H', self.data, self.offset)[0]
-        if children_count > 50000:
-            return ""
         self.offset += 2
         descriptor = struct.unpack_from('<I', self.data, self.offset)[0]
         self.offset += 4
         
         children = []
         for _ in range(children_count):
-            if self.offset + 6 > len(self.data):
-                break
             child_id = struct.unpack_from('<H', self.data, self.offset)[0]
             self.offset += 2
             data_desc = struct.unpack_from('<I', self.data, self.offset)[0]
@@ -71,21 +67,11 @@ class WotXmlParser:
         result = f"{indent}<{name}>\n"
         
         for child in children:
-            if child['id'] >= len(self.dictionary):
-                self.offset = data_start + (child['desc'] & 0x0FFFFFFF)
-                continue
-            
             tag_name = self.dictionary[child['id']]
             end_address = child['desc'] & 0x0FFFFFFF
             data_type = child['desc'] >> 28
             
             child_end_offset = data_start + end_address
-            if child_end_offset > len(self.data):
-                child_end_offset = len(self.data)
-            if self.offset > child_end_offset:
-                self.offset = child_end_offset
-                continue
-            
             length = child_end_offset - self.offset
             
             child_indent = "  " * (depth + 1)
@@ -94,10 +80,7 @@ class WotXmlParser:
                 if length == 0:
                     result += f"{child_indent}<{tag_name}></{tag_name}>\n"
                 else:
-                    if self.offset >= len(self.data):
-                        result += f"{child_indent}<{tag_name}></{tag_name}>\n"
-                    else:
-                        result += self.read_element(tag_name, depth + 1)
+                    result += self.read_element(tag_name, depth + 1)
             else:
                 val = ""
                 if data_type == 1:

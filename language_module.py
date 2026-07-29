@@ -3,6 +3,7 @@ language_module.py — Parse .mo files from WoT game client (any language).
 Detects language, builds dictionaries, exports locale JSON for website.
 """
 import os
+import re
 import json
 import struct
 import xml.etree.ElementTree as ET
@@ -374,6 +375,15 @@ def setup(wot_path, settings, save_callback):
         _lang_module = LanguageModule(wot_path)
         _lang_module._cache_dir = os.path.join(config.USER_DATA_DIR, "localization", lang)
         _lang_module.load_cache()
+
+    try:
+        from stats_data import generate_mo_maps
+        if lm and lm.dictionaries:
+            generate_mo_maps(lm, lang)
+            print(f"[LANG SETUP] mo_maps generated for {lang}")
+    except Exception as e:
+        print(f"[LANG SETUP] mo_maps error: {e}")
+
     return lang
 
 
@@ -452,6 +462,17 @@ def regenerate_game_entities(lm):
                 "icon": data.get("icon", ""),
                 "original_ukr": original_ref,
             }
+            added += 1
+
+            if lm is not None:
+                resolved_name = None
+                if cat_key in ("equipment", "consumables"):
+                    base_id = re.sub(r'_tier\d+$', '', eid) if cat_key == "equipment" else eid
+                    resolved_name = lm.t(f"archetype/{base_id}/name")
+                elif cat_key == "crew_perks":
+                    resolved_name = lm.t(f"{eid}/name")
+                if resolved_name and not resolved_name.startswith("#") and "/name" not in resolved_name:
+                    existing_cat[eid]["name"] = resolved_name
             added += 1
 
     if added > 0:

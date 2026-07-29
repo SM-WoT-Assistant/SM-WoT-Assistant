@@ -44,7 +44,7 @@ ROLE_SKILL_POOLS = {
         "commander_sixthSense", "commander_practical", "commander_eagleEye",
         "commander_enemyShotPredictor", "commander_emergency", "commander_tutor",
         "commander_coordination", "commander_holdLine", "commander_staySharp",
-        "repair", "camouflage", "brotherhood", "fireFighting"
+        "repair", "camouflage", "brotherhood"
     ],
     "gunner": [
         "gunner_sniper", "gunner_focus", "gunner_rancorous",

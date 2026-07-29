@@ -83,6 +83,24 @@ def _post(path, data, timeout=8):
         return False
 
 
+def report_fallback(source, context, error_text, level="warning"):
+    """Повідомити про використання fallback замість реальних даних.
+    
+    Args:
+        source: звідки викликано (напр. 'data_manager.load_tank_db')
+        context: які дані не вдалося завантажити (напр. 'tank_db.json')
+        error_text: опис помилки
+        level: 'warning' (non-fatal) або 'critical' (data loss)
+    """
+    report_error(
+        error_type="fallback",
+        stage="runtime",
+        error_text=f"[{level.upper()}] {source}: {error_text[:300]}",
+        blocked=(level == "critical"),
+        details={"source": source, "context": context, "fallback_level": level}
+    )
+
+
 def report_error(error_type, stage, error_text, blocked=False, details=None, message="", stack_trace=""):
     """Відправити помилку в RTDB error_reports/. Повертає True якщо успішно."""
     try:

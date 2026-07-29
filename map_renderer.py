@@ -57,6 +57,16 @@ class MapRenderer:
         self.app.canvas.create_rectangle(map_x - border, map_y, map_x, map_y + size, fill=fc, outline="", tags=("map", "frame"))
         self.app.canvas.create_rectangle(map_x + size, map_y, map_x + size + border, map_y + size, fill=fc, outline="", tags=("map", "frame"))
 
+    def _report_fallback_async(self, context, text):
+        try:
+            import threading
+            import firebase_reporter
+            threading.Thread(target=firebase_reporter.report_fallback, args=(
+                "map_renderer", context, text, "warning"
+            ), daemon=True).start()
+        except Exception:
+            pass
+
     def draw_arena_bases(self, cw, ch):
         app = self.app
         if not app.map_data or app.current_map_eng not in app.map_data: return
@@ -67,6 +77,9 @@ class MapRenderer:
         
         if not isinstance(bl, list) or len(bl) < 2: bl = [-500.0, -500.0]
         if not isinstance(ur, list) or len(ur) < 2: ur = [500.0, 500.0]
+        if bbox and ("bottomLeft" not in bbox or "upperRight" not in bbox):
+            self._report_fallback_async("boundingBox",
+                f"Missing boundingBox in map_data for {app.current_map_eng}")
         
         minX, minZ = bl[0], bl[1]
         maxX, maxZ = ur[0], ur[1]
@@ -141,6 +154,9 @@ class MapRenderer:
         ur = bbox.get("upperRight", [500.0, 500.0])
         if not isinstance(bl, list) or len(bl) < 2: bl = [-500.0, -500.0]
         if not isinstance(ur, list) or len(ur) < 2: ur = [500.0, 500.0]
+        if bbox and ("bottomLeft" not in bbox or "upperRight" not in bbox):
+            self._report_fallback_async("boundingBox",
+                f"Missing boundingBox in draw_grid for {app.current_map_eng}")
         minX, minZ = bl[0], bl[1]
         maxX, maxZ = ur[0], ur[1]
         width_game = maxX - minX

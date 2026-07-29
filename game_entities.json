@@ -1469,629 +1469,6 @@
       "icon": "comp7_light_march 0 0",
       "type": "standard",
       "price": "0"
-    },
-    "deluxImprovedConfiguration": {
-      "id": "deluxImprovedConfiguration",
-      "name": "\t#artefacts:deluxImprovedConfiguration/name\t",
-      "icon": "improvedConfiguration",
-      "type": "deluxe",
-      "price": "3000"
-    },
-    "deluxImprovedVentilation": {
-      "id": "deluxImprovedVentilation",
-      "name": "\t#artefacts:deluxImprovedVentilation/name\t",
-      "icon": "improvedVentilation",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxRammer": {
-      "id": "deluxRammer",
-      "name": "\t#artefacts:deluxRammer/name\t",
-      "icon": "rammer",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxCoatedOptics": {
-      "id": "deluxCoatedOptics",
-      "name": "\t#artefacts:deluxCoatedOptics/name\t",
-      "icon": "coatedOptics",
-      "type": "deluxe",
-      "price": "4000"
-    },
-    "deluxAimingStabilizer": {
-      "id": "deluxAimingStabilizer",
-      "name": "\t#artefacts:deluxAimingStabilizer/name\t",
-      "icon": "aimingStabilizer",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxEnhancedAimDrives": {
-      "id": "deluxEnhancedAimDrives",
-      "name": "\t#artefacts:deluxEnhancedAimDrives/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxeTurbocharger": {
-      "id": "deluxeTurbocharger",
-      "name": "\t#artefacts:deluxeTurbocharger/name\t",
-      "icon": "turbocharger",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxeExtraHealthReserve": {
-      "id": "deluxeExtraHealthReserve",
-      "name": "\t#artefacts:deluxeExtraHealthReserve/name\t",
-      "icon": "extraHealthReserve",
-      "type": "deluxe",
-      "price": "6000"
-    },
-    "deluxeImprovedRotationMechanism": {
-      "id": "deluxeImprovedRotationMechanism",
-      "name": "\t#artefacts:deluxeImprovedRotationMechanism/name\t",
-      "icon": "improvedRotationMechanism",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxeImprovedSights": {
-      "id": "deluxeImprovedSights",
-      "name": "\t#artefacts:deluxeImprovedSights/name\t",
-      "icon": "improvedSights",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxeAdditionalInvisibilityDevice": {
-      "id": "deluxeAdditionalInvisibilityDevice",
-      "name": "\t#artefacts:deluxeAdditionalInvisibilityDevice/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "deluxe",
-      "price": "6000"
-    },
-    "deluxeStereoscope": {
-      "id": "deluxeStereoscope",
-      "name": "\t#artefacts:deluxeStereoscope/name\t",
-      "icon": "stereoscope",
-      "type": "deluxe",
-      "price": "5000"
-    },
-    "deluxeCamouflageNet": {
-      "id": "deluxeCamouflageNet",
-      "name": "\t#artefacts:deluxeCamouflageNet/name\t",
-      "icon": "camouflageNet",
-      "type": "deluxe",
-      "price": "4000"
-    },
-    "trophyBasicAimDrives": {
-      "id": "trophyBasicAimDrives",
-      "name": "\t#artefacts:trophyBasicAimDrives/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedAimDrives": {
-      "id": "trophyUpgradedAimDrives",
-      "name": "\t#artefacts:trophyBasicAimDrives/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicTankRammer": {
-      "id": "trophyBasicTankRammer",
-      "name": "\t#artefacts:trophyBasicTankRammer/name\t",
-      "icon": "rammer",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedTankRammer": {
-      "id": "trophyUpgradedTankRammer",
-      "name": "\t#artefacts:trophyBasicTankRammer/name\t",
-      "icon": "rammer",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicImprovedVentilation": {
-      "id": "trophyBasicImprovedVentilation",
-      "name": "\t#artefacts:trophyBasicImprovedVentilation/name\t",
-      "icon": "improvedVentilation",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedImprovedVentilation": {
-      "id": "trophyUpgradedImprovedVentilation",
-      "name": "\t#artefacts:trophyUpgradedImprovedVentilation/name\t",
-      "icon": "improvedVentilation",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicAimingStabilizer": {
-      "id": "trophyBasicAimingStabilizer",
-      "name": "\t#artefacts:trophyBasicAimingStabilizer/name\t",
-      "icon": "aimingStabilizer",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedAimingStabilizer": {
-      "id": "trophyUpgradedAimingStabilizer",
-      "name": "\t#artefacts:trophyUpgradedAimingStabilizer/name\t",
-      "icon": "aimingStabilizer",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicCoatedOptics": {
-      "id": "trophyBasicCoatedOptics",
-      "name": "\t#artefacts:trophyBasicCoatedOptics/name\t",
-      "icon": "coatedOptics",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedCoatedOptics": {
-      "id": "trophyUpgradedCoatedOptics",
-      "name": "\t#artefacts:trophyUpgradedCoatedOptics/name\t",
-      "icon": "coatedOptics",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicImprovedConfiguration": {
-      "id": "trophyBasicImprovedConfiguration",
-      "name": "\t#artefacts:trophyBasicImprovedConfiguration/name\t",
-      "icon": "improvedConfiguration",
-      "type": "deluxe",
-      "price": "100000"
-    },
-    "trophyUpgradedImprovedConfiguration": {
-      "id": "trophyUpgradedImprovedConfiguration",
-      "name": "\t#artefacts:trophyUpgradedImprovedConfiguration/name\t",
-      "icon": "improvedConfiguration",
-      "type": "deluxe",
-      "price": "100000"
-    },
-    "trophyBasicImprovedRotationMechanism": {
-      "id": "trophyBasicImprovedRotationMechanism",
-      "name": "\t#artefacts:trophyBasicImprovedRotationMechanism/name\t",
-      "icon": "improvedRotationMechanism",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedImprovedRotationMechanism": {
-      "id": "trophyUpgradedImprovedRotationMechanism",
-      "name": "\t#artefacts:trophyUpgradedImprovedRotationMechanism/name\t",
-      "icon": "improvedRotationMechanism",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicImprovedSights": {
-      "id": "trophyBasicImprovedSights",
-      "name": "\t#artefacts:trophyBasicImprovedSights/name\t",
-      "icon": "improvedSights",
-      "type": "deluxe",
-      "price": "100000"
-    },
-    "trophyUpgradedImprovedSights": {
-      "id": "trophyUpgradedImprovedSights",
-      "name": "\t#artefacts:trophyUpgradedImprovedSights/name\t",
-      "icon": "improvedSights",
-      "type": "deluxe",
-      "price": "100000"
-    },
-    "trophyBasicAdditionalInvisibilityDevice": {
-      "id": "trophyBasicAdditionalInvisibilityDevice",
-      "name": "\t#artefacts:trophyBasicAdditionalInvisibilityDevice/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedAdditionalInvisibilityDevice": {
-      "id": "trophyUpgradedAdditionalInvisibilityDevice",
-      "name": "\t#artefacts:trophyUpgradedAdditionalInvisibilityDevice/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicTurbocharger": {
-      "id": "trophyBasicTurbocharger",
-      "name": "\t#artefacts:trophyBasicTurbocharger/name\t",
-      "icon": "../maps/icons/artefact/turbocharger.png 0 0",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedTurbocharger": {
-      "id": "trophyUpgradedTurbocharger",
-      "name": "\t#artefacts:trophyUpgradedTurbocharger/name\t",
-      "icon": "../maps/icons/artefact/turbocharger.png 0 0",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyBasicExtraHealthReserve": {
-      "id": "trophyBasicExtraHealthReserve",
-      "name": "\t#artefacts:trophyBasicExtraHealthReserve/name\t",
-      "icon": "extraHealthReserve",
-      "type": "standard",
-      "price": "100000"
-    },
-    "trophyUpgradedExtraHealthReserve": {
-      "id": "trophyUpgradedExtraHealthReserve",
-      "name": "\t#artefacts:trophyUpgradedExtraHealthReserve/name\t",
-      "icon": "extraHealthReserve",
-      "type": "standard",
-      "price": "100000"
-    },
-    "improvedConfiguration_tier2": {
-      "id": "improvedConfiguration_tier2",
-      "name": "\t#artefacts:improvedConfiguration_tier2/name\t",
-      "icon": "improvedConfiguration",
-      "type": "deluxe",
-      "price": "200000"
-    },
-    "improvedConfiguration_tier1": {
-      "id": "improvedConfiguration_tier1",
-      "name": "\t#artefacts:improvedConfiguration_tier1/name\t",
-      "icon": "improvedConfiguration",
-      "type": "deluxe",
-      "price": "600000"
-    },
-    "antifragmentationLining_tier4": {
-      "id": "antifragmentationLining_tier4",
-      "name": "\t#artefacts:antifragmentationLining_tier4/name\t",
-      "icon": "antifragmentationLining",
-      "type": "standard",
-      "price": "50000"
-    },
-    "antifragmentationLining_tier3": {
-      "id": "antifragmentationLining_tier3",
-      "name": "\t#artefacts:antifragmentationLining_tier3/name\t",
-      "icon": "antifragmentationLining",
-      "type": "standard",
-      "price": "200000"
-    },
-    "antifragmentationLining_tier2": {
-      "id": "antifragmentationLining_tier2",
-      "name": "\t#artefacts:antifragmentationLining_tier2/name\t",
-      "icon": "antifragmentationLining",
-      "type": "standard",
-      "price": "500000"
-    },
-    "antifragmentationLining_tier1": {
-      "id": "antifragmentationLining_tier1",
-      "name": "\t#artefacts:antifragmentationLining_tier1/name\t",
-      "icon": "antifragmentationLining",
-      "type": "standard",
-      "price": "750000"
-    },
-    "stereoscope_tier3": {
-      "id": "stereoscope_tier3",
-      "name": "\t#artefacts:stereoscope_tier3/name\t",
-      "icon": "stereoscope",
-      "type": "standard",
-      "price": "50000"
-    },
-    "stereoscope_tier2": {
-      "id": "stereoscope_tier2",
-      "name": "\t#artefacts:stereoscope_tier2/name\t",
-      "icon": "stereoscope",
-      "type": "standard",
-      "price": "200000"
-    },
-    "stereoscope_tier1": {
-      "id": "stereoscope_tier1",
-      "name": "\t#artefacts:stereoscope_tier1/name\t",
-      "icon": "stereoscope",
-      "type": "standard",
-      "price": "600000"
-    },
-    "coatedOptics_tier3": {
-      "id": "coatedOptics_tier3",
-      "name": "\t#artefacts:coatedOptics_tier3/name\t",
-      "icon": "coatedOptics",
-      "type": "standard",
-      "price": "50000"
-    },
-    "coatedOptics_tier2": {
-      "id": "coatedOptics_tier2",
-      "name": "\t#artefacts:coatedOptics_tier2/name\t",
-      "icon": "coatedOptics",
-      "type": "standard",
-      "price": "200000"
-    },
-    "coatedOptics_tier1": {
-      "id": "coatedOptics_tier1",
-      "name": "\t#artefacts:coatedOptics_tier1/name\t",
-      "icon": "coatedOptics",
-      "type": "standard",
-      "price": "600000"
-    },
-    "camouflageNet_tier3": {
-      "id": "camouflageNet_tier3",
-      "name": "\t#artefacts:camouflageNet_tier3/name\t",
-      "icon": "camouflageNet",
-      "type": "standard",
-      "price": "50000"
-    },
-    "camouflageNet_tier2": {
-      "id": "camouflageNet_tier2",
-      "name": "\t#artefacts:camouflageNet_tier2/name\t",
-      "icon": "camouflageNet",
-      "type": "standard",
-      "price": "100000"
-    },
-    "improvedVentilation_tier3": {
-      "id": "improvedVentilation_tier3",
-      "name": "\t#artefacts:improvedVentilation_tier3/name\t",
-      "icon": "improvedVentilation",
-      "type": "standard",
-      "price": "50000"
-    },
-    "improvedVentilation_tier2": {
-      "id": "improvedVentilation_tier2",
-      "name": "\t#artefacts:improvedVentilation_tier2/name\t",
-      "icon": "improvedVentilation",
-      "type": "standard",
-      "price": "200000"
-    },
-    "improvedVentilation_tier1": {
-      "id": "improvedVentilation_tier1",
-      "name": "\t#artefacts:improvedVentilation_tier1/name\t",
-      "icon": "improvedVentilation",
-      "type": "standard",
-      "price": "600000"
-    },
-    "grousers_tier3": {
-      "id": "grousers_tier3",
-      "name": "\t#artefacts:grousers_tier3/name\t",
-      "icon": "grousers",
-      "type": "standard",
-      "price": "50000"
-    },
-    "grousers_tier2": {
-      "id": "grousers_tier2",
-      "name": "\t#artefacts:grousers_tier2/name\t",
-      "icon": "grousers",
-      "type": "standard",
-      "price": "250000"
-    },
-    "grousers_tier1": {
-      "id": "grousers_tier1",
-      "name": "\t#artefacts:grousers_tier1/name\t",
-      "icon": "grousers",
-      "type": "standard",
-      "price": "500000"
-    },
-    "tankRammer_tier2": {
-      "id": "tankRammer_tier2",
-      "name": "\t#artefacts:tankRammer_tier2/name\t",
-      "icon": "rammer",
-      "type": "standard",
-      "price": "300000"
-    },
-    "tankRammer_tier1": {
-      "id": "tankRammer_tier1",
-      "name": "\t#artefacts:tankRammer_tier1/name\t",
-      "icon": "rammer",
-      "type": "standard",
-      "price": "600000"
-    },
-    "enhancedAimDrives_tier3": {
-      "id": "enhancedAimDrives_tier3",
-      "name": "\t#artefacts:enhancedAimDrives_tier3/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "standard",
-      "price": "50000"
-    },
-    "enhancedAimDrives_tier2": {
-      "id": "enhancedAimDrives_tier2",
-      "name": "\t#artefacts:enhancedAimDrives_tier2/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "standard",
-      "price": "200000"
-    },
-    "enhancedAimDrives_tier1": {
-      "id": "enhancedAimDrives_tier1",
-      "name": "\t#artefacts:enhancedAimDrives_tier1/name\t",
-      "icon": "enhancedAimDrives",
-      "type": "standard",
-      "price": "600000"
-    },
-    "aimingStabilizer_tier2": {
-      "id": "aimingStabilizer_tier2",
-      "name": "\t#artefacts:aimingStabilizer_tier2/name\t",
-      "icon": "aimingStabilizer",
-      "type": "standard",
-      "price": "200000"
-    },
-    "aimingStabilizer_tier1": {
-      "id": "aimingStabilizer_tier1",
-      "name": "\t#artefacts:aimingStabilizer_tier1/name\t",
-      "icon": "aimingStabilizer",
-      "type": "standard",
-      "price": "600000"
-    },
-    "additionalInvisibilityDevice_tier3": {
-      "id": "additionalInvisibilityDevice_tier3",
-      "name": "\t#artefacts:additionalInvisibilityDevice_tier3/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "standard",
-      "price": "50000"
-    },
-    "additionalInvisibilityDevice_tier2": {
-      "id": "additionalInvisibilityDevice_tier2",
-      "name": "\t#artefacts:additionalInvisibilityDevice_tier2/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "standard",
-      "price": "200000"
-    },
-    "additionalInvisibilityDevice_tier1": {
-      "id": "additionalInvisibilityDevice_tier1",
-      "name": "\t#artefacts:additionalInvisibilityDevice_tier1/name\t",
-      "icon": "additionalInvisibilityDevice",
-      "type": "standard",
-      "price": "600000"
-    },
-    "extraHealthReserve_tier3": {
-      "id": "extraHealthReserve_tier3",
-      "name": "\t#artefacts:extraHealthReserve_tier3/name\t",
-      "icon": "extraHealthReserve",
-      "type": "standard",
-      "price": "40000"
-    },
-    "extraHealthReserve_tier2": {
-      "id": "extraHealthReserve_tier2",
-      "name": "\t#artefacts:extraHealthReserve_tier2/name\t",
-      "icon": "extraHealthReserve",
-      "type": "standard",
-      "price": "200000"
-    },
-    "extraHealthReserve_tier1": {
-      "id": "extraHealthReserve_tier1",
-      "name": "\t#artefacts:extraHealthReserve_tier1/name\t",
-      "icon": "extraHealthReserve",
-      "type": "standard",
-      "price": "600000"
-    },
-    "improvedRadioCommunication": {
-      "id": "improvedRadioCommunication",
-      "name": "\t#artefacts:improvedRadioCommunication/name\t",
-      "icon": "improvedRadioCommunication",
-      "type": "standard",
-      "price": "600000"
-    },
-    "improvedRotationMechanism_tier2": {
-      "id": "improvedRotationMechanism_tier2",
-      "name": "\t#artefacts:improvedRotationMechanism_tier2/name\t",
-      "icon": "improvedRotationMechanism",
-      "type": "standard",
-      "price": "200000"
-    },
-    "improvedRotationMechanism_tier1": {
-      "id": "improvedRotationMechanism_tier1",
-      "name": "\t#artefacts:improvedRotationMechanism_tier1/name\t",
-      "icon": "improvedRotationMechanism",
-      "type": "standard",
-      "price": "600000"
-    },
-    "turbocharger_tier3": {
-      "id": "turbocharger_tier3",
-      "name": "\t#artefacts:turbocharger_tier3/name\t",
-      "icon": "turbocharger",
-      "type": "standard",
-      "price": "50000"
-    },
-    "turbocharger_tier2": {
-      "id": "turbocharger_tier2",
-      "name": "\t#artefacts:turbocharger_tier2/name\t",
-      "icon": "turbocharger",
-      "type": "standard",
-      "price": "200000"
-    },
-    "turbocharger_tier1": {
-      "id": "turbocharger_tier1",
-      "name": "\t#artefacts:turbocharger_tier1/name\t",
-      "icon": "turbocharger",
-      "type": "standard",
-      "price": "600000"
-    },
-    "commandersView": {
-      "id": "commandersView",
-      "name": "\t#artefacts:commandersView/name\t",
-      "icon": "commandersView",
-      "type": "standard",
-      "price": "600000"
-    },
-    "improvedSights_tier2": {
-      "id": "improvedSights_tier2",
-      "name": "\t#artefacts:improvedSights_tier2/name\t",
-      "icon": "improvedSights",
-      "type": "deluxe",
-      "price": "200000"
-    },
-    "improvedSights_tier1": {
-      "id": "improvedSights_tier1",
-      "name": "\t#artefacts:improvedSights_tier1/name\t",
-      "icon": "improvedSights",
-      "type": "deluxe",
-      "price": "600000"
-    },
-    "modernizedAimDrivesAimingStabilizer1": {
-      "id": "modernizedAimDrivesAimingStabilizer1",
-      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer1/name\t",
-      "icon": "modernizedAimDrivesAimingStabilizer",
-      "type": "standard",
-      "price": "100"
-    },
-    "modernizedAimDrivesAimingStabilizer2": {
-      "id": "modernizedAimDrivesAimingStabilizer2",
-      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer2/name\t",
-      "icon": "modernizedAimDrivesAimingStabilizer",
-      "type": "standard",
-      "price": "400"
-    },
-    "modernizedAimDrivesAimingStabilizer3": {
-      "id": "modernizedAimDrivesAimingStabilizer3",
-      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer3/name\t",
-      "icon": "modernizedAimDrivesAimingStabilizer",
-      "type": "standard",
-      "price": "1600"
-    },
-    "modernizedTurbochargerRotationMechanism1": {
-      "id": "modernizedTurbochargerRotationMechanism1",
-      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism1/name\t",
-      "icon": "modernizedTurbochargerRotationMechanism",
-      "type": "standard",
-      "price": "100"
-    },
-    "modernizedTurbochargerRotationMechanism2": {
-      "id": "modernizedTurbochargerRotationMechanism2",
-      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism2/name\t",
-      "icon": "modernizedTurbochargerRotationMechanism",
-      "type": "standard",
-      "price": "400"
-    },
-    "modernizedTurbochargerRotationMechanism3": {
-      "id": "modernizedTurbochargerRotationMechanism3",
-      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism3/name\t",
-      "icon": "modernizedTurbochargerRotationMechanism",
-      "type": "standard",
-      "price": "1600"
-    },
-    "modernizedExtraHealthReserveAntifragmentationLining1": {
-      "id": "modernizedExtraHealthReserveAntifragmentationLining1",
-      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining1/name\t",
-      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
-      "type": "standard",
-      "price": "100"
-    },
-    "modernizedExtraHealthReserveAntifragmentationLining2": {
-      "id": "modernizedExtraHealthReserveAntifragmentationLining2",
-      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining2/name\t",
-      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
-      "type": "standard",
-      "price": "400"
-    },
-    "modernizedExtraHealthReserveAntifragmentationLining3": {
-      "id": "modernizedExtraHealthReserveAntifragmentationLining3",
-      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining3/name\t",
-      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
-      "type": "standard",
-      "price": "1600"
-    },
-    "modernizedImprovedSightsEnhancedAimDrives1": {
-      "id": "modernizedImprovedSightsEnhancedAimDrives1",
-      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives1/name\t",
-      "icon": "modernizedImprovedSightsEnhancedAimDrives",
-      "type": "deluxe",
-      "price": "100"
-    },
-    "modernizedImprovedSightsEnhancedAimDrives2": {
-      "id": "modernizedImprovedSightsEnhancedAimDrives2",
-      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives2/name\t",
-      "icon": "modernizedImprovedSightsEnhancedAimDrives",
-      "type": "deluxe",
-      "price": "400"
-    },
-    "modernizedImprovedSightsEnhancedAimDrives3": {
-      "id": "modernizedImprovedSightsEnhancedAimDrives3",
-      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives3/name\t",
-      "icon": "modernizedImprovedSightsEnhancedAimDrives",
-      "type": "deluxe",
-      "price": "1600"
     }
   },
   "consumables": {
@@ -2275,226 +1652,430 @@
   "crew_perks": {
     "brotherhood": {
       "id": "brotherhood",
-      "name": "Brothers in Arms",
+      "name": "brotherhood",
       "icon": "brotherhood",
       "has_icon": false
     },
     "camouflage": {
       "id": "camouflage",
-      "name": "Concealment",
+      "name": "camouflage",
       "icon": "camouflage",
+      "has_icon": false
+    },
+    "commander_coordination": {
+      "id": "commander_coordination",
+      "name": "commander_coordination",
+      "icon": "commander_coordination",
       "has_icon": false
     },
     "commander_eagleEye": {
       "id": "commander_eagleEye",
-      "name": "Eagle Eye",
+      "name": "commander_eagleEye",
       "icon": "commander_eagleEye",
+      "has_icon": false
+    },
+    "commander_emergency": {
+      "id": "commander_emergency",
+      "name": "commander_emergency",
+      "icon": "commander_emergency",
       "has_icon": false
     },
     "commander_enemyShotPredictor": {
       "id": "commander_enemyShotPredictor",
-      "name": "Enemy Shot Predictor",
+      "name": "commander_enemyShotPredictor",
       "icon": "commander_enemyShotPredictor",
+      "has_icon": false
+    },
+    "commander_holdLine": {
+      "id": "commander_holdLine",
+      "name": "commander_holdLine",
+      "icon": "commander_holdLine",
       "has_icon": false
     },
     "commander_practical": {
       "id": "commander_practical",
-      "name": "Practical",
+      "name": "commander_practical",
       "icon": "commander_practical",
       "has_icon": false
     },
     "commander_sixthSense": {
       "id": "commander_sixthSense",
-      "name": "Sixth Sense",
+      "name": "commander_sixthSense",
       "icon": "commander_sixthSense",
+      "has_icon": false
+    },
+    "commander_staySharp": {
+      "id": "commander_staySharp",
+      "name": "commander_staySharp",
+      "icon": "commander_staySharp",
+      "has_icon": false
+    },
+    "commander_tutor": {
+      "id": "commander_tutor",
+      "name": "commander_tutor",
+      "icon": "commander_tutor",
       "has_icon": false
     },
     "driver_badRoadsKing": {
       "id": "driver_badRoadsKing",
-      "name": "Clutch Braking",
+      "name": "driver_badRoadsKing",
       "icon": "driver_badRoadsKing",
+      "has_icon": false
+    },
+    "driver_bulletproof": {
+      "id": "driver_bulletproof",
+      "name": "driver_bulletproof",
+      "icon": "driver_bulletproof",
+      "has_icon": false
+    },
+    "driver_motorExpert": {
+      "id": "driver_motorExpert",
+      "name": "driver_motorExpert",
+      "icon": "driver_motorExpert",
       "has_icon": false
     },
     "driver_rammingMaster": {
       "id": "driver_rammingMaster",
-      "name": "Preventative Maintenance",
+      "name": "driver_rammingMaster",
       "icon": "driver_rammingMaster",
+      "has_icon": false
+    },
+    "driver_reliablePlacement": {
+      "id": "driver_reliablePlacement",
+      "name": "driver_reliablePlacement",
+      "icon": "driver_reliablePlacement",
       "has_icon": false
     },
     "driver_smoothDriving": {
       "id": "driver_smoothDriving",
-      "name": "Off-Road Driving",
+      "name": "driver_smoothDriving",
       "icon": "driver_smoothDriving",
+      "has_icon": false
+    },
+    "driver_suspensionRepair": {
+      "id": "driver_suspensionRepair",
+      "name": "driver_suspensionRepair",
+      "icon": "driver_suspensionRepair",
       "has_icon": false
     },
     "driver_virtuoso": {
       "id": "driver_virtuoso",
-      "name": "Controlled Impact",
+      "name": "driver_virtuoso",
       "icon": "driver_virtuoso",
       "has_icon": false
     },
     "fireFighting": {
       "id": "fireFighting",
-      "name": "Firefighting",
+      "name": "fireFighting",
       "icon": "fireFighting",
+      "has_icon": false
+    },
+    "gunner_armorer": {
+      "id": "gunner_armorer",
+      "name": "gunner_armorer",
+      "icon": "gunner_armorer",
       "has_icon": false
     },
     "gunner_focus": {
       "id": "gunner_focus",
-      "name": "Designated Target",
+      "name": "gunner_focus",
       "icon": "gunner_focus",
+      "has_icon": false
+    },
+    "gunner_loneWolf": {
+      "id": "gunner_loneWolf",
+      "name": "gunner_loneWolf",
+      "icon": "gunner_loneWolf",
+      "has_icon": false
+    },
+    "gunner_pointBlast": {
+      "id": "gunner_pointBlast",
+      "name": "gunner_pointBlast",
+      "icon": "gunner_pointBlast",
+      "has_icon": false
+    },
+    "gunner_quickAiming": {
+      "id": "gunner_quickAiming",
+      "name": "gunner_quickAiming",
+      "icon": "gunner_quickAiming",
       "has_icon": false
     },
     "gunner_rancorous": {
       "id": "gunner_rancorous",
-      "name": "Armorer",
+      "name": "gunner_rancorous",
       "icon": "gunner_rancorous",
       "has_icon": false
     },
     "gunner_smoothTurret": {
       "id": "gunner_smoothTurret",
-      "name": "Smooth Ride",
+      "name": "gunner_smoothTurret",
       "icon": "gunner_smoothTurret",
       "has_icon": false
     },
     "gunner_sniper": {
       "id": "gunner_sniper",
-      "name": "Snap Shot",
+      "name": "gunner_sniper",
       "icon": "gunner_sniper",
       "has_icon": false
     },
     "improvedRadioCommunication": {
       "id": "improvedRadioCommunication",
-      "name": "Jack of All Trades",
+      "name": "improvedRadioCommunication",
       "icon": "improvedRadioCommunication",
+      "has_icon": false
+    },
+    "loader_ammunitionImprove": {
+      "id": "loader_ammunitionImprove",
+      "name": "loader_ammunitionImprove",
+      "icon": "loader_ammunitionImprove",
       "has_icon": false
     },
     "loader_desperado": {
       "id": "loader_desperado",
-      "name": "Adrenaline Rush",
+      "name": "loader_desperado",
       "icon": "loader_desperado",
       "has_icon": false
     },
     "loader_intuition": {
       "id": "loader_intuition",
-      "name": "Intuition",
+      "name": "loader_intuition",
       "icon": "loader_intuition",
+      "has_icon": false
+    },
+    "loader_magMastery": {
+      "id": "loader_magMastery",
+      "name": "loader_magMastery",
+      "icon": "loader_magMastery",
+      "has_icon": false
+    },
+    "loader_melee": {
+      "id": "loader_melee",
+      "name": "loader_melee",
+      "icon": "loader_melee",
       "has_icon": false
     },
     "loader_pedant": {
       "id": "loader_pedant",
-      "name": "Safe Stowage",
+      "name": "loader_pedant",
       "icon": "loader_pedant",
+      "has_icon": false
+    },
+    "loader_perfectCharge": {
+      "id": "loader_perfectCharge",
+      "name": "loader_perfectCharge",
+      "icon": "loader_perfectCharge",
+      "has_icon": false
+    },
+    "loader_secondChance": {
+      "id": "loader_secondChance",
+      "name": "loader_secondChance",
+      "icon": "loader_secondChance",
+      "has_icon": false
+    },
+    "radioman_battleTempered": {
+      "id": "radioman_battleTempered",
+      "name": "radioman_battleTempered",
+      "icon": "radioman_battleTempered",
+      "has_icon": false
+    },
+    "radioman_expert": {
+      "id": "radioman_expert",
+      "name": "radioman_expert",
+      "icon": "radioman_expert",
       "has_icon": false
     },
     "radioman_finder": {
       "id": "radioman_finder",
-      "name": "Sound Detection",
+      "name": "radioman_finder",
       "icon": "radioman_finder",
+      "has_icon": false
+    },
+    "radioman_interference": {
+      "id": "radioman_interference",
+      "name": "radioman_interference",
+      "icon": "radioman_interference",
+      "has_icon": false
+    },
+    "radioman_sideBySide": {
+      "id": "radioman_sideBySide",
+      "name": "radioman_sideBySide",
+      "icon": "radioman_sideBySide",
+      "has_icon": false
+    },
+    "radioman_signalInterception": {
+      "id": "radioman_signalInterception",
+      "name": "radioman_signalInterception",
+      "icon": "radioman_signalInterception",
+      "has_icon": false
+    },
+    "radioman_threatSearch": {
+      "id": "radioman_threatSearch",
+      "name": "radioman_threatSearch",
+      "icon": "radioman_threatSearch",
       "has_icon": false
     },
     "repair": {
       "id": "repair",
-      "name": "Repairs",
+      "name": "repair",
       "icon": "repair",
       "has_icon": false
     },
     "smokeSignal": {
       "id": "smokeSignal",
-      "name": "Signal Boosting",
+      "name": "smokeSignal",
       "icon": "smokeSignal",
       "has_icon": false
     }
   },
   "field_mods": {
-    "allTerrainSuspension": {
-      "id": "allTerrainSuspension",
-      "name": "All Terrain Suspension",
-      "icon": "allTerrainSuspension",
+    "additionalGrousers": {
+      "id": "additionalGrousers",
+      "name": "Additional Grousers",
+      "icon": "additionalGrousers",
       "type": "standard"
     },
-    "lightweightSuspension": {
-      "id": "lightweightSuspension",
-      "name": "Lightweight Suspension",
-      "icon": "lightweightSuspension",
+    "betterFriction": {
+      "id": "betterFriction",
+      "name": "Better Friction",
+      "icon": "betterFriction",
       "type": "standard"
     },
-    "parallaxAdjustment": {
-      "id": "parallaxAdjustment",
-      "name": "Parallax Adjustment",
-      "icon": "parallaxAdjustment",
+    "improvedAimingHandling": {
+      "id": "improvedAimingHandling",
+      "name": "Improved Aiming Handling",
+      "icon": "improvedAimingHandling",
       "type": "standard"
     },
-    "refinedPowder": {
-      "id": "refinedPowder",
-      "name": "Refined Powder",
-      "icon": "refinedPowder",
+    "improvedCamouflage": {
+      "id": "improvedCamouflage",
+      "name": "Improved Camouflage",
+      "icon": "improvedCamouflage",
       "type": "standard"
     },
-    "leftSidePeriscope": {
-      "id": "leftSidePeriscope",
-      "name": "Left Side Periscope",
-      "icon": "leftSidePeriscope",
+    "improvedChassisDurability": {
+      "id": "improvedChassisDurability",
+      "name": "Improved Chassis Durability",
+      "icon": "improvedChassisDurability",
       "type": "standard"
     },
-    "rightSidePeriscope": {
-      "id": "rightSidePeriscope",
-      "name": "Right Side Periscope",
-      "icon": "rightSidePeriscope",
+    "improvedChassisStability": {
+      "id": "improvedChassisStability",
+      "name": "Improved Chassis Stability",
+      "icon": "improvedChassisStability",
       "type": "standard"
     },
-    "rightAngleOptics": {
-      "id": "rightAngleOptics",
-      "name": "Right Angle Optics",
-      "icon": "rightAngleOptics",
+    "improvedEnginePower": {
+      "id": "improvedEnginePower",
+      "name": "Improved Engine Power",
+      "icon": "improvedEnginePower",
       "type": "standard"
     },
-    "antiReflectiveLenses": {
-      "id": "antiReflectiveLenses",
-      "name": "Anti Reflective Lenses",
-      "icon": "antiReflectiveLenses",
+    "improvedGunBreech": {
+      "id": "improvedGunBreech",
+      "name": "Improved Gun Breech",
+      "icon": "improvedGunBreech",
       "type": "standard"
     },
-    "reinforcedSpallLiner": {
-      "id": "reinforcedSpallLiner",
-      "name": "Reinforced Spall Liner",
-      "icon": "reinforcedSpallLiner",
+    "improvedLightFilters": {
+      "id": "improvedLightFilters",
+      "name": "Improved Light Filters",
+      "icon": "improvedLightFilters",
       "type": "standard"
     },
-    "antiFragmentationLining": {
-      "id": "antiFragmentationLining",
-      "name": "Anti Fragmentation Lining",
-      "icon": "antiFragmentationLining",
+    "improvedMuzzleBreak": {
+      "id": "improvedMuzzleBreak",
+      "name": "Improved Muzzle Break",
+      "icon": "improvedMuzzleBreak",
       "type": "standard"
     },
-    "powerSupplyTuning": {
-      "id": "powerSupplyTuning",
-      "name": "Power Supply Tuning",
-      "icon": "powerSupplyTuning",
+    "improvedObservationDevice": {
+      "id": "improvedObservationDevice",
+      "name": "Improved Observation Device",
+      "icon": "improvedObservationDevice",
       "type": "standard"
     },
-    "electricalSystemShielding": {
-      "id": "electricalSystemShielding",
-      "name": "Electrical System Shielding",
-      "icon": "electricalSystemShielding",
+    "improvedReflexScopes": {
+      "id": "improvedReflexScopes",
+      "name": "Improved Reflex Scopes",
+      "icon": "improvedReflexScopes",
       "type": "standard"
     },
-    "additionalForwardGears": {
-      "id": "additionalForwardGears",
-      "name": "Additional Forward Gears",
-      "icon": "additionalForwardGears",
+    "improvedScope": {
+      "id": "improvedScope",
+      "name": "Improved Scope",
+      "icon": "improvedScope",
       "type": "standard"
     },
-    "additionalReverseGears": {
-      "id": "additionalReverseGears",
-      "name": "Additional Reverse Gears",
-      "icon": "additionalReverseGears",
+    "improvedSelfRepairingTracks": {
+      "id": "improvedSelfRepairingTracks",
+      "name": "Improved Self Repairing Tracks",
+      "icon": "improvedSelfRepairingTracks",
       "type": "standard"
     },
-    "noModification": {
-      "id": "noModification",
-      "name": "No Modification",
-      "icon": "noModification",
+    "improvedSelfRepairingWheels": {
+      "id": "improvedSelfRepairingWheels",
+      "name": "Improved Self Repairing Wheels",
+      "icon": "improvedSelfRepairingWheels",
+      "type": "standard"
+    },
+    "improvedSharpnessVisor": {
+      "id": "improvedSharpnessVisor",
+      "name": "Improved Sharpness Visor",
+      "icon": "improvedSharpnessVisor",
+      "type": "standard"
+    },
+    "improvedSpallingResistance": {
+      "id": "improvedSpallingResistance",
+      "name": "Improved Spalling Resistance",
+      "icon": "improvedSpallingResistance",
+      "type": "standard"
+    },
+    "improvedSpeedIndicator": {
+      "id": "improvedSpeedIndicator",
+      "name": "Improved Speed Indicator",
+      "icon": "improvedSpeedIndicator",
+      "type": "standard"
+    },
+    "improvedSpeedIndicatorBackwards": {
+      "id": "improvedSpeedIndicatorBackwards",
+      "name": "Improved Speed Indicator Backwards",
+      "icon": "improvedSpeedIndicatorBackwards",
+      "type": "standard"
+    },
+    "improvedTurretRingStability": {
+      "id": "improvedTurretRingStability",
+      "name": "Improved Turret Ring Stability",
+      "icon": "improvedTurretRingStability",
+      "type": "standard"
+    },
+    "improvedTurretTurningWheels": {
+      "id": "improvedTurretTurningWheels",
+      "name": "Improved Turret Turning Wheels",
+      "icon": "improvedTurretTurningWheels",
+      "type": "standard"
+    },
+    "increasedSensitivityOptics": {
+      "id": "increasedSensitivityOptics",
+      "name": "Increased Sensitivity Optics",
+      "icon": "increasedSensitivityOptics",
+      "type": "standard"
+    },
+    "increasedThickness": {
+      "id": "increasedThickness",
+      "name": "Increased Thickness",
+      "icon": "increasedThickness",
+      "type": "standard"
+    },
+    "reinforcedInteriorModules": {
+      "id": "reinforcedInteriorModules",
+      "name": "Reinforced Interior Modules",
+      "icon": "reinforcedInteriorModules",
+      "type": "standard"
+    },
+    "reinforcedStructure": {
+      "id": "reinforcedStructure",
+      "name": "Reinforced Structure",
+      "icon": "reinforcedStructure",
       "type": "standard"
     }
   },

@@ -46,10 +46,12 @@ class WotXmlParser:
     
     def read_element(self, name, depth):
         if self.offset + 6 > len(self.data):
+            print(f"[DEBUG_EOF] name={name} depth={depth} offset={self.offset} data_len={len(self.data)}")
             return ""
         
         children_count = struct.unpack_from('<H', self.data, self.offset)[0]
         if children_count > 50000:
+            print(f"[DEBUG_INVALID] name={name} depth={depth} offset={self.offset} count={children_count}")
             return ""
         self.offset += 2
         descriptor = struct.unpack_from('<I', self.data, self.offset)[0]
@@ -72,6 +74,8 @@ class WotXmlParser:
         
         for child in children:
             if child['id'] >= len(self.dictionary):
+                print(f"[DEBUG_DICT] child_id={child['id']} dict_len={len(self.dictionary)} "
+                      f"parent={name} offset={self.offset}")
                 self.offset = data_start + (child['desc'] & 0x0FFFFFFF)
                 continue
             

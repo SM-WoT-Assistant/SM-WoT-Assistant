@@ -120,7 +120,7 @@ PERK_NAME_MAP = {
 }
 
 
-EQUIPMENT_BY_TIER = {
+_FALLBACK_BY_TIER = {
     1: [
         "camouflageNet_tier3", "coatedOptics_tier3", "enhancedAimDrives_tier3",
         "grousers_tier3", "improvedVentilation_tier3", "improvedSights_tier3",
@@ -199,7 +199,7 @@ EQUIPMENT_BY_TIER = {
         "modernizedImprovedSightsEnhancedAimDrives",
         "modernizedAimDrivesAimingStabilizer"
     ],
-    11: [  # Tier 11 — той самий набір що і Tier 10
+    11: [
         "camouflageNet_tier1", "coatedOptics_tier1", "enhancedAimDrives_tier1",
         "grousers_tier1", "improvedVentilation_tier1", "improvedSights_tier1",
         "stereoscope_tier1", "tankRammer_tier1", "binocularTelescope_tier1",
@@ -214,16 +214,60 @@ EQUIPMENT_BY_TIER = {
     ]
 }
 
-
-EQUIPMENT_EXCLUDE_BY_CLASS = {
+_FALLBACK_EXCLUDE_BY_CLASS = {
     "SPG": ["aimingStabilizer_tier1", "aimingStabilizer_tier2", "aimingStabilizer_tier3",
             "grousers_tier1", "grousers_tier2", "grousers_tier3", "additionalGrousers"],
-    "LT": [],  # Light tanks
-    "MT": [],  # Medium tanks
-    "HT": [],  # Heavy tanks
+    "LT": [],
+    "MT": [],
+    "HT": [],
     "TD": ["aimingStabilizer_tier1", "aimingStabilizer_tier2", "aimingStabilizer_tier3",
-           "modernizedAimDrivesAimingStabilizer"]  # TD не можуть використовувати Vertical Stabilizer
+           "modernizedAimDrivesAimingStabilizer"]
 }
+
+_MODERNIZED_TIER8_ITEMS = [
+    "modernizedTurbochargerRotationMechanism",
+    "modernizedExtraHealthReserveAntifragmentationLining",
+    "modernizedImprovedSightsEnhancedAimDrives",
+    "modernizedAimDrivesAimingStabilizer"
+]
+
+try:
+    from parse_tiers_devices import load_tiers_devices
+    _parsed = load_tiers_devices()
+    if _parsed:
+        EQUIPMENT_BY_TIER = _parsed["by_tier"]
+        for t in range(8, 12):
+            for item in _MODERNIZED_TIER8_ITEMS:
+                if item not in EQUIPMENT_BY_TIER[t]:
+                    EQUIPMENT_BY_TIER[t].append(item)
+        EQUIPMENT_EXCLUDE_BY_CLASS = {}
+        for cls, items in _parsed["exclude_by_class"].items():
+            EQUIPMENT_EXCLUDE_BY_CLASS[cls] = list(items)
+        for cls, items in _FALLBACK_EXCLUDE_BY_CLASS.items():
+            existing = EQUIPMENT_EXCLUDE_BY_CLASS.get(cls, [])
+            for item in items:
+                if item not in existing:
+                    existing.append(item)
+            EQUIPMENT_EXCLUDE_BY_CLASS[cls] = existing
+        EQUIPMENT_EXCLUDE_BY_TAGS = _parsed["exclude_by_tags"]
+        print("[PROMPT] Loaded equipment data from tiers_devices.xml")
+    else:
+        raise ValueError("parse_tiers_devices returned empty")
+except Exception as e:
+    print(f"[PROMPT] Equipment parser failed: {e} — using hardcoded fallback")
+    try:
+        from firebase_reporter import report_fallback
+        report_fallback("generate_prompt_v2", "tiers_devices.xml",
+                        f"Parser failed: {e}", level="warning")
+    except Exception:
+        pass
+    EQUIPMENT_BY_TIER = dict(_FALLBACK_BY_TIER)
+    for t in range(1, 12):
+        EQUIPMENT_BY_TIER[t] = list(_FALLBACK_BY_TIER[t])
+    EQUIPMENT_EXCLUDE_BY_CLASS = {}
+    for cls, items in _FALLBACK_EXCLUDE_BY_CLASS.items():
+        EQUIPMENT_EXCLUDE_BY_CLASS[cls] = list(items)
+    EQUIPMENT_EXCLUDE_BY_TAGS = {}
 
 
 
@@ -453,19 +497,6 @@ def get_crew_data_for_tank(tank_id, tier):
     
     return result
 
-
-def get_field_mods():
-    """
-    Повертає список польових модернізацій (з клієнта гри).
-    Ці модифікації доступні на різних рівнях прокачки танка.
-    """
-    return [
-        "All-Terrain Suspension", "Lightweight Suspension",
-        "Parallax Adjustment", "Refined Powder", "Left-Side Periscope", "Right-Side Periscope",
-        "Right-Angle Optics", "Anti-Reflective Lenses", "Reinforced Spall Liner", "Anti-Fragmentation Lining",
-        "Power Supply Tuning", "Electrical System Shielding", "Additional Forward Gears", "Additional Reverse Gears",
-        "No Modification"
-    ]
 
 
 def generate_prompt(tank_id, tank_name=None):

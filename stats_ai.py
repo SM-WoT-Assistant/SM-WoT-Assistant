@@ -17,6 +17,20 @@ import language_module
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
 
+_REPORTED_FALLBACKS = set()
+
+
+def _report_fallback(source, context, text, level="warning"):
+    key = f"{source}:{context}"
+    if key in _REPORTED_FALLBACKS:
+        return
+    _REPORTED_FALLBACKS.add(key)
+    try:
+        from firebase_reporter import report_fallback
+        report_fallback(source, context, text, level)
+    except Exception:
+        pass
+
 _CACHE_PATH = os.path.join(config.USER_DATA_DIR, "popular_tanks_cache.json")
 _AI_BUILD_CACHE_PATH = os.path.join(config.USER_DATA_DIR, "ai_builds_cache.json")
 _DATA_DIR = config.BASE_DIR
@@ -36,6 +50,8 @@ def _load_ai_build_cache():
                 )
         except Exception:
             pass
+    _report_fallback("stats_ai._load_ai_build_cache", "ai_builds_cache.json",
+                     "Cache file missing or corrupt")
     return {}, {}, 0, 0, ""
 
 
@@ -56,7 +72,8 @@ def _save_ai_build_cache(tag, build_data, fail_count=None, version=0, scripts_fi
                 "version": cur_ver, "scripts_fingerprint": cur_fp
             }, f, ensure_ascii=False, indent=2)
     except Exception:
-        pass
+        _report_fallback("stats_ai._save_ai_build_cache", "ai_builds_cache.json",
+                         "Failed to save AI build cache")
 
 
 def _save_ai_build_cache_bulk(builds_dict, updated_dict, fail_count=0, version=0, scripts_fingerprint=""):
@@ -70,7 +87,8 @@ def _save_ai_build_cache_bulk(builds_dict, updated_dict, fail_count=0, version=0
                 "scripts_fingerprint": scripts_fingerprint
             }, f, ensure_ascii=False, indent=2)
     except Exception:
-        pass
+        _report_fallback("stats_ai._save_ai_build_cache_bulk", "ai_builds_cache.json",
+                         "Failed to save AI build cache (bulk)")
 
 
 def _handle_ai_build_failure(tag):
@@ -101,7 +119,8 @@ def _load_popular_tank_cache():
                 fail_count = data.get('fail_count', 0)
                 return tanks, updated, fail_count
         except Exception:
-            pass
+            _report_fallback("stats_ai._load_popular_tank_cache", "popular_tanks_cache.json",
+                             "Cache file corrupt")
     return [], None, 0
 
 
@@ -214,22 +233,30 @@ class StatsAI:
         """Завантажує crew_builds.json з рекомендованими будовами екіпажу."""
         path = os.path.join(_DATA_DIR, 'crew_builds.json')
         if not os.path.exists(path):
+            _report_fallback("stats_ai.SatsAI._load_crew_builds", "crew_builds.json",
+                             "File not found", level="critical")
             return {}
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
+            _report_fallback("stats_ai.SatsAI._load_crew_builds", "crew_builds.json",
+                             "JSON parse error", level="critical")
             return {}
 
     def _load_equipment_loadouts(self):
         """Завантажує equipment_loadouts.json з даними про обладнання."""
         path = os.path.join(_DATA_DIR, 'equipment_loadouts.json')
         if not os.path.exists(path):
+            _report_fallback("stats_ai.SatsAI._load_equipment_loadouts", "equipment_loadouts.json",
+                             "File not found", level="critical")
             return {}
         try:
             with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except Exception:
+            _report_fallback("stats_ai.SatsAI._load_equipment_loadouts", "equipment_loadouts.json",
+                             "JSON parse error", level="critical")
             return {}
 
     def _get_crew_rows_for_tank(self, tag):
@@ -292,7 +319,7 @@ class StatsAI:
         secondary_perk_bonus = max(0, min(secondary_perk_bonus, 6))
         max_perks = max(1, min(max_perks, 20))
 
-        fallback_common = ['repair', 'camouflage', 'fireFighting', 'brotherhood']
+        fallback_common = ['repair', 'camouflage', 'brotherhood']
         rows = []
         for member in crew_members:
             role = str((member or {}).get('role') or '').strip()
@@ -1421,6 +1448,15 @@ class StatsAI:
             os.path.join(base_dir, f"{name.lower()}.png"),
         ])
 
+        # Fallback: search other category directories for icons sorted out of artefacts/
+        if category in ('artefacts', 'crew_perks', 'consumables'):
+            for fb in ('crew_perks', 'consumables', 'artefacts'):
+                if fb == category:
+                    continue
+                fb_dir = os.path.join(self.LOADOUT_ICON_DIR, fb)
+                candidates.append(os.path.join(fb_dir, f"{name}.png"))
+                candidates.append(os.path.join(fb_dir, f"{name.lower()}.png"))
+
         icon_path = next((p for p in candidates if os.path.exists(p)), None)
         if not icon_path:
             return None
@@ -1735,6 +1771,9 @@ class StatsAI:
             'field_mod_pairs_by_tank.json',
         )
         if not os.path.exists(path):
+            _report_fallback("stats_ai.SatsAI._load_field_mod_pairs_by_tank",
+                             "field_mod_pairs_by_tank.json",
+                             "File not found", level="critical")
             return {}
         try:
             with open(path, 'r', encoding='utf-8') as f:
@@ -1744,6 +1783,9 @@ class StatsAI:
                 return {}
             return pairs_by_tank
         except Exception:
+            _report_fallback("stats_ai.SatsAI._load_field_mod_pairs_by_tank",
+                             "field_mod_pairs_by_tank.json",
+                             "JSON parse error or invalid structure", level="critical")
             return {}
 
     def _field_mod_pair_limit_for_tier(self, tag):

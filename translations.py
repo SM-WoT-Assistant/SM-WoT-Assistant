@@ -139,6 +139,7 @@ TRANSLATIONS = {
             "stats_ai_up_to_date_full": "All data up to date",
             "crew_update_done": "Crew data updated",
             "equipment_update_done": "Equipment data updated",
+            "entity_update_done": "Game entities updated",
             "update_complete_ai": "Ready",
             "update_complete_no_ai": "Ready",
             "stage2_done_no_ai": "Ready",

@@ -62,16 +62,20 @@ class BWXmlDecoder:
         return True
     
     def _read_element(self, name, depth):
-        if self.offset >= len(self.data):
+        if self.offset + 6 > len(self.data):
             return ""
         
         children_count = struct.unpack_from('<H', self.data, self.offset)[0]
+        if children_count > 50000:
+            return ""
         self.offset += 2
         struct.unpack_from('<I', self.data, self.offset)[0]
         self.offset += 4
         
         children = []
         for _ in range(children_count):
+            if self.offset + 6 > len(self.data):
+                break
             child_id = struct.unpack_from('<H', self.data, self.offset)[0]
             self.offset += 2
             data_desc = struct.unpack_from('<I', self.data, self.offset)[0]
@@ -83,11 +87,19 @@ class BWXmlDecoder:
         result = f"{'  ' * depth}<{name}>\n"
         
         for child in children:
+            if child['id'] >= len(self.dictionary):
+                self.offset = data_start + (child['desc'] & 0x0FFFFFFF)
+                continue
             tag_name = self.dictionary[child['id']]
             end_address = child['desc'] & 0x0FFFFFFF
             data_type = child['desc'] >> 28
             
             child_end_offset = data_start + end_address
+            if child_end_offset > len(self.data):
+                child_end_offset = len(self.data)
+            if self.offset > child_end_offset:
+                self.offset = child_end_offset
+                continue
             length = child_end_offset - self.offset
             
             if data_type == 0:
@@ -419,37 +431,13 @@ class GameEntitiesExtractor:
                     existing_perks.add(f.stem)
             
             # Формуємо список перків
-            perk_map = {
-                "commander_sixthSense": "Sixth Sense",
-                "commander_practical": "Practical",
-                "commander_eagleEye": "Eagle Eye",
-                "commander_enemyShotPredictor": "Enemy Shot Predictor",
-                "brotherhood": "Brothers in Arms",
-                "repair": "Repairs",
-                "camouflage": "Concealment",
-                "fireFighting": "Firefighting",
-                "gunner_sniper": "Snap Shot",
-                "gunner_focus": "Designated Target",
-                "gunner_rancorous": "Armorer",
-                "gunner_smoothTurret": "Smooth Ride",
-                "driver_smoothDriving": "Off-Road Driving",
-                "driver_badRoadsKing": "Clutch Braking",
-                "driver_virtuoso": "Controlled Impact",
-                "driver_rammingMaster": "Preventative Maintenance",
-                "loader_pedant": "Safe Stowage",
-                "loader_desperado": "Adrenaline Rush",
-                "loader_intuition": "Intuition",
-                "radioman_finder": "Sound Detection",
-                "improvedRadioCommunication": "Jack of All Trades",
-                "smokeSignal": "Signal Boosting",
-                "radioman_sidebyside": "Relayer",
-            }
+            # Назви заповнюються з .mo файлів при runtime через LanguageModule
+            # Тут зберігаємо perk_id як name — ніде не використовується для відображення
             
             for perk_id in sorted(all_perks):
-                perk_name = perk_map.get(perk_id, perk_id.replace('_', ' ').title())
                 self.game_entities["crew_perks"][perk_id] = {
                     "id": perk_id,
-                    "name": perk_name,
+                    "name": perk_id,
                     "icon": perk_id,
                     "has_icon": perk_id in existing_perks
                 }
@@ -461,39 +449,62 @@ class GameEntitiesExtractor:
             print(f"   Помилка: {e}")
             
     def _extract_field_mods(self):
-        """Витягує польову модернізацію"""
-        # Польова модернізація - це не завжди в XML
-        # Спробуємо знайти в extracted_data
-        field_mods_found = []
-        
-        # Типові field mods (рівні 1-5)
-        standard_mods = [
-            "allTerrainSuspension",
-            "lightweightSuspension",
-            "parallaxAdjustment",
-            "refinedPowder",
-            "leftSidePeriscope",
-            "rightSidePeriscope",
-            "rightAngleOptics",
-            "antiReflectiveLenses",
-            "reinforcedSpallLiner",
-            "antiFragmentationLining",
-            "powerSupplyTuning",
-            "electricalSystemShielding",
-            "additionalForwardGears",
-            "additionalReverseGears",
-            "noModification"
-        ]
-        
-        for mod_id in standard_mods:
-            self.game_entities["field_mods"][mod_id] = {
-                "id": mod_id,
-                "name": re.sub(r'([A-Z])', r' \1', mod_id).title(),
-                "icon": mod_id,
-                "type": "standard"
-            }
-            
-        print(f"   Знайдено field mods: {len(standard_mods)}")
+        """Витягує польову модернізацію з post_progression XML"""
+        parsed = self._parse_field_mods_from_xml()
+        if parsed:
+            for mod_id in parsed:
+                self.game_entities["field_mods"][mod_id] = {
+                    "id": mod_id,
+                    "name": re.sub(r'([A-Z])', r' \1', mod_id).title(),
+                    "icon": mod_id,
+                    "type": "standard"
+                }
+            print(f"   Знайдено field mods: {len(parsed)} (з post_progression XML)")
+        else:
+            standard_mods = [
+                "allTerrainSuspension", "lightweightSuspension",
+                "parallaxAdjustment", "refinedPowder",
+                "leftSidePeriscope", "rightSidePeriscope",
+                "rightAngleOptics", "antiReflectiveLenses",
+                "reinforcedSpallLiner", "antiFragmentationLining",
+                "powerSupplyTuning", "electricalSystemShielding",
+                "additionalForwardGears", "additionalReverseGears",
+                "noModification"
+            ]
+            for mod_id in standard_mods:
+                self.game_entities["field_mods"][mod_id] = {
+                    "id": mod_id,
+                    "name": re.sub(r'([A-Z])', r' \1', mod_id).title(),
+                    "icon": mod_id,
+                    "type": "standard"
+                }
+            print(f"   Знайдено field mods: {len(standard_mods)} (fallback)")
+
+    def _parse_field_mods_from_xml(self):
+        """Парсить field_modifications.xml і повертає список унікальних imgName.
+
+        Використовує decoded XML з extracted_data/common/post_progression/.
+        Повертає [] при помилці."""
+        xml_path = self.project_root / "extracted_data" / "common" / "post_progression" / "field_modifications.xml"
+        if not xml_path.exists():
+            return []
+
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(str(xml_path))
+            root = tree.getroot()
+
+            img_names = set()
+            for elem in root.iter():
+                for child in elem:
+                    if child.tag == "imgName" and child.text:
+                        val = child.text.strip()
+                        if val and val != "pairModifications/" and "/" not in val:
+                            img_names.add(val)
+            return sorted(img_names)
+        except Exception as e:
+            print(f"[WARN] field_modifications.xml parse error: {e}")
+            return []
         
     def _check_icons(self):
         """Перевіряємо існування іконок"""
