@@ -958,42 +958,6 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
         print(f"[BUILD] Latest pointer updated (HTTP {resp_latest.status})")
     except Exception as e:
         print(f"[BUILD] Latest pointer warning: {e}")
-
-    # Write admin app version
-    admin_dl = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Admin_v{version}.exe"
-    admin_data = json.dumps({
-        "version": version,
-        "display_version": display_ver,
-        "release_date": today,
-        "download_url": admin_dl,
-        "changelog": f"Admin v{version}",
-    }).encode("utf-8")
-    admin_url = f"{RTDB_URL}/versions/admin/{version.replace('.', '_')}.json?auth={API_KEY}"
-    req_admin = urllib.request.Request(admin_url, data=admin_data, method="PUT")
-    req_admin.add_header("Content-Type", "application/json")
-    try:
-        resp_admin = urllib.request.urlopen(req_admin, timeout=10)
-        print(f"[BUILD] Admin v{version} published to RTDB (HTTP {resp_admin.status})")
-    except Exception as e:
-        print(f"[BUILD] Admin RTDB publish warning: {e}")
-
-    # Write admin latest pointer
-    admin_latest = json.dumps({
-        "version": version,
-        "display_version": display_ver,
-        "release_date": "9999-12-31",
-        "download_url": admin_dl,
-        "changelog": f"Admin v{version}",
-    }).encode("utf-8")
-    admin_latest_url = f"{RTDB_URL}/versions/admin/latest.json?auth={API_KEY}"
-    req_admin_latest = urllib.request.Request(admin_latest_url, data=admin_latest, method="PUT")
-    req_admin_latest.add_header("Content-Type", "application/json")
-    try:
-        resp_admin_latest = urllib.request.urlopen(req_admin_latest, timeout=10)
-        print(f"[BUILD] Admin latest pointer updated (HTTP {resp_admin_latest.status})")
-    except Exception as e:
-        print(f"[BUILD] Admin latest pointer warning: {e}")
-
     return True
 
 

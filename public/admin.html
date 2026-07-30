@@ -136,7 +136,14 @@
 
         <div class="card">
             <h2 class="section-header" onclick="toggleSection(this)">▶ Admin App (Desktop)</h2>
-            <div class="section-body" id="admin-app-container"><div class="empty">Loading...</div></div>
+            <div class="section-body" id="admin-app-container">
+                <div style="padding:10px 14px;background:#1a1a1a;border-radius:6px;font-size:13px;line-height:1.6;">
+                    <span style="color:#888;">
+                    Admin app is distributed separately (local build only).<br>
+                    Run from the project folder: <code style="color:#88cc88;">python admin_app.py</code>
+                    </span>
+                </div>
+            </div>
         </div>
         </div>
     </div>
@@ -228,7 +235,6 @@ function loadDashboard() {
     loadBuildsData();
     pollPendingUpdates();
     startErrorPolling();
-    loadAdminAppData();
     // Update last visit after all data loaded
     setTimeout(() => {
         localStorage.setItem("admin_last_visit", new Date().toISOString());
@@ -890,39 +896,7 @@ function pollPendingUpdates() {
     }).catch(() => {});
 }
 
-function loadAdminAppData() {
-    db.ref("versions/admin/latest").once("value").then(s => {
-        const data = s.val();
-        const container = document.getElementById("admin-app-container");
-        if (!data || !data.version) {
-            container.innerHTML = '<div class="empty">No admin release data</div>';
-            return;
-        }
-        const hasNew = isFresh(data.release_date);
-        container.innerHTML = `
-            <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px;">
-                <div class="stat-box"><div class="num">v${data.version}</div><div class="label">Latest Version</div></div>
-                <div class="stat-box"><div class="num">${data.release_date || '—'}</div><div class="label">Release Date</div></div>
-            </div>
-            <div style="padding:10px 14px;background:#1a1a1a;border-radius:6px;font-size:13px;line-height:1.6;">
-                <b style="color:#ffaa00;">Usage:</b>
-                <code style="display:block;background:#111;padding:8px 12px;margin:6px 0;border-radius:4px;color:#88cc88;">
-                python admin_app.py --wot-path="C:/Games/World_of_Tanks_EU"
-                </code>
-                <span style="color:#888;">Run from the project folder. Requires Python 3.12. Update via <code style="color:#88cc88;">git pull</code></span>
-                <br><br>
-                <a href="https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/tag/v${data.version}" style="color:#88cc88;font-weight:bold;">Download Admin v${data.version} from GitHub →</a>
-            </div>
-        `;
-        if (hasNew) {
-            const hdr = container.closest('.card').querySelector('.section-header');
-            hdr.classList.add('has-new');
-            expandSection(hdr);
-        }
-    }).catch(() => {
-        document.getElementById("admin-app-container").innerHTML = '<div class="empty">Loading error</div>';
-    });
-}
+
 
 </script>
 

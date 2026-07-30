@@ -40,8 +40,7 @@ _WM_APP = 0x8000
 _WM_TRAY_CALLBACK = _WM_APP + 1
 _GUID = "{4A2C4E6B-3B1A-4B8A-9E1F-7D3A5F8C2B6E}"
 
-# ── Auto-update ──────────────────────────────────
-_ADMIN_VER_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app/versions/admin/latest.json?auth=AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+# ── Settings ─────────────────────────────────────
 _ADMIN_SETTINGS_PATH = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "admin_settings.json")
 
 def _load_admin_settings():
@@ -83,34 +82,10 @@ def _set_windows_startup(enable):
 
 def _read_admin_version():
     try:
-        with open(os.path.join(_BUNDLE_DIR, "VERSION"), "r") as f:
+        with open(os.path.join(_BUNDLE_DIR, "admin_version.txt"), "r") as f:
             return f.read().strip()
     except:
         return "0.0.0"
-
-def _check_admin_update():
-    """Check for admin app update. Returns (new_version, download_url) or None."""
-    import requests
-    try:
-        r = requests.get(_ADMIN_VER_URL, timeout=8)
-        if r.status_code == 200:
-            data = r.json()
-            if data and data.get("version"):
-                remote = tuple(int(n) for n in data["version"].split("."))
-                local = tuple(int(n) for n in _read_admin_version().split("."))
-                if remote > local:
-                    return (data["version"], data.get("download_url", ""))
-    except:
-        pass
-    return None
-
-def _do_admin_update(new_ver, url):
-    """Notify about new version (no auto-update for script mode)."""
-    print(f"\n{'='*50}")
-    print(f"[UPDATE] Admin v{new_ver} available!")
-    print(f"[UPDATE] Update via: git pull")
-    print(f"[UPDATE] Or download: {url}")
-    print(f"{'='*50}\n")
 
 class AdminTray:
     def __init__(self, parent):
@@ -263,20 +238,14 @@ class AdminApp:
         self.prompts = load_prompts()
         self.tray = AdminTray(self)
 
-        # Check for updates
-        update = _check_admin_update()
-        if update:
-            new_ver, url = update
-            self._log(f"Admin v{new_ver} available, updating...")
-            _do_admin_update(new_ver, url)
-
         self._build_ui()
         self._log(f"Admin started (WoT: {wot_path or 'not set'})")
         self._log(f"Tanks: {len(self.tank_db)}, Prompts: {len(self.prompts)}")
         self._start_background()
 
     def _build_ui(self):
-        self.root.title("SM WoT Assistant Admin")
+        ver = _read_admin_version()
+        self.root.title(f"SM WoT Assistant Admin v{ver}")
         self.root.geometry("860x620")
         self.root.configure(bg=BG)
         self.root.minsize(600, 400)
@@ -317,6 +286,7 @@ class AdminApp:
             f.pack(fill="x", pady=3)
             return v
 
+        self._card_ver = _card(left, "Admin Version", "ver")
         self._card_wg = _card(left, "WG Game Version", "wg")
         self._card_status = _card(left, "Game Status", "st")
         self._card_queue = _card(left, "Queue", "qu")
@@ -355,10 +325,22 @@ class AdminApp:
 
     def _log(self, msg):
         ts = time.strftime("%H:%M:%S")
-        self.log_text.insert(tk.END, f"[{ts}] {msg}\n")
-        self.log_text.see(tk.END)
+        line = f"[{ts}] {msg}"
+        try:
+            log_dir = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
+            os.makedirs(log_dir, exist_ok=True)
+            with open(os.path.join(log_dir, "admin.log"), "a", encoding="utf-8") as f:
+                f.write(line + "\n")
+        except:
+            pass
+        if hasattr(self, 'log_text') and self.log_text:
+            self.log_text.insert(tk.END, line + "\n")
+            self.log_text.see(tk.END)
+        else:
+            print(line)
 
     def _update_cards(self):
+        self._card_ver.config(text=_read_admin_version())
         self._card_wg.config(text=self._wg_ver or "—")
         status = "OK" if os.path.exists(os.path.join(self._wot_path or "", "version.xml")) else "No WoT"
         self._card_status.config(text=status, fg=GREEN if status == "OK" else RED)
@@ -562,6 +544,16 @@ class AdminApp:
 
 def main():
     import argparse
+
+    # Single-instance mutex
+    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_Admin_SingleInstance")
+    if ctypes.windll.kernel32.GetLastError() == 183:
+        hwnd = ctypes.windll.user32.FindWindowW(None, f"SM WoT Assistant Admin v{_read_admin_version()}")
+        if hwnd:
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="SM WoT Assistant Admin App")
     parser.add_argument("--wot-path", type=str, default=None, help="Path to WoT installation")
     parser.add_argument("--tray", action="store_true", help="Start minimized to tray")
@@ -578,6 +570,7 @@ def main():
     else:
         root.deiconify()
     app.run()
+    ctypes.windll.kernel32.CloseHandle(mutex)
 
 if __name__ == "__main__":
     main()

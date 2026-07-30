@@ -1,20 +1,16 @@
 #!/usr/bin/env python3
 """Build SM WoT Assistant Admin as a standalone onefile EXE.
-Uploads to Firebase Hosting (admin-only download).
+Local build only — no GitHub or RTDB publish.
 """
-import os, sys, json, subprocess, time, hashlib, shutil
+import os, sys, subprocess, shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
-PUBLIC_ADMIN_DIR = os.path.join(BASE_DIR, "public", "admin")
-PYTHON_EXE = sys.executable
-
-RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
-API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+PYTHON_EXE = r"C:\Users\PRO\AppData\Local\Programs\Python\Python312\python.exe"
 
 
 def read_version():
-    with open(os.path.join(BASE_DIR, "VERSION"), "r") as f:
+    with open(os.path.join(BASE_DIR, "admin_version.txt"), "r") as f:
         return f.read().strip()
 
 
@@ -36,7 +32,7 @@ def build_admin_exe(version):
         "--specpath", os.path.join(BASE_DIR, "build"),
         "--clean",
         "--add-data", f"{os.path.join(BASE_DIR, 'admin_icon.ico')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'VERSION')}{os.pathsep}.",
+        "--add-data", f"{os.path.join(BASE_DIR, 'admin_version.txt')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, '_fill_all_builds.py')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, 'generate_prompt_v2.py')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, 'stats_data.py')}{os.pathsep}.",
@@ -68,53 +64,6 @@ def build_admin_exe(version):
     return exe
 
 
-def deploy_to_firebase(version):
-    """Upload admin EXE to GitHub Releases (Firebase Hosting blocks EXE files)."""
-    print(f"[BUILD] Uploading to GitHub release v{version}...")
-    src = os.path.join(DIST_DIR, "SM WoT Assistant Admin.exe")
-    result = subprocess.run(
-        ["gh", "release", "upload", f"v{version}", src, "--clobber"],
-        cwd=BASE_DIR, capture_output=True, text=True
-    )
-    if result.returncode != 0:
-        print(f"[BUILD] GitHub upload FAILED: {result.stderr}")
-        return False
-    print(f"[BUILD] GitHub upload OK")
-    return True
-
-
-def write_version_to_rtdb(version):
-    """Write admin version metadata to RTDB."""
-    import urllib.request
-
-    size = os.path.getsize(os.path.join(DIST_DIR, "SM WoT Assistant Admin.exe"))
-    size_str = f"{size / (1024 * 1024):.0f} MB"
-    today = time.strftime("%Y-%m-%d")
-    dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/SM_WoT_Assistant_Admin.exe"
-
-    data = json.dumps({
-        "version": version,
-        "display_version": f"{version} Beta",
-        "release_date": today,
-        "build_size": size_str,
-        "download_url": dl_url,
-    }).encode("utf-8")
-
-    # Versioned entry
-    for path in [f"versions/admin/{version.replace('.', '_')}", "versions/admin/latest"]:
-        url = f"{RTDB_URL}/{path}.json?auth={API_KEY}"
-        req = urllib.request.Request(url, data=data, method="PUT")
-        req.add_header("Content-Type", "application/json")
-        try:
-            resp = urllib.request.urlopen(req, timeout=10)
-            print(f"[BUILD] RTDB {path}: HTTP {resp.status}")
-        except Exception as e:
-            print(f"[BUILD] RTDB warning ({path}): {e}")
-
-    print(f"[BUILD] Admin v{version} published")
-    print(f"[BUILD] Download URL: {dl_url}")
-
-
 def clean():
     """Clean build artifacts."""
     for p in [os.path.join(BASE_DIR, "build", "admin_app"),
@@ -124,7 +73,6 @@ def clean():
                 shutil.rmtree(p)
             else:
                 os.remove(p)
-    # Clean old EXEs from dist (keep only latest)
     if os.path.exists(DIST_DIR):
         for f in os.listdir(DIST_DIR):
             if f.startswith("SM WoT Assistant Admin") and f.endswith(".exe"):
@@ -139,13 +87,10 @@ def main():
 
     clean()
     build_admin_exe(version)
-    deploy_to_firebase(version)
-    write_version_to_rtdb(version)
 
     print()
-    print(f"[BUILD] Admin v{version} built and deployed!")
-    print(f"[BUILD] Admin EXE: https://sm-wot-assistant.web.app/admin/SM_WoT_Assistant_Admin_v{version}.exe")
-    print(f"[BUILD] Latest:     https://sm-wot-assistant.web.app/admin/SM_WoT_Assistant_Admin_latest.exe")
+    print(f"[BUILD] Admin v{version} built!")
+    print(f"[BUILD] EXE: {os.path.join(DIST_DIR, 'SM WoT Assistant Admin.exe')}")
 
 
 if __name__ == "__main__":
