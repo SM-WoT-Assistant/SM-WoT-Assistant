@@ -103,8 +103,9 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
         return []
     old = {}
     if os.path.exists(manifest_path):
-        with open(manifest_path, "r", encoding="utf-8") as f:
-            old = json.load(f)
+        with _MANIFEST_LOCK:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                old = json.load(f)
     changed = []
     with zipfile.ZipFile(pkg_path, 'r') as z:
         for name in z.namelist():
@@ -124,6 +125,65 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
     else:
         print(f"[DETECT] No changed tanks ({len(old)} entries checked)")
     return changed
+
+
+_MANIFEST_LOCK = threading.Lock()
+
+def snapshot_manifest(wot_path, manifest_path):
+    """Write current scripts.pkg vehicle XML fingerprints as baseline manifest."""
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(pkg_path):
+        return False
+    new = {}
+    with zipfile.ZipFile(pkg_path, 'r') as z:
+        for name in z.namelist():
+            if not name.startswith("scripts/item_defs/vehicles/") or not name.endswith(".xml"):
+                continue
+            if "common/" in name or "components/" in name or "list.xml" in name:
+                continue
+            new[name] = _entry_fingerprint(z.getinfo(name))
+    with _MANIFEST_LOCK:
+        try:
+            os.makedirs(os.path.dirname(os.path.abspath(manifest_path)), exist_ok=True)
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(new, f)
+            return True
+        except Exception:
+            return False
+
+
+def update_manifest_for_tags(wot_path, manifest_path, tags):
+    """Advance manifest entries for generated tags to current pkg fingerprints."""
+    if not tags or not os.path.exists(manifest_path):
+        return False
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(pkg_path):
+        return False
+    tags_set = set(tags)
+    updates = {}
+    with zipfile.ZipFile(pkg_path, 'r') as z:
+        for name in z.namelist():
+            if not name.startswith("scripts/item_defs/vehicles/") or not name.endswith(".xml"):
+                continue
+            if "common/" in name or "components/" in name or "list.xml" in name:
+                continue
+            tag = os.path.splitext(os.path.basename(name))[0]
+            if tag in tags_set:
+                updates[name] = _entry_fingerprint(z.getinfo(name))
+    if not updates:
+        return False
+    with _MANIFEST_LOCK:
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+            data.update(updates)
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            return True
+        except Exception:
+            return False
 
 _WG_API_URL = "https://api.worldoftanks.eu/wot/encyclopedia/info/?application_id=0cc3f254142cf2e40511006d6cd18761&r_realm=eu"
 

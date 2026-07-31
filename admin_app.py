@@ -6,7 +6,7 @@ auto-generates builds via AI Mode, notifies on results.
 Usage:
   python admin_app.py --wot-path="C:/Games/World_of_Tanks_EU"
 """
-import os, sys, json, time, threading, tkinter as tk
+import os, sys, json, time, threading, shutil, tkinter as tk
 from tkinter import ttk, scrolledtext
 import ctypes
 from ctypes import wintypes
@@ -25,7 +25,7 @@ from admin_build_generator import (
     _put_json, _get_json, _rtdb_url, _update_builds_version,
     _update_pending_status, check_wg_tanks_version,
     _WG_API_URL, _is_build_complete,
-    check_wg_game_version
+    check_wg_game_version, snapshot_manifest, update_manifest_for_tags
 )
 
 BG = "#1a1a1a"
@@ -98,9 +98,12 @@ class AdminTray:
     def _create_window(self):
         WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_long, ctypes.c_uint, ctypes.c_long, ctypes.c_long)
         def wndproc(hwnd, msg, wparam, lparam):
-            if msg == _WM_TRAY_CALLBACK and lparam == 0x0203:
-                self.parent.root.deiconify()
-                self.parent.root.lift()
+            if msg == _WM_TRAY_CALLBACK:
+                if lparam == 0x0202 or lparam == 0x0203:
+                    self.parent.root.deiconify()
+                    self.parent.root.lift()
+                elif lparam == 0x0205:
+                    self.parent.root.after(0, self.parent._show_tray_menu)
             return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
         self._wndproc = WNDPROC(wndproc)
         hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
@@ -232,16 +235,73 @@ class AdminApp:
         self._queue = []
         self._last_detected = []
         self._admin_settings = _load_admin_settings()
-        self._wot_path = wot_path or self._admin_settings.get("wot_path", "")
+        self._wot_path = self._resolve_wot_path(wot_path)
+        if self._wot_path and not self._admin_settings.get("wot_path"):
+            self._admin_settings["wot_path"] = self._wot_path
+            _save_admin_settings(self._admin_settings)
+        self._manifest_path = self._resolve_manifest()
 
         self.tank_db = load_tank_db()
         self.prompts = load_prompts()
         self.tray = AdminTray(self)
 
         self._build_ui()
-        self._log(f"Admin started (WoT: {wot_path or 'not set'})")
+        self._log(f"Admin started (WoT: {self._wot_path or 'not set'})")
         self._log(f"Tanks: {len(self.tank_db)}, Prompts: {len(self.prompts)}")
         self._start_background()
+
+    def _resolve_wot_path(self, cli_wot_path):
+        """Resolve WoT path: CLI arg → admin settings → main app settings → common paths."""
+        candidates = []
+        if cli_wot_path:
+            candidates.append(cli_wot_path)
+        if self._admin_settings.get("wot_path"):
+            candidates.append(self._admin_settings["wot_path"])
+        try:
+            main_settings_path = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "settings.json")
+            with open(main_settings_path, "r", encoding="utf-8") as f:
+                main_settings = json.load(f)
+                if main_settings.get("wot_path"):
+                    candidates.append(main_settings["wot_path"])
+        except:
+            pass
+        candidates.extend([
+            "C:/Games/World_of_Tanks_EU", "D:/Games/World_of_Tanks_EU",
+            "E:/Games/World_of_Tanks_EU", "C:/Games/World_of_Tanks",
+            "D:/Games/World_of_Tanks", "E:/Games/World_of_Tanks"
+        ])
+        for p in candidates:
+            p = (p or "").strip()
+            if p and os.path.exists(os.path.join(p, "version.xml")):
+                return p
+        return ""
+
+    def _resolve_manifest(self):
+        """Persistent change-tracking manifest in AppData.
+        Seeded from a fresh dev manifest (CWD) or a baseline snapshot of scripts.pkg
+        so the first scan never reports every tank as changed."""
+        manifest_dir = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
+        path = os.path.join(manifest_dir, ".tank_extract_manifest.json")
+        if os.path.exists(path):
+            return path
+        if self._wot_path:
+            cwd_manifest = os.path.join(_BUNDLE_DIR, ".tank_extract_manifest.json")
+            if os.path.exists(cwd_manifest):
+                try:
+                    if not detect_changed_tanks(self._wot_path, cwd_manifest):
+                        os.makedirs(manifest_dir, exist_ok=True)
+                        shutil.copy(cwd_manifest, path)
+                        self._log("Manifest seeded from dev copy")
+                        return path
+                except Exception:
+                    pass
+            try:
+                if snapshot_manifest(self._wot_path, path):
+                    self._log("Manifest baseline created from scripts.pkg")
+                    return path
+            except Exception as e:
+                self._log(f"Manifest baseline failed: {e}")
+        return path
 
     def _build_ui(self):
         ver = _read_admin_version()
@@ -262,8 +322,9 @@ class AdminApp:
         tk.Label(top, text="Admin", font=("Segoe UI", 16, "bold"),
                  fg="#ff4500", bg=BG).pack(side="left")
 
-        tk.Button(top, text="⚙", font=("Segoe UI", 14), bg=BG, fg="#aaa", bd=0,
-                  command=self._show_settings).pack(side="right", padx=(0, 4))
+        self._settings_btn = tk.Button(top, text="⚙", font=("Segoe UI", 14), bg=BG, fg="#aaa", bd=0,
+                                       command=self._show_settings_menu)
+        self._settings_btn.pack(side="right", padx=(0, 4))
 
         # Status bar
         self.status_lbl = tk.Label(self.root, text="Initializing...", font=("Segoe UI", 10),
@@ -348,34 +409,38 @@ class AdminApp:
         self._card_queue.config(text=str(q), fg=ACCENT if q > 0 else "#888")
         self._card_last.config(text=time.strftime("%H:%M") if self._last_scan > 0 else "—")
 
-    def _show_settings(self):
+    def _show_settings_menu(self):
+        """Gear button opens a dropdown menu (same pattern as the main app)."""
+        menu = tk.Menu(self.root, tearoff=0, bg="#222222", fg=FG,
+                       activebackground="#333333", activeforeground=ACCENT, bd=1)
+        sw = tk.BooleanVar(value=self._admin_settings.get("start_with_windows", False))
+        menu.add_checkbutton(label="Start with Windows", variable=sw,
+                             command=lambda: self._on_settings_change("start_with_windows", sw.get()))
+        sm = tk.BooleanVar(value=self._admin_settings.get("start_minimized", False))
+        menu.add_checkbutton(label="Start minimized to tray", variable=sm,
+                             command=lambda: self._on_settings_change("start_minimized", sm.get()))
+        menu.add_separator()
+        menu.add_command(label="WoT Path...", command=self._show_wot_path_dialog)
+        try:
+            x = self._settings_btn.winfo_rootx()
+            y = self._settings_btn.winfo_rooty() + self._settings_btn.winfo_height()
+            menu.tk_popup(x, y)
+        finally:
+            menu.grab_release()
+
+    def _show_wot_path_dialog(self):
         dlg = tk.Toplevel(self.root)
         dlg.configure(bg=BG)
-        dlg.title("Admin Settings")
-        dlg.geometry("400x250")
+        dlg.title("WoT Path")
+        dlg.geometry("420x120")
         dlg.resizable(False, False)
         dlg.transient(self.root)
         dlg.grab_set()
 
-        tk.Label(dlg, text="Admin Settings", font=("Segoe UI", 12, "bold"),
-                 fg=ACCENT, bg=BG).pack(pady=(12, 8))
-
-        sw = tk.BooleanVar(value=self._admin_settings.get("start_with_windows", False))
-        cb1 = tk.Checkbutton(dlg, text="Start with Windows", variable=sw,
-                              bg=BG, fg=FG, selectcolor="#333",
-                              command=lambda: self._on_settings_change("start_with_windows", sw.get()))
-        cb1.pack(anchor="w", padx=20, pady=4)
-
-        sm = tk.BooleanVar(value=self._admin_settings.get("start_minimized", False))
-        cb2 = tk.Checkbutton(dlg, text="Start minimized to tray", variable=sm,
-                              bg=BG, fg=FG, selectcolor="#333",
-                              command=lambda: self._on_settings_change("start_minimized", sm.get()))
-        cb2.pack(anchor="w", padx=20, pady=4)
-
         tk.Label(dlg, text="WoT Path:", bg=BG, fg="#aaa",
-                 font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(8, 2))
+                 font=("Segoe UI", 9)).pack(anchor="w", padx=20, pady=(12, 2))
         wp = tk.Entry(dlg, bg="#222", fg=FG, bd=0, insertbackground=FG,
-                       font=("Segoe UI", 9))
+                      font=("Segoe UI", 9))
         wp.insert(0, self._admin_settings.get("wot_path", self._wot_path or ""))
         wp.pack(fill="x", padx=20, pady=(0, 4))
 
@@ -385,9 +450,10 @@ class AdminApp:
             self._wot_path = val
             _save_admin_settings(self._admin_settings)
             self._log(f"WoT path set to: {val}")
+            dlg.destroy()
 
         tk.Button(dlg, text="Save", bg="#333", fg=FG, bd=0, padx=20, pady=4,
-                  command=lambda: [_save_wp(), dlg.destroy()]).pack(pady=10)
+                  command=_save_wp).pack(pady=6)
 
     def _on_settings_change(self, key, value):
         self._admin_settings[key] = value
@@ -407,7 +473,7 @@ class AdminApp:
         self._scan_btn.config(state="disabled")
         self._log("Scanning scripts.pkg for changes...")
         try:
-            changed = detect_changed_tanks(self._wot_path) if self._wot_path else []
+            changed = detect_changed_tanks(self._wot_path, self._manifest_path) if self._wot_path else []
             self._last_scan = time.time()
             if changed:
                 self._queue = changed
@@ -444,6 +510,10 @@ class AdminApp:
                 if ok:
                     _update_builds_version()
                     self._queue = [t for t in self._queue if t not in queue]
+                    try:
+                        update_manifest_for_tags(self._wot_path, self._manifest_path, queue)
+                    except Exception:
+                        pass
                     self._log("Generation complete!")
                     self.tray.show_notification("Builds Updated", f"{len(queue)} tanks regenerated",
                                                  level="info")
@@ -507,7 +577,7 @@ class AdminApp:
                                 _put_json(_rtdb_url("builds/tanks_updated_at"), ts)
                                 self._log(f"WG tanks_updated_at changed: {ts}")
                                 if self._wot_path:
-                                    changed = detect_changed_tanks(self._wot_path)
+                                    changed = detect_changed_tanks(self._wot_path, self._manifest_path)
                                     if changed:
                                         self._queue = changed
                                         self.root.after(0, self._update_cards)
@@ -517,7 +587,7 @@ class AdminApp:
                                         self._do_generate(changed)
                     if self._wot_path and now - self._last_scan > 3600:
                         self._last_scan = now
-                        changed = detect_changed_tanks(self._wot_path)
+                        changed = detect_changed_tanks(self._wot_path, self._manifest_path)
                         if changed:
                             self._queue = changed
                             self.root.after(0, self._update_cards)
@@ -536,6 +606,26 @@ class AdminApp:
         self.root.mainloop()
 
     def _on_close(self):
+        """X button minimizes to tray; exit only via tray menu."""
+        self.root.withdraw()
+
+    def _show_window(self):
+        self.root.deiconify()
+        self.root.lift()
+
+    def _show_tray_menu(self):
+        menu = tk.Menu(self.root, tearoff=False)
+        menu.add_command(label="Show", command=self._show_window)
+        menu.add_separator()
+        menu.add_command(label="Exit", command=self._exit_app)
+        pt = wintypes.POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        try:
+            menu.tk_popup(pt.x, pt.y)
+        finally:
+            menu.grab_release()
+
+    def _exit_app(self):
         self._running = False
         if hasattr(self, "tray"):
             self.tray.remove()
@@ -567,6 +657,8 @@ def main():
     if args.tray or settings.get("start_minimized", False):
         # Start in tray - window stays withdrawn, tray icon is visible
         app.root.after(100, app._log, "Started minimized to tray")
+        app.root.after(300, lambda: app.tray.show_notification(
+            "SM WoT Assistant Admin", f"Running in tray (WoT: {app._wot_path or 'not set'})"))
     else:
         root.deiconify()
     app.run()

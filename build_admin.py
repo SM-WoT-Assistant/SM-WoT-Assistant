@@ -47,6 +47,12 @@ def build_admin_exe(version):
         "--hidden-import", "PIL",
         "--hidden-import", "PIL._tkinter_finder",
         "--hidden-import", "requests",
+        "--hidden-import", "selenium.webdriver.chrome.webdriver",
+        "--hidden-import", "selenium.webdriver.chrome.service",
+        "--hidden-import", "selenium.webdriver.chrome.options",
+        "--hidden-import", "selenium.webdriver.common.service",
+        "--hidden-import", "selenium.webdriver.common.selenium_manager",
+        "--hidden-import", "selenium.webdriver.common.driver_finder",
         admin_py,
     ], cwd=BASE_DIR)
 

@@ -233,6 +233,17 @@ build.py автоматично комітить VERSION та installer.nsi пі
 4. **Highlight**: нові рядки (`isFresh()` перевірка по `admin_last_visit`) отримують CSS клас `row-new` з анімацією затемнення 3s.
 5. **`_lastBuildsVersion`** — зберігається в `localStorage`, при зміні секція AI Builds авто-розкривається.
 
+## Admin app fixes (31.07.2026)
+1. **WoT path auto-detect** (admin_app.py:_resolve_wot_path) — ланцюг: CLI `--wot-path` → admin_settings.json → головний `%APPDATA%/SM WoT Assistant/settings.json` wot_path → common paths (той самий список що map_manager.py). Валідація через `version.xml`. Знайдений шлях зберігається в admin_settings.json.
+2. **Хрестик → трей** — `_on_close()` робить `root.withdraw()` (програма живе, фоновий цикл працює). Повний вихід тільки через трей-меню **Exit**.
+3. **Трей-меню** — ЛКМ (0x0202) або даблклік (0x0203) → показати вікно; ПКМ (0x0205) → контекстне меню Show / Exit через `_show_tray_menu()` (tk_popup на позиції GetCursorPos).
+4. **Балон при старті в трей** — "Running in tray (WoT: ...)" через `tray.show_notification()`.
+5. **build_admin.py selenium hidden imports** — `selenium.webdriver.chrome.webdriver` (критичний, lazy-import selenium 4), `selenium.webdriver.chrome.service`, `selenium.webdriver.chrome.options`, `selenium.webdriver.common.service`, `selenium.webdriver.common.selenium_manager`, `selenium.webdriver.common.driver_finder`. Без них frozen EXE падав: `No module named 'selenium.webdriver.chrome.webdriver'` — генерація НЕ працювала ніколи.
+6. **Генерація вимагає закритий Chrome** — `_create_driver()` використовує реальний профіль `C:\Users\PRO\AppData\Local\Google\Chrome\User Data` + `--profile-directory=Default`; якщо Chrome запущений — "session not created: Chrome instance exited" (профіль заблокований).
+7. **Маніфест змін танків у AppData** (admin_app.py:_resolve_manifest) — `.tank_extract_manifest.json` тепер живе в `%APPDATA%/SM WoT Assistant/`, НЕ в CWD. Причина: frozen onefile CWD = `%TEMP%\_MEIxxxxx`, відносний шлях маніфесту не знаходився → `old={}` → detect завжди повертав ВСІ 1309 танків → авто-генерація при кожному старті/таймері (30 хв WG / 60 хв scan) → вікна Chrome з домашньою сторінкою (handoff у запущений Chrome) + балон "Chrome instance exited" вічно. Сід при першому запуску: CWD-копія ТІЛЬКИ якщо свіжа (detect по ній == 0), інакше snapshot поточного scripts.pkg (`snapshot_manifest()`) → перший запуск завжди = 0 змін. Всі 3 виклики `detect_changed_tanks()` передають `manifest_path=self._manifest_path`.
+8. **Оновлення маніфесту після генерації** — `update_manifest_for_tags(wot_path, manifest_path, tags)` (admin_build_generator.py): після `ok=True` записи згенерованих тегів оновлюються поточними fingerprint-ами → танки не редетектуються вічно кожні 60 хв. Семантика збігається з існуючим pop queue. `_MANIFEST_LOCK` (threading.Lock) захищає читання detect + записи (snapshot/update).
+9. **⚙ шестірня → випадаюче меню** — `_show_settings_menu()` (tk.Menu tk_popup під кнопкою, той самий паттерн що в головній програмі): чекбокси Start with Windows / Start minimized to tray + пункт "WoT Path..." → `_show_wot_path_dialog()` (маленький Toplevel з полем шляху + Save). Старого діалогу Admin Settings зі всіма налаштуваннями більше немає.
+
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.
 2. **Наприкінці сесії:** зберегти ключові факти в `ctx_memory`:
