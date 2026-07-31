@@ -96,15 +96,18 @@ class AdminTray:
         self._add_icon()
 
     def _create_window(self):
-        WNDPROC = ctypes.WINFUNCTYPE(ctypes.c_long, ctypes.c_long, ctypes.c_uint, ctypes.c_long, ctypes.c_long)
+        user32 = ctypes.windll.user32
+        user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
+        user32.DefWindowProcW.restype = wintypes.LPARAM
+        WNDPROC = ctypes.WINFUNCTYPE(wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM)
         def wndproc(hwnd, msg, wparam, lparam):
-            if msg == _WM_TRAY_CALLBACK:
-                if lparam == 0x0202 or lparam == 0x0203:
+            try:
+                if msg == _WM_TRAY_CALLBACK and (lparam & 0xFFFF) in (0x0202, 0x0203):
                     self.parent.root.deiconify()
                     self.parent.root.lift()
-                elif lparam == 0x0205:
-                    self.parent.root.after(0, self.parent._show_tray_menu)
-            return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+            except Exception:
+                pass
+            return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
         self._wndproc = WNDPROC(wndproc)
         hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
         cls_name = "AdminTrayClass"
@@ -421,6 +424,8 @@ class AdminApp:
                              command=lambda: self._on_settings_change("start_minimized", sm.get()))
         menu.add_separator()
         menu.add_command(label="WoT Path...", command=self._show_wot_path_dialog)
+        menu.add_separator()
+        menu.add_command(label="Exit", command=self._exit_app)
         try:
             x = self._settings_btn.winfo_rootx()
             y = self._settings_btn.winfo_rooty() + self._settings_btn.winfo_height()
@@ -606,24 +611,12 @@ class AdminApp:
         self.root.mainloop()
 
     def _on_close(self):
-        """X button minimizes to tray; exit only via tray menu."""
+        """X button minimizes to tray; full exit via Settings gear -> Exit."""
         self.root.withdraw()
 
     def _show_window(self):
         self.root.deiconify()
         self.root.lift()
-
-    def _show_tray_menu(self):
-        menu = tk.Menu(self.root, tearoff=False)
-        menu.add_command(label="Show", command=self._show_window)
-        menu.add_separator()
-        menu.add_command(label="Exit", command=self._exit_app)
-        pt = wintypes.POINT()
-        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
-        try:
-            menu.tk_popup(pt.x, pt.y)
-        finally:
-            menu.grab_release()
 
     def _exit_app(self):
         self._running = False
