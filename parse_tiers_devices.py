@@ -1,6 +1,9 @@
 import os
 import sys
+import json
+import zipfile
 import xml.etree.ElementTree as ET
+import config
 
 _TIERS_RAW = os.path.join(
     "temp_scripts2", "scripts", "item_defs", "vehicles",
@@ -9,9 +12,33 @@ _TIERS_RAW = os.path.join(
 _TIERS_DECODED = os.path.join(
     "temp_scripts", "decoded", "tiers_devices_decoded.xml"
 )
+_PKG_ENTRY = "scripts/item_defs/vehicles/common/optional_devices/tiers_devices.xml"
 _BW_SIG = b'\x45\x4e\xa1\x62'
 
 ALL_CLASSES = ["SPG", "LT", "MT", "HT", "TD"]
+
+
+def _try_client_pkg():
+    """Читає tiers_devices.xml з scripts.pkg клієнта гри (ZIP) в писемний кеш.
+
+    Повертає шлях до кешованої сирої копії або None."""
+    try:
+        if not os.path.exists(config.SETTINGS_FILE):
+            return None
+        with open(config.SETTINGS_FILE, "r", encoding="utf-8") as f:
+            wot_path = (json.load(f) or {}).get("wot_path", "")
+        if not wot_path:
+            return None
+        pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+        if not os.path.exists(pkg_path):
+            return None
+        raw_path = os.path.join(config.USER_DATA_DIR, "tiers_devices_raw.xml")
+        with zipfile.ZipFile(pkg_path, "r") as z:
+            with open(raw_path, "wb") as f:
+                f.write(z.read(_PKG_ENTRY))
+        return raw_path
+    except Exception:
+        return None
 
 
 def _ensure_decoded(xml_path, base_dir):
@@ -21,7 +48,7 @@ def _ensure_decoded(xml_path, base_dir):
         with open(xml_path, 'rb') as f:
             header = f.read(4)
         if header == _BW_SIG:
-            decoded_path = os.path.join(base_dir, _TIERS_DECODED)
+            decoded_path = os.path.join(config.USER_DATA_DIR, "tiers_devices_decoded.xml")
             os.makedirs(os.path.dirname(decoded_path), exist_ok=True)
             from decode_xml import WotXmlParser
             parser = WotXmlParser()
@@ -106,10 +133,14 @@ def load_tiers_devices(xml_path=None):
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
     if xml_path is None:
-        candidates = [
+        pkg_raw = _try_client_pkg()
+        candidates = []
+        if pkg_raw:
+            candidates.append(pkg_raw)
+        candidates.extend([
             os.path.join(base_dir, _TIERS_DECODED),
             os.path.join(base_dir, _TIERS_RAW),
-        ]
+        ])
     else:
         candidates = [xml_path]
 

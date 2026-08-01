@@ -101,12 +101,27 @@ def report_fallback(source, context, error_text, level="warning"):
     )
 
 
+def _report_version():
+    """Версія для звітів: admin_version.txt якщо це frozen адмінка, інакше основна."""
+    try:
+        av = os.path.join(config.BUNDLE_DIR, "admin_version.txt")
+        if os.path.exists(av) and (
+            getattr(sys, "frozen", False)
+            or not os.path.exists(os.path.join(config.BUNDLE_DIR, "VERSION"))
+        ):
+            with open(av, "r", encoding="utf-8") as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return config.load_version()
+
+
 def report_error(error_type, stage, error_text, blocked=False, details=None, message="", stack_trace=""):
     """Відправити помилку в RTDB error_reports/. Повертає True якщо успішно."""
     try:
         report = {
             "type": error_type,
-            "version": config.load_version(),
+            "version": _report_version(),
             "stage": stage,
             "blocked": blocked,
             "error": (error_text or message or "")[:500],

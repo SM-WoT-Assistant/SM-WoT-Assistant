@@ -137,11 +137,20 @@
         <div class="card">
             <h2 class="section-header" onclick="toggleSection(this)">▶ Admin App (Desktop)</h2>
             <div class="section-body" id="admin-app-container">
-                <div style="padding:10px 14px;background:#1a1a1a;border-radius:6px;font-size:13px;line-height:1.6;">
-                    <span style="color:#888;">
-                    Admin app is distributed separately (local build only).<br>
-                    Run from the project folder: <code style="color:#88cc88;">python admin_app.py</code>
-                    </span>
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                    <div class="stat-box"><div class="num" id="admin-version">—</div><div class="label">Admin Version</div></div>
+                    <div class="stat-box"><div class="num" id="admin-status">—</div><div class="label">Status</div></div>
+                    <div class="stat-box"><div class="num" id="admin-activity">—</div><div class="label">Activity</div></div>
+                    <div class="stat-box"><div class="num" id="admin-last-gen">—</div><div class="label">Last Generation</div></div>
+                </div>
+                <div style="font-size:13px;color:#888;line-height:1.7;">
+                    Builds DB updated: <b style="color:#ccc;" id="builds-updated">—</b><br>
+                    Prompts updated: <b style="color:#ccc;" id="prompts-updated">—</b><br>
+                    Popular tanks updated: <b style="color:#ccc;" id="popular-updated">—</b>
+                </div>
+                <div style="font-size:12px;color:#666;margin-top:10px;padding-top:8px;border-top:1px solid #222;">
+                    Admin app is distributed separately (local build only). Run from the project folder:
+                    <code style="color:#88cc88;">python admin_app.py</code>
                 </div>
             </div>
         </div>
@@ -233,6 +242,7 @@ function loadDashboard() {
     loadAdminReleases();
     loadUsers();
     loadBuildsData();
+    loadAdminAppData();
     pollPendingUpdates();
     startErrorPolling();
     // Update last visit after all data loaded
@@ -827,6 +837,49 @@ function loadBuildsData() {
     db.ref("popular_tanks/version").once("value").then(s => {
         document.getElementById("popular-version").textContent = s.val() || '—';
     }).catch(() => {});
+}
+
+function fmtDateTime(iso) {
+    if (!iso) return '—';
+    return String(iso).slice(0, 16).replace('T', ' ');
+}
+
+function loadAdminAppData() {
+    db.ref("admin_app").once("value").then(s => {
+        const d = s.val() || {};
+        document.getElementById("admin-version").textContent = d.version || '—';
+        const stEl = document.getElementById("admin-status");
+        const online = d.last_seen && (Date.now() / 1000 - d.last_seen) < 300;
+        if (online) {
+            stEl.textContent = 'Online';
+            stEl.style.color = '#66cc66';
+        } else {
+            stEl.textContent = 'Offline';
+            stEl.style.color = '#cc6666';
+        }
+        const actEl = document.getElementById("admin-activity");
+        const act = d.status || 'idle';
+        if (act === 'generating') {
+            actEl.textContent = 'Generating...';
+            actEl.style.color = '#ffaa00';
+        } else if (act === 'offline') {
+            actEl.textContent = '—';
+            actEl.style.color = '#888';
+        } else {
+            actEl.textContent = 'Idle';
+            actEl.style.color = '#888';
+        }
+        const lg = d.last_generation;
+        document.getElementById("admin-last-gen").textContent =
+            (lg && lg.at) ? ((lg.count || 0) + ' tanks · ' + fmtDateTime(lg.at)) : '—';
+    }).catch(() => {});
+    db.ref("builds/last_generated_at").once("value").then(s =>
+        document.getElementById("builds-updated").textContent = fmtDateTime(s.val())).catch(() => {});
+    db.ref("prompts/last_generated_at").once("value").then(s =>
+        document.getElementById("prompts-updated").textContent = fmtDateTime(s.val())).catch(() => {});
+    db.ref("popular_tanks/last_generated_at").once("value").then(s =>
+        document.getElementById("popular-updated").textContent = fmtDateTime(s.val())).catch(() => {});
+    setTimeout(loadAdminAppData, 60000);
 }
 
 function renderPendingStatus(data, type) {
