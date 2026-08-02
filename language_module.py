@@ -378,8 +378,9 @@ def setup(wot_path, settings, save_callback):
 
     try:
         from stats_data import generate_mo_maps
-        if lm and lm.dictionaries:
-            generate_mo_maps(lm, lang)
+        src = _lang_module if _lang_module is not None else lm
+        if src and src.dictionaries:
+            generate_mo_maps(src, lang)
             print(f"[LANG SETUP] mo_maps generated for {lang}")
     except Exception as e:
         print(f"[LANG SETUP] mo_maps error: {e}")

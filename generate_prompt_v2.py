@@ -379,9 +379,9 @@ def get_ammo_types(tier=10, tank_class="MT"):
 
 
 def _cons_rev_map():
-    from stats_data import CONS_MAP
+    from ai_engine import AI_CONS_MAP
     rev = {}
-    for dn, ik in CONS_MAP.items():
+    for dn, ik in AI_CONS_MAP.items():
         if ik not in rev or ('(' not in dn and '(' in rev[ik]):
             rev[ik] = dn
     return rev
