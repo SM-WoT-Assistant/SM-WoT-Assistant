@@ -6,5 +6,6 @@
   "compaction": {
     "auto": false,
     "prune": false
-  }
+  },
+  "snapshots": false
 }
