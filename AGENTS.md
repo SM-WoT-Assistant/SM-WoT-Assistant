@@ -24,6 +24,7 @@
 6. **Іконка "Зламане дерево"** (06.06.2026): FontAwesome символ `chr(0xF18C)` (fontawesome-webfont.ttf). Рендериться через `canvas.create_text` з шрифтом FontAwesome, колір через fill=. SVG-рендеринг через PyQt6 видалено. Кешування не потрібне (шрифтовий символ).
 7. **DrawingPalette** (painting_palette.py) — плаваюча палітра замість старого `draw_menu` + `PainterDialog`. Авто-deactivate після створення об'єкта. Ctrl+Z undo через keyboard хук. Ctrl+↑/↓ resize в edit mode (debounce 150ms від double-fire keyboard+bind_all).
 8. **PainterDialog** (painter.py) — ВИДАЛЕНО (06.06.2026). Замінено на DrawingPalette.
+9. **Автовисота DrawingPalette** (03.08.2026): (a) `show()` викликає `_refresh_linked_schemes_list()` після відновлення `_saved_pos` — висота підганяється під поточний контент (секція Groups + linked schemes) при КОЖНОМУ показі. (b) `_adapt_palette_height()` оновлює `_saved_pos` при зміні висоти — збережена геометрія завжди актуальна. (c) `_hide_download_inline()` викликає `_adapt_palette_height()` — після закриття Download (580×780) кнопки груп не обрізаються. Корінь старого бага: `show()` скидав висоту на 520 з `_saved_pos` (встановленого `_restore_position()`), перезаписуючи підігнану висоту; `_adapt_palette_height` викликався тільки при create/join групи.
 
 ## Cache validation rules (25.07.2026, дійсні для Firebase архітектури)
 1. **stats_ai.py:_is_build_complete()** — статична валідація: перевіряє `equipment_1` та `consumables_1` не пусті.
@@ -173,6 +174,8 @@ build.py автоматично комітить VERSION та installer.nsi пі
 15. **_DragHelper** (dialog_utils.py:17-25) — клас для перетягування `overrideredirect` вікон. Параметри: `toplevel`, `frame`. Використовується в усіх кастомних діалогах.
 16. **Токен групи:** інвайт-код з кнопкою Copy на top_bar поруч з group_selector. Для officer — показує код (#ffaa00) + clipboard copy. Для member — 🔒. Для Public — прихований.
 17. **_show_group_sync_notification** (main.py:1815) — `overrideredirect(True)` + кастомний header + `_DragHelper`.
+18. **Захист від дублікатів назв груп** (03.08.2026): у одного користувача не може бути двох груп з однаковою назвою. `create_group()` (firebase_groups.py) перевіряє `get_user_groups(uid)` перед PUT — при збігу назви (case-insensitive) повертає (None, "Ви вже маєте групу з такою назвою") БЕЗ створення. `join_group()` — та сама перевірка назви цільової групи ПІСЛЯ гілки "вже член" (повторний join своєї групи працює). UI не змінювався — do_create/do_join вже показують повернену помилку через status_var. Причина бага: користувач створив дві групи "001" (5eb72871/5147D4 та 98e53f80/B22858) → `_group_id_map` (ui_manager.py:199) колізія ключа label → обидва items селектора вели до однієї групи → "однаковий інвайт". Дубль 5eb72871 видалено з RTDB.
+19. **`_put(path, None)` фікс** (03.08.2026, firebase_reporter.py:66, admin_build_generator.py:45 `_put_json`): `requests.put(json=None)` не шле тіло → RTDB 400 → ВСІ видалення тихо не працювали (leave_group, kick_member, delete_group, delete_group_scheme, admin `_cleanup_old_error_reports`). Тепер `data is None` → `requests.put(url, data=b"null", headers={"Content-Type": "application/json"})` → 200. DELETE-еквівалент: PUT null.
 
 ## Overlay startup fix (29.06.2026, повторюваний баг)
 

@@ -10,7 +10,7 @@ closes SM WoT Assistant v*.exe. Then returns to monitoring.
 import os, sys, json, time, ctypes, subprocess, re
 from ctypes import wintypes
 
-DEBUG = True
+DEBUG = False
 
 kernel32 = ctypes.windll.kernel32
 user32 = ctypes.windll.user32
@@ -208,8 +208,11 @@ def _launch_app():
     if DEBUG: print(f"[DEBUG] _launch_app: NOTHING to launch — all paths failed")
 
 def main():
-    mutex = kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_TrayWatcher")
-    if kernel32.GetLastError() == 183:
+    _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _k32.CreateMutexW.argtypes = (ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p)
+    _k32.CreateMutexW.restype = ctypes.c_void_p
+    mutex = _k32.CreateMutexW(None, False, "SM_WoT_Assistant_TrayWatcher")
+    if ctypes.get_last_error() == 183:
         if DEBUG: print(f"[DEBUG] main: another tray watcher already running, exiting")
         sys.exit(0)
     if DEBUG: print(f"[DEBUG] main: tray watcher started, PID={os.getpid()}")

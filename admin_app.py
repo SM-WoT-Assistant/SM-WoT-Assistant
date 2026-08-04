@@ -1031,8 +1031,11 @@ def main():
     import argparse
 
     # Single-instance mutex
-    mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_Admin_SingleInstance")
-    if ctypes.windll.kernel32.GetLastError() == 183:
+    _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    _k32.CreateMutexW.argtypes = (ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p)
+    _k32.CreateMutexW.restype = ctypes.c_void_p
+    mutex = _k32.CreateMutexW(None, False, "SM_WoT_Assistant_Admin_SingleInstance")
+    if ctypes.get_last_error() == 183:
         hwnd = ctypes.windll.user32.FindWindowW(None, f"SM WoT Assistant Admin v{_read_admin_version()}")
         if hwnd:
             ctypes.windll.user32.SetForegroundWindow(hwnd)

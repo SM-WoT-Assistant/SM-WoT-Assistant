@@ -1,11 +1,12 @@
 {
-  "$schema": "https://opencode.ai/config.json",
+  "$schema": "https://opencode.ai",
+  "lsp": true,
   "plugin": [
-    "@cortexkit/opencode-magic-context"
+    "@cortexkit/opencode-magic-context@latest"
   ],
   "compaction": {
     "auto": false,
-    "prune": false
-  },
-  "snapshots": false
+    "prune": false,
+    "snapshots": false
+  }
 }

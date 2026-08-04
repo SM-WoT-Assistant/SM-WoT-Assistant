@@ -160,12 +160,12 @@ class StatsAI:
                         if found:
                             resolved.append(found)
                 if len(resolved) < 5:
-                    print(f"[AI Browser] Кеш має {len(cached_tanks)} танків, але тільки {len(resolved)} валідні — ігнорую")
+                    print(f"[SYNC] Кеш має {len(cached_tanks)} танків, але тільки {len(resolved)} валідні — ігнорую")
                     self.popular_tanks = []
                 else:
                     self._cache_version = 1
                     self.popular_tanks = resolved
-                    print(f"[AI Browser] Завантажено {len(resolved)} танків з кешу")
+                    print(f"[SYNC] Завантажено {len(resolved)} танків з кешу")
             else:
                 self.popular_tanks = []
         else:

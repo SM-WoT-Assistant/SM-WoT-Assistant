@@ -365,6 +365,7 @@ class DrawingPalette(tk.Toplevel):
         current_h = int(m.group(2))
         if abs(target_h - current_h) > 10:
             self.geometry(f"{w}x{target_h}{rest}")
+            self._saved_pos = f"{w}x{target_h}{rest}"
 
     def _make_dark_header(self, parent, title):
         hdr = tk.Frame(parent, bg="#2a2a2a", height=28)
@@ -1382,6 +1383,7 @@ class DrawingPalette(tk.Toplevel):
         self.update_idletasks()
         if self._saved_pos:
             self.geometry(self._saved_pos)
+        self._refresh_linked_schemes_list()
         self._sync_tool_state()
         self.after(100, self._lift_self)
 
@@ -1590,6 +1592,7 @@ class DrawingPalette(tk.Toplevel):
                 self.geometry(self._palette_compact_geo)
             except Exception:
                 pass
+        self._adapt_palette_height()
 
     def _download_populate(self):
         try:

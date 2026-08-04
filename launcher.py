@@ -65,8 +65,11 @@ class Launcher:
     def __init__(self):
         self.skip_splash = "--skip-splash" in sys.argv
 
-        self.mutex = ctypes.windll.kernel32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
-        if ctypes.windll.kernel32.GetLastError() == 183:
+        _k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        _k32.CreateMutexW.argtypes = (ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p)
+        _k32.CreateMutexW.restype = ctypes.c_void_p
+        self.mutex = _k32.CreateMutexW(None, False, "SM_WoT_Assistant_SingleInstance")
+        if ctypes.get_last_error() == 183:
             sys.exit(0)
 
         self.version = load_version()

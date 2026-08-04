@@ -44,7 +44,12 @@ def _rtdb_url(path):
 
 def _put_json(url, data, timeout=15):
     import requests
-    r = requests.put(url, json=data, timeout=timeout)
+    if data is None:
+        # PUT null — видалення вузла (json=None не шле тіло, RTDB повертає 400)
+        r = requests.put(url, data=b"null",
+                         headers={"Content-Type": "application/json"}, timeout=timeout)
+    else:
+        r = requests.put(url, json=data, timeout=timeout)
     return r.status_code in (200, 204)
 
 def _get_json(url, timeout=10):

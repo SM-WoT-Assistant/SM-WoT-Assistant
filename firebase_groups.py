@@ -64,6 +64,12 @@ def create_group(name, description, user_id=None, nickname=None):
     if len(name) > 50:
         return None, "Назва має бути не більше 50 символів"
 
+    # Захист від дублікатів: у користувача не може бути двох груп з однаковою назвою
+    my_groups = get_user_groups(uid)
+    if any(isinstance(ginfo, dict) and (ginfo.get("name") or "").lower() == name.lower()
+           for gid, ginfo in my_groups.items() if gid != PUBLIC_GROUP_ID):
+        return None, "Ви вже маєте групу з такою назвою"
+
     group_id = str(uuid.uuid4())
     invite_code = uuid.uuid4().hex[:6].upper()
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
@@ -130,6 +136,12 @@ def join_group(invite_code, user_id=None, nickname=None):
     members = groups[target_gid].get("members", {})
     if isinstance(members, dict) and uid in members:
         return target_gid, target_name
+
+    # Захист від дублікатів: не вступати в групу, назва якої вже є у користувача
+    my_groups = get_user_groups(uid)
+    if any(isinstance(ginfo, dict) and (ginfo.get("name") or "").lower() == (target_name or "").lower()
+           for gid, ginfo in my_groups.items() if gid != PUBLIC_GROUP_ID):
+        return None, "Ви вже маєте групу з такою назвою"
 
     now = time.strftime("%Y-%m-%dT%H:%M:%S")
     member_data = {

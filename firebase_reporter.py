@@ -67,7 +67,12 @@ def _put(path, data, timeout=8):
     if not _is_configured():
         return False
     try:
-        r = requests.put(_rtdb_url(path), json=data, headers=config.HEADERS, timeout=timeout)
+        if data is None:
+            # PUT null — видалення вузла (json=None не шле тіло, RTDB повертає 400)
+            r = requests.put(_rtdb_url(path), data=b"null",
+                             headers={"Content-Type": "application/json"}, timeout=timeout)
+        else:
+            r = requests.put(_rtdb_url(path), json=data, headers=config.HEADERS, timeout=timeout)
         return 200 <= r.status_code < 300
     except Exception:
         return False
