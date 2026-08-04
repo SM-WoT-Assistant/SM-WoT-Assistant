@@ -97,7 +97,7 @@ MAP_NAMES_EN = {
     "251_br_battle_city3": "Arzaghir 4.04", "252_br_battle_city4": "Firnulfir",
     "28_desert": "Sand River", "29_el_hallouf": "El Halluf", "31_airfield": "Airfield",
     "33_fjord": "Fjords", "34_redshire": "Redshire", "35_steppes": "Steppes",
-    "36_fishing_bay": "Fishermans Bay", "37_caucasus": "Pass",
+    "36_fishing_bay": "Fishermans Bay", "37_caucasus": "Mountain Pass",
     "38_mannerheim_line": "Mannerheim Line", "44_north_america": "Live Oaks",
     "45_north_america": "Highway", "47_canada_a": "Serene Coast",
     "59_asia_great_wall": "Empire's Border", "60_asia_miao": "Pearl River",

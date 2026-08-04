@@ -16,7 +16,6 @@ _EVENT_MAP_IDS = {
     "208_bf_epic_normandy", "209_wg_epic_suburbia", "210_bf_epic_desert",
     "212_epic_random_valley_sm25",
     "250_br_battle_city2-1", "251_br_battle_city3", "252_br_battle_city4",
-    "37_caucasus", "59_asia_great_wall",
 }
 _UNAVAILABLE_FILE = os.path.join(config.USER_DATA_DIR, "unavailable_tactic_maps.json")
 

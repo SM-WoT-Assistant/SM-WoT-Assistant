@@ -74,6 +74,8 @@ class WindowManager:
         self.drag = None
         self.mouse_drag_active = False
         self.mouse_last_pos = None
+        self._root_hwnd = None
+        self._po_hwnd = None
         self.drag_thread = None
         self.drag_running = False
         self.ctrl_press_time = None  # Час першого натиску Ctrl
@@ -146,11 +148,21 @@ class WindowManager:
 
                 painter_move_active = hasattr(self.app, "painter") and getattr(self.app.painter, "move_drag_active", False)
 
+                # Глобальне перетягування вікна: в norm (бойовому) режимі дозволено
+                # з будь-якої точки екрана (вікно click-through, це фіча), а в edit —
+                # лише коли курсор над вікном програми, інакше кліки в грі
+                # (приціл, мінімапа) тягнуть вікно за курсором і зсувають його позицію.
+                over_app = self.app.mode == "norm" or self._cursor_over_app()
+
                 # У форматуванні (F8) дозволяємо перетягування ЛКМ без Ctrl (будь-який режим)
-                drag_ready = lmb_pressed and not painter_move_active and (
+                drag_ready = lmb_pressed and not painter_move_active and over_app and (
                     self.format_mode_enabled or
                     (self._is_ctrl_armed() and ctrl_pressed)
                 )
+                # Коли drag уже почався — продовжуємо поки затиснута ЛКМ, інакше
+                # перетин межі вікна (over_app flapping) обриває drag на півшляху.
+                if self.mouse_drag_active:
+                    drag_ready = lmb_pressed
 
                 if drag_ready:
                     if not self.mouse_drag_active:
@@ -200,6 +212,40 @@ class WindowManager:
             print(f"[DRAG] Помилка в mouse monitor: {e}")
         finally:
             self.drag_running = False
+
+    def _cursor_over_app(self):
+        """True, якщо курсор над вікном програми (root або overlay _po_win).
+
+        WindowFromPoint може повернути дочірній hwnd (canvas/entry — у Tk це
+        окремі WS_CHILD-вікна), тому піднімаємось ланцюгом GetParent до 8 рівнів
+        і порівнюємо з клієнтським/wrapper hwnd рута й оверлея.
+        """
+        try:
+            pt = ctypes.wintypes.POINT()
+            ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+            hwnd = ctypes.windll.user32.WindowFromPoint(pt)
+            if self._root_hwnd is None:
+                self._root_hwnd = self.app.root.winfo_id()
+            if self._po_hwnd is None:
+                po = getattr(self.app, "_po_win", None)
+                if po is not None and po.winfo_exists():
+                    hid = po.winfo_id()
+                    self._po_hwnd = hid or None  # 0 -> перевірити ще раз
+            targets = [self._root_hwnd]
+            if self._po_hwnd:
+                targets.append(self._po_hwnd)
+                targets.append(ctypes.windll.user32.GetParent(self._po_hwnd))
+            targets.append(ctypes.windll.user32.GetParent(self._root_hwnd))
+            h = hwnd
+            for _ in range(8):
+                if h in targets:
+                    return True
+                h = ctypes.windll.user32.GetParent(h)
+                if not h:
+                    break
+            return False
+        except Exception:
+            return False
 
     def stop_mouse_drag_monitor(self):
         """Зупинка моніторингу миші для drag"""
@@ -262,8 +308,9 @@ class WindowManager:
         
         def on_mouse_click(event):
             if event.button == 'left' and keyboard.is_pressed('alt'):
-                self.mouse_drag_active = True
-                self.mouse_last_pos = (event.x, event.y)
+                if self.app.mode == "norm" or self._cursor_over_app():
+                    self.mouse_drag_active = True
+                    self.mouse_last_pos = (event.x, event.y)
         
         def on_mouse_release(event):
             if event.button == 'left':

@@ -353,7 +353,6 @@ def setup(wot_path, settings, save_callback):
         )
         print(f"[LANG SETUP] exported locale/{lang}.json")
         regenerate_game_entities(lm)
-        regenerate_map_dictionary(lm)
         settings["language"] = lang
         try:
             with open(config.SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -375,6 +374,15 @@ def setup(wot_path, settings, save_callback):
         _lang_module = LanguageModule(wot_path)
         _lang_module._cache_dir = os.path.join(config.USER_DATA_DIR, "localization", lang)
         _lang_module.load_cache()
+
+    # Словник назв мап завжди перегенерується з клієнта (arenas.mo) у мові клієнта —
+    # на кожному старті, не тільки при зміні мови. Інакше застарілий словник від
+    # іншої мови клієнта (напр. EN) лишається назавжди й показує чужі назви.
+    try:
+        if _lang_module is not None and _lang_module.dictionaries.get("arenas"):
+            regenerate_map_dictionary(_lang_module)
+    except Exception as e:
+        print(f"[LANG SETUP] map dictionary error: {e}")
 
     try:
         from stats_data import generate_mo_maps
