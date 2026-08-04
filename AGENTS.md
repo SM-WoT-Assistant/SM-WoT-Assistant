@@ -60,6 +60,8 @@
 8. **Трей**: F10; tray wndproc = чистий форвардер, жодного Tk/I-O в колбеку (#1440); PE_SIZE 568/556 (#1309); tray_watcher = stdlib+ctypes без tkinter/PIL/requests.
 9. **Кеші**: валідація на load і save (#1346); повний реєстр — docs/cache.md.
 10. **RTDB видалення**: PUT null, ніколи `requests.put(json=None)` (#1470).
+11. **Release Cleanup Protocol** (після КОЖНОГО релізу): локально dist/ → лишити 5 останніх білдів; GitHub → видалити релізи старші 5 останніх (`gh api -X DELETE releases/{id}`); RTDB versions/ → лишити 5 останніх + latest (PUT null). Повна процедура — docs/release.md.
+12. **No dead code**: новий .py без імпортерів (перевірка grep'ом імпортів) — одразу в _archive/scripts/; тестові виводи (html/json/log/txt-дампи) не комітити; розхідники (dist, extracted_gui, temp_scripts.zip) чистити.
 
 ## Cross-session пам'ять (Magic Context plugin)
 1. Пам'ять автоматично інжектиться в контекст — перевірка на старті НЕ ПОТРІБНА.

@@ -44,7 +44,6 @@
 - Splash: `main.py:1045` — `config.load_version()`
 - Редактор (водяний знак): `map_renderer.py:249` — `config.load_version()`
 - Довідка (F1): `help_system.py:49` — `config.load_version()` (через import config)
-- AI WebView: `ai_webview_gui.py:28` — `_read_version()` (читає VERSION, не імпортує config)
 
 ### Seeding файлів у AppData (перший запуск)
 - `config.DEFAULT_FILES` (config.py:34) = `["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]`
@@ -59,9 +58,31 @@ build.py автоматично комітить VERSION та installer.nsi пі
 Після білду запустити `dist/SM WoT Assistant vX.Y.Z/SM WoT Assistant.exe` — smoke test.
 
 
-## Admin build layout onedir (04.08.2026, admin v1.0.4)
-1. **build_admin.py** збирає адмінку як **--onedir** у `dist/SM WoT Assistant Admin/` (EXE + `_internal/` з бандлом: admin_version.txt, admin_uk_seed.json, tiers_devices_decoded.xml тощо). Раніше був --onefile у корінь dist — міняли через плутанину двох EXE з однаковою назвою (dist root та стара папка).
+## Admin build layout onedir (04.08.2026, admin v1.0.4)1. **build_admin.py** збирає адмінку як **--onedir** у `dist/SM WoT Assistant Admin/` (EXE + `_internal/` з бандлом: admin_version.txt, admin_uk_seed.json, tiers_devices_decoded.xml тощо). Раніше був --onefile у корінь dist — міняли через плутанину двох EXE з однаковою назвою (dist root та стара папка).
 2. **PyInstaller onedir** додає ім'я програми до distpath (`distpath/<name>/`) — тому `--distpath` = корінь `dist`, а не `dist/SM WoT Assistant Admin` (інакше подвійне вкладення).
 3. **clean()** перед збіркою: `shutil.rmtree(dist/SM WoT Assistant Admin)` + видалення старих `dist/SM WoT Assistant Admin*.exe` з кореня. Канонічна точка запуску: `dist/SM WoT Assistant Admin/SM WoT Assistant Admin.exe`.
 4. **Перед перезбіркою** вбити запущену адмінку (працюючий EXE заблокований Windows → clean() падає з PermissionError WinError 5; стара інстанція також блокує нову через мутекс).
+
+## Release Cleanup Protocol (після КОЖНОГО релізу, 04.08.2026)
+
+Правило: лишити **5 останніх** білдів/версій скрізь, решту прибрати. Порядок (спочатку перевірити, що новий реліз працює!):
+
+1. **Локально dist/** — лишити 5 останніх версіонованих папок (`SM WoT Assistant vX.Y.Z/`) + їх Setup/Portable/manifest; видалити:
+   ```powershell
+   $keep = @("1.0.62","1.0.63","1.0.64","1.0.65","1.0.66")  # поточні 5
+   Get-ChildItem dist -Directory | Where-Object { $_.Name -match "v(\d+\.\d+\.\d+)" -and $matches[1] -notin $keep -and $_.Name -notmatch "Admin" } | Remove-Item -Recurse -Force
+   Get-ChildItem dist -File | Where-Object { $_.Name -match "v(\d+\.\d+\.\d+)" -and $matches[1] -notin $keep } | Remove-Item -Force
+   ```
+2. **GitHub** — видалити релізи старші 5 останніх (assets видаляються разом з релізом; теги лишаються):
+   ```powershell
+   gh api "repos/nkcgml-boop/SM-WoT-Assistant/releases?per_page=100" --jq ".[] | select(.tag_name != \"v1.0.66\") | .id" | ForEach-Object { gh api -X DELETE "repos/nkcgml-boop/SM-WoT-Assistant/releases/$_" }
+   ```
+3. **RTDB versions/** — лишити 5 останніх + `latest`, решту PUT null (правило #1470):
+   ```python
+   # keys < 5 останніх + 'admin' → PUT null, див. firebase_reporter._rtdb_url()
+   ```
+4. **Інші розхідники**: `temp_scripts.zip`, `*.log`, `*_err.txt`, `*_out.txt`, `extracted_gui/` — видаляти одразу після екстракцій; новий .py без імпортерів → `_archive/scripts/` (правило No dead code).
+
+Перевірка після чистки: `gh api .../releases` = 5, `versions.json` = 6 ключів (5 версій + latest), dist ≤ ~5 GB.
+
 
