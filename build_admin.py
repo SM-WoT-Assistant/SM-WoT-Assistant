@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Build SM WoT Assistant Admin as a standalone onefile EXE.
+"""Build SM WoT Assistant Admin as a standalone onedir EXE (dist/SM WoT Assistant Admin/).
 Local build only — no GitHub or RTDB publish.
 """
 import os, sys, subprocess, shutil
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DIST_DIR = os.path.join(BASE_DIR, "dist")
+ADMIN_DIR = os.path.join(DIST_DIR, "SM WoT Assistant Admin")
 PYTHON_EXE = r"C:\Users\PRO\AppData\Local\Programs\Python\Python312\python.exe"
 
 
@@ -24,7 +25,7 @@ def build_admin_exe(version):
 
     result = subprocess.run([
         PYTHON_EXE, "-m", "PyInstaller",
-        "--onefile", "--windowed",
+        "--onedir", "--windowed",
         "--icon", os.path.join(BASE_DIR, "admin_icon.ico"),
         "--name", "SM WoT Assistant Admin",
         "--distpath", DIST_DIR,
@@ -63,7 +64,7 @@ def build_admin_exe(version):
         print("[BUILD] Admin EXE build FAILED")
         sys.exit(1)
 
-    exe = os.path.join(DIST_DIR, "SM WoT Assistant Admin.exe")
+    exe = os.path.join(ADMIN_DIR, "SM WoT Assistant Admin.exe")
     if not os.path.exists(exe):
         print("[BUILD] FATAL: Admin EXE not found")
         sys.exit(1)
@@ -82,6 +83,8 @@ def clean():
                 shutil.rmtree(p)
             else:
                 os.remove(p)
+    if os.path.isdir(ADMIN_DIR):
+        shutil.rmtree(ADMIN_DIR)
     if os.path.exists(DIST_DIR):
         for f in os.listdir(DIST_DIR):
             if f.startswith("SM WoT Assistant Admin") and f.endswith(".exe"):
@@ -99,7 +102,7 @@ def main():
 
     print()
     print(f"[BUILD] Admin v{version} built!")
-    print(f"[BUILD] EXE: {os.path.join(DIST_DIR, 'SM WoT Assistant Admin.exe')}")
+    print(f"[BUILD] EXE: {os.path.join(ADMIN_DIR, 'SM WoT Assistant Admin.exe')}")
 
 
 if __name__ == "__main__":

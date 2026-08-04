@@ -295,3 +295,9 @@ build.py автоматично комітить VERSION та installer.nsi пі
 3. **Перевірено** (03-04.08.2026): smoke — 2-й інстанс main.py виходить за ~8с; 2-й dev tray_watcher виходить; встановлені старі EXE (v1.0.65) дають дублі — новий реліз лікує.
 4. **tray_watcher.py:13** — `DEBUG = False` (релізна гігієна; DEBUG-принти залишаються в коді).
 5. **Реліз**: v1.0.66 (03.08-батч: мутекс-фікс ×4, PUT null у firebase_reporter.py:66/admin_build_generator.py:45, захист дублікатів назв груп firebase_groups.py, автовисота DrawingPalette painting_palette.py, [SYNC]-теги stats_ai.py, чищення тестових залишків). admin_version.txt → 1.0.4.
+
+## Admin build layout onedir (04.08.2026, admin v1.0.4)
+1. **build_admin.py** збирає адмінку як **--onedir** у `dist/SM WoT Assistant Admin/` (EXE + `_internal/` з бандлом: admin_version.txt, admin_uk_seed.json, tiers_devices_decoded.xml тощо). Раніше був --onefile у корінь dist — міняли через плутанину двох EXE з однаковою назвою (dist root та стара папка).
+2. **PyInstaller onedir** додає ім'я програми до distpath (`distpath/<name>/`) — тому `--distpath` = корінь `dist`, а не `dist/SM WoT Assistant Admin` (інакше подвійне вкладення).
+3. **clean()** перед збіркою: `shutil.rmtree(dist/SM WoT Assistant Admin)` + видалення старих `dist/SM WoT Assistant Admin*.exe` з кореня. Канонічна точка запуску: `dist/SM WoT Assistant Admin/SM WoT Assistant Admin.exe`.
+4. **Перед перезбіркою** вбити запущену адмінку (працюючий EXE заблокований Windows → clean() падає з PermissionError WinError 5; стара інстанція також блокує нову через мутекс).
