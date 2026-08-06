@@ -4,6 +4,18 @@
 
 ---
 
+## v1.0.67 (06.08.2026)
+
+**Зміни після v1.0.66 (коміти 9990b5e..446bc4e, гілка api-integration):**
+- Повернуто 2 мапи (59_asia_great_wall / Кордон Імперії, 37_caucasus / Перевал) — прибрано з `_EVENT_MAP_IDS`; 44 мапи в Standard (ctf).
+- Назви мап завжди в мові клієнта гри: `regenerate_map_dictionary(_lang_module)` на кожному старті (деталі нижче, розділ 04.08.2026).
+- Фікс дрейфу позиції вікна редагування: `WindowManager._cursor_over_app()` WindowFromPoint + GetParent-ланцюг, mode-гейт drag (деталі нижче).
+- Аудит 04.08: 125 мертвих модулів → `_archive/scripts/`, чистка dist/GitHub/RTDB (5 останніх), реорганізація docs (13 тематичних файлів).
+- Реліз: повний цикл build.py (PyInstaller → NSIS → ZIP → verify → manifest → GitHub release → RTDB) + Release Cleanup Protocol (лишились v1.0.63–v1.0.67).
+- Адмінка не змінювалась (v1.0.4, onedir).
+
+---
+
 ## Виправлення мап та дрейфу позиції вікна (04.08.2026)
 
 **Назви мап завжди в мові клієнта гри (language_module.py):**
