@@ -76,8 +76,8 @@
 ## Docs index (читати ТІЛЬКИ релевантне для задачі)
 | Задача | Файл |
 |---|---|
-| Архітектура в цілому, layers, data flow | docs/architecture.md |
-| Де який файл, naming, куди додавати код | docs/structure.md |
+| Архітектура в цілому, layers, data flow | ARCHITECTURE.md (корінь, канонічний) |
+| Де який файл, naming, куди додавати код | STRUCTURE.md (корінь, канонічний) |
 | Firebase, RTDB, identity, groups, admin RTDB статус | docs/firebase.md |
 | Painter, DrawingPalette, overlay, малюнки | docs/painter.md |
 | Мапи, сітка координат, екстракція, TACTIC/MAPS | docs/maps.md |
