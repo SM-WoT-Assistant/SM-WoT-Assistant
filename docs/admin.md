@@ -4,6 +4,14 @@
 
 ---
 
+## Chrome profile isolation (07.08.2026, admin_build_generator.py, адмінка v1.0.5)
+1. **Проблема**: `_create_driver()` використовував реальний профіль Chrome `C:\Users\PRO\AppData\Local\Google\Chrome\User Data` + `--profile-directory=Default`. Коли Chrome уже запущений — новий chrome.exe віддає URL існуючому інстансу і виходить → `session not created: Chrome instance exited` (профіль заблокований SingletonLock). Після оновлення гри (тригер `pending_updates/builds`) демон `admin_build_generator.py --listen` падав на генерації кожен цикл.
+2. **Фікс** (admin_build_generator.py:223-315): при запущеному Chrome (`_chrome_running()` — tasklist-перевірка; невідомо → вважаємо залоченим) профіль КОПІЮЄТЬСЯ в `%TEMP%\sm_wot_admin_chrome_profile` (`_copy_chrome_profile()`, shutil.copytree) з виключенням кешів і локів (Cache/Code Cache/GPUCache/DawnCache/GraphiteDawnCache/ShaderCache/GrShaderCache/component_crx_cache/SingletonLock/SingletonCookie/SingletonSocket), залочені файли пропускаються. Свіжа копія не має SingletonLock → драйвер тримає власний інстанс. Перевірка наявності `Default/` + `Local State` (неповна копія → RuntimeError зі зрозумілим текстом). При закритому Chrome — як раніше, реальний профіль. Пункт 6 розділу 31.07.2026 ("Генерація вимагає закритий Chrome") — застарів.
+3. **`_create_driver()` єдиний** — його імпортує і адмінка (`admin_app.py:24`), і демон; фікс входить у frozen admin EXE з перезбіркою. admin_version.txt → 1.0.5 (#1446).
+4. **Верифікація**: AST-аудит + ізольований smoke-тест (11/11): `_chrome_running()` bool, копія з exclude-патернами, перезапис існуючого dst, RuntimeError при браку Local State, FileNotFoundError при відсутньому src.
+5. **Нюанс**: `CHROME_COPY_DIR` спільний для демона й адмінки — одночасний запуск обох із відкритим Chrome конкурує за директорію (на практиці працює один).
+
+
 ## Зміна в генерації промпту (28.05.2026)
 1. `generate_prompt_v2.py:575` — "Current date: 2026-05-28." замінено на "2026 year"
    - Причина: рядок "Current date: ..." блокував AI відповідь для окремих танків (Google AI Mode ігнорував запит з повною датою для певних назв)

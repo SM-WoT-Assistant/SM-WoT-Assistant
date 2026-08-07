@@ -4,6 +4,16 @@
 
 ---
 
+## Chrome profile isolation в адмін-генераторі (07.08.2026)
+
+**Проблема:** `admin_build_generator.py:_create_driver()` (спільний для демона `--listen` і адмінки через `admin_app.py:24`) використовував реальний профіль Chrome. При запущеному Chrome → `session not created: Chrome instance exited` (профіль заблокований SingletonLock) → після оновлення гри демон падав на генерації білдів кожен цикл.
+
+**Фікс:** при запущеному Chrome профіль копіюється в `%TEMP%\sm_wot_admin_chrome_profile` з виключенням кешів і Singleton-локів (`_chrome_running()` tasklist + `_copy_chrome_profile()`); неповна копія → RuntimeError; при закритому Chrome — як раніше. Верифікація: AST + smoke 11/11. Повний опис — docs/admin.md (07.08.2026).
+
+**Перезбірка адмінки:** admin_version.txt → 1.0.5 (#1446), `python build_admin.py` → `dist/SM WoT Assistant Admin/` (onedir). Головний застосунок не чіпався.
+
+---
+
 ## v1.0.67 (06.08.2026)
 
 **Зміни після v1.0.66 (коміти 9990b5e..446bc4e, гілка api-integration):**

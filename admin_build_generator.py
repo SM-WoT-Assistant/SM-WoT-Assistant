@@ -13,7 +13,7 @@ Requires:
   - pip install selenium
   - Generate prompts first: python builds_table.py --gen-prompts
 """
-import os, sys, json, time, re, random, threading, traceback, hashlib, zipfile
+import os, sys, json, time, re, random, threading, traceback, hashlib, zipfile, shutil, tempfile, subprocess
 
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -220,7 +220,51 @@ def check_wg_game_version():
         pass
     return (None, None)
 
-# ── Selenium engine ─────────────────────────────────
+# ── Chrome profile handling ─────────────────────────
+CHROME_COPY_DIR = os.path.join(tempfile.gettempdir(), "sm_wot_admin_chrome_profile")
+
+_PROFILE_SKIP = shutil.ignore_patterns(
+    "Cache", "Code Cache", "GPUCache", "DawnCache", "GraphiteDawnCache",
+    "ShaderCache", "GrShaderCache", "component_crx_cache",
+    "SingletonLock", "SingletonCookie", "SingletonSocket",
+)
+
+
+def _chrome_running():
+    """True if any chrome.exe is running — the real profile is locked then."""
+    try:
+        out = subprocess.run(
+            ["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
+            capture_output=True, text=True, timeout=10).stdout
+        return "chrome.exe" in out.lower()
+    except Exception:
+        return True  # unknown → assume locked, safer to generate from a copy
+
+
+def _copy_chrome_profile(src, dst):
+    """Best-effort copy of the real Chrome profile for an isolated instance.
+
+    Chrome running + real --user-data-dir → new chrome.exe hands off the URL to
+    the running instance and exits → "session not created: Chrome instance
+    exited" before any AI prompt. A fresh copy has no SingletonLock, so the
+    driver keeps its own instance. Caches and lock files are excluded; locked
+    files are skipped (state only, non-critical).
+    """
+    if os.path.isdir(dst):
+        shutil.rmtree(dst, ignore_errors=True)
+    skipped = []
+    try:
+        shutil.copytree(src, dst, ignore=_PROFILE_SKIP)
+    except shutil.Error as e:
+        skipped = list(e.args[0]) if e.args else []
+    for needed in ("Default", "Local State"):
+        if not os.path.exists(os.path.join(dst, needed)):
+            raise RuntimeError(f"Chrome profile copy incomplete: missing {needed} in {dst}")
+    if skipped:
+        print(f"[CHROME] {len(skipped)} locked files skipped during profile copy")
+    return dst
+
+
 def _create_driver():
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
@@ -232,7 +276,18 @@ def _create_driver():
     from selenium.webdriver.common.action_chains import ActionChains
 
     opts = Options()
-    opts.add_argument(f"--user-data-dir={CHROME_PROFILE}")
+    profile_dir = CHROME_PROFILE
+    if _chrome_running():
+        print("[CHROME] Chrome is running — copying profile for an isolated instance")
+        try:
+            profile_dir = _copy_chrome_profile(CHROME_PROFILE, CHROME_COPY_DIR)
+        except Exception as e:
+            raise RuntimeError(
+                "Chrome is running and its profile is locked; auto-copy of the profile "
+                f"failed ({e}). Close Chrome and retry.") from e
+    else:
+        print(f"[CHROME] Chrome closed — using the real profile ({profile_dir})")
+    opts.add_argument(f"--user-data-dir={profile_dir}")
     opts.add_argument(f"--profile-directory={CHROME_PROFILE_DIR}")
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument("--no-first-run")
@@ -241,7 +296,14 @@ def _create_driver():
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
 
-    driver = webdriver.Chrome(options=opts)
+    try:
+        driver = webdriver.Chrome(options=opts)
+    except Exception as e:
+        if _chrome_running() and "session not created" in str(e):
+            raise RuntimeError(
+                "Chrome is running — the driver could not start an isolated instance; "
+                f"({str(e)[:120]})") from e
+        raise
     # Inject stealth JS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": """
