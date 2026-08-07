@@ -4,6 +4,29 @@
 
 ---
 
+## Фікс механізму оновлення білдів + новий танк F141_Durendal (07.08.2026, адмінка v1.0.6)
+
+**Проблема:** після оновлення гри до v2.3.1.1 (#910, 06.08) адмінка повідомила «Генерація завершена!» (06.08 19:06, 82с), але білд нового танка F141_Durendal НЕ потрапив у RTDB, а манифест змін `%APPDATA%/SM WoT Assistant/.tank_extract_manifest.json` вже містив його fingerprint → detect назавжди приховував танк від автооновлення.
+
+**Корінь (2 дефекти в одному ланцюзі):**
+1. `tank_db.json` застарів (29.07, без F141_Durendal): головний застосунок у stability_mode викликає лише `extract_metadata` (копіює XML у `extracted_data`), а не `build_database()`. `generate_builds` фільтрував queue-тег по tank_db (`all_tags = [t for t in queue if t in tank_db]`) → total=0 → `return True` («All tanks already cached!») — хибний успіх.
+2. `admin_app._do_generate` при ok=True оновлював манифест для ВСЬОГО queue (`update_manifest_for_tags(..., queue)`), включно з незгенерованими тегами — «з'їдений» танк.
+3. Додатково: `generate_prompt` резолвить танк через `tank_slots_full.json` (1266 записів, без F141) → навіть свіжий tank_db.json не допоміг би («Tank not found»).
+
+**Фікс (admin_build_generator.py + admin_app.py):**
+- `generate_builds` повертає `(ok, done_tags)` — список тегів, реально завантажених у RTDB; хибний успіх при total=0 прибрано (`(False, [])`).
+- Манифест оновлюється ТІЛЬКИ для `done_tags` (admin_app.py:892, слухач listen_mode).
+- Теги з queue, відсутні в tank_db, добудовуються з клієнта: `_tank_record_from_client` (list.xml: tier/class/nation/premium/compact_descr), `_slots_and_crew_from_client` (vehicle XML: crew roles, supplySlots→equipment_slots + slot_types + consumable_slots, postProgressionTree, customRoleSlotOptions, optDevsOverrides). Записи вносяться в module-level словники `generate_prompt_v2` (tank_db/tank_slots/crew_builds) і зберігаються в локальні JSON (`_persist_client_tank_data`).
+- Прибрано debug-дамп `ai_response_dump.txt` (після верифікації навігаційного ретраю).
+
+**Дані:** tank_db.json (1140), tank_slots_full.json (1267, +F141), crew_builds.json (1140) оновлені з клієнта; ключ `F141_Durendal.xml` видалено з манифесту.
+
+**Верифікація (живий цикл):** detect → `['F141_Durendal']` → `--builds F141_Durendal` → RTDB `builds/tanks/F141_Durendal` = повний білд (equipment_1: verticalstabilizer/improvedaiming/coatedoptics; consumables_1: largerepairkit/largefirstaidkit/automaticfireextinguisher; без `#artefacts:` сміття, #1452) → манифест оновлено по done_tags → detect = 0 змін. `builds/version` → v7.
+
+**Перезбірка адмінки:** admin_version.txt → 1.0.6 (#1446), `python build_admin.py` → `dist/SM WoT Assistant Admin/` (onedir). Головний застосунок не чіпався. Повний опис — docs/admin.md.
+
+---
+
 ## Chrome profile isolation в адмін-генераторі (07.08.2026)
 
 **Проблема:** `admin_build_generator.py:_create_driver()` (спільний для демона `--listen` і адмінки через `admin_app.py:24`) використовував реальний профіль Chrome. При запущеному Chrome → `session not created: Chrome instance exited` (профіль заблокований SingletonLock) → після оновлення гри демон падав на генерації білдів кожен цикл.

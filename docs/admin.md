@@ -4,6 +4,18 @@
 
 ---
 
+## Механізм оновлення білдів: done_tags + добудова з клієнта (07.08.2026, admin_build_generator.py, адмінка v1.0.6)
+1. **Проблема (F141_Durendal, гра v2.3.1.1 #910)**: адмінка повідомила «Генерація завершена!» (06.08 19:06), але білд нового танка НЕ потрапив у RTDB, а манифест змін уже містив його fingerprint → танк назавжди схований від автооновлення. Корінь: (а) `tank_db.json` застарів (головний застосунок у stability_mode викликає лише `extract_metadata`, не `build_database`) → `generate_builds` фільтрував queue по tank_db → total=0 → `return True` («All tanks already cached!») — хибний успіх; (б) `admin_app._do_generate` при ok=True оновлював манифест для ВСЬОГО queue; (в) `generate_prompt` резолвить танк через `tank_slots_full.json`, який теж не мав нового танка («Tank not found» навіть зі свіжим tank_db.json).
+2. **Фікс**:
+   - `generate_builds` повертає `(ok, done_tags)` — теги, реально завантажені в RTDB; при total==0 повертає `(False, [])` замість хибного True.
+   - `update_manifest_for_tags(..., done_tags)` — манифест оновлюється ТІЛЬКИ для згенерованих (admin_app.py:892; те саме в listen_mode).
+   - Теги queue без запису в tank_db добудовуються з клієнта: `_tank_record_from_client(tag, wot_path)` — list.xml (tier/class/nation/premium/compact_descr, обробка unescaped `&` у `<gold>`); `_slots_and_crew_from_client(tag, wot_path)` — vehicle XML через WotXmlParser (crew roles з `also`-ролями, supplySlots → equipment_slots/equipment_slot_types/consumable_slots, postProgressionTree, customRoleSlotOptions, optDevsOverrides).
+   - `_persist_client_tank_data` — записи зберігаються в tank_db.json (indent=4), tank_slots_full.json (indent=2, як оригінал), crew_builds.json (`tanks`-вузол), плюс оновлюються module-level словники `generate_prompt_v2` (tank_db/tank_slots/crew_builds) для поточного процесу.
+3. **Верифікація (живий цикл)**: detect → `['F141_Durendal']` → `--builds F141_Durendal` → RTDB повний білд (3 equipment + 7 consumables, без `#`-сміття) → манифест по done_tags → detect = 0 змін; `builds/version` → v7. Дані: tank_db.json 1140, tank_slots_full.json 1267, crew_builds.json 1140.
+4. **Перезбірка**: admin_version.txt → 1.0.6 (#1446), `python build_admin.py` → `dist/SM WoT Assistant Admin/`.
+
+---
+
 ## Chrome profile isolation (07.08.2026, admin_build_generator.py, адмінка v1.0.5)
 1. **Проблема**: `_create_driver()` використовував реальний профіль Chrome `C:\Users\PRO\AppData\Local\Google\Chrome\User Data` + `--profile-directory=Default`. Коли Chrome уже запущений — новий chrome.exe віддає URL існуючому інстансу і виходить → `session not created: Chrome instance exited` (профіль заблокований SingletonLock). Після оновлення гри (тригер `pending_updates/builds`) демон `admin_build_generator.py --listen` падав на генерації кожен цикл.
 2. **Фікс** (admin_build_generator.py:223-315): при запущеному Chrome (`_chrome_running()` — tasklist-перевірка; невідомо → вважаємо залоченим) профіль КОПІЮЄТЬСЯ в `%TEMP%\sm_wot_admin_chrome_profile` (`_copy_chrome_profile()`, shutil.copytree) з виключенням кешів і локів (Cache/Code Cache/GPUCache/DawnCache/GraphiteDawnCache/ShaderCache/GrShaderCache/component_crx_cache/SingletonLock/SingletonCookie/SingletonSocket), залочені файли пропускаються. Свіжа копія не має SingletonLock → драйвер тримає власний інстанс. Перевірка наявності `Default/` + `Local State` (неповна копія → RuntimeError зі зрозумілим текстом). При закритому Chrome — як раніше, реальний профіль. Пункт 6 розділу 31.07.2026 ("Генерація вимагає закритий Chrome") — застарів.

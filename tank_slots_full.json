@@ -44537,5 +44537,40 @@
       5,
       1
     ]
+  },
+  "F141_Durendal": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "france",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_MT_support"
   }
 }

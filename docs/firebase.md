@@ -51,12 +51,13 @@
 15. **prompts_cache.json** — 994 промпти, згенеровані `builds_table.py`, включено в бандл (не в DEFAULT_FILES — використовується тільки адміном).
 
 
-## Rebalance detection chain (27.07.2026)
+## Rebalance detection chain (27.07.2026, оновлено 07.08.2026)
 1. **map_manager.py:check_game_version()** — при виявленні зміни версії гри (`version_changed=True`) або зміни вмісту `scripts.pkg` (`ext.has_changed()`) записує тригер у Firebase: `firebase_reporter._put("pending_updates/builds", {status:"idle", version, scripts_pkg_changed:true})`.
-2. **admin_build_generator.py --listen** — полінг `pending_updates/builds` кожні 10с. При появі `status=="generating"` запускає `generate_builds(driver, tank_db, prompts, force=True)` — генерація ВСІХ танків з ігноруванням кешу.
+2. **admin_build_generator.py --listen** — полінг `pending_updates/builds` кожні 10с. При появі `status=="generating"` запускає `generate_builds(driver, tank_db, prompts, queue=..., wot_path=...)` — генерація змінених танків з ігноруванням кешу.
 3. **`_update_builds_version()`** — після генерації оновлює `builds/version` (інкремент) та `builds/scripts_fingerprint` (MD5 від `{ver, ts}`).
 4. **stats_ai.py:_sync_builds()** — при старті клієнта порівнює `remote_version != local_version` → force re-sync ALL танків.
 5. **Повний ланцюжок:** `scripts.pkg змінився → client detect → pending_updates → admin --listen pick up → generate_all → bump version+fingerprint → client sync`.
+6. **07.08.2026 (фікс "з'їденого" танка F141_Durendal):** `generate_builds` повертає `(ok, done_tags)` — лише теги, реально завантажені в RTDB; `update_manifest_for_tags` оновлює манифест тільки для них (не для всього queue). Теги без запису в tank_db добудовуються з клієнта (`_tank_record_from_client` + `_slots_and_crew_from_client`) — нові танки гри більше не губляться манифестом.
 
 
 ## admin.html changes (27.07.2026)

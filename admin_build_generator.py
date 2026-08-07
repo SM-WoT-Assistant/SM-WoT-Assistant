@@ -19,6 +19,7 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from generate_prompt_v2 import generate_prompt
+import generate_prompt_v2 as _gp
 from stats_ai import _save_ai_build_cache, _load_ai_build_cache, _save_ai_build_cache_bulk, StatsAI
 _is_build_complete = StatsAI._is_build_complete
 from _fill_all_builds import parse_build as _parse_build_response
@@ -227,6 +228,8 @@ _PROFILE_SKIP = shutil.ignore_patterns(
     "Cache", "Code Cache", "GPUCache", "DawnCache", "GraphiteDawnCache",
     "ShaderCache", "GrShaderCache", "component_crx_cache",
     "SingletonLock", "SingletonCookie", "SingletonSocket",
+    "Last Session", "Current Session", "Last Tabs", "Current Tabs",
+    "Sessions",
 )
 
 
@@ -247,8 +250,10 @@ def _copy_chrome_profile(src, dst):
     Chrome running + real --user-data-dir → new chrome.exe hands off the URL to
     the running instance and exits → "session not created: Chrome instance
     exited" before any AI prompt. A fresh copy has no SingletonLock, so the
-    driver keeps its own instance. Caches and lock files are excluded; locked
-    files are skipped (state only, non-critical).
+    driver keeps its own instance. Caches, lock files and session files are
+    excluded (session files of the running Chrome would otherwise trigger the
+    "restore pages?" crash-recovery bubble and a tab storm in the isolated
+    instance); locked files are skipped (state only, non-critical).
     """
     if os.path.isdir(dst):
         shutil.rmtree(dst, ignore_errors=True)
@@ -322,12 +327,9 @@ def _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT):
     from selenium.webdriver.common.keys import Keys
     from selenium.webdriver.common.action_chains import ActionChains
 
-    # Navigate to Google AI Mode
-    driver.get("https://www.google.com/search?q=&udm=50")
-    time.sleep(2)
-
-    # Find textarea via multi-selector
-    textarea = None
+    # Navigate to Google AI Mode. The first navigation can race Chrome startup
+    # on a freshly copied profile (document stuck at readyState=loading with an
+    # empty page) — retry with a clean blank-page reset in between.
     selectors = [
         "textarea[jsname]",
         "textarea[aria-label]",
@@ -336,13 +338,31 @@ def _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT):
         "div.Txyg0d textarea",
         "textarea",
     ]
-    for sel in selectors:
+    textarea = None
+    for attempt in range(1, 4):
         try:
-            textarea = driver.find_element(By.CSS_SELECTOR, sel)
-            if textarea.is_enabled():
-                break
-        except:
-            continue
+            driver.get("about:blank")
+        except Exception:
+            pass
+        driver.get("https://www.google.com/search?q=&udm=50")
+        deadline = time.time() + 30
+        while time.time() < deadline and textarea is None:
+            for sel in selectors:
+                try:
+                    el = driver.find_element(By.CSS_SELECTOR, sel)
+                    if el.is_enabled():
+                        textarea = el
+                        break
+                except:
+                    continue
+            if textarea is None:
+                time.sleep(1)
+        if textarea:
+            break
+        try:
+            print(f"[AI] page load attempt {attempt} failed (readyState={driver.execute_script('return document.readyState')}), retrying...")
+        except Exception:
+            print(f"[AI] page load attempt {attempt} failed, retrying...")
 
     if not textarea:
         print("[AI] textarea not found!")
@@ -499,21 +519,334 @@ def generate_popular(driver, tank_db):
     print(f"[POPULAR] Uploaded {len(tags)} tanks: {ok}")
     return ok
 
-def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queue=None):
-    """Generate builds for specified tanks."""
+def _tank_record_from_client(tag, wot_path):
+    """Build a tank_db record for a tag missing from tank_db, from client scripts.pkg.
+
+    Parses the nation's list.xml (BigWorld binary XML) via WotXmlParser and
+    extracts level/tags/id/price — the same fields TankExtractor.build_database uses.
+    Returns a record dict or None. Returns None without error when wot_path is unknown.
+    """
+    import xml.etree.ElementTree as ET
+    from decode_xml import WotXmlParser
+
+    if not wot_path:
+        return None
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(pkg_path):
+        return None
+
+    NATION_IDS = {
+        "ussr": 0, "germany": 1, "usa": 2, "china": 3,
+        "france": 4, "uk": 5, "japan": 6, "czech": 7,
+        "sweden": 8, "poland": 9, "italy": 10,
+    }
+    tmp = os.path.join(tempfile.gettempdir(), f"admin_list_{tag}.xml")
+    decoder = WotXmlParser()
+
+    def _clean_xml(text):
+        text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', text, flags=re.DOTALL)
+        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
+        text = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|#\d+);)', '&amp;', text)
+        return text
+
+    try:
+        with zipfile.ZipFile(pkg_path, 'r') as z:
+            list_names = [n for n in z.namelist()
+                          if n.startswith("scripts/item_defs/vehicles/")
+                          and n.endswith("/list.xml")]
+            for entry in sorted(list_names):
+                try:
+                    raw = z.read(entry)
+                except Exception:
+                    continue
+                with open(tmp, "wb") as f:
+                    f.write(raw)
+                try:
+                    if not decoder.decode_file(tmp, tmp):
+                        continue
+                    with open(tmp, "r", encoding="utf-8", errors="ignore") as f:
+                        text = f.read()
+                except Exception:
+                    continue
+                try:
+                    root = ET.fromstring(_clean_xml(text))
+                except Exception:
+                    continue
+                tank = None
+                for child in root:
+                    if child.tag == tag:
+                        tank = child
+                        break
+                if tank is None:
+                    continue
+                level_text = tank.findtext("level", "")
+                tags_text = tank.findtext("tags", "") or ""
+                id_text = (tank.findtext("id", "") or "").strip()
+                price_node = tank.find("price")
+                is_premium_hint = (price_node is not None
+                                   and "gold" in ET.tostring(price_node, encoding="unicode").lower())
+                nation_base = entry.split("/")[3]
+                nation_mapping = {"usa": "USA", "ussr": "USSR", "uk": "UK"}
+                display_nation = nation_mapping.get(nation_base, nation_base.capitalize())
+                nation_id = NATION_IDS.get(nation_base, -1)
+
+                clean_name = re.sub(r'^[A-Z][a-z]?\d{1,3}_', '', tag)
+                clean_name = clean_name.replace("_", " ")
+                clean_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', clean_name)
+                clean_name = re.sub(r'([a-zA-Z])(\d)', r'\1 \2', clean_name)
+                clean_name = re.sub(r'(\d)([a-zA-Z])', r'\1 \2', clean_name)
+
+                tags_text_l = tags_text.lower()
+                v_class = "Unknown"
+                if "lighttank" in tags_text_l: v_class = "LT"
+                elif "mediumtank" in tags_text_l: v_class = "MT"
+                elif "heavytank" in tags_text_l: v_class = "HT"
+                elif "at-spg" in tags_text_l: v_class = "TD"
+                elif "spg" in tags_text_l: v_class = "SPG"
+
+                is_premium = bool(is_premium_hint)
+                if "premium" in tags_text_l or "special" in tags_text_l:
+                    is_premium = True
+
+                compact_descr = None
+                if nation_id >= 0 and id_text.isdigit():
+                    compact_descr = (int(id_text) << 8) | (nation_id << 4) | 1
+
+                try:
+                    tier_val = int(level_text) if str(level_text).strip() else 0
+                except Exception:
+                    tier_val = 0
+
+                return {
+                    "name": clean_name,
+                    "tier": tier_val,
+                    "class": v_class,
+                    "nation": display_nation,
+                    "icon": f"{tag}.png".lower(),
+                    "is_premium": is_premium,
+                    "compact_descr": compact_descr,
+                }
+    except Exception:
+        pass
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+    return None
+
+
+def _slots_and_crew_from_client(tag, wot_path):
+    """Build tank_slots_full.json + crew_builds.json records for a tag missing from local data.
+
+    Parses the vehicle's own XML in scripts.pkg (decoded via WotXmlParser):
+    crew roles, supplySlots (equipment count + slot types), consumable slots,
+    postProgressionTree, customRoleSlotOptions, optDevsOverrides.
+    Returns (slots_rec, crew_rec) or (None, None).
+    """
+    from decode_xml import WotXmlParser
+
+    if not wot_path:
+        return (None, None)
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(pkg_path):
+        return (None, None)
+
+    tmp = os.path.join(tempfile.gettempdir(), f"admin_veh_{tag}.xml")
+    decoder = WotXmlParser()
+    try:
+        with zipfile.ZipFile(pkg_path, 'r') as z:
+            entry = None
+            for n in z.namelist():
+                if n.startswith("scripts/item_defs/vehicles/") and n.endswith(f"/{tag}.xml"):
+                    entry = n
+                    break
+            if entry is None:
+                return (None, None)
+            raw = z.read(entry)
+        with open(tmp, "wb") as f:
+            f.write(raw)
+        if not decoder.decode_file(tmp, tmp):
+            return (None, None)
+        with open(tmp, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+    except Exception:
+        return (None, None)
+    finally:
+        try:
+            os.remove(tmp)
+        except Exception:
+            pass
+
+    slots = {
+        "crew_roles": [],
+        "equipment_slots": 0,
+        "consumable_slots": [],
+        "available_equipment": [],
+        "has_post_progression": False,
+        "field_mods": [],
+        "nation": "unknown",
+    }
+    nation = None
+    if entry:
+        parts = entry.split("/")
+        if len(parts) >= 4:
+            nation = parts[3]
+    if nation:
+        slots["nation"] = nation
+
+    crew_block = re.search(r"<crew>(.*?)</crew>", content, re.DOTALL)
+    roles = []
+    if crew_block:
+        roles = re.findall(r"<(\w+)\s*>.*?</\w+>", crew_block.group(1), re.DOTALL)
+        roles = [r for r in roles if r in ("commander", "gunner", "driver", "loader", "radioman")]
+    slots["crew_roles"] = roles
+
+    supply_match = re.search(r"<supplySlots>([^<]+)", content)
+    if supply_match:
+        slot_list = supply_match.group(1).strip().split()
+        equip_types = []
+        consumables = []
+        for s in slot_list:
+            if s in ("6", "7", "8"):
+                consumables.append(s)
+            else:
+                equip_types.append(s)
+        slots["equipment_slots"] = len(equip_types)
+        slots["consumable_slots"] = consumables
+        if equip_types:
+            slots["equipment_slot_types"] = [int(x) for x in equip_types]
+
+    pp_match = re.search(r"<postProgressionTree>([^<]+)", content)
+    if pp_match:
+        slots["has_post_progression"] = True
+        slots["post_progression_tree"] = pp_match.group(1).strip()
+
+    opt_match = re.search(r"<optDevsOverrides>(.*?)</optDevsOverrides>", content, re.DOTALL)
+    if opt_match:
+        items = [m.group(1) for m in re.finditer(r"<([a-zA-Z_]+)>(.*?)</\1>", opt_match.group(1), re.DOTALL)
+                 if "<" in m.group(2)]
+        slots["available_equipment"] = sorted(set(items))
+
+    crew_rec = {
+        "crew_members": [],
+        "crew": [],
+        "custom_role_slot_options": None,
+    }
+    if crew_block:
+        seen_roles = []
+        for role in roles:
+            member_text = re.search(rf"<{role}\s*>(.*?)</{role}>", crew_block.group(1), re.DOTALL)
+            also = []
+            if member_text:
+                inner = member_text.group(1)
+                for token in re.split(r"[\s,;/|]+", inner.strip()):
+                    if token in ("commander", "gunner", "driver", "loader", "radioman") and token != role:
+                        also.append(token)
+            seen_roles.append(role)
+            crew_rec["crew_members"].append({"role": role, "also": also})
+            crew_rec["crew"].append(role)
+    slot_match = re.search(r"<customRoleSlotOptions>\s*([^<]+?)\s*</customRoleSlotOptions>", content, re.DOTALL)
+    if slot_match:
+        crew_rec["custom_role_slot_options"] = re.sub(r"\s+", " ", slot_match.group(1)).strip()
+
+    if not crew_rec["crew_members"]:
+        crew_rec = None
+    return (slots, crew_rec)
+
+
+def _persist_client_tank_data(tag, db_rec, slots_rec, crew_rec):
+    """Persist a client-derived tank record into the local data files (best-effort).
+
+    Updates tank_db.json, tank_slots_full.json and crew_builds.json with the
+    new tag so subsequent runs and admin rebuilds include the tank. Safe to call
+    from frozen onedir builds (_BUNDLE_DIR files are writable but the update
+    simply persists there; failures are ignored).
+    """
+    try:
+        with open("tank_db.json", "r", encoding="utf-8") as f:
+            tank_db = json.load(f)
+        if isinstance(tank_db, dict):
+            tank_db[tag] = db_rec
+            with open("tank_db.json", "w", encoding="utf-8") as f:
+                json.dump(tank_db, f, ensure_ascii=False, indent=4)
+            print(f"[BUILD] {tag}: tank_db.json updated")
+    except Exception as e:
+        print(f"[WARN] tank_db.json persist failed: {e}")
+
+    try:
+        with open("tank_slots_full.json", "r", encoding="utf-8") as f:
+            slots_all = json.load(f)
+        if isinstance(slots_all, dict):
+            slots_all[tag] = slots_rec
+            with open("tank_slots_full.json", "w", encoding="utf-8") as f:
+                json.dump(slots_all, f, ensure_ascii=False, indent=2)
+            print(f"[BUILD] {tag}: tank_slots_full.json updated")
+    except Exception as e:
+        print(f"[WARN] tank_slots_full.json persist failed: {e}")
+
+    if crew_rec:
+        try:
+            with open("crew_builds.json", "r", encoding="utf-8") as f:
+                crew_all = json.load(f)
+            if isinstance(crew_all, dict) and isinstance(crew_all.get("tanks"), dict):
+                crew_all["tanks"][tag] = crew_rec
+                with open("crew_builds.json", "w", encoding="utf-8") as f:
+                    json.dump(crew_all, f, ensure_ascii=False, indent=4)
+                print(f"[BUILD] {tag}: crew_builds.json updated")
+        except Exception as e:
+            print(f"[WARN] crew_builds.json persist failed: {e}")
+
+
+def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queue=None, wot_path=None):
+    """Generate builds for specified tanks.
+
+    Returns (ok, done_tags): ok=True when at least one build was uploaded,
+    done_tags is the list of tags actually uploaded to RTDB.
+    """
     print("\n=== Generating Builds ===\n")
 
     all_tags_sorted = sorted(tank_db.keys(), key=lambda t: (tank_db[t].get("tier",0), tank_db[t].get("name","")))
+    unknown = []
     if single_tag:
         if single_tag not in tank_db:
-            print(f"[BUILD] Tag {single_tag} not found in DB")
-            return False
+            rec = _tank_record_from_client(single_tag, wot_path)
+            slots_rec, crew_rec = _slots_and_crew_from_client(single_tag, wot_path)
+            if rec and slots_rec:
+                tank_db[single_tag] = rec
+                _gp.tank_db[single_tag] = rec
+                _gp.tank_slots[single_tag] = slots_rec
+                if crew_rec:
+                    _gp.crew_builds['tanks'][single_tag] = crew_rec
+                _persist_client_tank_data(single_tag, rec, slots_rec, crew_rec)
+                print(f"[BUILD] {single_tag}: added from client scripts.pkg (tier {rec.get('tier')}, {rec.get('class')})")
+            else:
+                print(f"[BUILD] Tag {single_tag} not found in DB or client")
+                return (False, [])
         all_tags = [single_tag]
         total = 1
     elif queue is not None:
-        all_tags = [t for t in queue if t in tank_db]
+        all_tags = []
+        for t in queue:
+            if t in tank_db:
+                all_tags.append(t)
+            else:
+                rec = _tank_record_from_client(t, wot_path)
+                slots_rec, crew_rec = _slots_and_crew_from_client(t, wot_path)
+                if rec and slots_rec:
+                    tank_db[t] = rec
+                    _gp.tank_db[t] = rec
+                    _gp.tank_slots[t] = slots_rec
+                    if crew_rec:
+                        _gp.crew_builds['tanks'][t] = crew_rec
+                    _persist_client_tank_data(t, rec, slots_rec, crew_rec)
+                    all_tags.append(t)
+                    print(f"[BUILD] {t}: added from client scripts.pkg (tier {rec.get('tier')}, {rec.get('class')})")
+                else:
+                    unknown.append(t)
         total = len(all_tags)
-        print(f"[BUILD] Queue: {total} tanks from detection")
+        print(f"[BUILD] Queue: {total} tanks from detection"
+              + (f" (+{len(unknown)} unknown skipped: {', '.join(unknown)})" if unknown else ""))
     elif force:
         all_tags = all_tags_sorted
         total = len(all_tags)
@@ -525,14 +858,18 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         total = len(all_tags)
 
     if total == 0:
-        print("[BUILD] All tanks already cached!")
-        return True
+        if unknown:
+            print(f"[BUILD] No tanks to generate (unknown in DB/client: {', '.join(unknown)})")
+        else:
+            print("[BUILD] All tanks already cached!")
+        return (False, [])
 
     prog = load_progress() if not single_tag else {"pass":1,"index":0,"retry":[],"ok_count":0,"fail_count":0}
     ok_count = prog["ok_count"]
     fail_count = prog["fail_count"]
     start_idx = prog["index"]
     to_process = all_tags[start_idx:]
+    done_tags = []
 
     for idx, tag in enumerate(to_process):
         actual_idx = start_idx + idx
@@ -581,6 +918,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             if prompt_new:
                 _upload_prompt(tag, prompt)
             ok_count += 1
+            done_tags.append(tag)
             save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)
         else:
             print(f"    [FAIL] upload failed")
@@ -598,7 +936,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         total_cached = len(existing)
         _update_builds_version()
         print(f"\n=== Done: {total_cached} cached (ok={ok_count}, fail={fail_count}) ===\n")
-    return True
+    return (len(done_tags) > 0, done_tags)
 
 # ─── Listen mode ────────────────────────────────────
 def listen_mode(tank_db, wot_path=None):
@@ -672,7 +1010,13 @@ def listen_mode(tank_db, wot_path=None):
             driver = _create_driver()
             try:
                 _update_pending_status("builds", "generating", progress={"done":0,"total":0,"current":""})
-                ok = generate_builds(driver, tank_db, prompts, force=(queue is None), queue=queue)
+                ok, done_tags = generate_builds(driver, tank_db, prompts, force=(queue is None), queue=queue,
+                                                wot_path=wot_path)
+                if ok and done_tags:
+                    try:
+                        update_manifest_for_tags(wot_path, ".tank_extract_manifest.json", done_tags)
+                    except Exception:
+                        pass
                 _update_pending_status("builds", "done" if ok else "error",
                     "Completed successfully" if ok else "Generation failed")
             except Exception as e:
@@ -713,7 +1057,7 @@ def main():
             single_tag = args.builds if isinstance(args.builds, str) else None
             prompts = load_prompts()
             print(f"[PROMPTS] {len(prompts)} cached")
-            generate_builds(driver, tank_db, prompts, single_tag=single_tag)
+            generate_builds(driver, tank_db, prompts, single_tag=single_tag, wot_path=args.wot_path)
         else:
             parser.print_help()
     finally:

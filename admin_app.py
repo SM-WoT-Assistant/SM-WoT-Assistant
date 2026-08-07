@@ -884,24 +884,25 @@ class AdminApp:
         try:
             driver = _create_driver()
             try:
-                ok = generate_builds(driver, self.tank_db, self.prompts, queue=queue)
-                if ok:
+                ok, done_tags = generate_builds(driver, self.tank_db, self.prompts, queue=queue,
+                                                wot_path=self._wot_path)
+                if ok and done_tags:
                     _update_builds_version()
-                    self._queue = [t for t in self._queue if t not in queue]
+                    self._queue = [t for t in self._queue if t not in done_tags]
                     try:
-                        update_manifest_for_tags(self._wot_path, self._manifest_path, queue)
+                        update_manifest_for_tags(self._wot_path, self._manifest_path, done_tags)
                     except Exception:
                         pass
                     iso = time.strftime("%Y-%m-%dT%H:%M:%S")
                     _put_json(_rtdb_url("builds/last_generated_at"), iso)
                     _put_json(_rtdb_url("prompts/last_generated_at"), iso)
                     _put_json(_rtdb_url("admin_app/last_generation"),
-                              {"at": iso, "count": len(queue), "ok": True})
+                              {"at": iso, "count": len(done_tags), "ok": True})
                     _update_pending_status("builds", "done",
-                                           message=self.t("notif_builds_updated_body", n=len(queue)))
+                                           message=self.t("notif_builds_updated_body", n=len(done_tags)))
                     self._log(self.t("log_gen_done"))
                     self.tray.show_notification(self.t("notif_builds_updated"),
-                                                self.t("notif_builds_updated_body", n=len(queue)),
+                                                self.t("notif_builds_updated_body", n=len(done_tags)),
                                                 level="info")
                 else:
                     _update_pending_status("builds", "error", message="generation failed")
