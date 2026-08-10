@@ -12,6 +12,8 @@ Usage:
 import os, sys, subprocess, shutil, re, time, json
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, BASE_DIR)
+import admin_auth
 VERSION_FILE = os.path.join(BASE_DIR, "VERSION")
 SPEC_FILE = os.path.join(BASE_DIR, "wot_assistant.spec")
 NSI_FILE = os.path.join(BASE_DIR, "installer.nsi")
@@ -907,7 +909,12 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     import urllib.request
     import urllib.parse
     RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
-    API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
+
+    token = admin_auth.get_id_token()
+    if not token:
+        print("[BUILD] RTDB publish FAILED: no admin credentials "
+              "(admin_creds.json у %APPDATA%/SM WoT Assistant/)")
+        return False
 
     display_ver = version + (" Beta" if is_beta else "")
     beta_suffix = "_Beta" if is_beta else ""
@@ -931,7 +938,7 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     }).encode("utf-8")
 
     # Write versioned entry: versions/X_Y_Z
-    url = f"{RTDB_URL}/versions/{version.replace('.', '_')}.json?auth={API_KEY}"
+    url = f"{RTDB_URL}/versions/{version.replace('.', '_')}.json?auth={token}"
     req = urllib.request.Request(url, data=data, method="PUT")
     req.add_header("Content-Type", "application/json")
     try:
@@ -950,7 +957,7 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
         "download_url": dl_url,
         "changelog": f"Release v{version}",
     }).encode("utf-8")
-    url_latest = f"{RTDB_URL}/versions/latest.json?auth={API_KEY}"
+    url_latest = f"{RTDB_URL}/versions/latest.json?auth={token}"
     req_latest = urllib.request.Request(url_latest, data=latest_data, method="PUT")
     req_latest.add_header("Content-Type", "application/json")
     try:

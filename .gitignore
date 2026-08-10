@@ -84,6 +84,9 @@ dist/
 # Firebase local cache
 .firebase/
 
+# Admin RTDB credentials (секрет, ніколи не комітити)
+admin_creds.json
+
 # Local tactic exports
 Tactik_Shemi/
 

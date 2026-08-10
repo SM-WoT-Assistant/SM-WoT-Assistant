@@ -98,7 +98,7 @@
 ├── temp_scripts2/              # Extraction scripts v2 (scripts/ + component_defs, tutorial_docs, user_data_object_defs)
 ├── _decoded_search/            # Decoded XML map search results (per-map .xml files)
 ├── _archive/                   # Archived code variants: scripts/ (125 dead modules), docs/, temp_scripts/, temp_scripts2/, localization/, tools/, test_data/, etc.
-├── docs/                       # Topical documentation (architecture.md, structure.md, firebase.md, painter.md, maps.md, cache.md, release.md, admin.md, tray.md, game-data.md, decoder.md, changelog.md, bugs.md)
+├── docs/                       # Topical documentation (firebase.md, painter.md, maps.md, cache.md, release.md, admin.md, tray.md, game-data.md, decoder.md, changelog.md, bugs.md)
 ├── build/                      # PyInstaller intermediate build cache (Analysis, PYZ, EXE, COLLECT); admin_app subdir
 ├── dist/                       # Release output (versioned onedir, NSIS installer, portable ZIP, manifest; SM WoT Assistant Admin/ onedir)
 ├── .venv/                      # Python virtual environment(s)
@@ -164,8 +164,8 @@
 - Contains: `scripts/`, `docs/` (obsolete markdown files), `temp_scripts/`, `temp_scripts2/`, `localization/`, `extrated_icons/`, `tools/`, `test_data/`, `tmp/`, `tmp_check/`, `temp_pages/`, `browser_profile/`, `AI_ALTERNATIVES/`
 
 **docs/:**
-- Purpose: Topical documentation (13 files) — see the docs index table in `AGENTS.md`
-- Contains: `architecture.md`, `structure.md`, `firebase.md`, `painter.md`, `maps.md`, `cache.md`, `release.md`, `admin.md`, `tray.md`, `game-data.md`, `decoder.md`, `changelog.md`, `bugs.md`
+- Purpose: Topical documentation (11 files) — see the docs index table in `AGENTS.md`
+- Contains: `firebase.md`, `painter.md`, `maps.md`, `cache.md`, `release.md`, `admin.md`, `tray.md`, `game-data.md`, `decoder.md`, `changelog.md`, `bugs.md`
 
 **build/:**
 - Purpose: PyInstaller intermediate build cache directory (temporary, cleaned between builds); `admin_app/` subdir used by `build_admin.py`

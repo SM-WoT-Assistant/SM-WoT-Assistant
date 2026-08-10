@@ -4,6 +4,31 @@
 
 ---
 
+## Захист RTDB правилами + адмін-Auth (10.08.2026)
+
+**Передісторія:** лист Firebase про незахищені правила (корінь `.read/.write: true`). Факти: RTDB не валідує `auth=` — API-ключ (публічний у клієнті і сайті) НЕ є автентифікацією, усі запити застосунку/сайту у правилах = `auth == null`. Єдиний компонент з реальним Auth — admin.html (email/password). Auth-акаунт адміна: `smwotassistant@gmail.com` / UID `W0bTk96xJMeVEEbplvMbxtl5igo2`.
+
+**Схема авторизації:**
+| Нода | Read | Write |
+|---|---|---|
+| `versions`, `builds`, `prompts`, `popular_tanks` | open (клієнт читає) | **тільки адмін-UID** (`auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'`) |
+| `error_reports` | open | wildcard `$id`: `!data.exists() \|\| auth != null` (create open, delete тільки адмін) |
+| `installations`, `service_events` | тільки `auth != null` (admin.html) | open (клієнтський ping/flush) |
+| `admin_app` | тільки `auth != null` | тільки `auth != null` (адмін-EXE з токеном) |
+| `schemes`, `groups`, `user_groups`, `users`, `pending_updates` | open | open (клієнтський контент + trigger) |
+| `drawings` | open | заборонено (легасі) |
+
+**Адмін-тулінг (build.py, admin_build_generator.py, admin_app.py)** пише в RTDB через ID-токен: `admin_auth.get_id_token()` — `accounts:signInWithPassword` з `%APPDATA%/SM WoT Assistant/admin_creds.json` (`{"email": ..., "password": ...}`, gitignored), кеш + refresh по refreshToken. `admin_auth._rtdb_url_with_token()` зрізає існуючий `?auth=` (RTDB бере ПЕРШИЙ auth-параметр — API-ключ дає 401). Клієнтський застосунок НЕ використовує admin_auth — він працює з відкритими клієнтськими нодами без auth.
+
+**Операційні правила:**
+- Якщо Auth-акаунт перестворити — UID зміниться, правила доведеться оновити (гейт на UID, не на email).
+- Адмін-EXE після змін admin_auth/admin_build_generator обов'язково перезбирати (`admin_version.txt` бамп + `build_admin.py`) — старий EXE пише API-ключем і отримує 401.
+- `admin_creds.json` — секрет, gitignored; без нього адмін-тулінг не пише RTDB (видима помилка, не тиха).
+
+**Верифіковано (10.08.2026):** повна curl-матриця (відкриті читання 200 / auth-читання 401 / адмін-записи без токена 401 / з токеном 200; error_reports create-open, overwrite-auth, delete-auth; installations/service_events write open) + dev-запуск main.py (ping + pending_updates сигнал — клієнтські шляхи живі).
+
+---
+
 ## Картка танка
 1. Вся інформація про білд — з Firebase RTDB (`builds/tanks/{tag}`), кешується локально в `ai_builds_cache.json`.
 2. Якщо Firebase недоступний і кеш порожній — показувати пусті секції (без фалбеків).

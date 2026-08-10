@@ -45,12 +45,18 @@ def _rtdb_url(path):
 
 def _put_json(url, data, timeout=15):
     import requests
+    import admin_auth
+    auth_url = admin_auth._rtdb_url_with_token(url)
+    if auth_url is None:
+        print("[ADMIN] RTDB write skipped: no admin credentials "
+              "(admin_creds.json у %APPDATA%/SM WoT Assistant/)")
+        return False
     if data is None:
         # PUT null — видалення вузла (json=None не шле тіло, RTDB повертає 400)
-        r = requests.put(url, data=b"null",
+        r = requests.put(auth_url, data=b"null",
                          headers={"Content-Type": "application/json"}, timeout=timeout)
     else:
-        r = requests.put(url, json=data, timeout=timeout)
+        r = requests.put(auth_url, json=data, timeout=timeout)
     return r.status_code in (200, 204)
 
 def _get_json(url, timeout=10):

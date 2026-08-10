@@ -4,6 +4,34 @@
 
 ---
 
+## Захист RTDB правилами + реальний Auth для адмін-тулінгу (10.08.2026)
+
+**Проблема:** лист Firebase «база містить незахищені правила» — `database.rules.json` мав кореневий `.read/.write: true` (будь-хто з URL бази міг читати/записувати все).
+
+**Дослідження (empirical):** RTDB НЕ валідує `auth=` параметр (real key / garbage / без auth → усі 200) — API-ключ НЕ є автентифікацією; застосунок і публічний сайт у правилах оцінюються як `auth == null`. Єдиний компонент з реальним Auth — admin.html (`signInWithEmailAndPassword`). Auth-користувач підтверджено: `smwotassistant@gmail.com`, UID `W0bTk96xJMeVEEbplvMbxtl5igo2` (signInWithPassword → `INVALID_LOGIN_CREDENTIALS`, не `EMAIL_NOT_FOUND`).
+
+**Зміни:**
+1. `admin_auth.py` (новий, корінь): `get_id_token()` — `accounts:signInWithPassword` з `%APPDATA%/SM WoT Assistant/admin_creds.json` (`{email, password}`, gitignored), кеш + авто-рефреш по refreshToken (~1 год); `_rtdb_url_with_token()` — ЗРІЗАЄ наявний `?auth=` перед додаванням токена, бо RTDB використовує ПЕРШИЙ auth-параметр (API-ключ → 401). Без креденціалів → `None` + одне попередження.
+2. `admin_build_generator.py:_put_json` — записи через ID-токен; без креденціалів → видимий фейл (False + повідомлення). `_get_json` не змінювався (читання відкриті).
+3. `build.py:write_version_to_rtdb` — `?auth=<idToken>`; без креденціалів → False + повідомлення (білд не падає, RTDB-крок пропускається).
+4. `admin_app.py` НЕ змінювався (імпортує `_put_json` з генератора) — **але зібраний адмін-EXE v1.0.6 пише API-ключем і тепер отримує 401 — потребує перезбірки `build_admin.py`** (див. нижче).
+5. `database.rules.json` (задеплоєно `firebase deploy --only database` 10.08.2026):
+   - корінь `.read/.write: false`;
+   - `versions/builds/prompts/popular_tanks` — read open, **write тільки `auth != null && auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'`** (клієнт їх лише читає);
+   - `installations`/`service_events` — read `auth != null`, write open (клієнтський ping/flush);
+   - `admin_app` — read+write `auth != null` (читає лише admin.html, пише адмін-EXE з токеном);
+   - `error_reports` — read open, write через **wildcard `$id`: `!data.exists() || auth != null`** (create для клієнта POST, delete/overwrite тільки з токеном — адмін-cleanup #1485);
+   - `schemes`/`groups`/`user_groups`/`users`/`pending_updates` — open (клієнтський контент + trigger від клієнта);
+   - `drawings` — read-only (легасі).
+
+**Нюанс правил для push (empirical):** append-only правило на рівні НОДИ для POST оцінюється НА САМІЙ НОДІ — `data.exists()` = true (нода існує) → 401. Тільки wildcard `$id` дає create-семантику для push.
+
+**Верифікація (#1471):** ast-аудит змінених модулів; smoke signIn (токен 940 симв.); curl-матриця: всі відкриті читання 200 (versions/builds/schemes/users/pending_updates/error_reports/drawings/popular_tanks), auth-читання 401 (installations/service_events/admin_app), записи адмін-нод без токена 401, PUT/DELETE з токеном 200 (через `_put_json` → True), error_reports: create 200 / overwrite без auth 401 / delete з токеном 200; installations PUT/DELETE 200; service_events POST 200. Dev-запуск `main.py`: `[REPORTER] Пінг успішно` + `[MAP_MGR] pending_updates/builds signaled` — клієнтські write-шляхи живі з новими правилами.
+
+**ВАЖЛИВО (операційно):** задеплоєний адмін-EXE `dist/SM WoT Assistant Admin` (v1.0.6) має старий `_put_json` (API-ключ) → записи в `builds/prompts/popular_tanks/versions/admin_app` тепер 401. Перед наступним використанням адмінки: бамп `admin_version.txt` → 1.0.7 та `python build_admin.py`. Демон `--listen` запускається з сирців — підхоплює зміну без перезбірки.
+
+---
+
 ## Канонічні ARCHITECTURE.md / STRUCTURE.md у корені (07.08.2026)
 
 **Рішення:** кореневі `ARCHITECTURE.md` (48 KB) і `STRUCTURE.md` (33 KB) — канонічні project-docs (opencode інжектить їх у контекст як `<project-docs>`; вони свіжіші за фактами: WotXmlParser/decode_xml, is_beta unconditionally, актуальні версії). `docs/architecture.md` + `docs/structure.md` (вербатім-копії від 04.08, містять застарілі факти: WotXmlDecoder, ai_webview_gui, VERSION 1.0.65) переміщено в `_archive/docs/` (`git mv`, історія збережена). AGENTS.md docs index оновлено на кореневі файли. Версійні факти в кореневих синхронізовано (admin_version.txt 1.0.4 → 1.0.6) + додано опис done_tags-механізму в секцію AI Pipeline.
