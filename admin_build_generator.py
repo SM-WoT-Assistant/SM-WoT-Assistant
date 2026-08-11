@@ -952,8 +952,8 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         if ok:
             print(f"    [OK] uploaded")
             if prompt_new:
-                _upload_prompt(tag, prompt)
-                save_prompt(tag, prompt)
+                if _upload_prompt(tag, prompt):
+                    save_prompt(tag, prompt)
             ok_count += 1
             done_tags.append(tag)
             save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)

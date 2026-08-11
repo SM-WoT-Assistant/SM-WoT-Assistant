@@ -10,11 +10,11 @@
 
 **Зміни:**
 1. **Бекфіл:** промпт F141_Durendal скопійовано з RTDB у кінець `prompts_cache.json` (збережено історичний порядок ключів, без sort_keys) → 995/995.
-2. **`admin_build_generator.py:save_prompt(tag, prompt)`** (новий): після успішного `_upload_prompt()` у `generate_builds()` дописує новий промпт у `PROMPTS_FILE` — файл більше не дрейфує від tank_db. Валідація на load і write (#1346): пошкоджений/не-dict кеш скидається, невалідні промпти (<50 символів, не str) не пишуться.
+2. **`admin_build_generator.py:save_prompt(tag, prompt)`** (новий): у `generate_builds()` після успішного `_upload_prompt()` (гейт на результат аплоаду — інакше недолетілий у RTDB промпт міг би "замаскуватися" локальним кешем, `prompt_new=False` назавжди) дописує новий промпт у `PROMPTS_FILE` — файл більше не дрейфує від tank_db. Валідація на load і write (#1346): пошкоджений/не-dict кеш скидається, невалідні промпти (<50 символів, не str) не пишуться.
 3. **`load_prompts()`** став толерантним: пошкоджений JSON або не-dict значення → `{}` замість необробленого JSONDecodeError (краш адмінки на старті при пошкодженому файлі).
-4. `admin_version.txt` 1.0.7 → **1.0.8**, перезбірка `build_admin.py` (#1531 — зміна admin_build_generator.py обов'язково = перезбірка EXE).
+4. `admin_version.txt` 1.0.7 → **1.0.9** (1.0.8 — самолікування; 1.0.9 — гейт `_upload_prompt` → `save_prompt`), перезбірка `build_admin.py` (#1531 — зміна admin_build_generator.py обов'язково = перезбірка EXE).
 
-**Верифікація (#1471, #1479):** ast-parse обох файлів; 6 smoke-тестів `save_prompt`/`load_prompts` (roundtrip, пошкоджений кеш на обох шляхах, невалідні промпти, порядок ключів, не-dict JSON); бандл `_internal/prompts_cache.json` = 995 (Durendal присутній), `admin_version.txt` = 1.0.8; живий запуск нового EXE → `admin.log`: «Танків: 995, Промптів: 995». Адмінка запущена і працює (після вбивтя старої інстанції для перезбірки, #1491).
+**Верифікація (#1471, #1479):** ast-parse обох файлів; 6 smoke-тестів `save_prompt`/`load_prompts` (roundtrip, пошкоджений кеш на обох шляхах, невалідні промпти, порядок ключів, не-dict JSON); бандл `_internal/prompts_cache.json` = 995 (Durendal присутній), `admin_version.txt` = 1.0.9; живий запуск нового EXE → `admin.log`: «Танків: 995, Промптів: 995». Адмінка запущена і працює (після вбивтя старої інстанції для перезбірки, #1491).
 
 ---
 
