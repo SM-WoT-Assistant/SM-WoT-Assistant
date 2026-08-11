@@ -25,7 +25,8 @@ from admin_build_generator import (
     _put_json, _get_json, _rtdb_url, _update_builds_version,
     _update_pending_status, check_wg_tanks_version,
     _WG_API_URL, _is_build_complete,
-    check_wg_game_version, snapshot_manifest, update_manifest_for_tags
+    check_wg_game_version, snapshot_manifest, update_manifest_for_tags,
+    scan_incomplete_builds
 )
 
 BG = "#1a1a1a"
@@ -101,6 +102,8 @@ _TR_EN = {
     "log_tray_started": "Started minimized to tray",
     "log_tray_running": "Running in tray (WoT: {path})",
     "log_cleanup_done": "Cleaned {n} old error reports (>60 days)",
+    "log_sweep_queued": "Incomplete builds queued for regeneration",
+    "log_sweep_error": "Fill sweep failed: {err}",
     "notif_changes": "Changes Detected",
     "notif_changes_body": "{n} tanks changed",
     "notif_gen_started": "Generation Started",
@@ -437,6 +440,7 @@ class AdminApp:
         self._log(self.t("log_tanks_prompts", tanks=len(self.tank_db), prompts=len(self.prompts)))
         self._last_heartbeat = 0.0
         self._last_cleanup = 0.0
+        self._last_sweep = -86280.0  # first fill sweep ~120s after start, then every 24h
         threading.Thread(target=self._report_admin_status,
                          kwargs={"status": "idle"}, daemon=True).start()
         self._start_background()
@@ -478,6 +482,25 @@ class AdminApp:
                 self._log(self.t("log_cleanup_done", n=n))
         except Exception:
             pass
+
+    def _run_build_fill_sweep(self):
+        """Generate strictly incomplete builds (daily self-heal, direct GUI path).
+
+        Generates directly (no pending_updates trigger) so a concurrently running
+        daemon --listen does not pick up the same queue and double-generate."""
+        try:
+            if self._generating:
+                return
+            st = _get_json(_rtdb_url("pending_updates/builds"))
+            if st and st.get("status") == "generating":
+                return
+            queue = sorted(scan_incomplete_builds().keys())
+            if queue:
+                self._log(self.t("log_sweep_queued"))
+                threading.Thread(target=self._do_generate,
+                                 args=(queue,), daemon=True).start()
+        except Exception as e:
+            self._log(self.t("log_sweep_error", err=e))
 
     def t(self, key, **kw) -> str:
         v = str(_TR_EN.get(key, key))
@@ -966,6 +989,9 @@ class AdminApp:
                     if now - self._last_cleanup > 86400:  # 24 h
                         self._last_cleanup = now
                         self._cleanup_old_error_reports()
+                    if now - self._last_sweep > 86400:  # 24 h fill sweep
+                        self._last_sweep = now
+                        self._run_build_fill_sweep()
                     if now - self._last_wg > 1800:  # 30 min
                         self._last_wg = now
                         wg_ver, ts = check_wg_game_version()

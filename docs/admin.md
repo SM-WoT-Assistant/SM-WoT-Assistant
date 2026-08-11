@@ -4,6 +4,26 @@
 
 ---
 
+## Щоденний авто-свіп неповних білдів (11.08.2026, адмінка v1.0.10)
+
+**Проблема:** гейт `_is_build_complete` перевіряє лише `equipment_1` + `consumables_1` → білд без перків екіпажу проходить і ніколи не перегенеровується. Аудит 995 білдів RTDB проти клієнтських `crew_roles` (tank_slots_full.json): 118 неповних (J20_Type_2605 без crew, 113 без перків лоадера та ін.).
+
+**Механізм:**
+1. `strict_build_incomplete(tag, build_data)` (admin_build_generator.py) — строгий чек: `equipment_1/2` + `consumables_1/2` непусті; кожна роль клієнта присутня в білді з непустими перками. Нормалізація ролей `_normalize_crew_role()`: `loader_radio`→loader+radioman, `loader_2/gunner_2/radioman_2`→базова роль, регістр. Клієнтські ролі з `_gp.tank_slots` (module-level dict generate_prompt_v2; для loader_radio-танків tank_slots_full містить ТІЛЬКИ первинну роль — радист покривається, не вимагається).
+2. `scan_incomplete_builds()` — 1 GET `builds/tanks.json` + порівняння → `{tag: [missing]}` (~118 зараз, обладнання 0 проблем).
+3. **Демон `--listen`:** таймер `_last_sweep` (24 год, перший — одразу) → `_run_daily_sweep()` пише `pending_updates/builds` {status: generating, queue: неповні} — існуюча механіка черги генерує. Гвард: пропуск якщо `pending_updates/builds.status=="generating"` АБО `admin_app/status=="generating"` зі свіжим `last_seen` (<180 с — захист від застряглого статусу після падіння GUI).
+4. **Адмінка GUI:** `_run_build_fill_sweep()` у `_start_background` — генерує напряму (thread), БЕЗ pending-тригера, щоб демон не підхопив ту саму чергу (подвійна генерація). Гвард: `self._generating` + pending status.
+5. **Взаємне виключення:** GUI пише `admin_app/status=generating` (наявний патерн #1443) — демон по ньому + last_seen пропускає свій свіп; GUI перевіряє pending (демон активний → пропуск).
+6. **Цикл самолікування:** неповний білд → свіп (24 год / при старті) → регенерація → все ще неповний (ШІ ще не знає) → наступний свіп знову, поки всі секції не заповняться.
+7. **Верифікація:** smoke strict-чека (Durendal→[], J20→усі crew, M48A2→crew:loader, Type 59 loader_radio→[], gunner_2→[], порожні перки→missing, equipment_2→missing); сухий scan=118; живий запуск v1.0.10 — «Генерую 118 білдів...», RTDB pending status=generating.
+
+**Відомі обмеження (успадковані):**
+- `_do_generate` пише pending БЕЗ queue (#1443) → демон, побачивши status=generating, міг би форс-регенерувати ВСЕ (queue=None). Раса існує з ручною кнопкою Generate; не запускати демон одночасно з GUI-генерацією.
+- Застряглий `pending_updates/builds.status="generating"` після падіння генератора блокує обидва свіпи (гвард); лікується демоном або ручним Generate.
+- `self._last_sweep = -86280.0` порівнюється з `time.time()` (epoch) → свіп при старті GUI спрацьовує негайно (як `_last_cleanup`, #1485), а не через 120 с — заповнення йде при КОЖНОМУ старті, що відповідає меті.
+
+---
+
 ## Механізм оновлення білдів: done_tags + добудова з клієнта (07.08.2026, admin_build_generator.py, адмінка v1.0.6)
 1. **Проблема (F141_Durendal, гра v2.3.1.1 #910)**: адмінка повідомила «Генерація завершена!» (06.08 19:06), але білд нового танка НЕ потрапив у RTDB, а манифест змін уже містив його fingerprint → танк назавжди схований від автооновлення. Корінь: (а) `tank_db.json` застарів (головний застосунок у stability_mode викликає лише `extract_metadata`, не `build_database`) → `generate_builds` фільтрував queue по tank_db → total=0 → `return True` («All tanks already cached!») — хибний успіх; (б) `admin_app._do_generate` при ok=True оновлював манифест для ВСЬОГО queue; (в) `generate_prompt` резолвить танк через `tank_slots_full.json`, який теж не мав нового танка («Tank not found» навіть зі свіжим tank_db.json).
 2. **Фікс**:

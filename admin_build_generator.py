@@ -536,6 +536,85 @@ def _update_pending_status(path, status, message="", progress=None):
         data["progress"] = progress
     _put_json(_rtdb_url(f"pending_updates/{path}"), data)
 
+# ── Daily fill sweep for incomplete builds ──────────
+def _normalize_crew_role(role):
+    """Normalize a crew role name to the canonical base role(s) used by client data.
+
+    Combined/secondary roles map to their primary slot: loader_radio -> loader + radioman,
+    loader_2/gunner_2 -> loader/gunner, radioman_2 -> radioman.
+    """
+    r = str(role or "").lower()
+    if "loader_radio" in r:
+        return ("loader", "radioman")
+    if "radio" in r:
+        return ("radioman",)
+    if "loader" in r:
+        return ("loader",)
+    if "gunner" in r:
+        return ("gunner",)
+    if "driver" in r:
+        return ("driver",)
+    if "commander" in r:
+        return ("commander",)
+    return (r,)
+
+def strict_build_incomplete(tag, build_data):
+    """Strict completeness check: every equipment/consumable loadout non-empty and every
+    client crew role present with non-empty perks. Returns list of missing sections
+    (e.g. ['equipment_2', 'crew:loader']) or [] when the build is fully filled."""
+    missing = []
+    for k in ("equipment_1", "equipment_2", "consumables_1", "consumables_2"):
+        if not build_data.get(k):
+            missing.append(k)
+    build_roles = {}
+    for member in (build_data.get("crew") or []):
+        if not isinstance(member, (list, tuple)) or not member:
+            continue
+        role = member[0]
+        perks = member[1] if len(member) > 1 else []
+        for r in _normalize_crew_role(role):
+            build_roles.setdefault(r, []).extend(perks or [])
+    slots = getattr(_gp, "tank_slots", {}) or {}
+    slots = slots.get(tag, {}) if isinstance(slots, dict) else {}
+    expected = set()
+    for role in (slots.get("crew_roles") or []):
+        expected.update(_normalize_crew_role(role))
+    for r in sorted(expected):
+        if not build_roles.get(r):
+            missing.append("crew:" + r)
+    return missing
+
+def scan_incomplete_builds():
+    """Fetch all RTDB builds and return {tag: [missing sections]} for strictly incomplete ones."""
+    all_builds = _get_json(_rtdb_url("builds/tanks")) or {}
+    incomplete = {}
+    for tag, entry in all_builds.items():
+        if not isinstance(entry, dict):
+            continue
+        missing = strict_build_incomplete(tag, entry.get("data", entry))
+        if missing:
+            incomplete[tag] = missing
+    return incomplete
+
+def _run_daily_sweep():
+    """Queue all strictly incomplete builds for regeneration via pending_updates/builds.
+    Returns the list of queued tags (empty when nothing to fill)."""
+    incomplete = scan_incomplete_builds()
+    if not incomplete:
+        print("[SWEEP] Daily fill sweep: no incomplete builds")
+        return []
+    queue = sorted(incomplete.keys())
+    _put_json(_rtdb_url("pending_updates/builds"), {
+        "status": "generating",
+        "queue": queue,
+        "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "message": f"Daily fill sweep: {len(queue)} incomplete builds",
+    })
+    print(f"[SWEEP] Daily fill sweep: {len(queue)} incomplete builds queued")
+    for tag in queue:
+        print(f"[SWEEP]   {tag}: {', '.join(incomplete[tag])}")
+    return queue
+
 # ── Generation modes ────────────────────────────────
 def generate_popular(driver, tank_db):
     """Generate popular tanks list via AI."""
@@ -981,6 +1060,7 @@ def listen_mode(tank_db, wot_path=None):
     print(f"\n=== Listen Mode {'(WoT: ' + wot_path + ')' if wot_path else '(no WoT path)'} ===\n")
     _last_scan = -3600  # trigger initial scan immediately
     _last_wg = -21600  # trigger initial WG check immediately
+    _last_sweep = -86400  # trigger initial fill sweep immediately
 
     while True:
         now = time.time()
@@ -1017,6 +1097,19 @@ def listen_mode(tank_db, wot_path=None):
                                 "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                                 "message": f"{len(changed)} tanks changed per WG API trigger"
                             })
+
+        # ── Daily incomplete-build fill sweep (every 24h) ──
+        if now - _last_sweep > 86400:
+            _last_sweep = now
+            st = _get_json(_rtdb_url("pending_updates/builds"))
+            admin_st = _get_json(_rtdb_url("admin_app/status"))
+            admin_seen = _get_json(_rtdb_url("admin_app/last_seen")) or 0
+            if st and st.get("status") == "generating":
+                print("[SWEEP] skipped - builds generation in progress (pending)")
+            elif admin_st == "generating" and int(now) - int(admin_seen) < 180:
+                print("[SWEEP] skipped - admin app is generating builds")
+            else:
+                _run_daily_sweep()
 
         # ── Check pending_updates ────────────────────────
         pop = _get_json(_rtdb_url("pending_updates/popular_tanks"))
