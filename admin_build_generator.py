@@ -94,9 +94,39 @@ def save_progress(pass_num, idx, retry, ok_c, fail_c):
 
 def load_prompts():
     if os.path.exists(PROMPTS_FILE):
-        with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, dict):
+                return loaded
+        except Exception:
+            pass
     return {}
+
+def save_prompt(tag, prompt):
+    """Зберігає згенерований промпт у prompts_cache.json (самолікування кешу).
+
+    prompt_cache.json — статичний файл, згенерований разово; без цього запису
+    нові танки (напр. F141_Durendal) давали б вічну розбіжність tank_db/prompts.
+    Валідація на load і write (#1346): пошкоджений кеш скидається.
+    """
+    try:
+        if not prompt or not isinstance(prompt, str) or len(prompt) < 50:
+            return
+        prompts = {}
+        if os.path.exists(PROMPTS_FILE):
+            try:
+                with open(PROMPTS_FILE, "r", encoding="utf-8") as f:
+                    loaded = json.load(f)
+                if isinstance(loaded, dict):
+                    prompts = loaded
+            except Exception:
+                prompts = {}
+        prompts[tag] = prompt
+        with open(PROMPTS_FILE, "w", encoding="utf-8") as f:
+            json.dump(prompts, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"    [WARN] prompt cache save failed: {e}")
 
 # ── Change detection ──────────────────────────────
 def _entry_fingerprint(info):
@@ -923,6 +953,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             print(f"    [OK] uploaded")
             if prompt_new:
                 _upload_prompt(tag, prompt)
+                save_prompt(tag, prompt)
             ok_count += 1
             done_tags.append(tag)
             save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)

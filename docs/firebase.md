@@ -73,7 +73,7 @@
 12. **`_load_ai_build_cache()`** тепер повертає 5 значень: `(builds, updated, fail_count, version, scripts_fingerprint)`.
 13. **`_save_ai_build_cache_bulk()`** — новий bulk save для Firebase.
 14. **builds_table.py** — one-time скрипт для початкової заливки всіх білдів + промптів + популярних танків у Firebase.
-15. **prompts_cache.json** — 994 промпти, згенеровані `builds_table.py`, включено в бандл (не в DEFAULT_FILES — використовується тільки адміном).
+15. **prompts_cache.json** — 995 промптів (994 + F141_Durendal), включено в бандл (не в DEFAULT_FILES — використовується тільки адміном). З 11.08.2026 — самолікуючийся: `save_prompt()` в `admin_build_generator.py` дописує новозгенеровані промпти (`prompt_new=True`) після успішного `_upload_prompt()`; `load_prompts()` і `save_prompt()` толерантні до пошкодженого файлу (#1346).
 
 
 ## Rebalance detection chain (27.07.2026, оновлено 07.08.2026)
