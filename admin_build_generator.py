@@ -268,6 +268,21 @@ _PROFILE_SKIP = shutil.ignore_patterns(
     "Sessions", "Profile *", "Guest Profile",
 )
 
+# Failure classes worth retrying in _create_driver(). Chrome auto-updates
+# often: a fresh major/binary can briefly lack a matching chromedriver
+# (Selenium Manager then fails to resolve/download it) or stall session
+# creation. All of these resolve themselves once Chrome's driver is
+# published/network returns — a retry with a fresh profile copy is enough.
+_DRIVER_RETRY_MARKERS = (
+    "session not created",
+    "This version of ChromeDriver only supports",
+    "Could not obtain version",
+    "Could not successfully connect to the driver manager",
+    "Error communicating with the remote browser",
+    "Local file not found",
+    "se-manager",
+)
+
 
 def _kill_chrome_matching(pattern):
     """Force-kill chrome.exe processes whose command line contains ``pattern``.
@@ -352,19 +367,20 @@ def _create_driver():
     opts.add_experimental_option("useAutomationExtension", False)
 
     last_err = None
-    for attempt in (1, 2):
+    for attempt in (1, 2, 3):
         try:
             driver = webdriver.Chrome(options=opts)
             break
         except Exception as e:
             last_err = e
             msg = str(e)
-            if "session not created" not in msg:
+            if not any(m in msg for m in _DRIVER_RETRY_MARKERS):
                 raise
+            delay = 3 if attempt < 3 else 15
             print(f"[CHROME] session creation attempt {attempt} failed ({msg[:100]});"
-                  " cleaning up and retrying with a fresh profile")
+                  f" retrying in {delay}s with a fresh profile copy")
             # A failed session can leave the spawned chrome.exe alive and holding
-            # the profile dir — the next attempt would repeat the same timeout.
+            # the profile dir — the next attempt would repeat the same failure.
             # Kill leftovers, then rebuild a clean profile copy for the retry.
             _kill_chrome_matching(CHROME_COPY_DIR)
             try:
@@ -373,11 +389,21 @@ def _create_driver():
                 profile_dir = _copy_chrome_profile(CHROME_PROFILE, CHROME_COPY_DIR)
             except Exception as e2:
                 print(f"[CHROME] fresh profile copy for retry failed: {e2}")
-            time.sleep(3)
+            time.sleep(delay)
     else:
         raise RuntimeError(
-            "Could not start the Chrome driver session after 2 attempts "
-            f"({str(last_err)[:120]})") from last_err
+            "Could not start the Chrome driver session after 3 attempts. "
+            "Chrome was probably updated recently and the matching chromedriver "
+            "is not published yet (or the network is down) — wait a few hours "
+            "and retry. Last error: "
+            f"{str(last_err)[:120]}") from last_err
+    # Version log: instant diagnosis after any future Chrome update incident.
+    try:
+        bv = driver.capabilities.get("browserVersion", "?")
+        cv = (driver.capabilities.get("chrome") or {}).get("chromedriverVersion", "?")
+        print(f"[CHROME] session OK: chrome={bv} chromedriver={cv}")
+    except Exception:
+        pass
     # Inject stealth JS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": """
@@ -1038,7 +1064,31 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             continue
 
         # Submit to AI
-        response = _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT)
+        try:
+            response = _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT)
+        except Exception as e:
+            # Session died mid-run (e.g. Chrome updated/restarted externally,
+            # OS killed the browser). Reconnect ONCE and retry the same tank so
+            # the rest of the queue is not lost; a second failure just fails
+            # this tank (it returns to the queue via save_progress).
+            print(f"    [RECONNECT] session died ({str(e)[:100]}); recreating driver...")
+            try:
+                driver.quit()
+            except Exception:
+                pass
+            _kill_chrome_matching(CHROME_COPY_DIR)
+            try:
+                if os.path.isdir(CHROME_COPY_DIR):
+                    shutil.rmtree(CHROME_COPY_DIR, ignore_errors=True)
+            except Exception:
+                pass
+            driver = _create_driver()
+            try:
+                response = _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT)
+            except Exception as e2:
+                print(f"    [RECONNECT] second attempt failed ({str(e2)[:100]});"
+                      f" failing tank {tag}")
+                response = None
         if not response:
             print(f"    [FAIL] no response")
             fail_count += 1
