@@ -13,6 +13,18 @@ BASE_DIR = os.getcwd()
 EXTRACT_DIR = os.path.join(BASE_DIR, "extracted_data")
 ICONS_DIR = os.path.join(BASE_DIR, "extracted_icons")
 
+def _sanitize_list_xml(xml_text):
+    """Очищення декодованого list.xml перед ET.fromstring.
+
+    WG вставляє в <price> неекрановані маркери відсутності ціни: раніше '&',
+    тепер '<(' (невалідний XML) — без ескейпу падає весь лист нації. Також
+    зрізаємо UTF-8 BOM, який ламає парсинг (invalid token, column 3).
+    """
+    xml_text = xml_text.lstrip("\ufeff")
+    xml_text = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|#\d+);)', '&amp;', xml_text)
+    xml_text = re.sub(r'<(?![\w/!?-])', '&lt;', xml_text)
+    return xml_text
+
 class TankExtractor:
     def __init__(self, wot_path):
         self.wot_path = wot_path
@@ -890,6 +902,7 @@ class TankExtractor:
                 with open(list_xml, "r", encoding="utf-8", errors="ignore") as f:
                     xml_text = f.read().strip()
                 
+                xml_text = _sanitize_list_xml(xml_text)
                 # ВИПРАВЛЕННЯ: Видаляємо проблемні xmlns теги та огортаємо в root
                 xml_text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', xml_text, flags=re.DOTALL)
                 if xml_text.startswith("<"):
@@ -1019,6 +1032,7 @@ class TankExtractor:
             try:
                 with open(list_xml, "r", encoding="utf-8", errors="ignore") as f:
                     xml_text = f.read().strip()
+                xml_text = _sanitize_list_xml(xml_text)
                 xml_text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', xml_text, flags=re.DOTALL)
                 if xml_text.startswith("<"):
                     xml_text = re.sub(r'^<[^>]+>', '<root>', xml_text, count=1)

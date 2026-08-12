@@ -44572,5 +44572,40 @@
       1
     ],
     "post_progression_tree": "role_MT_support"
+  },
+  "Ch45_WZ_114_CFE_D": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "china",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_assault"
   }
 }

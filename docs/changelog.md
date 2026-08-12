@@ -4,6 +4,29 @@
 
 ---
 
+## Новий танк Ch45_WZ_114_CFE_D: 3 кореневі баги в адмін-генерації (адмінка v1.0.14, 13.08.2026)
+
+**Проблема:** о 22:28 12.08 гарячий фікс гри додав у scripts.pkg новий китайський танк Ch45_WZ_114_CFE_D (WZ 114 CFE D, tier 9, HT). Адмінка детектувала його (періодичне сканування "1 змінених танків!" о 23:27, 23:34, 00:27), але генерація падала "Генерація FAILED" без жодної помилки. Три окремі кореневі причини ланцюгом:
+
+1. **list.xml: новий маркер ціни `&lt;( ` від WG.** У `&lt;price&gt;`-блоках танків без ціни WG раніше ставив `&amp;`, тепер `&lt;( ` (невалідний XML). `ET.fromstring(china/list.xml)` → "invalid token" → `_tank_record_from_client()` повертав **None** → танк ішов у `unknown` → `total=0` → тихий `(False, [])`. Маніфест не просувався → танк ре-детектувався щогодини → вічний цикл FAILED. (Той самий латентний мінування був і в `tank_extractor.py` — наступна повна екстракція тихо загубила б китайський лист, ремейк бага F141_Durendal #1519.)
+
+2. **Застарілий `_fill_progress.json`.** `generate_builds()` для queue-шляху брав `start_idx = prog["index"]` з файлу прогресу попередньої сесії (07.08, index=1) → `to_process` порожній → цикл не виконувався взагалі (ok=1 зі старого файлу) → теж тихий `(False, [])`.
+
+3. **Race гідрації сторінки AI Mode (Chrome 151).** Після фіксу 1+2 танк доходив до `_submit_to_ai`, але textarea знаходилась у напів-ініціалізованому стані: селектори ловили прихований textarea (0×0, `is_enabled()`=True без `is_displayed()`), а `click()` одразу після знахідки падав "element not interactable" (React-гідрація замінює ноди — стейл-референс ніколи не стає клікабельним). Два RECONNECT-цикли (2×60с таймаути) → `[FAIL] no response`.
+
+**Зміни:**
+1. `admin_build_generator.py::_clean_xml` — додано ескейп сирого `<`: `re.sub(r'<(?![\w/!?-])', '&lt;', text)` (після `&amp;`-ескейпу).
+2. `tank_extractor.py::_sanitize_list_xml` (новий модульний хелпер, використано в обох місцях парсингу list.xml: `build_database` + `update_compact_descr`) — ескейп `&amp;` + `&lt;` + зріз UTF-8 BOM (ламав парсинг на column 3).
+3. `generate_builds()` — свіжий прогрес для queue/single_tag: `{"pass":1,"index":0,...}`; `load_progress()` лишився лише для force/batch (легасі crash-resume). Застарілий `_fill_progress.json` більше не впливає на queue-шляхи.
+4. `_submit_to_ai()` — (а) readyState-гейт у циклі пошуку: textarea приймається лише при `document.readyState == "complete"`; (б) приймаються лише `is_enabled() AND is_displayed()` (відсікає прихований 0×0 інпут); (в) клік-ретрай 20×1с з ПОВТОРНИМ пошуком елемента кожну спробу (React замінює ноди).
+5. `_update_builds_version()` викликається лише при `ok_count > 0` — failed-рани більше не бамплять `builds/version` і не форсують у всіх клієнтів повний ре-синк незмінених даних (до фіксу кожен FAILED-цикл бампав версію 15→16→17 без жодного аплоаду).
+
+**Верифікація (#1471):** ast 3 модулі; dev: `_tank_record_from_client` → запис `{"name": "WZ 114 CFE D", tier 9, HT, China, is_premium: true, compact_descr: 64305}`; `_slots_and_crew_from_client` OK; повний dev-прогон `generate_builds(queue=['Ch45_WZ_114_CFE_D'])` → `[OK] uploaded` → RTDB `builds/tanks/Ch45_WZ_114_CFE_D` повний (ammo AP/APCR/HE, consumables, equipment improvedhardening/gunrammer/verticalstabilizer, crew 5 ролей з перками, field_mods), `builds/version` 17, промпт в RTDB (6070 chars) + `prompts_cache.json` → 996. AppData `.tank_extract_manifest.json` просунуто для Ch45 → старт v1.0.14: "Змін не виявлено" — цикл закритий.
+
+**Обмеження/примітки:** `dist/SM WoT Assistant Admin` на момент білда був заблокований невидимим хендлом (не процес, не Explorer, не Restart Manager — ймовірно AV-мініфільтр; rename/delete → WinError 32, запис усередину працює) → v1.0.14 зібрано в `%TEMP%\opencode\admin_build14\` (перевірено: `_internal\admin_version.txt` = 1.0.14, EXE 8.6MB) і запущено адмінку звідти; своп у канонічну папку — після розблокування. Білд у dev-дереві: tank_db.json 1141, tank_slots_full.json 1268 (+35, комічено), crew_builds.json 1141 — Ch45 увійде в наступний реліз бандла (патерн F141_Durendal #1528).
+
+---
+
 ## Стійкість до частих оновлень Chrome (адмінка v1.0.12, 12.08.2026)
 
 **Проблема:** Chrome автооновлюється регулярно (02:54 12.08 — 151.0.7922.109). Після v1.0.11 (always-copy, #1542) сам DevToolsActivePort-клас вилікуваний, але залишались дірки на оновлення: (1) SM-помилки драйвера (офлайн, `Could not obtain version`) не входили в ретрай — падали одразу; (2) вікно "новий major Chrome, драйвер ще не випущений" давало `This version of ChromeDriver only supports...` і ретрай повторював ту саму помилку; (3) смерть сесії ПІД час генерації (`WebDriverException` у `_submit_to_ai`) не ловилась — весь цикл падав, решта черги чекала до наступного свепу; (4) версії браузера/драйвера ніде не логувались — діагностика інциденту займала години.

@@ -442,10 +442,21 @@ def _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT):
         driver.get("https://www.google.com/search?q=&udm=50")
         deadline = time.time() + 30
         while time.time() < deadline and textarea is None:
+            # Page half-initialized state: textarea exists+enabled but the click
+            # throws "element not interactable" (overlay/boot race on the fresh
+            # profile copy). Only accept the input once the document is fully
+            # loaded — the readyState gate replaces the old accept-and-click.
+            try:
+                if driver.execute_script("return document.readyState") != "complete":
+                    time.sleep(1)
+                    continue
+            except Exception:
+                time.sleep(1)
+                continue
             for sel in selectors:
                 try:
                     el = driver.find_element(By.CSS_SELECTOR, sel)
-                    if el.is_enabled():
+                    if el.is_enabled() and el.is_displayed():
                         textarea = el
                         break
                 except:
@@ -463,8 +474,31 @@ def _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT):
         print("[AI] textarea not found!")
         return None
 
-    # Paste prompt via clipboard + keyboard
-    textarea.click()
+    # The page can still be settling (boot overlay / re-render) right after
+    # readyState=complete, and the input node gets replaced during hydration —
+    # a stale reference never becomes clickable. Re-query a displayed+enabled
+    # input every attempt and click until it sticks (20s budget).
+    clicked = False
+    for _ in range(20):
+        for sel in selectors:
+            try:
+                el = driver.find_element(By.CSS_SELECTOR, sel)
+                if el.is_enabled() and el.is_displayed():
+                    try:
+                        el.click()
+                        textarea = el
+                        clicked = True
+                        break
+                    except Exception:
+                        continue
+            except:
+                continue
+        if clicked:
+            break
+        time.sleep(1)
+    if not clicked:
+        print("[AI] textarea never became interactive")
+        return None
     time.sleep(0.3)
     import pyperclip
     pyperclip.copy(prompt)
@@ -721,6 +755,7 @@ def _tank_record_from_client(tag, wot_path):
         text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', text, flags=re.DOTALL)
         text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', '', text)
         text = re.sub(r'&(?!(?:amp|lt|gt|quot|apos|#\d+);)', '&amp;', text)
+        text = re.sub(r'<(?![\w/!?-])', '&lt;', text)
         return text
 
     try:
@@ -1038,7 +1073,9 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             print("[BUILD] All tanks already cached!")
         return (False, [])
 
-    prog = load_progress() if not single_tag else {"pass":1,"index":0,"retry":[],"ok_count":0,"fail_count":0}
+    prog = ({"pass":1,"index":0,"retry":[],"ok_count":0,"fail_count":0}
+            if single_tag or queue is not None
+            else load_progress())
     ok_count = prog["ok_count"]
     fail_count = prog["fail_count"]
     start_idx = prog["index"]
@@ -1133,7 +1170,10 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
     if not single_tag:
         existing, _, _, _, _ = _load_ai_build_cache()
         total_cached = len(existing)
-        _update_builds_version()
+        # Version/fingerprint advance only on actual uploads — failed runs must
+        # not force every client into a full re-sync of unchanged data.
+        if ok_count > 0:
+            _update_builds_version()
         print(f"\n=== Done: {total_cached} cached (ok={ok_count}, fail={fail_count}) ===\n")
     return (len(done_tags) > 0, done_tags)
 
