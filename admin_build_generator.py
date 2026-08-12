@@ -263,21 +263,32 @@ CHROME_COPY_DIR = os.path.join(tempfile.gettempdir(), "sm_wot_admin_chrome_profi
 _PROFILE_SKIP = shutil.ignore_patterns(
     "Cache", "Code Cache", "GPUCache", "DawnCache", "GraphiteDawnCache",
     "ShaderCache", "GrShaderCache", "component_crx_cache",
-    "SingletonLock", "SingletonCookie", "SingletonSocket",
+    "SingletonLock", "SingletonCookie", "SingletonSocket", "lockfile",
     "Last Session", "Current Session", "Last Tabs", "Current Tabs",
-    "Sessions",
+    "Sessions", "Profile *", "Guest Profile",
 )
 
 
-def _chrome_running():
-    """True if any chrome.exe is running — the real profile is locked then."""
+def _kill_chrome_matching(pattern):
+    """Force-kill chrome.exe processes whose command line contains ``pattern``.
+
+    A failed Selenium session creation (DevToolsActivePort timeout / hand-off
+    exit) can leave the spawned chrome.exe running and holding its profile
+    directory. That leftover poisons every later run: the next session either
+    times out the same way or dies with the fast 'Chrome instance exited'
+    hand-off — one failure cascades until the zombie dies. Chrome processes
+    started by the admin pipeline always carry the profile path in their
+    command line; the user's own Chrome (started normally) does not.
+    """
+    pat = pattern.replace("'", "''")
+    q = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+         "Where-Object {{ $_.CommandLine -like '*{0}*' }} | "
+         "ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}").format(pat)
     try:
-        out = subprocess.run(
-            ["tasklist", "/FI", "IMAGENAME eq chrome.exe", "/NH"],
-            capture_output=True, text=True, timeout=10).stdout
-        return "chrome.exe" in out.lower()
+        subprocess.run(["powershell", "-NoProfile", "-Command", q],
+                       capture_output=True, timeout=20)
     except Exception:
-        return True  # unknown → assume locked, safer to generate from a copy
+        pass
 
 
 def _copy_chrome_profile(src, dst):
@@ -317,17 +328,20 @@ def _create_driver():
     from selenium.webdriver.common.action_chains import ActionChains
 
     opts = Options()
-    profile_dir = CHROME_PROFILE
-    if _chrome_running():
-        print("[CHROME] Chrome is running — copying profile for an isolated instance")
-        try:
-            profile_dir = _copy_chrome_profile(CHROME_PROFILE, CHROME_COPY_DIR)
-        except Exception as e:
-            raise RuntimeError(
-                "Chrome is running and its profile is locked; auto-copy of the profile "
-                f"failed ({e}). Close Chrome and retry.") from e
-    else:
-        print(f"[CHROME] Chrome closed — using the real profile ({profile_dir})")
+    # ALWAYS drive an isolated copy of the profile, never the real one.
+    # Chrome blocks remote debugging (--remote-debugging-port) on the default
+    # user-data-dir: the browser starts but never writes DevToolsActivePort and
+    # the session times out after 60s ("session not created: DevToolsActivePort
+    # file doesn't exist"). A copy in %TEMP% is a non-default dir, so the
+    # driver works with it whether Chrome is open or closed; the copy also
+    # keeps the CAPTCHA-free login state of the user's Default profile.
+    print("[CHROME] preparing isolated profile copy (never drives the real profile)")
+    try:
+        _kill_chrome_matching(CHROME_COPY_DIR)
+        profile_dir = _copy_chrome_profile(CHROME_PROFILE, CHROME_COPY_DIR)
+    except Exception as e:
+        raise RuntimeError(
+            f"Profile copy failed ({e}). Close Chrome and retry.") from e
     opts.add_argument(f"--user-data-dir={profile_dir}")
     opts.add_argument(f"--profile-directory={CHROME_PROFILE_DIR}")
     opts.add_argument("--disable-blink-features=AutomationControlled")
@@ -337,14 +351,33 @@ def _create_driver():
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
 
-    try:
-        driver = webdriver.Chrome(options=opts)
-    except Exception as e:
-        if _chrome_running() and "session not created" in str(e):
-            raise RuntimeError(
-                "Chrome is running — the driver could not start an isolated instance; "
-                f"({str(e)[:120]})") from e
-        raise
+    last_err = None
+    for attempt in (1, 2):
+        try:
+            driver = webdriver.Chrome(options=opts)
+            break
+        except Exception as e:
+            last_err = e
+            msg = str(e)
+            if "session not created" not in msg:
+                raise
+            print(f"[CHROME] session creation attempt {attempt} failed ({msg[:100]});"
+                  " cleaning up and retrying with a fresh profile")
+            # A failed session can leave the spawned chrome.exe alive and holding
+            # the profile dir — the next attempt would repeat the same timeout.
+            # Kill leftovers, then rebuild a clean profile copy for the retry.
+            _kill_chrome_matching(CHROME_COPY_DIR)
+            try:
+                if os.path.isdir(CHROME_COPY_DIR):
+                    shutil.rmtree(CHROME_COPY_DIR, ignore_errors=True)
+                profile_dir = _copy_chrome_profile(CHROME_PROFILE, CHROME_COPY_DIR)
+            except Exception as e2:
+                print(f"[CHROME] fresh profile copy for retry failed: {e2}")
+            time.sleep(3)
+    else:
+        raise RuntimeError(
+            "Could not start the Chrome driver session after 2 attempts "
+            f"({str(last_err)[:120]})") from last_err
     # Inject stealth JS
     driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
         "source": """
