@@ -69,8 +69,19 @@ def build_admin_exe(version):
         print("[BUILD] FATAL: Admin EXE not found")
         sys.exit(1)
 
+    # A broken COLLECT leaves an empty _internal — bootloader then dies with
+    # "Failed to load Python DLL" on the next launch (13.08.2026 incident).
+    internal = os.path.join(ADMIN_DIR, "_internal")
+    if not os.path.isdir(internal) or not os.path.exists(os.path.join(internal, "python312.dll")):
+        print("[BUILD] FATAL: bundle incomplete — _internal missing python312.dll")
+        sys.exit(1)
+    count = sum(1 for _ in os.scandir(internal))
+    if count == 0:
+        print("[BUILD] FATAL: bundle incomplete — _internal is empty")
+        sys.exit(1)
+
     size_mb = os.path.getsize(exe) / (1024 * 1024)
-    print(f"[BUILD] Admin EXE: {size_mb:.1f} MB")
+    print(f"[BUILD] Admin EXE: {size_mb:.1f} MB, _internal: {count} entries")
     return exe
 
 
