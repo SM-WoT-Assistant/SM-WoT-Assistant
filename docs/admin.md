@@ -4,6 +4,16 @@
 
 ---
 
+## Причини FAILED видимі у 5 каналах + повністю фонова генерація (13.08.2026, адмінка v1.0.15)
+
+1. **generate_builds > (ok, done_tags, reasons)**: reasons = `{tag: "категорія: деталь"}` для КОЖНОГО невдалого танка + `reasons["summary"]`. Категорії явні: `unknown_tank` / `client_parse_fail` / `no_prompt` / `ai_no_response` / `ai_parse_fail` / `upload_fail`. Канали: консольний принт, admin.log + GUI-лог + трей-балун (замість голого «Генерація FAILED»), RTDB `pending_updates/builds` (status=error, message=summary), `report_fallback` > `error_reports` (admin.html Errors).
+2. **Fail-реєстр** у `.tank_extract_manifest.json` (`_failures: {tag: {count, fp}}`): `update_manifest_failures()` / `exclude_failed_tags()`, поріг 3 > танк виключається з детекту і щоденного свепу; скидання лічильника — успішна генерація (через `update_manifest_for_tags`) або зміна фінгерпринта його scripts.pkg-файла (новий патч гри = свіжа спроба). Вічна петля silent FAILED неможлива.
+3. **Захист класу**: `detect_changed_tanks` повідомляє про відсутність scripts.pkg (`report_fallback`) замість тихого `[]`; `_tank_record_from_client` КИДАЄ `RuntimeError("list.xml parse failed: ...")` замість тихого `None`; `_fill_progress.json` > `config.USER_DATA_DIR` + гвард `start_idx >= len(all_tags) > 0`; `builds/version` бампиться лише при `ok_count > 0` (дубль у `_do_generate` прибрано); свеп фільтрується через `exclude_failed_tags`.
+4. **Повністю у фоні**: Chrome ВСЕГДИ оф-скрін (`--window-position=-32000,-32000` замість `--start-maximized` — жодного вікна поверх інших); адмінка стартує в системному треї (`start_minimized: True` для нових інсталяцій, X > у трей, вихід через Settings); dev-запуски — `pythonw.exe` (без термінальних вікон; причини фейлів і так у admin.log + RTDB).
+5. **Верифікація (#1471)**: ast 4 модулі + 8 ізольованих юніт-тестів fail-реєстру + live-проби (RTDB `error_reports` запис, Chrome позиція `(-32000, -32000)`), адмінка v1.0.15 у треї «Танків: 995, Промптів: 996», «Змін не виявлено».
+
+---
+
 ## Р©РѕРґРµРЅРЅРёР№ Р°РІС‚Рѕ-СЃРІС–Рї РЅРµРїРѕРІРЅРёС… Р±С–Р»РґС–РІ (11.08.2026, Р°РґРјС–РЅРєР° v1.0.10)
 
 **РџСЂРѕР±Р»РµРјР°:** РіРµР№С‚ `_is_build_complete` РїРµСЂРµРІС–СЂСЏС” Р»РёС€Рµ `equipment_1` + `consumables_1` в†’ Р±С–Р»Рґ Р±РµР· РїРµСЂРєС–РІ РµРєС–РїР°Р¶Сѓ РїСЂРѕС…РѕРґРёС‚СЊ С– РЅС–РєРѕР»Рё РЅРµ РїРµСЂРµРіРµРЅРµСЂРѕРІСѓС”С‚СЊСЃСЏ. РђСѓРґРёС‚ 995 Р±С–Р»РґС–РІ RTDB РїСЂРѕС‚Рё РєР»С–С”РЅС‚СЃСЊРєРёС… `crew_roles` (tank_slots_full.json): 118 РЅРµРїРѕРІРЅРёС… (J20_Type_2605 Р±РµР· crew, 113 Р±РµР· РїРµСЂРєС–РІ Р»РѕР°РґРµСЂР° С‚Р° С–РЅ.).

@@ -36,7 +36,7 @@ CHROME_PROFILE_DIR = "Default"
 SELENIUM_TIMEOUT = 60       # seconds to wait for AI response
 DELAY_MIN, DELAY_MAX = 25, 35  # random delay between prompts
 
-PROGRESS_FILE = "_fill_progress.json"
+PROGRESS_FILE = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "_fill_progress.json")
 PROMPTS_FILE = "prompts_cache.json"
 
 # ── Helpers ─────────────────────────────────────────
@@ -83,14 +83,21 @@ def load_tank_db():
 
 def load_progress():
     if os.path.exists(PROGRESS_FILE):
-        with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
     return {"pass":1,"index":0,"retry":[],"ok_count":0,"fail_count":0}
 
 def save_progress(pass_num, idx, retry, ok_c, fail_c):
-    with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
-        json.dump({"pass":pass_num,"index":idx,"retry":retry,
-                    "ok_count":ok_c,"fail_count":fail_c}, f)
+    try:
+        os.makedirs(os.path.dirname(PROGRESS_FILE), exist_ok=True)
+        with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
+            json.dump({"pass":pass_num,"index":idx,"retry":retry,
+                        "ok_count":ok_c,"fail_count":fail_c}, f)
+    except Exception:
+        pass
 
 def load_prompts():
     if os.path.exists(PROMPTS_FILE):
@@ -138,10 +145,21 @@ def _fingerprint_equal(a, b):
     return a.get("size") == b.get("size") and a.get("crc") == b.get("crc")
 
 def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
-    """Return list of tank tags whose vehicle XML changed in scripts.pkg."""
+    """Return list of tank tags whose vehicle XML changed in scripts.pkg.
+
+    Tags with _FAIL_THRESHOLD consecutive generation failures (see
+    update_manifest_failures) are excluded — a persistent failure must not
+    spin an hourly re-detection loop. A fingerprint change of the tank's XML
+    (new game version) resets the counter and re-enables detection.
+    """
     pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
     if not os.path.exists(pkg_path):
         print(f"[DETECT] scripts.pkg not found at {pkg_path}")
+        try:
+            from firebase_reporter import report_fallback
+            report_fallback("admin_detect", "scripts.pkg", f"scripts.pkg not found at {pkg_path}")
+        except Exception:
+            pass
         return []
     old = {}
     if os.path.exists(manifest_path):
@@ -149,6 +167,8 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             with open(manifest_path, "r", encoding="utf-8") as f:
                 old = json.load(f)
     changed = []
+    changed_names = {}
+    fps = {}
     with zipfile.ZipFile(pkg_path, 'r') as z:
         for name in z.namelist():
             if not name.startswith("scripts/item_defs/vehicles/") or not name.endswith(".xml"):
@@ -161,6 +181,23 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             if prev is None or not _fingerprint_equal(prev, fp):
                 tag = os.path.splitext(os.path.basename(name))[0]
                 changed.append(tag)
+                changed_names[tag] = name
+                fps[name] = fp
+    # Exclude tanks stuck in the consecutive-failure registry (same fingerprint).
+    if changed:
+        fails = _manifest_failures(manifest_path)
+        if fails:
+            excluded = []
+            for tag in list(changed):
+                name = changed_names.get(tag)
+                f = fails.get(tag)
+                if (f and int(f.get("count", 0)) >= _FAIL_THRESHOLD
+                        and name and f.get("fp") == fps.get(name)):
+                    excluded.append(tag)
+                    changed.remove(tag)
+            if excluded:
+                print(f"[DETECT] {len(excluded)} tanks excluded after {_FAIL_THRESHOLD} failed generations: "
+                      f"{', '.join(excluded[:10])}{'...' if len(excluded) > 10 else ''}")
     if changed:
         names = ", ".join(changed[:10])
         print(f"[DETECT] {len(changed)} changed: {names}{'...' if len(changed) > 10 else ''}")
@@ -221,11 +258,110 @@ def update_manifest_for_tags(wot_path, manifest_path, tags):
             if not isinstance(data, dict):
                 data = {}
             data.update(updates)
+            # Success resets the consecutive-failure counter for these tags.
+            fails = data.get("_failures")
+            if isinstance(fails, dict) and fails:
+                for tag in tags_set:
+                    fails.pop(tag, None)
+                data["_failures"] = fails
             with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(data, f)
             return True
         except Exception:
             return False
+
+
+_FAIL_THRESHOLD = 3  # consecutive failed generations before a tank is excluded from scans
+
+def _manifest_failures(manifest_path):
+    """Read the {tag: {count, fp}} consecutive-failure registry from the manifest."""
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        fails = d.get("_failures") if isinstance(d, dict) else None
+        return fails if isinstance(fails, dict) else {}
+    except Exception:
+        return {}
+
+def update_manifest_failures(wot_path, manifest_path, failed_tags):
+    """Increment consecutive-failure counters for tags that failed to generate.
+
+    Counters are keyed by the current scripts.pkg fingerprint — a fingerprint
+    change (new game version/hotfix) resets the counter, so a failed tank gets
+    a fresh attempt when its XML actually changes again.
+    """
+    if not failed_tags or not os.path.exists(manifest_path):
+        return False
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(pkg_path):
+        return False
+    failed_set = set(failed_tags)
+    failures = _manifest_failures(manifest_path)
+    with zipfile.ZipFile(pkg_path, 'r') as z:
+        for name in z.namelist():
+            if not name.startswith("scripts/item_defs/vehicles/") or not name.endswith(".xml"):
+                continue
+            if "common/" in name or "components/" in name or "list.xml" in name:
+                continue
+            tag = os.path.splitext(os.path.basename(name))[0]
+            if tag not in failed_set:
+                continue
+            fp = _entry_fingerprint(z.getinfo(name))
+            prev = failures.get(tag)
+            if prev and prev.get("fp") == fp:
+                failures[tag] = {"count": int(prev.get("count", 0)) + 1, "fp": fp}
+            else:
+                failures[tag] = {"count": 1, "fp": fp}
+    with _MANIFEST_LOCK:
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+            data["_failures"] = failures
+            with open(manifest_path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            return True
+        except Exception:
+            return False
+
+def exclude_failed_tags(tags, manifest_path, wot_path=""):
+    """Filter out tags stuck in the consecutive-failure registry.
+
+    A tag stays excluded only while its current fingerprint matches the one
+    recorded at the failure — a new game version (fingerprint change) lifts
+    the exclusion and grants a fresh attempt.
+    """
+    if not tags:
+        return []
+    fails = _manifest_failures(manifest_path)
+    if not fails:
+        return list(tags)
+    pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg") if wot_path else ""
+    fps = {}
+    if pkg_path and os.path.exists(pkg_path):
+        with zipfile.ZipFile(pkg_path, 'r') as z:
+            for name in z.namelist():
+                if not name.startswith("scripts/item_defs/vehicles/") or not name.endswith(".xml"):
+                    continue
+                if "common/" in name or "components/" in name or "list.xml" in name:
+                    continue
+                tag = os.path.splitext(os.path.basename(name))[0]
+                if tag in tags:
+                    fps[tag] = _entry_fingerprint(z.getinfo(name))
+    out = []
+    for t in tags:
+        f = fails.get(t)
+        if f is None:
+            out.append(t)
+            continue
+        if int(f.get("count", 0)) < _FAIL_THRESHOLD:
+            out.append(t)
+            continue
+        if fps and f.get("fp") != fps.get(t):
+            out.append(t)  # fingerprint changed — new game version, fresh attempt
+    return out
+
 
 _WG_API_URL = "https://api.worldoftanks.eu/wot/encyclopedia/info/?application_id=0cc3f254142cf2e40511006d6cd18761&r_realm=eu"
 
@@ -362,7 +498,10 @@ def _create_driver():
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument("--no-first-run")
     opts.add_argument("--no-default-browser-check")
-    opts.add_argument("--start-maximized")
+    # Off-screen window: the AI Mode session runs fully hidden (no visible
+    # Chrome window above other apps). Position far outside the screen bounds.
+    opts.add_argument("--window-position=-32000,-32000")
+    opts.add_argument("--window-size=1400,900")
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)
 
@@ -689,7 +828,7 @@ def scan_incomplete_builds():
             incomplete[tag] = missing
     return incomplete
 
-def _run_daily_sweep():
+def _run_daily_sweep(wot_path=""):
     """Queue all strictly incomplete builds for regeneration via pending_updates/builds.
     Returns the list of queued tags (empty when nothing to fill)."""
     incomplete = scan_incomplete_builds()
@@ -697,6 +836,10 @@ def _run_daily_sweep():
         print("[SWEEP] Daily fill sweep: no incomplete builds")
         return []
     queue = sorted(incomplete.keys())
+    queue = exclude_failed_tags(queue, ".tank_extract_manifest.json", wot_path)
+    if not queue:
+        print("[SWEEP] Daily fill sweep: all incomplete builds are in the failure registry")
+        return []
     _put_json(_rtdb_url("pending_updates/builds"), {
         "status": "generating",
         "queue": queue,
@@ -763,6 +906,7 @@ def _tank_record_from_client(tag, wot_path):
             list_names = [n for n in z.namelist()
                           if n.startswith("scripts/item_defs/vehicles/")
                           and n.endswith("/list.xml")]
+            last_parse_err = None
             for entry in sorted(list_names):
                 try:
                     raw = z.read(entry)
@@ -772,14 +916,17 @@ def _tank_record_from_client(tag, wot_path):
                     f.write(raw)
                 try:
                     if not decoder.decode_file(tmp, tmp):
+                        last_parse_err = f"{entry}: decode failed"
                         continue
                     with open(tmp, "r", encoding="utf-8", errors="ignore") as f:
                         text = f.read()
-                except Exception:
+                except Exception as e:
+                    last_parse_err = f"{entry}: {e}"
                     continue
                 try:
                     root = ET.fromstring(_clean_xml(text))
-                except Exception:
+                except Exception as e:
+                    last_parse_err = f"{entry}: {e}"
                     continue
                 tank = None
                 for child in root:
@@ -835,8 +982,10 @@ def _tank_record_from_client(tag, wot_path):
                     "is_premium": is_premium,
                     "compact_descr": compact_descr,
                 }
-    except Exception:
-        pass
+        # Tag not found in any nation list — if any list failed to parse, that is
+        # the reason (a WG format change must surface loudly, not as a silent None).
+        if last_parse_err:
+            raise RuntimeError(f"list.xml parse failed: {last_parse_err}")
     finally:
         try:
             os.remove(tmp)
@@ -1010,17 +1159,26 @@ def _persist_client_tank_data(tag, db_rec, slots_rec, crew_rec):
 def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queue=None, wot_path=None):
     """Generate builds for specified tanks.
 
-    Returns (ok, done_tags): ok=True when at least one build was uploaded,
-    done_tags is the list of tags actually uploaded to RTDB.
+    Returns (ok, done_tags, reasons): ok=True when at least one build was
+    uploaded, done_tags is the list of tags actually uploaded to RTDB,
+    reasons is {tag: "category: detail"} for every failed tag plus a
+    "summary" entry — the failure reason must always reach the caller, it is
+    never allowed to disappear into a bare False.
     """
     print("\n=== Generating Builds ===\n")
 
     all_tags_sorted = sorted(tank_db.keys(), key=lambda t: (tank_db[t].get("tier",0), tank_db[t].get("name","")))
     unknown = []
+    reasons = {}
     if single_tag:
         if single_tag not in tank_db:
-            rec = _tank_record_from_client(single_tag, wot_path)
-            slots_rec, crew_rec = _slots_and_crew_from_client(single_tag, wot_path)
+            try:
+                rec = _tank_record_from_client(single_tag, wot_path)
+                slots_rec, crew_rec = _slots_and_crew_from_client(single_tag, wot_path)
+            except Exception as e:
+                reasons[single_tag] = f"client_parse_fail: {e}"
+                print(f"[BUILD] {single_tag}: {reasons[single_tag]}")
+                return (False, [], reasons)
             if rec and slots_rec:
                 tank_db[single_tag] = rec
                 _gp.tank_db[single_tag] = rec
@@ -1030,8 +1188,9 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
                 _persist_client_tank_data(single_tag, rec, slots_rec, crew_rec)
                 print(f"[BUILD] {single_tag}: added from client scripts.pkg (tier {rec.get('tier')}, {rec.get('class')})")
             else:
-                print(f"[BUILD] Tag {single_tag} not found in DB or client")
-                return (False, [])
+                reasons[single_tag] = "unknown_tank: not found in DB or client scripts.pkg"
+                print(f"[BUILD] {single_tag}: {reasons[single_tag]}")
+                return (False, [], reasons)
         all_tags = [single_tag]
         total = 1
     elif queue is not None:
@@ -1040,8 +1199,13 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             if t in tank_db:
                 all_tags.append(t)
             else:
-                rec = _tank_record_from_client(t, wot_path)
-                slots_rec, crew_rec = _slots_and_crew_from_client(t, wot_path)
+                try:
+                    rec = _tank_record_from_client(t, wot_path)
+                    slots_rec, crew_rec = _slots_and_crew_from_client(t, wot_path)
+                except Exception as e:
+                    reasons[t] = f"client_parse_fail: {e}"
+                    unknown.append(t)
+                    continue
                 if rec and slots_rec:
                     tank_db[t] = rec
                     _gp.tank_db[t] = rec
@@ -1052,6 +1216,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
                     all_tags.append(t)
                     print(f"[BUILD] {t}: added from client scripts.pkg (tier {rec.get('tier')}, {rec.get('class')})")
                 else:
+                    reasons[t] = "unknown_tank: not found in DB or client scripts.pkg"
                     unknown.append(t)
         total = len(all_tags)
         print(f"[BUILD] Queue: {total} tanks from detection"
@@ -1068,10 +1233,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
 
     if total == 0:
         if unknown:
-            print(f"[BUILD] No tanks to generate (unknown in DB/client: {', '.join(unknown)})")
+            reasons["summary"] = f"no tanks to generate — unknown in DB/client: {', '.join(unknown)}"
+            print(f"[BUILD] {reasons['summary']}")
         else:
             print("[BUILD] All tanks already cached!")
-        return (False, [])
+        return (False, [], reasons)
 
     prog = ({"pass":1,"index":0,"retry":[],"ok_count":0,"fail_count":0}
             if single_tag or queue is not None
@@ -1079,6 +1245,10 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
     ok_count = prog["ok_count"]
     fail_count = prog["fail_count"]
     start_idx = prog["index"]
+    # Stale/out-of-range progress (e.g. from an older queue) must never silently
+    # empty the run — fall back to the beginning.
+    if start_idx >= len(all_tags):
+        start_idx = 0
     to_process = all_tags[start_idx:]
     done_tags = []
 
@@ -1095,12 +1265,16 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             prompt = generate_prompt(tag, tank_name)
             prompt_new = True
         if not prompt or len(prompt) < 50:
-            print(f"    SKIP: no prompt")
-            save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)
+            reasons[tag] = "no_prompt: generate_prompt returned nothing usable"
+            print(f"    [FAIL] {reasons[tag]}")
+            fail_count += 1
+            retry_tags = [tag] + to_process[idx+1:]
+            save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
             continue
 
         # Submit to AI
+        submit_err = None
         try:
             response = _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT)
         except Exception as e:
@@ -1108,7 +1282,8 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             # OS killed the browser). Reconnect ONCE and retry the same tank so
             # the rest of the queue is not lost; a second failure just fails
             # this tank (it returns to the queue via save_progress).
-            print(f"    [RECONNECT] session died ({str(e)[:100]}); recreating driver...")
+            submit_err = str(e)
+            print(f"    [RECONNECT] session died ({submit_err[:100]}); recreating driver...")
             try:
                 driver.quit()
             except Exception:
@@ -1123,11 +1298,13 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             try:
                 response = _submit_to_ai(driver, prompt, timeout=SELENIUM_TIMEOUT)
             except Exception as e2:
-                print(f"    [RECONNECT] second attempt failed ({str(e2)[:100]});"
+                submit_err = str(e2)
+                print(f"    [RECONNECT] second attempt failed ({submit_err[:100]});"
                       f" failing tank {tag}")
                 response = None
         if not response:
-            print(f"    [FAIL] no response")
+            reasons[tag] = "ai_no_response" + (f": {submit_err[:150]}" if submit_err else "")
+            print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
@@ -1137,7 +1314,8 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         # Parse
         build_data = _parse_build_response(response)
         if not build_data or not _is_build_complete(build_data):
-            print(f"    [FAIL] parse fail or incomplete")
+            reasons[tag] = "ai_parse_fail: no build or incomplete parse from AI response"
+            print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
@@ -1157,7 +1335,8 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             done_tags.append(tag)
             save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)
         else:
-            print(f"    [FAIL] upload failed")
+            reasons[tag] = "upload_fail: RTDB write rejected"
+            print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
@@ -1175,7 +1354,24 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         if ok_count > 0:
             _update_builds_version()
         print(f"\n=== Done: {total_cached} cached (ok={ok_count}, fail={fail_count}) ===\n")
-    return (len(done_tags) > 0, done_tags)
+
+    # Every failure must reach the caller with its reason — reported to RTDB
+    # error_reports (admin.html Errors) and embedded in the summary.
+    if reasons:
+        try:
+            from firebase_reporter import report_fallback
+            for tag, reason in list(reasons.items())[:5]:
+                if tag == "summary":
+                    continue
+                report_fallback("admin_generation", tag, reason)
+        except Exception:
+            pass
+        summary = "; ".join(f"{t}={r}" for t, r in list(reasons.items())[:5])
+        if len(reasons) > 5:
+            summary += f" (+{len(reasons)-5} more)"
+        reasons["summary"] = summary
+        print(f"[FAILED] {summary}")
+    return (len(done_tags) > 0, done_tags, reasons)
 
 # ─── Listen mode ────────────────────────────────────
 def listen_mode(tank_db, wot_path=None):
@@ -1232,7 +1428,7 @@ def listen_mode(tank_db, wot_path=None):
             elif admin_st == "generating" and int(now) - int(admin_seen) < 180:
                 print("[SWEEP] skipped - admin app is generating builds")
             else:
-                _run_daily_sweep()
+                _run_daily_sweep(wot_path or "")
 
         # ── Check pending_updates ────────────────────────
         pop = _get_json(_rtdb_url("pending_updates/popular_tanks"))
@@ -1263,15 +1459,19 @@ def listen_mode(tank_db, wot_path=None):
             driver = _create_driver()
             try:
                 _update_pending_status("builds", "generating", progress={"done":0,"total":0,"current":""})
-                ok, done_tags = generate_builds(driver, tank_db, prompts, force=(queue is None), queue=queue,
-                                                wot_path=wot_path)
-                if ok and done_tags:
-                    try:
+                ok, done_tags, reasons = generate_builds(driver, tank_db, prompts, force=(queue is None), queue=queue,
+                                                         wot_path=wot_path)
+                failed = [t for t in (queue or []) if t not in done_tags]
+                try:
+                    if failed:
+                        update_manifest_failures(wot_path or "", ".tank_extract_manifest.json", failed)
+                    if ok and done_tags:
                         update_manifest_for_tags(wot_path, ".tank_extract_manifest.json", done_tags)
-                    except Exception:
-                        pass
+                except Exception:
+                    pass
+                err_msg = reasons.get("summary") or "Generation failed" if reasons else "Generation failed"
                 _update_pending_status("builds", "done" if ok else "error",
-                    "Completed successfully" if ok else "Generation failed")
+                    "Completed successfully" if ok else err_msg)
             except Exception as e:
                 _update_pending_status("builds", "error", str(e))
                 traceback.print_exc()

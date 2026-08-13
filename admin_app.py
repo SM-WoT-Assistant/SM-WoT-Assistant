@@ -22,11 +22,11 @@ sys.path.insert(0, _BUNDLE_DIR)
 from admin_build_generator import (
     detect_changed_tanks, generate_builds, generate_popular,
     load_tank_db, load_prompts, _create_driver,
-    _put_json, _get_json, _rtdb_url, _update_builds_version,
+    _put_json, _get_json, _rtdb_url,
     _update_pending_status, check_wg_tanks_version,
     _WG_API_URL, _is_build_complete,
     check_wg_game_version, snapshot_manifest, update_manifest_for_tags,
-    scan_incomplete_builds
+    update_manifest_failures, exclude_failed_tags, scan_incomplete_builds
 )
 
 BG = "#1a1a1a"
@@ -227,7 +227,7 @@ def _load_uk_translations():
 _ADMIN_SETTINGS_PATH = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "admin_settings.json")
 
 def _load_admin_settings():
-    defaults = {"start_with_windows": False, "start_minimized": False, "wot_path": ""}
+    defaults = {"start_with_windows": False, "start_minimized": True, "wot_path": ""}
     try:
         if os.path.exists(_ADMIN_SETTINGS_PATH):
             with open(_ADMIN_SETTINGS_PATH, "r", encoding="utf-8") as f:
@@ -495,6 +495,7 @@ class AdminApp:
             if st and st.get("status") == "generating":
                 return
             queue = sorted(scan_incomplete_builds().keys())
+            queue = exclude_failed_tags(queue, self._manifest_path, self._wot_path or "")
             if queue:
                 self._log(self.t("log_sweep_queued"))
                 threading.Thread(target=self._do_generate,
@@ -907,10 +908,9 @@ class AdminApp:
         try:
             driver = _create_driver()
             try:
-                ok, done_tags = generate_builds(driver, self.tank_db, self.prompts, queue=queue,
-                                                wot_path=self._wot_path)
+                ok, done_tags, reasons = generate_builds(driver, self.tank_db, self.prompts, queue=queue,
+                                                         wot_path=self._wot_path)
                 if ok and done_tags:
-                    _update_builds_version()
                     self._queue = [t for t in self._queue if t not in done_tags]
                     try:
                         update_manifest_for_tags(self._wot_path, self._manifest_path, done_tags)
@@ -928,10 +928,20 @@ class AdminApp:
                                                 self.t("notif_builds_updated_body", n=len(done_tags)),
                                                 level="info")
                 else:
-                    _update_pending_status("builds", "error", message="generation failed")
-                    self._log(self.t("log_gen_failed"))
+                    failed = [t for t in queue if t not in done_tags]
+                    try:
+                        if failed:
+                            update_manifest_failures(self._wot_path, self._manifest_path, failed)
+                    except Exception:
+                        pass
+                    err_msg = (reasons.get("summary") or "generation failed") if reasons else "generation failed"
+                    for t, r in list(reasons.items())[:5]:
+                        if t != "summary":
+                            self._log(f"  {t}: {r}")
+                    _update_pending_status("builds", "error", message=err_msg[:300])
+                    self._log(self.t("log_gen_failed") + f" — {err_msg[:200]}")
                     self.tray.show_notification(self.t("notif_gen_failed"),
-                                                self.t("notif_gen_failed_body"),
+                                                err_msg[:120],
                                                 level="error")
             finally:
                 driver.quit()
