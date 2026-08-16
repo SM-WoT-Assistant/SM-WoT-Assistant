@@ -21,7 +21,8 @@ class LogWatcher:
         # Регулярний вираз для виявлення завантаження карти (бою)
         # Приклад: Loading space: spaces/01_karelia
         self.arena_re = re.compile(r"Loading space: spaces/(?P<map_id>\w+)")
-        self.hangar_re = re.compile(r"Loading space: spaces/hangar")
+        # Хангар та івент-простори клієнта (hangar, hangar_v4, h33_*, h42_Wot_Bday_2026 і т.д.)
+        self.hangar_re = re.compile(r"Loading space: spaces/(?:hangar\w*|h\d+_\w+)")
         self.arena_type_re = re.compile(r"arenaType = (?P<type>\d+)")
         # Регулярний вираз для мініматп - коли UI готова
         self.minimap_re = re.compile(r"Space is changed: WaitingSpace\(\) -> BattleLoadingSpace\(\)")
@@ -118,8 +119,8 @@ class LogWatcher:
                             match = self.arena_re.search(line)
                             if match:
                                 map_id = match.group("map_id")
-                                # Пропускаємо ангар - це не бій
-                                if not map_id.startswith("hangar"):
+                                # Пропускаємо ангар та івент-простори - це не бій
+                                if not (map_id.startswith("hangar") or re.match(r"h\d+_\w+", map_id)):
                                     if self._last_arena_id != map_id:
                                         self._countdown_fired_for_arena = None
                                     self._last_arena_id = map_id  # Зберігаємо для мініматп

@@ -209,7 +209,7 @@
 **Admin Build Entry:**
 - Location: `build_admin.py`
 - Triggers: `python build_admin.py`
-- Responsibilities: Build `admin_app.py` as `--onedir --windowed` EXE named `SM WoT Assistant Admin` into `dist/SM WoT Assistant Admin/` via PyInstaller with explicit `--add-data` for bundled JSONs, `admin_version.txt`, `admin_uk_seed.json`, `temp_scripts/decoded/tiers_devices_decoded.xml`, plus selenium 4 hidden imports and `--hidden-import deep_translator`; local build only — no GitHub upload, no RTDB publish; version read from `admin_version.txt`
+- Responsibilities: Build `admin_app.py` as `--onedir --windowed` EXE named `SM WoT Assistant Admin` into `dist/SM WoT Assistant Admin/` via PyInstaller with explicit `--add-data` for bundled JSONs, `admin_version.txt`, `admin_uk_seed.json`, `temp_scripts/decoded/tiers_devices_decoded.xml`, plus selenium 4 hidden imports and `--hidden-import deep_translator`; post-build `_internal` guard (`build_admin_exe()` verifies `_internal` exists, is non-empty, and contains `python312.dll` — otherwise `[BUILD] FATAL` + `exit(1)`, guarding against a broken COLLECT that produces a `"Failed to load Python DLL"` bundle; success prints `Admin EXE: X MB, _internal: N entries`); local build only — no GitHub upload, no RTDB publish; version read from `admin_version.txt`
 
 **Admin Desktop App:**
 - Location: `admin_app.py` (class `AdminApp`)
@@ -250,7 +250,7 @@
 
 **Version System:**
 - `VERSION` file at project root contains a plaintext semver string (e.g., `1.0.68`)
-- `admin_version.txt` — independent plaintext semver for the Admin Desktop App (e.g., `1.0.14`); read by `admin_app.py:_read_admin_version()` and `build_admin.py:read_version()`, bundled into the admin EXE via `--add-data`; not tied to main `VERSION`; `firebase_reporter._report_version()` uses it for error-report `version` when the admin EXE is frozen (or when no `VERSION` is bundled)
+- `admin_version.txt` — independent plaintext semver for the Admin Desktop App (e.g., `1.0.16`); read by `admin_app.py:_read_admin_version()` and `build_admin.py:read_version()`, bundled into the admin EXE via `--add-data`; not tied to main `VERSION`; `firebase_reporter._report_version()` uses it for error-report `version` when the admin EXE is frozen (or when no `VERSION` is bundled)
 - `config.load_version()` (`config.py`) reads VERSION and appends `" Beta"` unconditionally — all window titles display `"1.0.68 Beta"`; `build.py` controls the GitHub release title and RTDB `display_version` field with `is_beta=True` unconditionally but does not affect runtime `load_version()`
 
 **Build & Packaging:**

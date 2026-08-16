@@ -1383,8 +1383,6 @@ class WotAssistantHQ:
         }
         ui_mode = mode_map.get(mode, "Standard")
         self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
-        if self.auto_battle_var.get() and self.mode != "edit":
-            self.root.after(0, self.toggle_editor)
 
     def on_battle_ended(self):
         self.save_settings()
@@ -1426,7 +1424,8 @@ class WotAssistantHQ:
             print(f"[BATTLE] EARLY EXIT: log_path empty")
             return
 
-        self.switch_to_maps(2)
+        if self.active_view != "maps" or self.map_mode != 2:
+            self.switch_to_maps(2)
 
         if self.auto_mode_filter_var.get():
             self.selected_battle_mode.set(ui_mode)
