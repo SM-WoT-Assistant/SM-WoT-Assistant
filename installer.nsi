@@ -28,7 +28,8 @@ UninstPage instfiles
 Section "Install"
     SetOutPath "$INSTDIR"
     ; Вбити запущений трей-вочер, бо Windows блокує перезапис .exe
-    ExecWait 'taskkill /f /im "SM WoT Assistant Tray Watcher.exe"'
+    ; nsExec::ExecToStack — прихований запуск консольної програми (ExecWait показує блимання термінала)
+    nsExec::ExecToStack 'taskkill /f /im "SM WoT Assistant Tray Watcher.exe"'
     File /r "dist\SM WoT Assistant\*.*"
     WriteRegStr HKCU "Software\SM WoT Assistant" "installed" "1"
 
