@@ -4,6 +4,23 @@
 
 ---
 
+## Перехід Beta → Alpha у всіх релізах (16.08.2026)
+
+**Рішення користувача:** напис "Beta" замінюється на "Alpha" у цьому та всіх наступних релізах.
+
+**Змінені файли (8):**
+- `config.py:19` — `load_version()` повертає `" Alpha"` замість `" Beta"` (заголовки вікон → "SM WoT Assistant v1.0.69 Alpha")
+- `build.py` — механічний rename `is_beta` → `is_alpha`; `" Beta"` → `" Alpha"` (GitHub release title `v1.0.69 Alpha`, RTDB `display_version`); `_Beta` → `_Alpha` (назви installer/portable: `SM_WoT_Assistant_Setup_v1.0.69_Alpha.exe`); `--prerelease` лишається True (Alpha = prerelease); змінні в snake_case (`alpha_exe`/`alpha_zip`/`alpha_suffix`); докстрінг почищено від застарілого `--beta`
+- `launcher.py:88` + `main.py:2468` — regex EXE-імен приймає `(?: Beta| Alpha)?` (легасі-сумісність; реальні EXE завжди чисті)
+- `firebase_reporter.py:304` — коментар (код `split()[0]` працює з будь-яким суфіксом)
+- `AGENTS.md:54`, `ARCHITECTURE.md` (5 місць), `STRUCTURE.md` (2 місця) — документація оновлена
+
+**Верифікація (#1471):** AST-parse 5 модулів OK; regex-тест 4 кейсів OK; `load_version()` → "1.0.68 Alpha"; кирилиця в коментарях не пошкоджена (0 replacement chars). BOM, доданий PowerShell-ом при write, видалено.
+
+**Реліз:** v1.0.69 Alpha — повний цикл build.py (GitHub release + RTDB publish) + Release Cleanup Protocol (#1497).
+
+---
+
 ## Сайт: скріншоти секцій замість текстових карток + lightbox (16.08.2026)
 
 **Зміни на `public/index.html` (задеплоєно на Firebase Hosting):**

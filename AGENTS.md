@@ -51,7 +51,7 @@
 
 ## Критичні факти (завжди в контексті)
 1. **Шляхи**: config.BASE_DIR (бандл), config.USER_DATA_DIR (%APPDATA%/SM WoT Assistant). **НІКОЛИ не чіпати AppData settings.json** (#1219) — всі фікси геометрії тільки кодом.
-2. **Версії**: VERSION (головна; config.load_version() додає " Beta"), admin_version.txt (адмінка, незалежна). Зміна адмінки після релізу → бамп admin_version.txt (#1446).
+2. **Версії**: VERSION (головна; config.load_version() додає " Alpha"), admin_version.txt (адмінка, незалежна). Зміна адмінки після релізу → бамп admin_version.txt (#1446).
 3. **Білд**: `python build.py X.Y.Z` (головна; кожен білд = GitHub release; брудний git блокує), `python build_admin.py` (адмінка, onedir → dist/SM WoT Assistant Admin/, перед перезбіркою вбити запущену адмінку).
 4. **Мутекси**: SM_WoT_Assistant_SingleInstance, SM_WoT_Assistant_Admin_SingleInstance, SM_WoT_Assistant_TrayWatcher. Патерн: `WinDLL("kernel32", use_last_error=True)` + `get_last_error() == 183` (#1474).
 5. **Мова**: 'uk' (не 'ua'); UI через `app.t('ui', key)`; класи LT/MT/HT/TD/SPG завжди англійською.

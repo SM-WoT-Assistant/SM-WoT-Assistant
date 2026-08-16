@@ -2465,7 +2465,7 @@ if __name__ == "__main__":
     if getattr(sys, 'frozen', False):
         install_dir = os.path.dirname(sys.executable)
         current_name = os.path.basename(sys.executable)
-        exe_pattern = r'SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta)?)\.exe'
+        exe_pattern = r'SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta| Alpha)?)\.exe'
         for f in os.listdir(install_dir):
             if re.match(exe_pattern, f) and f != current_name:
                 try:

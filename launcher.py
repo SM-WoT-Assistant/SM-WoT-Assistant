@@ -85,7 +85,7 @@ class Launcher:
         candidates = []
         try:
             for f in os.listdir(self.install_dir):
-                m = re.match(r"SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta)?)\.exe", f)
+                m = re.match(r"SM WoT Assistant v(\d+\.\d+\.\d+(?: Beta| Alpha)?)\.exe", f)
                 if m:
                     ver_str = m.group(1).split()[0]  # "1.0.38 Beta" -> "1.0.38"
                     candidates.append((tuple(int(n) for n in ver_str.split(".")), m.group(1)))

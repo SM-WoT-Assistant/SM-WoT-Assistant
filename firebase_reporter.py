@@ -301,7 +301,7 @@ def compare_versions(current, latest):
     """Порівнює версії. Повертає True якщо latest > current."""
     try:
         def _parts(v):
-            clean = v.split()[0]  # "1.0.38 Beta" → "1.0.38"
+            clean = v.split()[0]  # "1.0.38 Alpha" → "1.0.38"
             return tuple(int(x) for x in str(clean).replace("v", "").split(".")[:3])
         return _parts(latest) > _parts(current)
     except Exception:
