@@ -1038,6 +1038,14 @@ class WotAssistantHQ:
             self._sync_po_pos()
             self._po_win.lift()
 
+    def _battle_restore_from_tray(self):
+        """Старт бою з трею: показуємо вікно редагування з картою бою незалежно
+        від того, в якому режимі програма була згорнута. Перемикання в бойовий
+        режим відбувається на відліку (countdown) — «перед самим боєм»."""
+        self._restore_from_tray()
+        if self.mode != "edit":
+            self.toggle_editor()
+
     def _on_tray_click(self):
         """Колбек при кліку на іконку в треї"""
         self._restore_from_tray()
@@ -1369,7 +1377,7 @@ class WotAssistantHQ:
 
         if self._unhide_on_battle_var.get() and self._hidden_by_f10:
             self._restored_by_battle = True
-            self._restore_from_tray()
+            self.root.after(0, self._battle_restore_from_tray)
         
         if not self.auto_sync_var.get():
             return

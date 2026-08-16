@@ -85,7 +85,7 @@
 
 **Battle Detection Flow:**
 1. `log_reader.py:LogWatcher._run` tails `python.log` with regex patterns; type-to-mode mapping: 1→ctf (Standard), 2→domination (Encounter), 3→assault (Storm), 4→comp7 (Onslaught), 5→comp7_light (OnslaughtLight)
-2. On map detection → `main.py:on_battle_detected` → auto-sync map selector and battle mode filters
+2. On map detection → `main.py:on_battle_detected` → auto-sync map selector and battle mode filters; when unhidden from tray (`unhide_on_battle`), restores via `_battle_restore_from_tray()` through `root.after(0, ...)` (no Tk from the watcher thread) and always switches to the edit window (`toggle_editor` if mode != edit) so the battle starts with the editing view
 3. On countdown start → `main.py:on_battle_countdown_started` → optionally switch to battle mode (auto-battle)
 4. On vehicle detection → `main.py:on_vehicle_detected` → auto-filter vehicle class
 5. On battle end → `main.py:on_battle_ended` → optionally return to editor with last battle's map
