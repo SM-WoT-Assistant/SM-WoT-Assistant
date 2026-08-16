@@ -24,11 +24,18 @@
         main { max-width: 820px; margin: 0 auto; padding: 40px 24px; }
         section { margin-bottom: 48px; }
         section h2 { font-size: 22px; color: #ffaa00; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #222; }
-        .features { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
-        @media (max-width: 700px) { .features { grid-template-columns: repeat(2, 1fr); } }
-        .feature-card { background: #151515; border-radius: 8px; padding: 18px 14px; border: 1px solid #222; text-align: center; }
-        .feature-card h3 { color: #ff4500; font-size: 16px; margin-bottom: 6px; }
-        .feature-card p { color: #999; font-size: 12px; }
+        .screens { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        @media (max-width: 700px) { .screens { grid-template-columns: 1fr; } }
+        .screen-card { background: #151515; border: 1px solid #222; border-radius: 10px; padding: 16px 14px 18px; text-align: center; }
+        .screen-card img { width: 100%; max-width: 420px; height: auto; border-radius: 8px; cursor: zoom-in; border: 1px solid #2a2a2a; display: block; margin: 0 auto; }
+        .screen-card img:hover { border-color: #ff4500; }
+        .screen-card h3 { color: #ff4500; font-size: 16px; margin: 12px 0 6px; }
+        .screen-card p { color: #999; font-size: 13px; }
+        .screen-card a { color: #7ab; text-decoration: none; }
+        .screen-card a:hover { color: #9cf; }
+        .lightbox { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88); z-index: 1000; align-items: center; justify-content: center; cursor: zoom-out; }
+        .lightbox.open { display: flex; }
+        .lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 8px; border: 1px solid #333; }
         .schemes-hero { background: #111; border: 1px solid #222; border-radius: 10px; padding: 32px 24px; text-align: center; }
         .schemes-hero h3 { color: #ffaa00; font-size: 18px; margin-bottom: 8px; }
         table { width: 100%; border-collapse: collapse; }
@@ -58,23 +65,32 @@
 
 <main>
     <section>
-        <h2>Features</h2>
-        <div class="features">
-            <div class="feature-card">
+        <h2>Screens</h2>
+        <div class="screens">
+            <div class="screen-card">
+                <img src="img/start.webp" alt="Start screen" loading="lazy" width="780" height="919" onclick="openLightbox(this.src)">
+                <h3>Start</h3>
+                <p>Tactical assistant for World of Tanks: maps with coordinate grids, tactical schemes, tank setups and a battle overlay — all in one lightweight app.</p>
+            </div>
+            <div class="screen-card">
+                <img src="img/setup.webp" alt="SETUP screen" loading="lazy" width="782" height="967" onclick="openLightbox(this.src)">
                 <h3>SETUP</h3>
-                <p>AI tank builds via Google Gemini. Equipment, perks, consumables — optimal choice for any vehicle.</p>
+                <p>Recommended tank builds: equipment, crew perks and consumables for every vehicle. Pick your tank and get a ready setup in seconds.</p>
             </div>
-            <div class="feature-card">
+            <div class="screen-card">
+                <img src="img/maps.webp" alt="MAPS screen" loading="lazy" width="785" height="923" onclick="openLightbox(this.src)">
                 <h3>MAPS</h3>
-                <p>60+ in-game maps with 10&times;10 coordinate grid. All data from WoT client, no hardcoding.</p>
+                <p>60+ in-game maps with a 10&times;10 coordinate grid. All map data is extracted from the WoT client — nothing hardcoded.</p>
             </div>
-            <div class="feature-card">
+            <div class="screen-card">
+                <img src="img/tactic.webp" alt="TACTIC screen" loading="lazy" width="780" height="921" onclick="openLightbox(this.src)">
                 <h3>TACTIC</h3>
-                <p>Draw tactical schemes: markers, arrows, text, icons. JSON export/import. Clan publishing.</p>
+                <p>Draw tactical schemes: markers, arrows, text, tree icons. JSON export/import, clan publishing. Map images taken from <a href="https://wotmapsbyyaya.com/maps" target="_blank" rel="noopener">wotmapsbyyaya.com</a>.</p>
             </div>
-            <div class="feature-card">
+            <div class="screen-card">
+                <img src="img/minimap.webp" alt="Battle overlay" loading="lazy" width="516" height="535" onclick="openLightbox(this.src)">
                 <h3>Overlay</h3>
-                <p>Semi-transparent overlay window on top of the game. Auto-detection of map via python.log during battle.</p>
+                <p>Semi-transparent battle overlay on top of the game. Auto-detects the current map and battle mode from the game log during battle.</p>
             </div>
         </div>
     </section>
@@ -98,6 +114,10 @@
     <p>SM WoT Assistant &copy; 2026 &nbsp;&middot;&nbsp;
     <a href="https://sm-wot-assistant.web.app">sm-wot-assistant.web.app</a></p>
 </footer>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <img id="lightbox-img" src="" alt="">
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
@@ -145,6 +165,19 @@ function loadLatestVersion() {
         });
 }
 loadLatestVersion();
+
+function openLightbox(src) {
+    document.getElementById("lightbox-img").src = src;
+    document.getElementById("lightbox").classList.add("open");
+}
+
+function closeLightbox() {
+    document.getElementById("lightbox").classList.remove("open");
+}
+
+document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeLightbox();
+});
 </script>
 
 </body>
