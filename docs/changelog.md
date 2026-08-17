@@ -4,6 +4,23 @@
 
 ---
 
+## Спонсорство: Ko-fi + Monobank банка (17.08.2026)
+
+**Рішення:** Reddit API відмовив у доступі (не вписуємось у політику); Buy Me a Coffee та GitHub Sponsors **не працюють для України** (BMC — тільки Stripe-виплати, України немає в списку; GH Sponsors — Ukraine на waitlist, підтверджено в github discussion #67578). PayPal.me відсутній (обмеження для України).
+
+**Вибрано:** Ko-fi (виплати через PayPal — працює в Україні) + Monobank банка (приймає картки всього світу).
+
+**Зміни:**
+- `.github/FUNDING.yml` (новий) — `ko_fi: smwotassistant` + `custom: ["https://send.monobank.ua/jar/WqyWjTRpy"]` — кнопка Sponsor у репо
+- `public/index.html` — секція "Support the project": Ko-fi віджет (`kofiwidget2`, офіційний скрипт storage.ko-fi.com) + картка Monobank з QR-кодом (`public/img/qr_monobank.png`, згенерований через api.qrserver.com, 600×600)
+- `public/img/qr_monobank.png` (новий) — QR на банку WqyWjTRpy
+- `reddit_post.md` — секція "☕ Support" (Ko-fi, банка, QR) — для ручної публікації в браузері (API немає)
+- Деплой hosting (#1303), main fast-forward + push — FUNDING.yml на default гілці
+
+**Перевірка:** сайт віддає секцію Support + Ko-fi + QR (200 OK), FUNDING.yml у main через GitHub API (75 байт), дерево чисте на api-integration (b96e105).
+
+---
+
 ## Перенесення репозиторію в організацію SM-WoT-Assistant (17.08.2026)
 
 **Зміна:** репозиторій перенесено з `nkcgml-boop/SM-WoT-Assistant` в організацію `SM-WoT-Assistant/SM-WoT-Assistant` (GitHub автоматично редиректить старі URL — старі посилання не зламались).
