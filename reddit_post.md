@@ -39,6 +39,7 @@ The app is free and always will be. If you want to support development, you can:
 - **Ko-fi** — https://ko-fi.com/smwotassistant
 - **Monobank jar** — https://send.monobank.ua/jar/WqyWjTRpy
 - **QR codes** (scan to donate):
+  ![Ko-fi QR](https://sm-wot-assistant.web.app/img/qr_kofi.png)
   ![Monobank QR](https://sm-wot-assistant.web.app/img/qr_monobank.png)
   ![PayPal QR](https://sm-wot-assistant.web.app/img/paypal_qr.png)
 
