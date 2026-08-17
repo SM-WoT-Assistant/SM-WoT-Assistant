@@ -19,6 +19,15 @@
 
 **Перевірка:** сайт віддає секцію Support + Ko-fi + QR (200 OK), FUNDING.yml у main через GitHub API (75 байт), дерево чисте на api-integration (b96e105).
 
+**Доповнення (17.08.2026, коміти 21cf183, 2a99427, ee35a18):**
+- Ko-fi віджет оновлено: `kofiwidget2.init('Support me on Ko-fi', '#f26900', 'T0T1258SJ2')` (ID сторінки з дашборду; vanity-URL лишається `smwotassistant`)
+- Картка PayPal: `public/img/paypal_qr.png` (з `D:\!WORK\WOT\WOTtraner\IN\PayPalQR.png`, QR згенерований самим застосунком PayPal — акаунт nkc@ukr.net)
+- QR Ko-fi: `public/img/qr_kofi.png` (api.qrserver.com, 600×600) — тепер усі 3 картки мають QR
+- Footer: посилання на Reddit профіль `reddit.com/user/SM-WoT-Assistant` (живий, HTTP 200)
+- `reddit_post.md` — 3 QR у секції Support (Ko-fi, Monobank, PayPal); комплект PNG для ручної публікації: `%TEMP%\opencode\reddit_upload\` (5 скріншотів + img_qr + img_kofi + img_paypal)
+- Кнопку "Watch on YouTube" видалено з сайту (iframe відео лишився) — ee35a18
+- Всі зміни сайту задеплоєні та перевірені (200 OK)
+
 ---
 
 ## Перенесення репозиторію в організацію SM-WoT-Assistant (17.08.2026)
