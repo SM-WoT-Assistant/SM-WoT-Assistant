@@ -38,8 +38,9 @@ The app is free and always will be. If you want to support development, you can:
 
 - **Ko-fi** — https://ko-fi.com/smwotassistant
 - **Monobank jar** — https://send.monobank.ua/jar/WqyWjTRpy
-- **QR code** (scan to donate):
+- **QR codes** (scan to donate):
   ![Monobank QR](https://sm-wot-assistant.web.app/img/qr_monobank.png)
+  ![PayPal QR](https://sm-wot-assistant.web.app/img/paypal_qr.png)
 
 ---
 ⚠️ **Important:** set the game to **borderless window mode** before using the overlay!
