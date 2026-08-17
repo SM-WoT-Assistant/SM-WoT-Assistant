@@ -744,7 +744,7 @@ def verify_release_artifacts(version, is_alpha=False):
 
     # 5. Консистентність імен: RTDB download_url співпадає з реальним файлом
     expected_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
-    expected_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
+    expected_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
     print(f"  RTDB URL check: {expected_url}")
     dl_url_check = os.path.join(DIST_DIR, expected_filename)
     if os.path.exists(expected.get("Installer", "")) and os.path.basename(dl_url_check) != os.path.basename(expected.get("Installer", "")):
@@ -866,7 +866,7 @@ def audit_rtdb_entry(version, is_alpha=False):
     """Перевіряє RTDB download_url після запису."""
     alpha_suffix = "_Alpha" if is_alpha else ""
     expected_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
-    expected_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
+    expected_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
 
     try:
         import urllib.request
@@ -925,7 +925,7 @@ def write_version_to_rtdb(version, release_date=None, is_alpha=False):
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
     dl_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
-    dl_url = f"https://github.com/nkcgml-boop/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
+    dl_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
 
     data = json.dumps({
         "version": version,

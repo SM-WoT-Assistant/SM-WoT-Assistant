@@ -4,6 +4,23 @@
 
 ---
 
+## Перенесення репозиторію в організацію SM-WoT-Assistant (17.08.2026)
+
+**Зміна:** репозиторій перенесено з `nkcgml-boop/SM-WoT-Assistant` в організацію `SM-WoT-Assistant/SM-WoT-Assistant` (GitHub автоматично редиректить старі URL — старі посилання не зламались).
+
+**Переналагодження (виконано):**
+- `git remote set-url origin https://github.com/SM-WoT-Assistant/SM-WoT-Assistant.git`
+- `build.py:747,869,928` — hardcoded GitHub шлях у `verify_release_artifacts()` / `audit_rtdb_entry()` / `write_version_to_rtdb()` замінено на новий (AST OK)
+- `public/index.html:63,145` — кнопка Download + `GITHUB_RELEASES` → задеплоєно (`firebase deploy --only hosting`, сайт віддає новий URL)
+- `docs/release.md:78` — команда Release Cleanup Protocol оновлена
+- `reddit_post.md` — посилання оновлено (untracked)
+
+**Не потребувало змін:** RTDB `versions/` (старі `download_url` валідні через redirect, нові білди запишуть новий шлях), лаунчер/auto-update (читає `download_url` з RTDB), asset-імена.
+
+**Перевірка:** `gh api` — репо в організації (public, main, релізи v1.0.66–v1.0.70 на місці), сайт віддає новий URL, старого `nkcgml-boop` у дереві не лишилось.
+
+---
+
 ## Реліз v1.0.70 Alpha (16.08.2026)
 
 **Реліз:** повний цикл build.py (PyInstaller → NSIS → ZIP → verify → manifest → GitHub release → RTDB publish + аудити 4 фаз) — PASSED.

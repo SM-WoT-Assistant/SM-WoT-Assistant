@@ -75,7 +75,7 @@ build.py автоматично комітить VERSION та installer.nsi пі
    ```
 2. **GitHub** — видалити релізи старші 5 останніх (assets видаляються разом з релізом; теги лишаються):
    ```powershell
-   gh api "repos/nkcgml-boop/SM-WoT-Assistant/releases?per_page=100" --jq ".[] | select(.tag_name != \"v1.0.66\") | .id" | ForEach-Object { gh api -X DELETE "repos/nkcgml-boop/SM-WoT-Assistant/releases/$_" }
+   gh api "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases?per_page=100" --jq ".[] | select(.tag_name != \"v1.0.66\") | .id" | ForEach-Object { gh api -X DELETE "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases/$_" }
    ```
 3. **RTDB versions/** — лишити 5 останніх + `latest`, решту PUT null (правило #1470):
    ```python
