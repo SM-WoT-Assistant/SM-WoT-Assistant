@@ -52,6 +52,14 @@
         footer { text-align: center; padding: 40px 24px; color: #555; font-size: 13px; border-top: 1px solid #111; }
         footer a { color: #777; text-decoration: none; }
         footer a:hover { color: #aaa; }
+        .support { display: flex; gap: 20px; flex-wrap: wrap; justify-content: center; }
+        .support-card { background: #151515; border: 1px solid #222; border-radius: 10px; padding: 20px; text-align: center; flex: 1 1 240px; max-width: 320px; }
+        .support-card h3 { color: #ffaa00; font-size: 16px; margin-bottom: 8px; }
+        .support-card p { color: #999; font-size: 13px; margin-bottom: 12px; }
+        .support-card a { color: #7ab; text-decoration: none; }
+        .support-card a:hover { color: #9cf; }
+        .support-card img { width: 160px; height: 160px; border-radius: 8px; border: 1px solid #2a2a2a; display: block; margin: 0 auto; }
+        .support-card img:hover { border-color: #ff4500; }
     </style>
 </head>
 <body>
@@ -116,6 +124,24 @@
             The app automatically checks for new versions on startup. If an update is available, you'll see a notification in the status bar. You can also always download the latest version manually from GitHub.
         </p>
     </section>
+    <section>
+        <h2>Support the project</h2>
+        <div class="support">
+            <div class="support-card">
+                <h3>&#x2615; Ko-fi</h3>
+                <p>Buy me a coffee — one-time or monthly support.</p>
+                <div id="kofi-widget" style="margin-bottom:10px;"></div>
+                <a href="https://ko-fi.com/smwotassistant" target="_blank" rel="noopener">ko-fi.com/smwotassistant</a>
+            </div>
+            <div class="support-card">
+                <h3>&#x1F4B8; Monobank jar</h3>
+                <p>Scan the QR code or open the jar to donate.</p>
+                <a href="https://send.monobank.ua/jar/WqyWjTRpy" target="_blank" rel="noopener">
+                    <img src="img/qr_monobank.png" alt="Monobank jar QR code">
+                </a>
+            </div>
+        </div>
+    </section>
 </main>
 
 <footer>
@@ -126,6 +152,12 @@
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
     <img id="lightbox-img" src="" alt="">
 </div>
+
+<script src='https://storage.ko-fi.com/cdn/widget/Widget_2.js'></script>
+<script>
+    kofiwidget2.init('Support me on Ko-fi', '#29abe0', 'smwotassistant');
+    kofiwidget2.draw('kofi-widget');
+</script>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
