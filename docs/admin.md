@@ -4,6 +4,61 @@
 
 ---
 
+## Community Workspace — плитки, вбудований Chrome-браузер, статистика платформ (18.08.2026, адмінка v1.0.17)
+
+**Що це:** розділ в адмінці для моніторингу соцмереж/донатів/статистики + зашифроване сховище креденціалів.
+
+### 1. Плитки (головне вікно, завжди видимі)
+- Ряд із 5 плиток під статус-баром: **YouTube views | GitHub downloads | Ko-fi total | Installs | Errors**
+- Хінт на плитці (помаранчевий, `⚠`) якщо канал потребує підключення: `needs API key` / `needs login` / `blocked` / `action needed` — текст зі статусу фетча (`_tile_hint`, admin_app.py)
+- Клік по плитці → повноекранний Community-режим на відповідній вкладці
+- Оновлення: RTDB-лічильники 300с, платформи 600с (фоновий цикл `_start_background`; `_fetch_rtdb_counters`/`_refresh_community_background`)
+- У треї: Chrome НЕ працює — `_on_close` вбиває браузер (`_community_kill_browser`); Chrome-фетчі тільки при видимому вікні (`_app_visible()`), HTTP/API джерела працюють і в треї
+
+### 2. Повноекранний Community-режим
+- Кнопка **Community** в топбарі (поруч із ⚙) → `_enter_community()`: `root.attributes("-fullscreen", True)` + overlay-frame `place(relx=0,rely=0,relwidth=1,relheight=1)` поверх звичайного контенту (pack-лейаут не чіпається, `place_forget` при виході; ESC — вихід)
+- Склад: плитки (повторний ряд `_build_tile_strip`) + tk.Notebook (6 вкладок: Overview / YouTube / Reddit / GitHub / Ko-fi / API Keys; ttk clam-тема, Treeview dark) + червоний банер дій + вбудований браузер-фрейм
+- Вкладки з Treeview-списками матеріалів: YouTube (Відео|Дата|Views|Likes|Comments), Reddit (Пост|Дата|Score|Comments), GitHub (Реліз|Дата|Downloads), Ko-fi (сума + останні) — кнопка Refresh на кожній вкладці (`_community_refresh_tab`)
+
+### 3. Вбудований браузер (без окремих вікон)
+- Selenium-Chrome запускається з **постійним профілем** `%APPDATA%/SM WoT Assistant/community_chrome_profile/` (НЕ %TEMP% копія #1542 — цей профіль переживає рестарти, сід 1 раз з реального профілю через `_copy_chrome_profile`)
+- Стартує завжди оф-скрін; у fullscreen — `SetParent(chrome_hwnd, browser_frame.winfo_id())` + WS_CHILD через `_embed_hwnd` (WinAPI), ресайз за Configure-подіями (`_sync_browser_geometry`) — Chrome стає дочірнім вікном адмінки
+- `_find_chrome_hwnd_by_pid` → PowerShell Get-CimInstance (cmdline містить профіль-дир, без `--type=`) → EnumWindows
+- Потік дій: `_community_action_needed(msg)` → трей-балун + червоний банер + хінт плитки (CAPTCHA, потрібен логін); `_community_clear_action()` після розв'язання
+
+### 4. Ланцюг джерел даних (на кожну платформу)
+- **YouTube**: API key з vault → `videos?part=snippet&id=4JlDkM65PxY` → channelId → uploads playlist (`UU`+channelId[2:]) → playlistItems (пагінація) → statistics batch (~12 units/оновлення). Без ключа → Chrome: `/channel/{id}/videos` → `ytInitialData` → `_parse_yt_videos` (2026 формат `lockupViewModel`: title=`metadata.lockupMetadataViewModel.title.content`, views=`contentMetadataViewModel.metadataRows[*].metadataParts[*].text.content`; старий `videoRenderer` теж підтримується; videoId з `/vi/{id}/` thumbnail-URL)
+- **Reddit**: публічний `submitted.json` з UA (перевірка Content-Type — Reddit віддає HTML "blocked") → Chrome фолбек: сесія-чек `_reddit_logged_in` (`reddit.com/api/v1/me`) → автологін `_login_reddit` (vault username/password, selectors: `input[name='username'/'password']`, `button[type=submit]`; CAPTCHA-детект → дія) → парс `<shreddit-post>` атрибутів (score, comment-count, created-timestamp, title з `<h3>`)
+- **Ko-fi**: Chrome: сесія-чек `_kofi_logged_in` (`ko-fi.com/manage/donations`, URL/login-детект) → автологін `_login_kofi` (vault email/password) → `_parse_kofi_amounts` (best-effort: елементи з class*="amount|donation" + валюта) — структура дашборда може мінятись, порожній парс → статус `no_amounts_parsed`
+- **GitHub**: публічний API `api.github.com/repos/SM-WoT-Assistant/SM-WoT-Assistant/releases` → per-release downloads (сума assets), total
+- RTDB лічильники: `installations/` (всього + розбивка по версіях), `error_reports/`, `schemes/`, `users/`, `builds/version` + `last_generated_at`
+- Усі фетчі в daemon-потоках + `root.after(0, ...)`, статус кожного джерела: Loading… / ok / no_key / blocked / needs_* / error (ніколи не падає)
+
+### 5. Зашифроване сховище admin_vault.py (DPAPI)
+- Новий модуль: `CryptProtectData`/`CryptUnprotectData` (crypt32.dll через ctypes, `CRYPTPROTECT_UI_FORBIDDEN`), прив'язка до Windows-акаунта
+- Файл `%APPDATA%/SM WoT Assistant/admin_vault.json`: `{"youtube": {"api_key": "<base64 DPAPI>"}, "reddit": {...}, "kofi": {...}}` — API: `vault_get/vault_set/vault_has/vault_delete_field/vault_delete`
+- Розшифровка лише на вимогу, значення ніколи не логуються; вкладка API Keys (поля `show="*"`, масковані "•••", порожнє поле = видалити) + кнопка **Reset browser data** (kill браузера + видалення профілю)
+- Firebase `admin_creds.json` НЕ зачіпається (#1219-принцип, рішення користувача)
+
+### 6. Логіни
+- Спершу сесії з постійного профілю (куки з реального Chrome при першому сіді); протухли → vault-автологін (Reddit/Ko-fi); Google — ручний (автологін блокується захистом Google, ризик блокування акаунта)
+- Входи зберігаються в профілі → наступний запуск без авторизації (куки протухають на стороні серверів — повторна авторизація раз на кілька місяців норма)
+
+### 7. i18n
+- +83 ключі до `_TR_EN` (185 всього): плитки, вкладки, колонки, статуси, API-ключі, дії, help-секція `h_sec_community` (5 пунктів)
+- `admin_uk_seed.json` оновлено: 183 UK-переклади + свіжий `en_snapshot` (механізм `_load_uk_translations` — нуль Google-запитів на свіжій інсталяції)
+
+### 8. Верифікація (#1471)
+- ast-аудит (2389 рядків) + метод-аудит (53 викликані/88 визначених, 0 missing)
+- Юніт: parsers (ytInitialData обох форматів, shreddit-post, kofi amounts, `_parse_views` EN/UK/RU множники), vault round-trip (DPAPI-шифрування на диску, жодного plaintext)
+- Live smoke (Python 3.12): UI → fullscreen (6 вкладок) → драйвер (постійний профіль) → **SetParent hwnd знайдено і вбудовано** → YouTube сторінка + ytInitialData → GitHub API (6 downloads) → Reddit блок грейс-стан → yt chrome fetch (1 відео, 12 переглядів) → чистий kill
+- Жива проба Reddit-шляху: статус `needs_reddit_creds` + ACTION-сповіщення (без креденціалів у vault)
+
+### 9. Збірка
+- `admin_version.txt` 1.0.16 → **1.0.17**, `python build_admin.py` (Python 3.12, `_internal`-гвард)
+
+---
+
 ## Гвард перебірки + інцидент зламаного dist-бандла (13.08.2026, build_admin.py, адмінка v1.0.16)
 1. **Інцидент**: адмінка не стартувала — bootloader «Failed to load Python DLL ...\dist\SM WoT Assistant Admin\_internal\python312.dll». Причина: `_internal` порожній (0 файлів) + старий EXE в dist — продовження задокументованого в v1.0.14/v1.0.15 блокування dist невидимим хендлом (WinError 32): збірки v1.0.14/15 йшли в `%TEMP%\opencode\admin_build14/15\`, а частковий clean()/COLLECT лишив dist зламаним. Автозапуск HKCU\Run → dist → фейл.
 2. **Фікс**: перебірка v1.0.16 (лок пішов) + **гвард у build_admin.py::build_admin_exe** — перевірка `_internal` (існує, непустий, python312.dll присутній) після білда, інакше `[BUILD] FATAL` + exit(1); успіх друкує `Admin EXE: X MB, _internal: N entries`.

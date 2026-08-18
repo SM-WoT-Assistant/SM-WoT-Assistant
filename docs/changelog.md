@@ -4,6 +4,28 @@
 
 ---
 
+## Community Workspace в адмінці — плитки, вбудований Chrome, статистика, DPAPI-vault (18.08.2026, адмінка v1.0.17)
+
+**Що зроблено:** новий розділ в адмінці (admin_app.py, 1104 → 2389 рядків) + новий модуль admin_vault.py.
+
+1. **Плитки** в головному вікні (YT views | GH downloads | Ko-fi | Installs | Errors) + помаранчеві хінт-повідомлення коли канал потребує підключення (`needs API key` / `needs login` / `blocked` / `action needed`); клік → повноекранний Community-режим.
+2. **Повноекранний режим** (кнопка Community / ESC вихід): плитки + 6 вкладок (Overview / YouTube / Reddit / GitHub / Ko-fi / API Keys) + червоний банер дій + **вбудований браузер**: Selenium-Chrome з постійним профілем `%APPDATA%/SM WoT Assistant/community_chrome_profile/` (сід 1 раз з реального профілю, логини переживають рестарти), у fullscreen вшивається через `SetParent` + WS_CHILD у frame адмінки — жодних окремих вікон; у треї Chrome не працює (kill при мінімізації).
+3. **Ланцюг джерел**: YouTube API (key з vault) → Chrome `ytInitialData` (новий 2026 формат `lockupViewModel` + legacy `videoRenderer`); Reddit `submitted.json` → Chrome (сесія-чек + автологін, CAPTCHA → дія); Ko-fi Chrome автологін → best-effort парс донатів; GitHub публічний API; RTDB лічильники (installations по версіях, errors, schemes, users, builds/version).
+4. **admin_vault.py** — Windows DPAPI-сховище (`CryptProtectData`/`CryptUnprotectData`, ctypes), файл `admin_vault.json` в AppData, service→field, розшифровка на вимогу, ніколи не логується. Вкладка API Keys: YouTube key, Reddit username/password, Ko-fi email/password/client_id/secret/refresh_token (масковані "•••", порожнє поле = видалити) + Reset browser data. Firebase admin_creds.json не зачіпається (рішення користувача).
+5. **Потік дій**: детект капчі/логін-форми → трей-балун + червоний банер + хінт плитки → адмін розв'язує у вбудованому браузері → продовження (поллінг на наступному циклі).
+6. **i18n**: +83 ключі в `_TR_EN` (185), `admin_uk_seed.json` — 183 UK + свіжий en_snapshot (нуль Google-запитів на свіжій інсталяції).
+7. **Верифікація (#1471)**: ast + метод-аудит (0 missing), юніт-тести парсерів (обидва формати ytInitialData, shreddit-post, kofi, `_parse_views` EN/UK/RU) + vault round-trip, живий smoke (Python 3.12): fullscreen 6 вкладок → SetParent hwnd вбудовано → YouTube сторінка + ytInitialData → GitHub 6 downloads → Reddit грейс `needs_reddit_creds` → yt chrome fetch 1 відео (12 переглядів) → чистий kill.
+8. **Збірка**: admin_version.txt → 1.0.17, `python build_admin.py`.
+
+**Примітки для майбутніх сесій:**
+- YouTube 2026: канал-вкладка /videos віддає `lockupViewModel` (title в `metadata.lockupMetadataViewModel.title.content`, статистика в `contentMetadataViewModel.metadataRows[*].metadataParts[*].text.content`, videoId з thumbnail `/vi/{id}/`), старий `videoRenderer` підтримується для сумісності.
+- Смок-тести адмінки ганяти Python 3.12 (`C:\Users\PRO\AppData\Local\Programs\Python\Python312\python.exe`) — selenium 4.41 стоїть там, а `.venv` (3.14) його не має.
+- Reddit публічний `.json` зараз блокується (Content-Type HTML) — Chrome-шлях з логіном обов'язковий; статус грейс-стану перевірено живим запуском.
+- Ko-fi парс — best-effort (`class*="amount|donation"` + валюта); якщо дашборд змінить структуру — статус `no_amounts_parsed`, налаштувати під живе (потрібен вхід з креденціалами користувача).
+- `community_chrome_profile` може розростатись — кнопка Reset browser data на вкладці API Keys.
+
+---
+
 ## Спонсорство: Ko-fi + Monobank банка (17.08.2026)
 
 **Рішення:** Reddit API відмовив у доступі (не вписуємось у політику); Buy Me a Coffee та GitHub Sponsors **не працюють для України** (BMC — тільки Stripe-виплати, України немає в списку; GH Sponsors — Ukraine на waitlist, підтверджено в github discussion #67578). PayPal.me відсутній (обмеження для України).

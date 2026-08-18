@@ -6,10 +6,11 @@ auto-generates builds via AI Mode, notifies on results.
 Usage:
   python admin_app.py --wot-path="C:/Games/World_of_Tanks_EU"
 """
-import os, sys, json, time, re, threading, shutil, datetime, tkinter as tk
+import os, sys, json, time, re, threading, shutil, datetime, subprocess, tkinter as tk
 from tkinter import ttk, scrolledtext
 import ctypes
 from ctypes import wintypes
+import webbrowser
 
 if getattr(sys, 'frozen', False):
     _BUNDLE_DIR = sys._MEIPASS
@@ -19,6 +20,8 @@ else:
 os.chdir(_BUNDLE_DIR)
 sys.path.insert(0, _BUNDLE_DIR)
 
+import requests
+
 from admin_build_generator import (
     detect_changed_tanks, generate_builds, generate_popular,
     load_tank_db, load_prompts, _create_driver,
@@ -26,8 +29,11 @@ from admin_build_generator import (
     _update_pending_status, check_wg_tanks_version,
     _WG_API_URL, _is_build_complete,
     check_wg_game_version, snapshot_manifest, update_manifest_for_tags,
-    update_manifest_failures, exclude_failed_tags, scan_incomplete_builds
+    update_manifest_failures, exclude_failed_tags, scan_incomplete_builds,
+    _kill_chrome_matching, _copy_chrome_profile, CHROME_PROFILE,
+    CHROME_PROFILE_DIR, _DRIVER_RETRY_MARKERS
 )
+from admin_vault import (vault_get, vault_set, vault_has, vault_delete_field)
 
 BG = "#1a1a1a"
 BG2 = "#222222"
@@ -147,6 +153,90 @@ _TR_EN = {
     "h_log_newest_d": "Newest messages appear at the top; older ones move down.",
     "h_log_copy_d": "Right-click the log to copy a message (Copy / Select All).",
     "h_f1_d": "Press F1 to open this help at any time.",
+    # ── Community & Stats ──
+    "btn_community": "Community",
+    "comm_fs_hint": "ESC — exit fullscreen",
+    "tile_youtube": "YouTube",
+    "tile_github": "GitHub",
+    "tile_kofi": "Ko-fi",
+    "tile_installs": "Installs",
+    "tile_errors": "Errors",
+    "tile_needs_key": "⚠ needs API key",
+    "tile_needs_creds": "⚠ needs credentials",
+    "tile_needs_login": "⚠ needs login",
+    "tile_blocked": "⚠ blocked",
+    "tile_action": "⚠ action needed",
+    "tile_error": "⚠ error",
+    "tab_overview": "Overview",
+    "tab_youtube": "YouTube",
+    "tab_reddit": "Reddit",
+    "tab_github": "GitHub",
+    "tab_kofi": "Ko-fi",
+    "tab_apikeys": "API Keys",
+    "ov_social": "Social networks",
+    "ov_donations": "Donations",
+    "ov_rtdb": "Service counters (RTDB)",
+    "ov_sources": "Data sources status",
+    "ov_installs": "Installations",
+    "ov_installs_by_ver": "by version",
+    "ov_errors": "Errors",
+    "ov_schemes": "Schemes",
+    "ov_users": "Users",
+    "ov_builds_ver": "Builds version",
+    "ov_last_gen": "Last generation",
+    "st_ok": "OK",
+    "st_no_key": "no API key — Chrome fallback",
+    "st_not_conf": "not configured",
+    "st_loading": "Loading...",
+    "st_error": "error",
+    "st_blocked": "blocked",
+    "st_updated": "updated {time}",
+    "st_paypal_qr": "QR on website only",
+    "btn_refresh": "Refresh",
+    "btn_save_keys": "Save",
+    "btn_reset_browser": "Reset browser data",
+    "col_video": "Video",
+    "col_date": "Date",
+    "col_views": "Views",
+    "col_likes": "Likes",
+    "col_comments": "Comments",
+    "col_post": "Post",
+    "col_score": "Score",
+    "col_release": "Release",
+    "col_downloads": "Downloads",
+    "col_amount": "Amount",
+    "col_type": "Type",
+    "key_youtube_api": "YouTube Data API key",
+    "key_reddit_user": "Reddit username",
+    "key_reddit_pass": "Reddit password",
+    "key_kofi_email": "Ko-fi email",
+    "key_kofi_pass": "Ko-fi password",
+    "key_kofi_client_id": "Ko-fi client ID",
+    "key_kofi_secret": "Ko-fi client secret",
+    "key_kofi_token": "Ko-fi refresh token",
+    "key_saved": "Credentials saved (DPAPI encrypted)",
+    "key_clear": "Empty field = remove saved value",
+    "act_action_needed": "Action needed",
+    "act_captcha": "CAPTCHA detected — solve it in the embedded browser",
+    "act_login_google": "Log in to Google in the embedded browser (YouTube session)",
+    "act_login_reddit": "Reddit session expired — log in",
+    "act_login_kofi": "Ko-fi session expired — log in",
+    "notif_community_action": "Community — action needed",
+    "st_yt_manual_login": "Google login is manual (auto-login is blocked by Google security)",
+    "log_comm_start": "Community: browser started",
+    "log_comm_kill": "Community: browser stopped",
+    "log_comm_reset": "Community: browser data reset",
+    "log_comm_error": "Community refresh error: {err}",
+    "log_yt_ok": "YouTube: {n} videos",
+    "log_red_ok": "Reddit: {n} posts",
+    "log_gh_ok": "GitHub: {n} releases, {dl} downloads",
+    "log_kofi_ok": "Ko-fi: {n} donations, total {total}",
+    "h_sec_community": "Community",
+    "h_comm_tiles_d": "The tile strip shows overall stats: YouTube views, GitHub downloads, Ko-fi donations, installations and errors. Click a tile to open the Community view.",
+    "h_comm_fs_d": "The Community button or a tile click opens fullscreen Community: tiles, per-platform stats tables and the embedded Chrome browser (no separate windows appear).",
+    "h_comm_login_d": "Reddit and Ko-fi log in automatically with vault credentials; Google login is manual. If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
+    "h_comm_vault_d": "API keys and passwords are stored encrypted with Windows DPAPI in admin_vault.json (AppData). They are decrypted only on demand and never logged.",
+    "h_comm_profile_d": "Logins persist in the dedicated community Chrome profile (community_chrome_profile). You do not need to re-authorize after a restart; reset it with 'Reset browser data'.",
 }
 
 _SHIELD_TOKENS = [
@@ -269,6 +359,230 @@ def _read_admin_version():
             return f.read().strip()
     except:
         return "0.0.0"
+
+
+# ── Community & Stats ─────────────────────────────
+_COMMUNITY_PROFILE_DIR = os.path.join(os.environ.get("APPDATA", "."),
+                                      "SM WoT Assistant", "community_chrome_profile")
+_YT_VIDEO_ID = "4JlDkM65PxY"
+_YT_API = "https://www.googleapis.com/youtube/v3"
+_GITHUB_REPO = "SM-WoT-Assistant/SM-WoT-Assistant"
+_GITHUB_API = f"https://api.github.com/repos/{_GITHUB_REPO}"
+_REDDIT_USER = "SM-WoT-Assistant"
+_UA = "SM-WoT-Assistant-Admin/1.0"
+_APP_DATA_DIR = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
+
+_GWL_STYLE = -16
+_WS_POPUP = 0x80000000
+_WS_CHILD = 0x40000000
+_SWP_FRAMECHANGED = 0x0020
+_SWP_SHOWWINDOW = 0x0040
+_SWP_NOZORDER = 0x0004
+
+
+def _fmt_num(n):
+    try:
+        n = int(n)
+    except Exception:
+        return "—"
+    if n >= 1000000:
+        return "%.1fM" % (n / 1000000.0)
+    if n >= 1000:
+        return "%.1fK" % (n / 1000.0)
+    return str(n)
+
+
+def _fmt_money(v):
+    try:
+        return "%.2f" % float(v)
+    except Exception:
+        return "—"
+
+
+def _parse_views(txt):
+    """'12K views' / '11 тис. переглядів' / '1,2 млн' / '450' → int. Returns 0 on garbage."""
+    m = re.search(r"([\d\s.,\u00a0]+)\s*((?:тис|тыс|млн|млрд|[KMBкмл])\w*)?", str(txt), re.I)
+    if not m:
+        return 0
+    try:
+        n = float(m.group(1).replace("\u00a0", "").replace(" ", "").replace(",", "."))
+    except Exception:
+        return 0
+    suffix = (m.group(2) or "").lower()
+    word = suffix if suffix in ("тис", "тыс", "млн", "млрд") else suffix[:1]
+    mult = {"тис": 1000, "тыс": 1000, "млн": 1000000, "млрд": 1000000000,
+            "k": 1000, "m": 1000000, "b": 1000000000,
+            "к": 1000, "м": 1000000, "л": 1000000000}.get(word, 1)
+    return int(n * mult)
+
+
+def _safe_int(v, default=0):
+    try:
+        return int(v)
+    except Exception:
+        return default
+
+
+def _yt_initial_data(html):
+    m = re.search(r"var ytInitialData = ({.*?});(?:</script>|var )", html, re.S)
+    if not m:
+        return None
+    try:
+        return json.loads(m.group(1))
+    except Exception:
+        return None
+
+
+def _parse_yt_videos(data):
+    """Extract video list from ytInitialData (channel /videos tab).
+
+    Handles both legacy videoRenderer and the 2026 lockupViewModel layout:
+    title = metadata.lockupMetadataViewModel.title.content,
+    stats = metadata...contentMetadataViewModel.metadataRows[*].metadataParts[*].text.content.
+    """
+    videos = []
+    try:
+        tabs = data["contents"]["twoColumnBrowseResultsRenderer"]["tabs"]
+        items = []
+        for tab in tabs:
+            cont = tab.get("tabRenderer", {}).get("content", {})
+            if "richGridRenderer" in cont:
+                items = cont["richGridRenderer"]["contents"]
+            elif "sectionListRenderer" in cont:
+                for sec in cont["sectionListRenderer"]["contents"]:
+                    items += sec.get("itemSectionRenderer", {}).get("contents", [])
+            else:
+                continue
+            break
+        for it in items:
+            content = it.get("richItemRenderer", {}).get("content", {}) if "richItemRenderer" in it else it
+            vr = content.get("videoRenderer")
+            lv = content.get("lockupViewModel")
+            if not vr and not lv:
+                continue
+            if vr:
+                vid = vr.get("videoId", "")
+                title = "".join(r.get("text", "") for r in (vr.get("title", {}).get("runs") or []))
+                views_txt = (vr.get("viewCountText", {}).get("simpleText") or
+                             "".join(r.get("text", "") for r in (vr.get("viewCountText", {}).get("runs") or [])))
+                date_txt = (vr.get("publishedTimeText", {}).get("simpleText") or "")
+            else:
+                lm = (lv.get("metadata", {}).get("lockupMetadataViewModel") or {})
+                title = ((lm.get("title") or {}).get("content") or "").strip()
+                parts = []
+                for row in (lm.get("metadata") or {}).get("contentMetadataViewModel", {}).get("metadataRows", []):
+                    for mp in row.get("metadataParts", []):
+                        t = ((mp.get("text") or {}).get("content") or "").strip()
+                        if t:
+                            parts.append(t)
+                views_txt = parts[0] if parts else ""
+                date_txt = parts[1] if len(parts) > 1 else ""
+                img = (lv.get("contentImage") or {}).get("thumbnailViewModel", {}).get("image", {}).get("sources") or []
+                m = re.search(r"/vi/([A-Za-z0-9_-]{11})/", img[0].get("url", "")) if img else None
+                vid = m.group(1) if m else ""
+            videos.append({"id": vid, "title": title, "date": date_txt,
+                           "views": _parse_views(views_txt), "views_txt": views_txt,
+                           "likes": 0, "comments": 0})
+    except Exception:
+        pass
+    return videos
+
+
+def _parse_reddit_html(html):
+    """Extract posts from shreddit-feed HTML (user profile page)."""
+    posts = []
+    for attrs_str, body in re.findall(r"<shreddit-post\b([^>]*)>(.*?)</shreddit-post>", html, re.S):
+        attrs = dict(re.findall(r'([a-z0-9-]+)="([^"]*)"', attrs_str))
+        title = ""
+        mt = re.search(r"<h3[^>]*>(.*?)</h3>", body, re.S)
+        if mt:
+            title = re.sub(r"<[^>]+>", "", mt.group(1)).strip()
+        ts = attrs.get("created-timestamp", "")
+        posts.append({"title": title, "date": ts[:10] if len(ts) >= 10 else "",
+                      "score": _safe_int(attrs.get("score")),
+                      "comments": _safe_int(attrs.get("comment-count")),
+                      "url": "https://www.reddit.com" + attrs.get("permalink", "")})
+    return posts
+
+
+def _parse_kofi_amounts(html):
+    """Best-effort donation amount extraction from Ko-fi dashboard HTML."""
+    amounts = []
+    for m in re.finditer(r'<[^>]+class="[^"]*(?:amount|donation)[^"]*"[^>]*>\s*([€£$¥]\s*[\d.,]+)\s*<',
+                         html, re.I):
+        txt = re.sub(r"[^\d.,]", "", m.group(1)).replace(",", ".")
+        try:
+            amounts.append(float(txt))
+        except Exception:
+            pass
+    return amounts
+
+
+def _chrome_main_pid(profile_dir):
+    """PID of the main chrome.exe browser process for a profile dir
+    (the process without --type= holds the top-level window)."""
+    pat = profile_dir.replace("'", "''")
+    q = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+         "Where-Object {{ $_.CommandLine -like '*{0}*' -and $_.CommandLine -notlike '*--type=*' }} | "
+         "Select-Object -First 1 -ExpandProperty ProcessId").format(pat)
+    try:
+        out = subprocess.run(["powershell", "-NoProfile", "-Command", q],
+                             capture_output=True, text=True, timeout=20)
+        pid = out.stdout.strip()
+        return int(pid) if pid.isdigit() else None
+    except Exception:
+        return None
+
+
+def _find_hwnd_by_pid(pid):
+    """Top-level window HWNDs belonging to a PID."""
+    result = []
+    EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def _cb(hwnd, lparam):
+        pid_out = wintypes.DWORD()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid_out))
+        if pid_out.value == pid:
+            result.append(hwnd)
+        return True
+
+    try:
+        ctypes.windll.user32.EnumWindows(EnumProc(_cb), 0)
+    except Exception:
+        pass
+    for h in result:
+        if ctypes.windll.user32.IsWindowVisible(h):
+            return h
+    return result[-1] if result else None
+
+
+def _embed_hwnd(hwnd, parent_hwnd, w, h):
+    """Reparent a Chrome window into a tkinter frame (no stray windows)."""
+    user32 = ctypes.windll.user32
+    user32.SetParent.argtypes = [wintypes.HWND, wintypes.HWND]
+    user32.SetParent.restype = wintypes.HWND
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongPtrW.restype = ctypes.c_void_p
+    user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+    user32.SetWindowLongPtrW.restype = ctypes.c_void_p
+    user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, ctypes.c_int, wintypes.UINT]
+    user32.SetParent(hwnd, parent_hwnd)
+    style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
+    user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style & ~_WS_POPUP) | _WS_CHILD)
+    user32.SetWindowPos(hwnd, 0, 0, 0, w, h,
+                        _SWP_FRAMECHANGED | _SWP_SHOWWINDOW | _SWP_NOZORDER)
+
+
+def _move_hwnd(hwnd, x, y, w, h):
+    user32 = ctypes.windll.user32
+    user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
+                                    ctypes.c_int, ctypes.c_int, wintypes.UINT]
+    try:
+        user32.SetWindowPos(hwnd, 0, x, y, w, h,
+                            _SWP_SHOWWINDOW | _SWP_NOZORDER)
+    except Exception:
+        pass
 
 class AdminTray:
     def __init__(self, parent):
@@ -435,6 +749,17 @@ class AdminApp:
         self.prompts = load_prompts()
         self.tray = AdminTray(self)
 
+        self._community = {
+            "driver": None, "visible": False, "hwnd": None,
+            "yt_channel_id": None, "fs": False, "refreshing": False,
+            "action": None, "last_comm": 0.0, "last_rtdb": 0.0,
+            "stats": {"youtube": None, "reddit": None, "github": None, "kofi": None,
+                      "installs": None, "installs_by_ver": {}, "errors": None,
+                      "schemes": None, "users": None, "builds_ver": None,
+                      "last_generated_at": None},
+            "status": {"youtube": "idle", "reddit": "idle", "github": "idle", "kofi": "idle"},
+        }
+
         self._build_ui()
         self._log(self.t("log_started", path=self._wot_path or self.t("not_set")))
         self._log(self.t("log_tanks_prompts", tanks=len(self.tank_db), prompts=len(self.prompts)))
@@ -444,6 +769,7 @@ class AdminApp:
         threading.Thread(target=self._report_admin_status,
                          kwargs={"status": "idle"}, daemon=True).start()
         self._start_background()
+        self.root.after(8000, self._refresh_community_background)
 
     def _report_admin_status(self, status=None):
         """Publish admin app info to RTDB admin_app/ node (fire-and-forget)."""
@@ -530,6 +856,12 @@ class AdminApp:
                 w.config(text=self.t(key))
             except Exception:
                 pass
+        if hasattr(self, "_nb"):
+            for name, ix in getattr(self, "_tab_ix", {}).items():
+                try:
+                    self._nb.tab(ix, text=self.t("tab_" + name))
+                except Exception:
+                    pass
         self._update_cards()
 
     def _show_help(self):
@@ -587,6 +919,13 @@ class AdminApp:
         L.append("\u2022 " + self.t("h_log_newest_d"))
         L.append("\u2022 " + self.t("h_log_copy_d"))
         L.append("\u2022 " + self.t("h_f1_d"))
+        L.append("")
+        L.append("== " + self.t("h_sec_community") + " ==")
+        L.append("\u2022 " + self.t("h_comm_tiles_d"))
+        L.append("\u2022 " + self.t("h_comm_fs_d"))
+        L.append("\u2022 " + self.t("h_comm_login_d"))
+        L.append("\u2022 " + self.t("h_comm_vault_d"))
+        L.append("\u2022 " + self.t("h_comm_profile_d"))
         return "\n".join(L)
 
     def _resolve_wot_path(self, cli_wot_path):
@@ -673,11 +1012,22 @@ class AdminApp:
                                    cursor="hand2", command=self._toggle_lang)
         self._lang_btn.pack(side="right", padx=(0, 8))
 
+        self._comm_btn = tk.Button(top, text=self.t("btn_community"), font=("Segoe UI", 9, "bold"),
+                                   bg=BG, fg="#88cc88", bd=0, cursor="hand2",
+                                   command=self._toggle_community)
+        self._comm_btn.pack(side="right", padx=(0, 8))
+        self._tr_widgets.append((self._comm_btn, "btn_community"))
+
         # Status bar
         self.status_lbl = tk.Label(self.root, text=self.t("status_init"), font=("Segoe UI", 10),
                                    fg="#888888", bg=BG, anchor="w")
         self.status_lbl.pack(fill="x", padx=12, pady=(0, 4))
         self._tr_widgets.append((self.status_lbl, "status_init"))
+
+        # Community tiles (overall stats, click → fullscreen Community view)
+        self._tiles = self._build_tile_strip(self.root)
+        self._tiles["frame"].pack(fill="x", padx=12, pady=(0, 4))
+        self._update_tiles()
 
         # Main content
         content = tk.Frame(self.root, bg=BG)
@@ -800,6 +1150,953 @@ class AdminApp:
         q = len(self._queue)
         self._card_queue.config(text=str(q), fg=ACCENT if q > 0 else "#888")
         self._card_last.config(text=time.strftime("%H:%M") if self._last_scan > 0 else "—")
+
+    # ── Community & Stats ──────────────────────────
+    def _build_tile_strip(self, parent):
+        frame = tk.Frame(parent, bg=BG)
+        tiles = {"frame": frame, "vals": {}, "hints": {}}
+
+        def _tile(key, tab):
+            f = tk.Frame(frame, bg=BG2, bd=1, relief="solid", highlightbackground="#333",
+                         cursor="hand2")
+            f.pack(side="left", padx=(0, 6), fill="x", expand=True)
+            t = tk.Label(f, text=self.t("tile_" + key), font=("Segoe UI", 8), fg="#888", bg=BG2)
+            t.pack(anchor="w", padx=6, pady=(4, 0))
+            v = tk.Label(f, text="—", font=("Segoe UI", 13, "bold"), fg=ACCENT, bg=BG2)
+            v.pack(anchor="w", padx=6)
+            h = tk.Label(f, text="", font=("Segoe UI", 7), fg="#ffaa00", bg=BG2)
+            h.pack(anchor="w", padx=6, pady=(0, 3))
+            for wdg in (f, t, v, h):
+                wdg.bind("<Button-1>", lambda e, tb=tab: self._open_community_tab(tb))
+            self._tr_widgets.append((t, "tile_" + key))
+            tiles["vals"][key] = v
+            tiles["hints"][key] = h
+
+        _tile("youtube", "youtube")
+        _tile("github", "github")
+        _tile("kofi", "kofi")
+        _tile("installs", "overview")
+        _tile("errors", "overview")
+        return tiles
+
+    def _tile_hint(self, status):
+        if status in (None, "ok", "idle", "hidden"):
+            return ""
+        if status == "no_key":
+            return self.t("tile_needs_key")
+        if status == "blocked":
+            return self.t("tile_blocked")
+        if "captcha" in status:
+            return self.t("tile_action")
+        if status.startswith("needs_"):
+            return self.t("tile_needs_login")
+        return self.t("tile_error")
+
+    def _update_tiles(self):
+        st = self._community["stats"]
+        status = self._community["status"]
+        for strip in (getattr(self, "_tiles", None), getattr(self, "_tiles_fs", None)):
+            if not strip:
+                continue
+            vals, hints = strip["vals"], strip["hints"]
+            yt = st.get("youtube")
+            ytv = 0
+            if yt and yt.get("channel", {}).get("views"):
+                ytv = yt["channel"]["views"]
+            elif yt and yt.get("videos"):
+                ytv = sum(v.get("views", 0) for v in yt["videos"])
+            vals["youtube"].config(text=_fmt_num(ytv) if ytv else "—")
+            hints["youtube"].config(text=self._tile_hint(status.get("youtube")))
+            gh = st.get("github")
+            vals["github"].config(text=_fmt_num(gh.get("total")) if gh else "—")
+            hints["github"].config(text="")
+            kf = st.get("kofi")
+            vals["kofi"].config(text=_fmt_money(kf.get("total")) if kf else "—")
+            hints["kofi"].config(text=self._tile_hint(status.get("kofi")))
+            vals["installs"].config(text=str(st.get("installs")) if st.get("installs") is not None else "—")
+            hints["installs"].config(text="")
+            vals["errors"].config(text=str(st.get("errors")) if st.get("errors") is not None else "—")
+            hints["errors"].config(text="")
+
+    def _open_community_tab(self, tab):
+        if not self._community.get("fs"):
+            self._enter_community()
+        self.root.after(250, lambda: self._select_tab(tab))
+
+    def _select_tab(self, tab):
+        if hasattr(self, "_nb"):
+            try:
+                self._nb.select(self._tab_ix.get(tab, 0))
+            except Exception:
+                pass
+
+    def _toggle_community(self):
+        if self._community.get("fs"):
+            self._exit_community()
+        else:
+            self._enter_community()
+
+    def _enter_community(self):
+        if self._community.get("fs"):
+            return
+        self._community["fs"] = True
+        if not hasattr(self, "_comm_root"):
+            self._build_community_ui()
+        self._comm_root.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self.root.attributes("-fullscreen", True)
+        self.root.focus_force()
+        self.root.bind("<Escape>", lambda e: self._exit_community())
+        self.root.after(500, self._community_show_browser)
+        self._update_comm_tabs()
+
+    def _exit_community(self):
+        if not self._community.get("fs"):
+            return
+        self._community["fs"] = False
+        self.root.attributes("-fullscreen", False)
+        try:
+            self._comm_root.place_forget()
+        except Exception:
+            pass
+        self.root.unbind("<Escape>")
+        self._community_move_browser_offscreen()
+        self._community_clear_action()
+
+    def _build_community_ui(self):
+        self._comm_root = tk.Frame(self.root, bg=BG)
+        hdr = tk.Frame(self._comm_root, bg=BG)
+        hdr.pack(fill="x", padx=12, pady=(8, 0))
+        tk.Label(hdr, text=self.t("comm_fs_hint"), font=("Segoe UI", 8), fg="#666", bg=BG).pack(side="left")
+        self._tiles_fs = self._build_tile_strip(self._comm_root)
+        self._tiles_fs["frame"].pack(fill="x", padx=12, pady=(4, 4))
+        self._update_tiles()
+        style = ttk.Style()
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+        style.configure("TNotebook", background=BG, borderwidth=0)
+        style.configure("TNotebook.Tab", background="#333", foreground=FG,
+                        padding=[10, 4], font=("Segoe UI", 9))
+        style.map("TNotebook.Tab", background=[("selected", ACCENT)],
+                  foreground=[("selected", "#000")])
+        style.configure("Treeview", background="#111111", fieldbackground="#111111",
+                        foreground=FG, borderwidth=0, rowheight=22, font=("Segoe UI", 9))
+        style.configure("Treeview.Heading", background="#333", foreground=FG,
+                        font=("Segoe UI", 9, "bold"))
+        style.map("Treeview", background=[("selected", "#444")], foreground=[("selected", FG)])
+        self._nb = ttk.Notebook(self._comm_root)
+        self._nb.pack(fill="both", expand=True, padx=12, pady=(4, 0))
+        self._tab_status = {}
+        self._trees = {}
+        self._tab_ix = {}
+        ov = tk.Frame(self._nb, bg=BG)
+        self._nb.add(ov, text=self.t("tab_overview"))
+        self._tab_ix["overview"] = 0
+        self._build_overview_tab(ov)
+        defs = [
+            ("youtube", ("video", "date", "views", "likes", "comments")),
+            ("reddit", ("post", "date", "score", "comments")),
+            ("github", ("release", "date", "downloads")),
+            ("kofi", ("date", "amount", "type")),
+        ]
+        i = 1
+        for name, cols in defs:
+            tab = tk.Frame(self._nb, bg=BG)
+            self._nb.add(tab, text=self.t("tab_" + name))
+            self._tab_ix[name] = i
+            i += 1
+            top = tk.Frame(tab, bg=BG)
+            top.pack(fill="x", padx=8, pady=(6, 2))
+            st = tk.Label(top, text=self.t("st_loading"), font=("Segoe UI", 9), fg="#888", bg=BG)
+            st.pack(side="left")
+            self._tab_status[name] = st
+            tk.Button(top, text=self.t("btn_refresh"), bg="#333", fg=FG, bd=0,
+                      padx=10, pady=2, cursor="hand2",
+                      command=lambda n=name: self._community_refresh_tab(n)).pack(side="right")
+            tree_f, tree = self._make_tree(tab, cols)
+            tree_f.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+            self._trees[name] = tree
+        ak = tk.Frame(self._nb, bg=BG)
+        self._nb.add(ak, text=self.t("tab_apikeys"))
+        self._tab_ix["apikeys"] = i
+        self._build_apikeys_tab(ak)
+        self._banner_lbl = tk.Label(self._comm_root, text="", bg="#1a1a1a", fg="#ffaaaa",
+                                    font=("Segoe UI", 10, "bold"))
+        self._banner_lbl.pack(fill="x", padx=12, pady=(4, 0))
+        self._browser_frame = tk.Frame(self._comm_root, bg="#000")
+        self._browser_frame.pack(fill="both", expand=True, padx=12, pady=6)
+        self._browser_frame.bind("<Configure>", self._on_browser_frame_configure)
+        self._update_comm_tabs()
+
+    def _make_tree(self, parent, cols):
+        widths = {"video": 340, "date": 100, "views": 80, "likes": 70, "comments": 80,
+                  "post": 360, "score": 70, "release": 150, "downloads": 100,
+                  "amount": 100, "type": 120}
+        frame = tk.Frame(parent, bg=BG)
+        tree = ttk.Treeview(frame, columns=cols, show="headings", height=10)
+        for c in cols:
+            tree.heading(c, text=self.t("col_" + c))
+            tree.column(c, width=widths.get(c, 120), anchor="w" if c in ("video", "post", "release") else "e")
+        vsb = ttk.Scrollbar(frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=vsb.set)
+        tree.pack(side="left", fill="both", expand=True)
+        vsb.pack(side="right", fill="y")
+        return frame, tree
+
+    def _build_overview_tab(self, parent):
+        self._ov_labels = {}
+        body = tk.Frame(parent, bg=BG)
+        body.pack(fill="both", expand=True, padx=10, pady=8)
+        tk.Label(body, text=self.t("ov_social"), font=("Segoe UI", 10, "bold"),
+                 fg=ACCENT, bg=BG).pack(anchor="w")
+        row = tk.Frame(body, bg=BG)
+        row.pack(anchor="w", pady=(2, 8))
+
+        def _link(txt, url):
+            tk.Button(row, text=txt, bg="#333", fg=FG, bd=0, padx=10, pady=3, cursor="hand2",
+                      command=lambda: webbrowser.open(url)).pack(side="left", padx=(0, 6))
+
+        _link("YouTube", "https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
+        _link("Reddit", "https://www.reddit.com/user/" + _REDDIT_USER + "/")
+        _link("GitHub", "https://github.com/" + _GITHUB_REPO + "/releases")
+        _link("Website", "https://sm-wot-assistant.web.app")
+        tk.Label(body, text=self.t("ov_donations"), font=("Segoe UI", 10, "bold"),
+                 fg=ACCENT, bg=BG).pack(anchor="w")
+        row2 = tk.Frame(body, bg=BG)
+        row2.pack(anchor="w", pady=(2, 4))
+        _link("Ko-fi", "https://ko-fi.com/smwotassistant")
+        _link("Monobank", "https://send.monobank.ua/jar/WqyWjTRpy")
+        tk.Label(row2, text="PayPal — " + self.t("st_paypal_qr"), font=("Segoe UI", 9),
+                 fg="#888", bg=BG).pack(side="left", padx=(6, 0))
+        tk.Label(body, text=self.t("ov_rtdb"), font=("Segoe UI", 10, "bold"),
+                 fg=ACCENT, bg=BG).pack(anchor="w", pady=(8, 2))
+        grid = tk.Frame(body, bg=BG)
+        grid.pack(anchor="w")
+        defs = [("installs", "ov_installs"), ("errors", "ov_errors"), ("schemes", "ov_schemes"),
+                ("users", "ov_users"), ("builds_ver", "ov_builds_ver"), ("last_gen", "ov_last_gen")]
+        for idx, (key, lkey) in enumerate(defs):
+            cell = tk.Frame(grid, bg=BG2, bd=1, relief="solid", highlightbackground="#333")
+            cell.grid(row=idx // 3, column=idx % 3, padx=4, pady=4, sticky="nsew")
+            tk.Label(cell, text=self.t(lkey), font=("Segoe UI", 8), fg="#888", bg=BG2
+                     ).pack(anchor="w", padx=6, pady=(4, 0))
+            v = tk.Label(cell, text="—", font=("Segoe UI", 12, "bold"), fg=ACCENT, bg=BG2)
+            v.pack(anchor="w", padx=6, pady=(0, 4))
+            self._ov_labels[key] = v
+        self._ov_byver = tk.Label(body, text="", font=("Segoe UI", 8), fg="#999", bg=BG,
+                                  justify="left", wraplength=700, anchor="w")
+        self._ov_byver.pack(anchor="w", pady=(2, 4))
+        tk.Label(body, text=self.t("ov_sources"), font=("Segoe UI", 10, "bold"),
+                 fg=ACCENT, bg=BG).pack(anchor="w", pady=(6, 2))
+        self._ov_src = {}
+        for name in ("youtube", "reddit", "github", "kofi"):
+            r = tk.Frame(body, bg=BG)
+            r.pack(anchor="w")
+            tk.Label(r, text=self.t("tab_" + name) + ":", font=("Segoe UI", 9),
+                     fg="#aaa", bg=BG, width=12, anchor="w").pack(side="left")
+            v = tk.Label(r, text="—", font=("Segoe UI", 9), fg="#888", bg=BG)
+            v.pack(side="left")
+            self._ov_src[name] = v
+        tk.Label(body, text=self.t("st_yt_manual_login"), font=("Segoe UI", 8),
+                 fg="#777", bg=BG).pack(anchor="w", pady=(6, 0))
+
+    def _build_apikeys_tab(self, parent):
+        body = tk.Frame(parent, bg=BG)
+        body.pack(fill="both", expand=True, padx=10, pady=8)
+        tk.Label(body, text=self.t("key_clear"), font=("Segoe UI", 8), fg="#888", bg=BG
+                 ).pack(anchor="w", pady=(0, 6))
+        fields = [
+            ("youtube", "api_key", "key_youtube_api", False),
+            ("reddit", "username", "key_reddit_user", False),
+            ("reddit", "password", "key_reddit_pass", True),
+            ("kofi", "username", "key_kofi_email", False),
+            ("kofi", "password", "key_kofi_pass", True),
+            ("kofi", "client_id", "key_kofi_client_id", False),
+            ("kofi", "client_secret", "key_kofi_secret", True),
+            ("kofi", "refresh_token", "key_kofi_token", True),
+        ]
+        self._key_entries = {}
+        for service, field, key, secret in fields:
+            row = tk.Frame(body, bg=BG)
+            row.pack(fill="x", pady=2)
+            tk.Label(row, text=self.t(key), font=("Segoe UI", 9), fg=FG, bg=BG,
+                     width=24, anchor="w").pack(side="left")
+            e = tk.Entry(row, bg="#222", fg=FG, bd=0, insertbackground=FG,
+                         show="*" if secret else "")
+            e.pack(side="left", fill="x", expand=True, ipady=2)
+            if vault_has(service, field):
+                e.insert(0, "•" * 8)
+            self._key_entries[(service, field)] = e
+        btns = tk.Frame(body, bg=BG)
+        btns.pack(fill="x", pady=(8, 0))
+        tk.Button(btns, text=self.t("btn_save_keys"), bg="#333", fg=FG, bd=0,
+                  padx=16, pady=4, cursor="hand2", command=self._save_apikeys).pack(side="left", padx=(0, 8))
+        tk.Button(btns, text=self.t("btn_reset_browser"), bg="#553333", fg=RED, bd=0,
+                  padx=16, pady=4, cursor="hand2", command=self._reset_browser_data).pack(side="left")
+        self._keys_msg = tk.Label(body, text="", font=("Segoe UI", 9), fg=GREEN, bg=BG)
+        self._keys_msg.pack(anchor="w", pady=(6, 0))
+
+    def _save_apikeys(self):
+        for (service, field), e in self._key_entries.items():
+            val = e.get().strip()
+            if val and val != "•" * 8:
+                vault_set(service, field, val)
+            elif not val and vault_has(service, field):
+                vault_delete_field(service, field)
+        for (service, field), e in self._key_entries.items():
+            e.delete(0, tk.END)
+            if vault_has(service, field):
+                e.insert(0, "•" * 8)
+        self._keys_msg.config(text=self.t("key_saved"))
+        self._log(self.t("key_saved"))
+
+    def _reset_browser_data(self):
+        def _work():
+            self._community_kill_browser()
+            shutil.rmtree(_COMMUNITY_PROFILE_DIR, ignore_errors=True)
+            self._log(self.t("log_comm_reset"))
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _fill_tree(self, tree, rows):
+        try:
+            tree.delete(*tree.get_children())
+            for row in rows:
+                tree.insert("", "end", values=row)
+        except Exception:
+            pass
+
+    def _set_tab_status(self, name, status):
+        lbl = self._tab_status.get(name)
+        if not lbl:
+            return
+        if status in (None, "ok"):
+            text, color = self.t("st_ok"), GREEN
+        elif status in ("idle", "hidden"):
+            text, color = self.t("st_not_conf") if status == "hidden" else self.t("st_loading"), "#888"
+        elif status == "no_key":
+            text, color = self.t("st_no_key"), "#888"
+        elif status == "blocked":
+            text, color = self.t("st_blocked"), RED
+        elif status.startswith("needs_"):
+            text, color = self.t("tile_needs_login") + " (" + status + ")", "#ffaa00"
+        elif "captcha" in status:
+            text, color = self.t("act_captcha"), "#ffaa00"
+        else:
+            text, color = self.t("st_error") + ": " + status, RED
+        lbl.config(text=text, fg=color)
+
+    def _update_comm_tabs(self):
+        if not hasattr(self, "_trees"):
+            return
+        st = self._community["stats"]
+        status = self._community["status"]
+        yt = st.get("youtube")
+        rows = []
+        if yt and yt.get("videos"):
+            for v in yt["videos"]:
+                rows.append((v.get("title", ""), v.get("date", ""),
+                             _fmt_num(v.get("views", 0)), _fmt_num(v.get("likes", 0)),
+                             _fmt_num(v.get("comments", 0))))
+        self._fill_tree(self._trees["youtube"], rows)
+        self._set_tab_status("youtube", status.get("youtube"))
+        red = st.get("reddit")
+        rows = []
+        if red and red.get("posts"):
+            for p in red["posts"]:
+                rows.append((p.get("title", ""), p.get("date", ""),
+                             _fmt_num(p.get("score", 0)), _fmt_num(p.get("comments", 0))))
+        self._fill_tree(self._trees["reddit"], rows)
+        self._set_tab_status("reddit", status.get("reddit"))
+        gh = st.get("github")
+        rows = []
+        if gh and gh.get("releases"):
+            for r_ in gh["releases"]:
+                rows.append((r_.get("tag", ""), r_.get("date", ""),
+                             _fmt_num(r_.get("downloads", 0))))
+        self._fill_tree(self._trees["github"], rows)
+        self._set_tab_status("github", status.get("github"))
+        kf = st.get("kofi")
+        rows = []
+        if kf and kf.get("amounts"):
+            for i, a in enumerate(kf["amounts"]):
+                rows.append(("", _fmt_money(a), "donation"))
+        self._fill_tree(self._trees["kofi"], rows)
+        self._set_tab_status("kofi", status.get("kofi"))
+        ov = self._ov_labels
+        ov["installs"].config(text=str(st.get("installs")) if st.get("installs") is not None else "—")
+        ov["errors"].config(text=str(st.get("errors")) if st.get("errors") is not None else "—")
+        ov["schemes"].config(text=str(st.get("schemes")) if st.get("schemes") is not None else "—")
+        ov["users"].config(text=str(st.get("users")) if st.get("users") is not None else "—")
+        ov["builds_ver"].config(text=str(st.get("builds_ver")) if st.get("builds_ver") is not None else "—")
+        lg = st.get("last_generated_at") or ""
+        ov["last_gen"].config(text=str(lg)[:19] if lg else "—")
+        byver = st.get("installs_by_ver") or {}
+        if byver:
+            top = sorted(byver.items(), key=lambda kv: -kv[1])[:10]
+            self._ov_byver.config(text=self.t("ov_installs_by_ver") + ": " +
+                                  ", ".join(f"{k} = {v}" for k, v in top))
+        else:
+            self._ov_byver.config(text="")
+        for name in ("youtube", "reddit", "github", "kofi"):
+            s = status.get(name)
+            if s == "ok":
+                text, color = self.t("st_ok"), GREEN
+            elif s in ("idle", "hidden"):
+                text, color = self.t("st_loading"), "#888"
+            elif s == "no_key":
+                text, color = self.t("st_no_key"), "#888"
+            elif s == "blocked":
+                text, color = self.t("st_blocked"), RED
+            elif s and s.startswith("needs_"):
+                text, color = self.t("tile_needs_login") + " (" + s + ")", "#ffaa00"
+            elif s and "captcha" in s:
+                text, color = self.t("act_captcha"), "#ffaa00"
+            elif s:
+                text, color = self.t("st_error") + ": " + s, RED
+            else:
+                text, color = "—", "#888"
+            self._ov_src[name].config(text=text, fg=color)
+
+    def _community_action_needed(self, msg):
+        self._community["action"] = msg
+        self.root.after(0, self._update_comm_banner)
+        try:
+            self.tray.show_notification(self.t("notif_community_action"), msg, level="error")
+        except Exception:
+            pass
+
+    def _community_clear_action(self):
+        self._community["action"] = None
+        self.root.after(0, self._update_comm_banner)
+
+    def _update_comm_banner(self):
+        if hasattr(self, "_banner_lbl"):
+            msg = self._community.get("action") or ""
+            self._banner_lbl.config(text=msg, bg="#552222" if msg else "#1a1a1a")
+        self._update_tiles()
+
+    def _app_visible(self):
+        try:
+            return self.root.state() == "normal"
+        except Exception:
+            return False
+
+    def _community_ensure_browser(self, visible):
+        """Lazy driver lifecycle bound to app visibility (no Chrome in tray)."""
+        drv = self._community.get("driver")
+        if drv is not None:
+            try:
+                drv.current_url
+            except Exception:
+                drv = None
+                self._community["driver"] = None
+                self._community["hwnd"] = None
+            else:
+                if self._community.get("visible") == visible:
+                    return drv
+                try:
+                    drv.quit()
+                except Exception:
+                    pass
+                self._community["driver"] = None
+                self._community["hwnd"] = None
+        try:
+            self._log(self.t("log_comm_start"))
+            if not os.path.isdir(_COMMUNITY_PROFILE_DIR):
+                try:
+                    _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
+                    _copy_chrome_profile(CHROME_PROFILE, _COMMUNITY_PROFILE_DIR)
+                except Exception as e:
+                    self._log(self.t("log_comm_error", err="profile seed: %s" % e))
+            from selenium import webdriver
+            from selenium.webdriver.chrome.options import Options
+            opts = Options()
+            opts.add_argument(f"--user-data-dir={_COMMUNITY_PROFILE_DIR}")
+            opts.add_argument(f"--profile-directory={CHROME_PROFILE_DIR}")
+            opts.add_argument("--disable-blink-features=AutomationControlled")
+            opts.add_argument("--no-first-run")
+            opts.add_argument("--no-default-browser-check")
+            opts.add_argument("--window-size=1400,900")
+            opts.add_argument("--window-position=-32000,-32000")
+            opts.add_experimental_option("excludeSwitches", ["enable-automation"])
+            opts.add_experimental_option("useAutomationExtension", False)
+            last_err = None
+            for attempt in (1, 2, 3):
+                try:
+                    drv = webdriver.Chrome(options=opts)
+                    break
+                except Exception as e:
+                    last_err = e
+                    msg = str(e)
+                    if not any(m in msg for m in _DRIVER_RETRY_MARKERS):
+                        raise
+                    time.sleep(3 if attempt < 3 else 15)
+                    _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
+            else:
+                raise RuntimeError("Chrome driver failed: %s" % str(last_err)[:120])
+            drv.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+                Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
+                Object.defineProperty(navigator, 'languages', { get: () => ['en-US','en'] });
+                """})
+            self._community["driver"] = drv
+            self._community["visible"] = False
+            self._community["hwnd"] = None
+        except Exception as e:
+            self._log(self.t("log_comm_error", err=str(e)[:150]))
+            self._community["driver"] = None
+            return None
+        if visible:
+            self._community_show_browser()
+        return drv
+
+    def _community_show_browser(self):
+        drv = self._community.get("driver")
+        if drv is None or self._community.get("visible"):
+            return
+        pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
+        hwnd = _find_hwnd_by_pid(pid) if pid else None
+        if not hwnd:
+            return
+        self._community["hwnd"] = hwnd
+        self._community["visible"] = True
+        try:
+            if hasattr(self, "_browser_frame"):
+                frame_id = self._browser_frame.winfo_id()
+                w = max(self._browser_frame.winfo_width(), 200)
+                h = max(self._browser_frame.winfo_height(), 200)
+                _embed_hwnd(hwnd, frame_id, w, h)
+        except Exception:
+            pass
+
+    def _community_move_browser_offscreen(self):
+        hwnd = self._community.get("hwnd")
+        self._community["visible"] = False
+        if hwnd:
+            _move_hwnd(hwnd, -32000, -32000, 1400, 900)
+
+    def _community_kill_browser(self):
+        drv = self._community.get("driver")
+        self._community["driver"] = None
+        self._community["hwnd"] = None
+        self._community["visible"] = False
+        if drv is not None:
+            try:
+                drv.quit()
+            except Exception:
+                pass
+        _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
+        self._log(self.t("log_comm_kill"))
+
+    def _on_browser_frame_configure(self, e):
+        if getattr(e, "widget", None) is not self._browser_frame:
+            return
+        hwnd = self._community.get("hwnd")
+        if hwnd:
+            self.root.after_idle(self._sync_browser_geometry)
+
+    def _sync_browser_geometry(self):
+        hwnd = self._community.get("hwnd")
+        if not hwnd or not self._community.get("fs"):
+            return
+        try:
+            w = self._browser_frame.winfo_width()
+            h = self._browser_frame.winfo_height()
+            if w > 10 and h > 10:
+                _move_hwnd(hwnd, 0, 0, w, h)
+        except Exception:
+            pass
+
+    def _find_elem(self, drv, selectors):
+        for by, sel in selectors:
+            try:
+                return drv.find_element(by, sel)
+            except Exception:
+                continue
+        return None
+
+    def _refresh_community_background(self):
+        if self._community.get("refreshing"):
+            return
+        self._community["refreshing"] = True
+
+        def _work():
+            try:
+                self._fetch_rtdb_counters()
+                self._community["stats"]["github"], st = self._fetch_github()
+                self._community["status"]["github"] = st or "ok"
+                yt = None
+                if vault_has("youtube", "api_key"):
+                    yt, st = self._fetch_yt_api()
+                    self._community["status"]["youtube"] = st or "ok"
+                else:
+                    self._community["status"]["youtube"] = "no_key"
+                if not yt and self._app_visible():
+                    yt, st = self._fetch_yt_chrome()
+                    self._community["status"]["youtube"] = st or "ok"
+                if yt:
+                    self._community["stats"]["youtube"] = yt
+                red, st = self._fetch_reddit_http()
+                if red:
+                    self._community["stats"]["reddit"] = red
+                    self._community["status"]["reddit"] = "ok"
+                else:
+                    self._community["status"]["reddit"] = st or "error"
+                    if self._app_visible():
+                        red2, st2 = self._fetch_reddit_chrome()
+                        if red2:
+                            self._community["stats"]["reddit"] = red2
+                            self._community["status"]["reddit"] = "ok"
+                        else:
+                            self._community["status"]["reddit"] = st2 or "error"
+                if self._app_visible():
+                    kf, st3 = self._fetch_kofi_chrome()
+                    if kf:
+                        self._community["stats"]["kofi"] = kf
+                        self._community["status"]["kofi"] = "ok"
+                    else:
+                        self._community["status"]["kofi"] = st3 or "error"
+                else:
+                    self._community["status"]["kofi"] = "hidden"
+            except Exception as e:
+                self._log(self.t("log_comm_error", err=str(e)[:200]))
+            finally:
+                self._community["refreshing"] = False
+                self.root.after(0, self._update_tiles)
+                self.root.after(0, self._update_comm_tabs)
+
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _community_refresh_tab(self, name):
+        if self._community.get("refreshing"):
+            return
+        self._community["refreshing"] = True
+        self._set_tab_status(name, "idle")
+
+        def _work():
+            try:
+                if name == "github":
+                    res, st = self._fetch_github()
+                elif name == "youtube":
+                    res, st = self._fetch_yt_api()
+                    if not res:
+                        res, st = self._fetch_yt_chrome()
+                elif name == "reddit":
+                    res, st = self._fetch_reddit_http()
+                    if not res:
+                        res, st = self._fetch_reddit_chrome()
+                else:
+                    res, st = self._fetch_kofi_chrome()
+                if res:
+                    self._community["stats"][name] = res
+                    self._community["status"][name] = "ok"
+                else:
+                    self._community["status"][name] = st or "error"
+            except Exception as e:
+                self._community["status"][name] = str(e)[:100]
+            finally:
+                self._community["refreshing"] = False
+                self.root.after(0, self._update_tiles)
+                self.root.after(0, self._update_comm_tabs)
+
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _fetch_rtdb_counters(self):
+        st = self._community["stats"]
+        try:
+            d = _get_json(_rtdb_url("installations")) or {}
+            if isinstance(d, dict):
+                st["installs"] = len(d)
+                by = {}
+                for v in d.values():
+                    if isinstance(v, dict):
+                        ver = str(v.get("version") or "?")
+                        by[ver] = by.get(ver, 0) + 1
+                st["installs_by_ver"] = by
+        except Exception:
+            pass
+        for node, key in (("error_reports", "errors"), ("schemes", "schemes"), ("users", "users")):
+            try:
+                d = _get_json(_rtdb_url(node))
+                st[key] = len(d) if isinstance(d, dict) else 0
+            except Exception:
+                pass
+        try:
+            b = _get_json(_rtdb_url("builds")) or {}
+            if isinstance(b, dict):
+                st["builds_ver"] = b.get("version")
+                st["last_generated_at"] = b.get("last_generated_at")
+        except Exception:
+            pass
+
+    def _fetch_github(self):
+        try:
+            r = requests.get(_GITHUB_API + "/releases",
+                             headers={"User-Agent": _UA}, timeout=20)
+            if r.status_code != 200:
+                return None, "http_" + str(r.status_code)
+            data = r.json()
+            releases = []
+            total = 0
+            for rel in data:
+                dl = sum(a.get("download_count", 0) for a in (rel.get("assets") or []))
+                total += dl
+                releases.append({"tag": rel.get("tag_name", ""),
+                                 "date": (rel.get("published_at") or "")[:10],
+                                 "downloads": dl})
+            if not releases:
+                return None, "empty"
+            return {"releases": releases, "total": total}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _fetch_yt_api(self):
+        key = vault_get("youtube", "api_key")
+        if not key:
+            return None, "no_key"
+        try:
+            r = requests.get(_YT_API + "/videos", params={"part": "snippet",
+                                                          "id": _YT_VIDEO_ID, "key": key}, timeout=15)
+            if r.status_code != 200:
+                return None, "http_" + str(r.status_code)
+            items = (r.json().get("items") or [])
+            if not items:
+                return None, "no_video"
+            ch = items[0]["snippet"]["channelId"]
+            channel = {}
+            rc = requests.get(_YT_API + "/channels", params={"part": "statistics",
+                                                             "id": ch, "key": key}, timeout=15)
+            if rc.status_code == 200:
+                ci = (rc.json().get("items") or [])
+                if ci:
+                    s = ci[0].get("statistics") or {}
+                    channel = {"subscribers": _safe_int(s.get("subscriberCount")),
+                               "views": _safe_int(s.get("viewCount")),
+                               "videos": _safe_int(s.get("videoCount"))}
+            playlist = "UU" + ch[2:]
+            vids, page = [], ""
+            while True:
+                rp = requests.get(_YT_API + "/playlistItems",
+                                  params={"part": "contentDetails", "playlistId": playlist,
+                                          "maxResults": 50, "pageToken": page, "key": key}, timeout=15)
+                if rp.status_code != 200:
+                    break
+                jp = rp.json()
+                vids += [it["contentDetails"]["videoId"] for it in (jp.get("items") or [])
+                         if "contentDetails" in it and "videoId" in it["contentDetails"]]
+                page = jp.get("nextPageToken")
+                if not page:
+                    break
+            videos = []
+            for i in range(0, len(vids), 50):
+                chunk = vids[i:i + 50]
+                rs = requests.get(_YT_API + "/videos", params={"part": "statistics,snippet",
+                                                               "id": ",".join(chunk), "key": key}, timeout=15)
+                if rs.status_code != 200:
+                    continue
+                for it in (rs.json().get("items") or []):
+                    s = it.get("statistics") or {}
+                    sn = it.get("snippet") or {}
+                    videos.append({"id": it.get("id", ""), "title": sn.get("title", ""),
+                                   "date": (sn.get("publishedAt") or "")[:10],
+                                   "views": _safe_int(s.get("viewCount")),
+                                   "likes": _safe_int(s.get("likeCount")),
+                                   "comments": _safe_int(s.get("commentCount"))})
+            return {"videos": videos, "channel": channel}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _fetch_yt_chrome(self):
+        drv = self._community_ensure_browser(self._community.get("fs"))
+        if drv is None:
+            return None, "no_browser"
+        try:
+            channel = self._community.get("yt_channel_id")
+            if not channel:
+                drv.get("https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
+                time.sleep(3.5)
+                m = re.search(r'"channelId":"(UC[0-9A-Za-z_-]{22})"', drv.page_source)
+                if not m:
+                    return None, "no_channel_id"
+                channel = m.group(1)
+                self._community["yt_channel_id"] = channel
+            drv.get("https://www.youtube.com/channel/" + channel + "/videos")
+            time.sleep(4)
+            html = drv.page_source
+            videos = _parse_yt_videos(_yt_initial_data(html)) if _yt_initial_data(html) else []
+            if not videos:
+                for sel in ("button[aria-label*='consent']", "button[aria-label*='Accept']",
+                            "form[action*='consent'] button"):
+                    try:
+                        drv.find_element("css selector", sel).click()
+                        time.sleep(3)
+                        break
+                    except Exception:
+                        continue
+                data = _yt_initial_data(drv.page_source)
+                videos = _parse_yt_videos(data) if data else []
+            if not videos:
+                return None, "no_videos_parsed"
+            return {"videos": videos, "channel": {}}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _fetch_reddit_http(self):
+        try:
+            r = requests.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json",
+                             headers={"User-Agent": _UA}, timeout=20)
+            ctype = r.headers.get("Content-Type", "")
+            if r.status_code != 200 or "json" not in ctype.lower():
+                return None, "blocked"
+            posts = []
+            for ch in (r.json().get("data", {}).get("children") or []):
+                d = ch.get("data", {})
+                posts.append({"title": d.get("title", ""),
+                              "date": time.strftime("%Y-%m-%d",
+                                                     time.localtime(d.get("created_utc", 0))),
+                              "score": d.get("score", 0), "comments": d.get("num_comments", 0),
+                              "url": "https://www.reddit.com" + (d.get("permalink") or "")})
+            if not posts:
+                return None, "empty"
+            return {"posts": posts}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _reddit_logged_in(self, drv):
+        try:
+            drv.get("https://www.reddit.com/api/v1/me")
+            time.sleep(2)
+            return '"name"' in drv.page_source and "login" not in drv.current_url.lower()
+        except Exception:
+            return False
+
+    def _login_reddit(self, drv):
+        user = vault_get("reddit", "username")
+        pw = vault_get("reddit", "password")
+        if not user or not pw:
+            return "needs_reddit_creds"
+        try:
+            drv.get("https://www.reddit.com/login/")
+            time.sleep(3.5)
+            u = self._find_elem(drv, [("css selector", "input[name='username']"),
+                                      ("id", "login-username")])
+            p = self._find_elem(drv, [("css selector", "input[name='password']"),
+                                      ("id", "login-password")])
+            if not u or not p:
+                return "login_form_missing"
+            u.clear()
+            u.send_keys(user)
+            p.clear()
+            p.send_keys(pw)
+            btn = self._find_elem(drv, [("css selector", "button[type='submit']"),
+                                        ("id", "login-submit")])
+            if not btn:
+                return "login_form_missing"
+            btn.click()
+            for _ in range(20):
+                time.sleep(2)
+                low = drv.page_source.lower()
+                if "captcha" in low or ("verify" in low and "human" in low):
+                    self._community_action_needed(self.t("act_captcha"))
+                    return "needs_captcha"
+                if "login" not in drv.current_url.lower():
+                    if self._reddit_logged_in(drv):
+                        return "ok"
+            return "login_timeout"
+        except Exception as e:
+            return "login_error: " + str(e)[:80]
+
+    def _fetch_reddit_chrome(self):
+        drv = self._community_ensure_browser(self._community.get("fs"))
+        if drv is None:
+            return None, "no_browser"
+        try:
+            if not self._reddit_logged_in(drv):
+                st = self._login_reddit(drv)
+                if st != "ok":
+                    if st == "needs_reddit_creds":
+                        self._community_action_needed("Reddit — " + self.t("tile_needs_login"))
+                    return None, st
+            drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/")
+            time.sleep(4)
+            posts = _parse_reddit_html(drv.page_source)
+            if not posts:
+                return None, "no_posts_parsed"
+            return {"posts": posts}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _kofi_logged_in(self, drv):
+        try:
+            drv.get("https://ko-fi.com/manage/donations")
+            time.sleep(3)
+            if "/login" in drv.current_url.lower():
+                return False
+            low = drv.page_source.lower()
+            if "sign in" in low and ("password" in low or "email" in low):
+                return False
+            return "donation" in low
+        except Exception:
+            return False
+
+    def _login_kofi(self, drv):
+        user = vault_get("kofi", "username")
+        pw = vault_get("kofi", "password")
+        if not user or not pw:
+            return "needs_kofi_creds"
+        try:
+            drv.get("https://ko-fi.com/login")
+            time.sleep(3.5)
+            u = self._find_elem(drv, [("css selector", "input[name='email'], input[type='email']"),
+                                      ("id", "email")])
+            p = self._find_elem(drv, [("css selector", "input[name='password'], input[type='password']"),
+                                      ("id", "password")])
+            if not u or not p:
+                return "login_form_missing"
+            u.clear()
+            u.send_keys(user)
+            p.clear()
+            p.send_keys(pw)
+            btn = self._find_elem(drv, [("css selector", "button[type='submit']"),
+                                        ("xpath", "//button[contains(.,'Log in') or contains(.,'Sign in')]")])
+            if not btn:
+                return "login_form_missing"
+            btn.click()
+            for _ in range(20):
+                time.sleep(2)
+                low = drv.page_source.lower()
+                if "captcha" in low or "cloudflare" in low:
+                    self._community_action_needed(self.t("act_captcha"))
+                    return "needs_captcha"
+                if "login" not in drv.current_url.lower():
+                    if self._kofi_logged_in(drv):
+                        return "ok"
+            return "login_timeout"
+        except Exception as e:
+            return "login_error: " + str(e)[:80]
+
+    def _fetch_kofi_chrome(self):
+        drv = self._community_ensure_browser(self._community.get("fs"))
+        if drv is None:
+            return None, "no_browser"
+        try:
+            if not self._kofi_logged_in(drv):
+                st = self._login_kofi(drv)
+                if st != "ok":
+                    if st == "needs_kofi_creds":
+                        self._community_action_needed("Ko-fi — " + self.t("tile_needs_login"))
+                    return None, st
+            amounts = _parse_kofi_amounts(drv.page_source)
+            if not amounts:
+                drv.get("https://ko-fi.com/manage/donations")
+                time.sleep(4)
+                amounts = _parse_kofi_amounts(drv.page_source)
+            if not amounts:
+                return None, "no_amounts_parsed"
+            return {"total": sum(amounts), "count": len(amounts), "amounts": amounts}, None
+        except Exception as e:
+            return None, str(e)[:80]
 
     def _show_settings_menu(self):
         """Gear button opens a dropdown menu (same pattern as the main app)."""
@@ -1034,6 +2331,16 @@ class AdminApp:
                                 self.t("notif_changes"),
                                 self.t("notif_changes_body", n=len(changed)))
                             self._do_generate(changed)
+                    if now - self._community["last_rtdb"] > 300:  # 5 min community RTDB counters
+                        self._community["last_rtdb"] = now
+                        try:
+                            self._fetch_rtdb_counters()
+                            self.root.after(0, self._update_tiles)
+                        except Exception:
+                            pass
+                    if now - self._community["last_comm"] > 600:  # 10 min community platforms
+                        self._community["last_comm"] = now
+                        self._refresh_community_background()
                 except Exception as e:
                     self._log(self.t("log_bg_error", err=e))
                 time.sleep(10)
@@ -1046,6 +2353,7 @@ class AdminApp:
 
     def _on_close(self):
         """X button minimizes to tray; full exit via Settings gear -> Exit."""
+        self._community_kill_browser()
         self.root.withdraw()
 
     def _show_window(self):
@@ -1054,6 +2362,7 @@ class AdminApp:
 
     def _exit_app(self):
         self._running = False
+        self._community_kill_browser()
         try:
             threading.Thread(target=self._report_admin_status,
                              kwargs={"status": "offline"}, daemon=True).start()
