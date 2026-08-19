@@ -4,6 +4,20 @@
 
 ---
 
+## Реліз v1.0.71 Alpha (19.08.2026, повний цикл build.py)
+
+Збірка: `python build.py 1.0.71` — PyInstaller (Python 3.12.7, onedir) → copy_data_files (3131 файли) → verify.json (30 танків) + popular_tanks_seed → launcher 35.8 MB (bundle verification PASSED: tcl86t/tk86t/_tkinter) → tray watcher 7.1 MB → NSIS installer 225.8 MB (`SM_WoT_Assistant_Setup_v1.0.71_Alpha.exe`) → portable ZIP 246.9 MB → verification PASSED (52 maps, 68 extracted_maps, 1246 icons) → manifest → **GitHub release v1.0.71 Alpha** (audit PASSED) → RTDB publish (HTTP 200, latest pointer оновлено, audit PASSED).
+
+**Що увійшло в реліз (від v1.0.70):**
+1. **Фікси бою** (937ee7d): стейт-машина бою в LogWatcher (`_battle_active` — hangar без бою/дублікат/reset більше не дає хибний battle_ended), скасування пендінгу повернення в edit при новому бою, `toggle_editor` перезаписує позицію (самолікування race), unhide-fallback на countdown (вікно завжди показується з трею перед боєм), drag-race: `save_settings` через `after(0)` + скасування drag при зміні режиму.
+2. **Палітра — Download-діалог** (3fc980d, c4e6eaf): список над груповими кнопками (логіка вікна), фіксована висота списку зі скролом (`pack_propagate(False)`, `dl_h = min(320, max(180, (sh-40) - base_h))`), вікно не виходить за екран — кнопки групових схем завжди видимі.
+3. **Фокус після малювання + персистенція товщини/розміру** (2bbea59): після створення елемента виділення лишається на ньому, Escape/ЛКП на порожньому знімає; `draw_thickness`/`draw_size` запам'ятовуються в settings.
+4. **Сайт**: скриншот вікна малювання (`img/draw.webp`), рядок про підтримку всіх мов гри; задеплоєно на Firebase Hosting.
+
+**Release Cleanup Protocol (#1497) після релізу:** локально dist/ — видалено v1.0.66 (лишились v1.0.67–v1.0.71); GitHub — видалено release v1.0.66 (лишились 5 останніх); RTDB versions/ — PUT null для 1_0_66 (лишились 1_0_67–1_0_71 + latest).
+
+---
+
 ## Виконано 19.08.2026: мови на сайті + скриншот вікна малювання + фокус після малювання + персистенція товщини/розміру
 
 1. **Сайт — всі мови гри**: `public/index.html` (підрядок під підзаголовком: "Supports ALL World of Tanks client languages — the app automatically detects your game language") + `reddit_post.md` (рядок з 🌍).
