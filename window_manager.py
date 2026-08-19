@@ -83,6 +83,7 @@ class WindowManager:
         self.ctrl_arm_timeout = 2.0  # Час дії "озброєного" режиму після подвійного Ctrl
         self.ctrl_armed_until = 0.0
         self.format_mode_enabled = False  # Ручний режим форматування (вмикається в edit)
+        self._drag_mode = None  # Режим (edit/norm), у якому почався drag — при зміні режиму drag скасовується
         self._last_tomato_size = None
         
         # Запуск моніторингу миші для drag
@@ -164,6 +165,15 @@ class WindowManager:
                 if self.mouse_drag_active:
                     drag_ready = lmb_pressed
 
+                # Режим змінився під час drag (напр. кінець бою → toggle_editor):
+                # скасовуємо drag, щоб не тягнути вікно через перемикання і не
+                # записати позицію чужого режиму в save_settings.
+                if self.mouse_drag_active and self._drag_mode is not None and self.app.mode != self._drag_mode:
+                    self.mouse_drag_active = False
+                    self.mouse_last_pos = None
+                    self._drag_mode = None
+                    continue
+
                 if drag_ready:
                     if not self.mouse_drag_active:
                         # Початок drag
@@ -171,6 +181,7 @@ class WindowManager:
                             time.sleep(0.1)
                             continue
                         self.mouse_drag_active = True
+                        self._drag_mode = self.app.mode
                         # Тимчасово вимикаємо click-through для захоплення фокуса
                         if self.app.mode == "norm":  # тільки в бойовому режимі
                             self.set_clickthrough(False)
@@ -199,10 +210,18 @@ class WindowManager:
                         # Кінець drag
                         self.mouse_drag_active = False
                         self.mouse_last_pos = None
+                        self._drag_mode = None
                         # Відновлюємо click-through якщо ми в бойовому режимі
                         if self.app.mode == "norm" and not self.format_mode_enabled:
                             self.set_clickthrough(True)
-                        self.app.save_settings()
+                        # save_settings через головний потік — з фонового потоку
+                        # запис позиції може вклинитись у toggle_editor (race:
+                        # mode вже змінився, а вікно ще на старій позиції →
+                        # edit_x/edit_y отримують бойову позицію)
+                        try:
+                            self.app.root.after(0, self.app.save_settings)
+                        except Exception:
+                            pass
                         if hasattr(self.app, '_sync_po_pos'): self.app._sync_po_pos()
                         print("[DRAG] Кінець drag")
                 
@@ -297,6 +316,12 @@ class WindowManager:
             if not self.mouse_drag_active or not keyboard.is_pressed('alt'):
                 self.mouse_drag_active = False
                 return
+            # Режим змінився під час drag — скасовуємо (аналог _monitor_mouse_drag)
+            if self._drag_mode is not None and self.app.mode != self._drag_mode:
+                self.mouse_drag_active = False
+                self.mouse_last_pos = None
+                self._drag_mode = None
+                return
             
             if self.mouse_last_pos:
                 dx = event.x - self.mouse_last_pos[0]
@@ -310,13 +335,18 @@ class WindowManager:
             if event.button == 'left' and keyboard.is_pressed('alt'):
                 if self.app.mode == "norm" or self._cursor_over_app():
                     self.mouse_drag_active = True
+                    self._drag_mode = self.app.mode
                     self.mouse_last_pos = (event.x, event.y)
         
         def on_mouse_release(event):
             if event.button == 'left':
                 self.mouse_drag_active = False
                 self.mouse_last_pos = None
-                self.app.save_settings()
+                self._drag_mode = None
+                try:
+                    self.app.root.after(0, self.app.save_settings)
+                except Exception:
+                    pass
                 if hasattr(self.app, '_sync_po_pos'): self.app._sync_po_pos()
 
         def on_any_mouse_event(event):

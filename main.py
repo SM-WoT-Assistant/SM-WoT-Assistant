@@ -99,6 +99,7 @@ class WotAssistantHQ:
         self._tray_icon = None
         self._hidden_by_f10 = False
         self._restored_by_battle = False
+        self._battle_edit_return = None  # after-id повернення в edit після бою (скасовується при новому бою)
         self._restore_button = None
         self._restore_drag_start = {"x": 0, "y": 0}
         self.active_group_id = "public"
@@ -857,6 +858,14 @@ class WotAssistantHQ:
             self.canvas.bind("<Configure>", self._on_canvas_resize, "+")
             self._canvas_cfg_bound = True
         self.map_renderer.show_main_splash()
+        # Перезаписуємо позицію в settings — це єдине чесне джерело: будь-який
+        # race-запис (drag-потік, save_settings з чужого потоку) перезапишеться
+        # тут актуальною edit/norm-позицією, яку ми щойно встановили.
+        self.settings[f"{prefix}x"] = int(px)
+        self.settings[f"{prefix}y"] = int(py)
+        if self.mode == "edit":
+            self.settings[f"{prefix}cx"] = int(px) + self.w // 2
+            self.settings[f"{prefix}cy"] = int(py) + self.h // 2
         self.root.attributes("-alpha", self.alpha)
         self.refresh_mode_indicator()
         self.root.after(0, self._adjust_for_canvas)
@@ -1351,9 +1360,15 @@ class WotAssistantHQ:
         self.root.after(0, apply_class_filter)
 
     def on_battle_countdown_started(self, map_id, arena_type):
-        print(f"[BATTLE] countdown_started: map={map_id}, arena_type={arena_type}, auto_battle={self.auto_battle_var.get()}, mode={self.mode}")
+        print(f"[BATTLE] countdown_started: map={map_id}, arena_type={arena_type}, auto_battle={self.auto_battle_var.get()}, mode={self.mode}, hidden={self._hidden_by_f10}, unhide_on_battle={self._unhide_on_battle_var.get()}")
         if not self.auto_battle_var.get():
             return
+        # Fallback: якщо arena-виявлення не встигло показати вікно з трею
+        # (загублена/запізніла лінія Loading space), показуємо вікно тут —
+        # перед боєм воно завжди має бути на екрані.
+        if self._hidden_by_f10 and self._unhide_on_battle_var.get():
+            self._restored_by_battle = True
+            self.root.after(0, self._restore_from_tray)
         if self.mode != "norm":
             self.root.after(100, self.toggle_editor)
 
@@ -1373,7 +1388,15 @@ class WotAssistantHQ:
         self.last_battle_map = map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
-        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}, unhide_on_battle={self._unhide_on_battle_var.get()}")
+        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}, unhide_on_battle={self._unhide_on_battle_var.get()}, hidden={self._hidden_by_f10}, mode={self.mode}")
+
+        # Новий бій скасовує відкладене повернення в edit після попереднього бою
+        if self._battle_edit_return is not None:
+            try:
+                self.root.after_cancel(self._battle_edit_return)
+            except Exception:
+                pass
+            self._battle_edit_return = None
 
         if self._unhide_on_battle_var.get() and self._hidden_by_f10:
             self._restored_by_battle = True
@@ -1394,7 +1417,7 @@ class WotAssistantHQ:
 
     def on_battle_ended(self):
         self.save_settings()
-        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}, restored_by_battle={self._restored_by_battle}")
+        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}, restored_by_battle={self._restored_by_battle}, mode={self.mode}, hidden={self._hidden_by_f10}")
         
         if self._restored_by_battle:
             self._restored_by_battle = False
@@ -1404,7 +1427,7 @@ class WotAssistantHQ:
         if not self.last_battle_map or not self.auto_battle_var.get():
             return
         
-        self.root.after(200, lambda: self._return_to_editor_with_map(self.last_battle_map, self.last_battle_mode, self.last_battle_map_mode))
+        self._battle_edit_return = self.root.after(200, lambda: self._return_to_editor_with_map(self.last_battle_map, self.last_battle_mode, self.last_battle_map_mode))
     
     def _return_to_editor_with_map(self, map_id, mode, map_source_mode=2):
         if self.mode != "edit":

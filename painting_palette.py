@@ -1592,7 +1592,15 @@ class DrawingPalette(tk.Toplevel):
             self._palette_compact_geo = self.geometry()
         except Exception:
             self._palette_compact_geo = None
-        self.geometry("580x780")
+        # Висота за контентом, а не жорстке 780: на DPI-масштабованих дисплеях
+        # контент палітри (включно з груповими кнопками внизу) перевищує 780px
+        # і кнопки груп обрізались. Список мап скролиться — йому вистачить
+        # різниці, але не менше 780 для зручності.
+        self.update_idletasks()
+        req_h = self.winfo_reqheight()
+        sh = self.winfo_screenheight()
+        target_h = min(max(req_h, 780), sh - 120)
+        self.geometry(f"580x{target_h}")
         bg = "#222"
         tk.Label(self._download_frame, text=self.app.t('ui', 'download_loading'),
                  bg=bg, fg="#888", font=("Arial", 9)).pack(padx=10, pady=10)

@@ -17,6 +17,7 @@ class LogWatcher:
         self._last_arena_id = None  # Відстежуємо, щоб не викликати мініматп двічі
         self._countdown_fired_for_arena = None
         self._last_vehicle_cd = None  # Останній виявлений compactDescr техніки
+        self._battle_active = False  # Чи була виявлена арена (бій) — hangar без бою не фіриться
         
         # Регулярний вираз для виявлення завантаження карти (бою)
         # Приклад: Loading space: spaces/01_karelia
@@ -64,6 +65,7 @@ class LogWatcher:
                     self._last_size = 0
                     self._last_arena_id = None
                     self._countdown_fired_for_arena = None
+                    self._battle_active = False
                 
                 if current_size > self._last_size:
                     with open(self.log_path, "r", encoding="utf-8", errors="ignore") as f:
@@ -88,24 +90,31 @@ class LogWatcher:
                                     if self.vehicle_callback:
                                         self.vehicle_callback(cd)
                             
-                            # Перевіряємо повернення в ангар
+                            # Перевіряємо повернення в ангар.
+                            # battle_ended фіриться ТІЛЬКИ якщо був активний бій
+                            # (_battle_active) — hangar без бою (старт гри, reset
+                            # python.log, дублікат hangar-лінії) викликає тихе
+                            # скидання стану без callback, інакше хибний
+                            # battle_ended перемикає вікно з режиму в режим.
                             if self.hangar_re.search(line):
+                                was_battle = self._battle_active
+                                self._battle_active = False
                                 self._last_arena_id = None
                                 self._countdown_fired_for_arena = None
                                 self._last_vehicle_cd = None
-                                if self.hangar_callback:
+                                if was_battle and self.hangar_callback:
                                     self.hangar_callback()
 
                             # Основний тригер перемикання у бойовий режим
                             if self.battle_space_re.search(line):
-                                if self._last_arena_id is not None and self.countdown_callback:
+                                if self._battle_active and self._last_arena_id is not None and self.countdown_callback:
                                     if self._countdown_fired_for_arena != self._last_arena_id:
                                         self._countdown_fired_for_arena = self._last_arena_id
                                         self.countdown_callback(self._last_arena_id, self.last_type)
 
                             # Fallback, якщо основний маркер з якоїсь причини не зловився
                             if self.battle_loaded_re.search(line):
-                                if self._last_arena_id is not None and self.countdown_callback:
+                                if self._battle_active and self._last_arena_id is not None and self.countdown_callback:
                                     if self._countdown_fired_for_arena != self._last_arena_id:
                                         self._countdown_fired_for_arena = self._last_arena_id
                                         self.countdown_callback(self._last_arena_id, self.last_type)
@@ -123,6 +132,7 @@ class LogWatcher:
                                 if not (map_id.startswith("hangar") or re.match(r"h\d+_\w+", map_id)):
                                     if self._last_arena_id != map_id:
                                         self._countdown_fired_for_arena = None
+                                    self._battle_active = True
                                     self._last_arena_id = map_id  # Зберігаємо для мініматп
                                     type_to_mode = {
                                         1: "ctf",      # Standard
