@@ -4,6 +4,31 @@
 
 ---
 
+## Фікси Community Workspace: embed браузера з потоку + вставка в поля API-ключів (19.08.2026, адмінка v1.0.18)
+
+**Звіти користувача:** (1) вікно браузера не видно у вікні адмінки — висить на панелі завдань, перемкнутись неможливо; (2) неможливо вставити API-ключі з буфера обміну у відповідні поля.
+
+**Корінь проблеми №1 (підтверджено admin.log):** рядок `Помилка фона: main thread is not in main loop` одразу після `Community: browser started`. `_community_show_browser()` викликався з **фонового демон-потоку** (через `_community_ensure_browser` → `_refresh_community_background` / `_community_refresh_tab` — всі fetch-шляхи працюють у daemon-потоці), а всередині робив Tkinter-виклики `winfo_id()/winfo_width()/winfo_height()`. Це кидало `RuntimeError: main thread is not in main loop`, яке ковталося голим `except Exception: pass` — embed тихо не відбувався. Chrome лишався оф-скрін (-32000,-32000), видимий на панелі завдань, і як окреме top-level вікно перехоплював фокус клавіатури → поля API-ключів не отримували Ctrl+V (проблема №2).
+
+**Фікс (admin_app.py):**
+1. `_community_show_browser()` переписано — тепер thread-safe: важкий пошук HWND (PowerShell/ctypes) виконується у worker-потоку `_locate`, який лише виставляє прапорець `embed_pending`; жодних Tkinter-викликів з фонового потоку.
+2. Новий `_community_poll_embed()` — виконується на головному потоці через `root.after(200, ...)`: робить embed (`_embed_hwnd` + winfo-виклики), ставить `visible=True` лише після успіху і зупиняється; перезапускається на кожному `_enter_community`.
+3. `_enter_community()` тепер активно запускає браузер (thread `_community_ensure_browser(True)`), якщо driver ще не створений — раніше браузер стартував лише лазі-фетчем, і при вході з трея фрейм був порожній.
+4. Гвард `creating` у `_community_ensure_browser()` — серіалізація створення driver (два потоки більше не створюють два webdriver.Chrome з тим самим профілем).
+5. У кінці створення driver embed викликається якщо `visible or fs` (раніше лише `visible`).
+
+**Фікс проблеми №2:** новий `_bind_entry_menu()` — ПКМ-контекстне меню Cut/Copy/Paste/Select All для всіх полів вкладки API Keys (патерн ui_manager.py:564-575 головної програми). Плюс нові i18n-ключі `menu_cut`/`menu_paste` у `_TR_EN` та `admin_uk_seed.json` (en_snapshot + uk).
+
+**Верифікація (#1471, #1584):**
+- ast-parse admin_app.py, json.load обох seed-файлів, юніт-тест дифа `_load_uk_translations` (2 нові ключі детектуються)
+- Живий smoke (Python 3.12, головний потік у mainloop): `_enter_community()` → Chrome стартує → HWND знайдено → **GetParent(hwnd) == frame_id** (вбудовано!) → `visible=True`; вихід та повторний вхід — re-embed також успішний (embed2=True)
+- `_bind_entry_menu`: кожне Entry поля API-ключів має `<Button-3>` біндінг
+- Тестові процеси прибрані (Chrome community-профілю не лишилось), мутекс-поведінка при запущеній старій адмінці підтверджена (exit 0)
+
+**Збірка:** admin_version.txt → 1.0.18 (#1446), `python build_admin.py` (перед цим убити запущену адмінку).
+
+---
+
 ## Community Workspace в адмінці — плитки, вбудований Chrome, статистика, DPAPI-vault (18.08.2026, адмінка v1.0.17)
 
 **Що зроблено:** новий розділ в адмінці (admin_app.py, 1104 → 2389 рядків) + новий модуль admin_vault.py.

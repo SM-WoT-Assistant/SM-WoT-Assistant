@@ -4,6 +4,28 @@
 
 ---
 
+## Фікси Community Workspace: embed браузера + вставка API-ключів (19.08.2026, адмінка v1.0.18)
+
+**Проблеми:** (1) браузер не вшивався у вікно адмінки (висів на панелі завдань оф-скрін); (2) неможливо вставити API-ключі з буфера у поля вкладки API Keys.
+
+**Корінь:** `_community_show_browser()` викликався з фонового daemon-потоку (усі fetch-шляхи — `_refresh_community_background`/`_community_refresh_tab` → `_community_ensure_browser` → `_community_show_browser`) і робив Tkinter-виклики `winfo_id/width/height` → `RuntimeError: main thread is not in main loop` (видно в admin.log як "Помилка фона") → голе `except Exception: pass` ковтало → embed ніколи не відбувався. Chrome лишався окремим видимим вікном і перехоплював фокус клавіатури → Ctrl+V не доходив до полів.
+
+**Фікс:**
+1. `_community_show_browser()` — thread-safe: пошук HWND у worker-потоку `_locate` (PowerShell/ctypes, thread-safe), лише прапорець `embed_pending`; жодних Tk-викликів з фонового потоку.
+2. `_community_poll_embed()` — головний потік (`root.after(200, ...)`): виконує `_embed_hwnd`, `visible=True` лише після успіху; зупиняється після embed; рестарт на кожному `_enter_community`.
+3. `_enter_community()` — активно стартує браузер (thread `_community_ensure_browser(True)`), якщо driver ще нема (раніше — лише лазі-фетч).
+4. Гвард `creating` у `_community_ensure_browser()` — два потоки не створюють два driver одночасно.
+5. Після створення driver: embed якщо `visible or fs`.
+6. `_bind_entry_menu()` — ПКМ Cut/Copy/Paste/Select All для полів API Keys (+ ключі `menu_cut`/`menu_paste` в `_TR_EN` та `admin_uk_seed.json`).
+
+**Правило на майбутнє:** жодних Tkinter-викликів (winfo/insert/after) з фонового потоку — тільки прапорці/черги + `root.after(0/200, ...)` на головному потоці. Клас цього бага — "Tk з не-головного потоку" (#1593-родина).
+
+**Верифікація:** живий smoke — GetParent(hwnd)==frame_id після входу в Community, re-embed після exit/re-enter; ПКМ-меню прив'язане до всіх полів; тестові процеси прибрані.
+
+**Збірка:** admin_version.txt → 1.0.18, `python build_admin.py`.
+
+---
+
 ## Community Workspace — плитки, вбудований Chrome-браузер, статистика платформ (18.08.2026, адмінка v1.0.17)
 
 **Що це:** розділ в адмінці для моніторингу соцмереж/донатів/статистики + зашифроване сховище креденціалів.

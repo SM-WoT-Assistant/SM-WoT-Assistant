@@ -76,6 +76,8 @@ _TR_EN = {
     "menu_help": "Help",
     "menu_copy": "Copy",
     "menu_select_all": "Select All",
+    "menu_cut": "Cut",
+    "menu_paste": "Paste",
     "dlg_wot_path": "WoT Path",
     "dlg_wot_path_label": "WoT Path:",
     "dlg_save": "Save",
@@ -750,7 +752,8 @@ class AdminApp:
         self.tray = AdminTray(self)
 
         self._community = {
-            "driver": None, "visible": False, "hwnd": None,
+            "driver": None, "visible": False, "hwnd": None, "creating": False,
+            "embed_pending": False,
             "yt_channel_id": None, "fs": False, "refreshing": False,
             "action": None, "last_comm": 0.0, "last_rtdb": 0.0,
             "stats": {"youtube": None, "reddit": None, "github": None, "kofi": None,
@@ -1246,7 +1249,10 @@ class AdminApp:
         self.root.attributes("-fullscreen", True)
         self.root.focus_force()
         self.root.bind("<Escape>", lambda e: self._exit_community())
+        if self._community.get("driver") is None:
+            threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
         self.root.after(500, self._community_show_browser)
+        self.root.after(200, self._community_poll_embed)
         self._update_comm_tabs()
 
     def _exit_community(self):
@@ -1426,6 +1432,7 @@ class AdminApp:
             e.pack(side="left", fill="x", expand=True, ipady=2)
             if vault_has(service, field):
                 e.insert(0, "•" * 8)
+            self._bind_entry_menu(e)
             self._key_entries[(service, field)] = e
         btns = tk.Frame(body, bg=BG)
         btns.pack(fill="x", pady=(8, 0))
@@ -1449,6 +1456,19 @@ class AdminApp:
                 e.insert(0, "•" * 8)
         self._keys_msg.config(text=self.t("key_saved"))
         self._log(self.t("key_saved"))
+
+    def _bind_entry_menu(self, entry):
+        m = tk.Menu(entry, tearoff=0, bg="#222", fg=FG)
+        m.add_command(label=self.t("menu_cut"), command=lambda: entry.event_generate("<<Cut>>"))
+        m.add_command(label=self.t("menu_copy"), command=lambda: entry.event_generate("<<Copy>>"))
+        m.add_command(label=self.t("menu_paste"), command=lambda: entry.event_generate("<<Paste>>"))
+        m.add_command(label=self.t("menu_select_all"), command=lambda: entry.event_generate("<<SelectAll>>"))
+        def show(e):
+            try:
+                m.tk_popup(e.x_root, e.y_root)
+            finally:
+                m.grab_release()
+        entry.bind("<Button-3>", show)
 
     def _reset_browser_data(self):
         def _work():
@@ -1583,6 +1603,15 @@ class AdminApp:
 
     def _community_ensure_browser(self, visible):
         """Lazy driver lifecycle bound to app visibility (no Chrome in tray)."""
+        if self._community.get("creating"):
+            return None
+        self._community["creating"] = True
+        try:
+            return self._community_ensure_browser_inner(visible)
+        finally:
+            self._community["creating"] = False
+
+    def _community_ensure_browser_inner(self, visible):
         drv = self._community.get("driver")
         if drv is not None:
             try:
@@ -1647,28 +1676,56 @@ class AdminApp:
             self._log(self.t("log_comm_error", err=str(e)[:150]))
             self._community["driver"] = None
             return None
-        if visible:
+        if visible or self._community.get("fs"):
             self._community_show_browser()
         return drv
 
     def _community_show_browser(self):
+        """Request embedding of the Chrome window into the app frame.
+
+        Thread-safe: the heavy HWND lookup (PowerShell/ctypes) runs in a worker
+        thread and only sets a flag; the actual Tkinter embed is done by
+        _community_poll_embed on the main thread. No Tk calls from worker
+        threads — those used to raise 'main thread is not in main loop' and
+        silently skip the embed."""
         drv = self._community.get("driver")
         if drv is None or self._community.get("visible"):
             return
-        pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
-        hwnd = _find_hwnd_by_pid(pid) if pid else None
-        if not hwnd:
+
+        def _locate():
+            for _ in range(10):  # Chrome window may appear a moment after driver start
+                drv = self._community.get("driver")
+                if drv is None or self._community.get("visible"):
+                    return
+                pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
+                hwnd = _find_hwnd_by_pid(pid) if pid else None
+                if hwnd:
+                    self._community["hwnd"] = hwnd
+                    self._community["embed_pending"] = True
+                    return
+                time.sleep(1)
+
+        threading.Thread(target=_locate, daemon=True).start()
+
+    def _community_poll_embed(self):
+        """Main thread only (root.after loop): embed the located Chrome window."""
+        if not self._community.get("fs"):
             return
-        self._community["hwnd"] = hwnd
-        self._community["visible"] = True
-        try:
-            if hasattr(self, "_browser_frame"):
-                frame_id = self._browser_frame.winfo_id()
-                w = max(self._browser_frame.winfo_width(), 200)
-                h = max(self._browser_frame.winfo_height(), 200)
-                _embed_hwnd(hwnd, frame_id, w, h)
-        except Exception:
-            pass
+        if (self._community.get("embed_pending") and self._community.get("hwnd")
+                and not self._community.get("visible")):
+            self._community["embed_pending"] = False
+            hwnd = self._community["hwnd"]
+            try:
+                if hasattr(self, "_browser_frame"):
+                    frame_id = self._browser_frame.winfo_id()
+                    w = max(self._browser_frame.winfo_width(), 200)
+                    h = max(self._browser_frame.winfo_height(), 200)
+                    _embed_hwnd(hwnd, frame_id, w, h)
+                    self._community["visible"] = True
+                    return
+            except Exception:
+                pass
+        self.root.after(200, self._community_poll_embed)
 
     def _community_move_browser_offscreen(self):
         hwnd = self._community.get("hwnd")
