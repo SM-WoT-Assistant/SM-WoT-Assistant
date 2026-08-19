@@ -33,5 +33,10 @@
 5. `finish_startup_splash()` ПОВИНЕН перераховувати `self.h = self.w + get_edit_extra_height()` після створення всіх панелей, щоб перезаписати stale edit_h з settings.
 6. Після `root.deiconify()` → `winfo_rootx/y()` може бути (0,0) поки window manager не поставив вікно. **ОБОВ'ЯЗКОВО** використовувати `root.after(100, ...)` для першого `_sync_po_pos()`.
 7. Ці шість пунктів треба перевіряти при КОЖНІЙ зміні `finish_startup_splash()`, `on_map_select()`, `get_edit_extra_height()`, `initialize_window()` — без винятків.
-8. **`root.minsize(self.w, self.h)`** — обов'язково після зміни геометрії в `finish_startup_splash()`, щоб вікно ніколи не ставало меншим за сумарний розмір всіх елементів.
+8.  **`root.minsize(self.w, self.h)`** — обов'язково після зміни геометрії в `finish_startup_splash()`, щоб вікно ніколи не ставало меншим за сумарний розмір всіх елементів.
+9.  **Фокус після малювання + персистенція товщини/розміру (19.08.2026):**
+    - Після створення об'єкта `on_release` викликає `_edit_object_at(len(drawings[map_id]) - 1)` (painter.py:674) — виділення/редагування лишається на намальованому елементі (заміна старого `palette._deactivate_tool()` без виділення).
+    - Escape знімає виділення: `<Escape>` bind на обох канвасах (painter.py:151) → `on_escape_deselect` → `palette.exit_edit_mode()`; палітра має власний `<Escape>` bind (painting_palette.py:73). ЛКП на порожньому місці — `painter.py:261-268` (клік по об'єкту = edit, по порожньому = `exit_edit_mode()`).
+    - Товщина/розмір персистентні: `_thickness` (painter.py:50) і `_thickness_var`/`_size_var` (painting_palette.py:59-62) ініціалізуються з `settings.draw_thickness`/`draw_size` (дефолт 3 / 1.0); зміни слайдерів пишуть у settings + `app.save_settings()` (`_save_draw_prefs`), гвард `_loading_obj` блокує перезапис при завантаженні об'єкта в палітру; нові об'єкти отримують збережені значення через `"thickness": self._thickness` (painter.py:638) та `obj["scale"] = self._size_var.get()` (`_write_to_object`, painting_palette.py:1537/1565).
+
 

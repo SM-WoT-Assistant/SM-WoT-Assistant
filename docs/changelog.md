@@ -4,12 +4,20 @@
 
 ---
 
-## Задачі наступної сесії (записано 19.08.2026, після адмінки v1.0.18)
+## Виконано 19.08.2026: мови на сайті + скриншот вікна малювання + фокус після малювання + персистенція товщини/розміру
 
-1. На сайт (`public/index.html`) і у ВСІ наступні публікації додати: програма підтримує всі мови, які є в грі — автоматично визначає мову, встановлену в клієнті гри.
-2. На сайт додати зображення (скриншот) вікна малювання.
-3. У вікні малювання (`painter.py`): після малювання елемента залишити виділення/фокус на намальованому елементі; зняти виділення — Escape або ЛКП на порожньому місці.
-4. Товщина ліній і розмір елемента повинні запам'ятовувати останній вибір користувача, а не скидатись на дефолт.
+1. **Сайт — всі мови гри**: `public/index.html` (підрядок під підзаголовком: "Supports ALL World of Tanks client languages — the app automatically detects your game language") + `reddit_post.md` (рядок з 🌍).
+2. **Скриншот вікна малювання**: користувач надав `D:\!WORK\WOT\WOTtraner\IN\Foto\Draw.png` (580×545) → сконвертовано PIL у `public/img/draw.webp` (17.5KB, WEBP quality=85) → картка "Drawing window" в галереї `public/index.html` (після TACTIC, перед Overlay) з описом про фокус/Escape/персистенцію.
+3. **Фокус після малювання** (`painter.py` + `painting_palette.py`):
+   - `painter.py:674` — після створення об'єкта в `on_release` викликається `_edit_object_at(len(drawings)-1)` — виділення/редагування лишається на намальованому елементі (замість старого `_deactivate_tool()` + показу палітри без виділення).
+   - Escape знімає виділення: `painter.py:151` bind `<Escape>` на обох канвасах → `on_escape_deselect` → `palette.exit_edit_mode()`; палітра теж має власний `<Escape>` bind (`painting_palette.py:73`).
+   - ЛКП на порожньому місці — вже існувало (`painter.py:261-268`: клік по об'єкту = edit, по порожньому = `exit_edit_mode()`).
+4. **Персистенція товщини/розміру**:
+   - `painter.py:50` — `_thickness = int(settings.get("draw_thickness", 3))`.
+   - `painting_palette.py:59-62` — `_thickness_var`/`_size_var` ініціалізуються з `settings.draw_thickness`/`draw_size`.
+   - `_on_thickness_change`/`_on_size_change` пишуть у `app.settings` + `_save_draw_prefs()` → `app.save_settings()`; гвард `_loading_obj` не дає перезаписати налаштування при завантаженні об'єкта в палітру.
+   - Нові об'єкти отримують збережені значення: `"thickness": self._thickness` (`painter.py:638`) + `obj["scale"] = self._size_var.get()` через `_write_to_object` (`painting_palette.py:1537, 1565`).
+   - **Верифікація (#1471/#1584)**: ast-parse painter.py/painting_palette.py/main.py OK; isolated smoke-тести — відновлення thickness з settings (7), flow on_release → створення → apply_to_new_object(thickness=7, scale=2.0) → load_object → show → `_editing_idx=0`, палітра `_on_thickness_change`/`_on_size_change` → settings + save_settings + гвард `_loading_obj` (7 залишається при завантаженні).
 
 ---
 

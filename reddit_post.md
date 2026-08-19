@@ -4,6 +4,8 @@
 
 Tactical assistant for World of Tanks: maps with coordinate grids, tactical schemes, tank setups and a battle overlay — all in one lightweight app for Windows 10/11.
 
+🌍 **Supports ALL World of Tanks client languages** — the app automatically detects your game language.
+
 <!-- IMAGES -->
 
 ## 🗺️ Maps

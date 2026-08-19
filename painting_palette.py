@@ -56,9 +56,9 @@ class DrawingPalette(tk.Toplevel):
             "TD": tk.BooleanVar(value=False),
             "SPG": tk.BooleanVar(value=False),
         }
-        self._thickness_var = tk.IntVar(value=3)
+        self._thickness_var = tk.IntVar(value=int(self.app.settings.get("draw_thickness", 3)))
         self._thickness_var.trace_add("write", self._on_thickness_change)
-        self._size_var = tk.DoubleVar(value=1.0)
+        self._size_var = tk.DoubleVar(value=float(self.app.settings.get("draw_size", 1.0)))
         self._size_var.trace_add("write", self._on_size_change)
 
         self.text_var = tk.StringVar(value="")
@@ -70,6 +70,7 @@ class DrawingPalette(tk.Toplevel):
         self._restore_position()
         self.after(0, self._refresh_linked_schemes_list)
         self.after(50, self._update_sliders_state)
+        self.bind("<Escape>", lambda e: self.exit_edit_mode())
 
     def _build_ui(self):
         bg = "#222"
@@ -787,19 +788,33 @@ class DrawingPalette(tk.Toplevel):
             pass
 
     def _on_thickness_change(self, *args):
+        if getattr(self, '_loading_obj', False):
+            return
         self.painter._thickness = self._thickness_var.get()
         if self.painter.select_all_active():
             self.painter.apply_thickness_to_all(self._thickness_var.get())
         elif self._edit_obj:
             self._on_any_change()
+        self.app.settings["draw_thickness"] = self._thickness_var.get()
+        self._save_draw_prefs()
 
     def _on_size_change(self, *args):
+        if getattr(self, '_loading_obj', False):
+            return
         if self.painter.select_all_active():
             self.painter.apply_scale_to_all(self._size_var.get())
         elif self._edit_obj and self.app.current_map_eng:
             self._edit_obj["scale"] = self._size_var.get()
             self.painter.save_drawings()
             self.painter.redraw()
+        self.app.settings["draw_size"] = self._size_var.get()
+        self._save_draw_prefs()
+
+    def _save_draw_prefs(self):
+        try:
+            self.app.save_settings()
+        except Exception:
+            pass
 
     def _on_any_change(self, *args):
         if getattr(self, '_loading_obj', False):

@@ -47,7 +47,7 @@ class MapPainter:
         self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
         self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
-        self._thickness = 3
+        self._thickness = int(self.app.settings.get("draw_thickness", 3))
         self._select_all = False
 
     def apply_thickness_to_all(self, value):
@@ -148,8 +148,14 @@ class MapPainter:
             ("<Control-B1-Motion>", self.on_move_drag),
             ("<Control-ButtonRelease-1>", self.on_move_release),
             ("<Button-3>", self.on_right_click),
+            ("<Escape>", self.on_escape_deselect),
         ]:
             target_canvas.bind(ev, cb, add="+")
+
+    def on_escape_deselect(self, event=None):
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            palette.exit_edit_mode()
     
     def set_tool(self, tool):
         self.active_tool = tool
@@ -657,7 +663,6 @@ class MapPainter:
             self.temp_item = None
             return
 
-        needs_show = palette.state() == 'withdrawn'
         palette.exit_edit_mode()
         palette.apply_to_new_object(new_obj, cw, ch)
         self.default_color = new_obj["color"]
@@ -666,11 +671,7 @@ class MapPainter:
         self.redraw()
         self.canvas.delete("temp_draw")
         self.temp_item = None
-        palette._deactivate_tool()
-        if needs_show:
-            palette.show()
-            if hasattr(self.app, 'draw_btn'):
-                self.app.draw_btn.config(bg="#ffaa00", fg="black")
+        self._edit_object_at(len(self.drawings[map_id]) - 1)
         self.active_tool = None
         self.app.root.after(10, palette._lift_self)
             
