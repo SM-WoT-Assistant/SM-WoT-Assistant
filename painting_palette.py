@@ -1587,26 +1587,45 @@ class DrawingPalette(tk.Toplevel):
         self._download_result = None
         for w in self._download_frame.winfo_children():
             w.destroy()
-        self._download_frame.pack(fill="both", expand=True, padx=6, pady=4, before=self._status_lbl)
+        # Список після групових кнопок: при нестачі висоти pack зрізає НАЙНИЖЧИЙ
+        # елемент (низ списку, tree скролиться), а кнопки групових схем
+        # (Create/Join/Manage) залишаються видимими на будь-якому екрані/DPI.
+        self._download_frame.pack(fill="both", expand=True, padx=6, pady=4, after=self._group_mgmt_frame)
         try:
             self._palette_compact_geo = self.geometry()
         except Exception:
             self._palette_compact_geo = None
-        # Висота за контентом, а не жорстке 780: на DPI-масштабованих дисплеях
-        # контент палітри (включно з груповими кнопками внизу) перевищує 780px
-        # і кнопки груп обрізались. Список мап скролиться — йому вистачить
-        # різниці, але не менше 780 для зручності.
-        self.update_idletasks()
-        req_h = self.winfo_reqheight()
-        sh = self.winfo_screenheight()
-        target_h = min(max(req_h, 780), sh - 120)
-        self.geometry(f"580x{target_h}")
+        self._resize_for_download()
         bg = "#222"
         tk.Label(self._download_frame, text=self.app.t('ui', 'download_loading'),
                  bg=bg, fg="#888", font=("Arial", 9)).pack(padx=10, pady=10)
         import threading
         t = threading.Thread(target=self._download_populate, daemon=True)
         t.start()
+
+    def _resize_for_download(self):
+        """Підганяє висоту палітри під повний контент (зараз або після
+        наповнення списку) і тримає вікно в межах екрана."""
+        try:
+            self.update_idletasks()
+            req_h = self.winfo_reqheight()
+            sh = self.winfo_screenheight()
+            target_h = min(max(req_h, 780), sh - 120)
+            if target_h < 300:
+                target_h = 300
+            g = self.geometry()
+            import re
+            m = re.match(r'^(\d+)x(\d+)(.*)$', g)
+            rest = m.group(3) if m else ""
+            x, y = 0, 0
+            m2 = re.match(r'^[+](-?\d+)[+](-?\d+)$', rest)
+            if m2:
+                x, y = int(m2.group(1)), int(m2.group(2))
+            if y + target_h > sh:
+                y = max(20, sh - target_h - 40)
+            self.geometry(f"580x{target_h}+{x}+{y}")
+        except Exception:
+            pass
 
     def _hide_download_inline(self):
         self._download_frame.pack_forget()
@@ -1851,6 +1870,10 @@ class DrawingPalette(tk.Toplevel):
                   font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
 
         _do_filter()
+        # Список побудований (фільтри + tree + кнопки Download/Cancel) —
+        # перераховуємо висоту під повний контент, інакше пізніше додані
+        # кнопки виштовхують групове меню за межі вікна.
+        self.after(50, self._resize_for_download)
 
     def _handle_download_result(self, item):
         """Called when user selects a scheme to download. Shows choice dialog."""
