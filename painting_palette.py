@@ -1587,10 +1587,12 @@ class DrawingPalette(tk.Toplevel):
         self._download_result = None
         for w in self._download_frame.winfo_children():
             w.destroy()
-        # Список після групових кнопок: при нестачі висоти pack зрізає НАЙНИЖЧИЙ
-        # елемент (низ списку, tree скролиться), а кнопки групових схем
-        # (Create/Join/Manage) залишаються видимими на будь-якому екрані/DPI.
-        self._download_frame.pack(fill="both", expand=True, padx=6, pady=4, after=self._group_mgmt_frame)
+        # Список НАД груповими кнопками (логіка вікна: групи внизу палітри).
+        # Висота списку фіксована (pack_propagate False) — контент (фільтри +
+        # tree + кнопки Download/Cancel) скролиться всередині своєї зони і
+        # не виштовхує групове меню за межі вікна.
+        self._download_frame.pack(fill="x", padx=6, pady=4, before=self._status_lbl)
+        self._download_frame.pack_propagate(False)
         try:
             self._palette_compact_geo = self.geometry()
         except Exception:
@@ -1604,13 +1606,17 @@ class DrawingPalette(tk.Toplevel):
         t.start()
 
     def _resize_for_download(self):
-        """Підганяє висоту палітри під повний контент (зараз або після
-        наповнення списку) і тримає вікно в межах екрана."""
+        """Висота палітри = контент БЕЗ списку (base_h, включно з груповими
+        кнопками внизу) + фіксована зона списку (dl_h, контент у скролі).
+        Вікно тримається в межах екрана і піднімається, якщо виходить за низ."""
         try:
             self.update_idletasks()
-            req_h = self.winfo_reqheight()
+            base_h = self.winfo_reqheight()
             sh = self.winfo_screenheight()
-            target_h = min(max(req_h, 780), sh - 120)
+            max_h = sh - 40
+            dl_h = min(320, max(180, max_h - base_h))
+            self._download_frame.configure(height=dl_h)
+            target_h = min(base_h + dl_h, max_h)
             if target_h < 300:
                 target_h = 300
             g = self.geometry()
@@ -1870,10 +1876,6 @@ class DrawingPalette(tk.Toplevel):
                   font=("Arial", 9, "bold"), padx=12, pady=4, command=on_download).pack(side="right", padx=2)
 
         _do_filter()
-        # Список побудований (фільтри + tree + кнопки Download/Cancel) —
-        # перераховуємо висоту під повний контент, інакше пізніше додані
-        # кнопки виштовхують групове меню за межі вікна.
-        self.after(50, self._resize_for_download)
 
     def _handle_download_result(self, item):
         """Called when user selects a scheme to download. Shows choice dialog."""
