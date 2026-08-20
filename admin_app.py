@@ -1917,7 +1917,7 @@ class AdminApp:
                     self._community["status"]["youtube"] = st or "ok"
                 else:
                     self._community["status"]["youtube"] = "no_key"
-                if not yt and self._app_visible():
+                if not yt and self._app_visible() and not self._community.get("fs"):
                     yt, st = self._fetch_yt_chrome()
                     self._community["status"]["youtube"] = st or "ok"
                 if yt:
@@ -1928,14 +1928,14 @@ class AdminApp:
                     self._community["status"]["reddit"] = "ok"
                 else:
                     self._community["status"]["reddit"] = st or "error"
-                    if self._app_visible():
+                    if self._app_visible() and not self._community.get("fs"):
                         red2, st2 = self._fetch_reddit_chrome()
                         if red2:
                             self._community["stats"]["reddit"] = red2
                             self._community["status"]["reddit"] = "ok"
                         else:
                             self._community["status"]["reddit"] = st2 or "error"
-                if self._app_visible():
+                if self._app_visible() and not self._community.get("fs"):
                     kf, st3 = self._fetch_kofi_chrome()
                     if kf:
                         self._community["stats"]["kofi"] = kf
@@ -2140,34 +2140,51 @@ class AdminApp:
         drv = self._community_ensure_browser(self._community.get("fs"))
         if drv is None:
             return None, "no_browser"
+        main_handle = None
         try:
-            channel = self._community.get("yt_channel_id")
-            if not channel:
-                drv.get("https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
-                time.sleep(3.5)
-                m = re.search(r'"channelId":"(UC[0-9A-Za-z_-]{22})"', drv.page_source)
-                if not m:
-                    return None, "no_channel_id"
-                channel = m.group(1)
-                self._community["yt_channel_id"] = channel
-            drv.get("https://www.youtube.com/channel/" + channel + "/videos")
-            time.sleep(4)
-            html = drv.page_source
-            videos = _parse_yt_videos(_yt_initial_data(html)) if _yt_initial_data(html) else []
-            if not videos:
-                for sel in ("button[aria-label*='consent']", "button[aria-label*='Accept']",
-                            "form[action*='consent'] button"):
+            main_handle = drv.current_window_handle
+            try:
+                drv.switch_to.new_window("tab")
+            except Exception:
+                pass
+            try:
+                channel = self._community.get("yt_channel_id")
+                if not channel:
+                    drv.get("https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
+                    time.sleep(3.5)
+                    m = re.search(r'"channelId":"(UC[0-9A-Za-z_-]{22})"', drv.page_source)
+                    if not m:
+                        return None, "no_channel_id"
+                    channel = m.group(1)
+                    self._community["yt_channel_id"] = channel
+                drv.get("https://www.youtube.com/channel/" + channel + "/videos")
+                time.sleep(4)
+                html = drv.page_source
+                videos = _parse_yt_videos(_yt_initial_data(html)) if _yt_initial_data(html) else []
+                if not videos:
+                    for sel in ("button[aria-label*='consent']", "button[aria-label*='Accept']",
+                                "form[action*='consent'] button"):
+                        try:
+                            drv.find_element("css selector", sel).click()
+                            time.sleep(3)
+                            break
+                        except Exception:
+                            continue
+                    data = _yt_initial_data(drv.page_source)
+                    videos = _parse_yt_videos(data) if data else []
+                if not videos:
+                    return None, "no_videos_parsed"
+                return {"videos": videos, "channel": {}}, None
+            finally:
+                try:
+                    drv.close()
+                except Exception:
+                    pass
+                if main_handle is not None:
                     try:
-                        drv.find_element("css selector", sel).click()
-                        time.sleep(3)
-                        break
+                        drv.switch_to.window(main_handle)
                     except Exception:
-                        continue
-                data = _yt_initial_data(drv.page_source)
-                videos = _parse_yt_videos(data) if data else []
-            if not videos:
-                return None, "no_videos_parsed"
-            return {"videos": videos, "channel": {}}, None
+                        pass
         except Exception as e:
             return None, str(e)[:80]
 
@@ -2249,32 +2266,49 @@ class AdminApp:
         drv = self._community_ensure_browser(self._community.get("fs"))
         if drv is None:
             return None, "no_browser"
+        main_handle = None
         try:
-            if not self._reddit_logged_in(drv):
-                st = self._login_reddit(drv)
-                if st != "ok":
-                    if st == "needs_reddit_creds":
-                        self._community_action_needed("Reddit — " + self.t("tile_needs_login"))
-                    return None, st
-            # Public .json API is 403 without OAuth, but the logged-in browser
-            # session gets it with cookies — parse JSON, not HTML.
-            drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json")
-            time.sleep(3)
-            posts = []
-            m = re.search(r"<pre>(.*?)</pre>", drv.page_source, re.S)
-            if m:
-                data = json.loads(m.group(1))
-                for ch in (data.get("data", {}).get("children") or []):
-                    d = ch.get("data", {})
-                    posts.append({"title": d.get("title", ""),
-                                  "date": time.strftime("%Y-%m-%d",
-                                                         time.localtime(d.get("created_utc", 0))),
-                                  "score": d.get("score", 0),
-                                  "comments": d.get("num_comments", 0),
-                                  "url": "https://www.reddit.com" + (d.get("permalink") or "")})
-            if not posts:
-                return None, "empty"
-            return {"posts": posts}, None
+            main_handle = drv.current_window_handle
+            try:
+                drv.switch_to.new_window("tab")
+            except Exception:
+                pass
+            try:
+                if not self._reddit_logged_in(drv):
+                    st = self._login_reddit(drv)
+                    if st != "ok":
+                        if st == "needs_reddit_creds":
+                            self._community_action_needed("Reddit — " + self.t("tile_needs_login"))
+                        return None, st
+                # Public .json API is 403 without OAuth, but the logged-in browser
+                # session gets it with cookies — parse JSON, not HTML.
+                drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json")
+                time.sleep(3)
+                posts = []
+                m = re.search(r"<pre>(.*?)</pre>", drv.page_source, re.S)
+                if m:
+                    data = json.loads(m.group(1))
+                    for ch in (data.get("data", {}).get("children") or []):
+                        d = ch.get("data", {})
+                        posts.append({"title": d.get("title", ""),
+                                      "date": time.strftime("%Y-%m-%d",
+                                                             time.localtime(d.get("created_utc", 0))),
+                                      "score": d.get("score", 0),
+                                      "comments": d.get("num_comments", 0),
+                                      "url": "https://www.reddit.com" + (d.get("permalink") or "")})
+                if not posts:
+                    return None, "empty"
+                return {"posts": posts}, None
+            finally:
+                try:
+                    drv.close()
+                except Exception:
+                    pass
+                if main_handle is not None:
+                    try:
+                        drv.switch_to.window(main_handle)
+                    except Exception:
+                        pass
         except Exception as e:
             return None, str(e)[:80]
 
@@ -2335,22 +2369,39 @@ class AdminApp:
         drv = self._community_ensure_browser(self._community.get("fs"))
         if drv is None:
             return None, "no_browser"
+        main_handle = None
         try:
-            if not self._kofi_logged_in(drv):
-                st = self._login_kofi(drv)
-                if st != "ok":
-                    if st == "needs_kofi_creds":
-                        self._community_action_needed("Ko-fi — " + self.t("tile_needs_login"))
-                    return None, st
-                drv.get("https://ko-fi.com/Manage/SupportReceived")
-                time.sleep(4)
-            amounts = _parse_kofi_amounts(drv.page_source)
-            if not amounts:
-                drv.get("https://ko-fi.com/Manage/SupportReceived")
-                time.sleep(4)
+            main_handle = drv.current_window_handle
+            try:
+                drv.switch_to.new_window("tab")
+            except Exception:
+                pass
+            try:
+                if not self._kofi_logged_in(drv):
+                    st = self._login_kofi(drv)
+                    if st != "ok":
+                        if st == "needs_kofi_creds":
+                            self._community_action_needed("Ko-fi — " + self.t("tile_needs_login"))
+                        return None, st
+                    drv.get("https://ko-fi.com/Manage/SupportReceived")
+                    time.sleep(4)
                 amounts = _parse_kofi_amounts(drv.page_source)
-            # 0 donations on a valid dashboard is a normal state, not an error.
-            return {"total": sum(amounts), "count": len(amounts), "amounts": amounts}, None
+                if not amounts:
+                    drv.get("https://ko-fi.com/Manage/SupportReceived")
+                    time.sleep(4)
+                    amounts = _parse_kofi_amounts(drv.page_source)
+                # 0 donations on a valid dashboard is a normal state, not an error.
+                return {"total": sum(amounts), "count": len(amounts), "amounts": amounts}, None
+            finally:
+                try:
+                    drv.close()
+                except Exception:
+                    pass
+                if main_handle is not None:
+                    try:
+                        drv.switch_to.window(main_handle)
+                    except Exception:
+                        pass
         except Exception as e:
             return None, str(e)[:80]
 

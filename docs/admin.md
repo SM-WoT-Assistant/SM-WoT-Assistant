@@ -61,6 +61,7 @@
 - RTDB лічильники: `installations/` (всього + розбивка по версіях), `error_reports/`, `schemes/`, `users/`, `builds/version` + `last_generated_at`
 - УВАГА (20.08.2026, v1.0.19): `installations/` має read `auth != null` (#1529) — лічильник читається через `admin_auth._rtdb_url_with_token()` (`_fetch_installations`); bare API key дає 401 → «0». Без `admin_creds.json` → tile «—». Також: `_rtdb_url()` вже містить `?auth=KEY` — query-параметри (orderBy/endAt/limitToLast) треба додавати через `&`, інакше RTDB 400 «orderBy must be defined» (баг `_cleanup_old_error_reports` та перших версій `_fetch_errors_list`)
 - Усі фетчі в daemon-потоках + `root.after(0, ...)`, статус кожного джерела: Loading… / ok / no_key / blocked / needs_* / error (ніколи не падає)
+- **Tab-ізоляція (v1.0.24, 21.08.2026):** `_fetch_yt_chrome`/`_fetch_reddit_chrome`/`_fetch_kofi_chrome` працюють у НОВІЙ фоновій вкладці (`switch_to.new_window("tab")` → close → повернення на `current_window_handle`) — вкладка юзера ніколи не навігується («браузер зникає» при логіні/Refresh було саме навігацією fetch по вкладці юзера); фоновий цикл `_refresh_community_background` НЕ запускає Chrome-фетчі у повноекранному Community (fs-guard) — тільки Refresh-кнопки
 
 ### 5. Зашифроване сховище admin_vault.py (DPAPI)
 - Новий модуль: `CryptProtectData`/`CryptUnprotectData` (crypt32.dll через ctypes, `CRYPTPROTECT_UI_FORBIDDEN`), прив'язка до Windows-акаунта
