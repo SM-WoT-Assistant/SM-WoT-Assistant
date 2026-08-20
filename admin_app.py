@@ -162,6 +162,7 @@ _TR_EN = {
     "tile_youtube": "YouTube",
     "tile_github": "GitHub",
     "tile_kofi": "Ko-fi",
+    "tile_reddit": "Reddit",
     "tile_installs": "Installs",
     "tile_errors": "Errors",
     "tile_needs_key": "⚠ needs API key",
@@ -698,6 +699,29 @@ def _hwnd_alive(hwnd):
         return False
 
 
+def _open_bg_tab(drv):
+    """Open a NEW BACKGROUND tab WITHOUT activating it in the UI (CDP
+    Target.createTarget), so the user's visible tab never jumps — closing it
+    later must not switch the UI to a neighbour tab (the 'page snaps to
+    Reddit' symptom). Falls back to a regular tab when CDP is unavailable.
+    Returns the new tab handle (or None)."""
+    try:
+        before = set(drv.window_handles)
+        drv.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
+        time.sleep(0.2)
+        new_handles = [h for h in drv.window_handles if h not in before]
+        if new_handles:
+            drv.switch_to.window(new_handles[-1])
+            return new_handles[-1]
+    except Exception:
+        pass
+    try:
+        drv.switch_to.new_window("tab")
+        return drv.current_window_handle
+    except Exception:
+        return None
+
+
 def _fix_crashed_profile_prefs():
     """Chrome shows a 'Restore pages?' bubble when the profile was killed
     (exit_type=Crashed + stale Last Session/Current Session files) — a modal
@@ -911,7 +935,8 @@ class AdminApp:
         threading.Thread(target=self._report_admin_status,
                          kwargs={"status": "idle"}, daemon=True).start()
         self._start_background()
-        self.root.after(8000, self._refresh_community_background)
+        # No periodic community fetch on startup: admin tool = manual updates
+        # (Refresh / Link buttons; one-shot RTDB counters on Community entry).
 
     def _report_admin_status(self, status=None):
         """Publish admin app info to RTDB admin_app/ node (fire-and-forget)."""
@@ -1317,6 +1342,7 @@ class AdminApp:
         _tile("youtube", "youtube")
         _tile("github", "github")
         _tile("kofi", "kofi")
+        _tile("reddit", "reddit")
         _tile("installs", "overview")
         _tile("errors", "errors")
         return tiles
@@ -1355,6 +1381,9 @@ class AdminApp:
             kf = st.get("kofi")
             vals["kofi"].config(text=_fmt_money(kf.get("total")) if kf else "—")
             hints["kofi"].config(text=self._tile_hint(status.get("kofi")))
+            red = st.get("reddit")
+            vals["reddit"].config(text=_fmt_num(len(red.get("posts", []))) if red else "—")
+            hints["reddit"].config(text=self._tile_hint(status.get("reddit")))
             vals["installs"].config(text=str(st.get("installs")) if st.get("installs") is not None else "—")
             hints["installs"].config(text="")
             vals["errors"].config(text=str(st.get("errors")) if st.get("errors") is not None else "—")
@@ -1392,6 +1421,15 @@ class AdminApp:
             threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
         self.root.after(500, self._community_show_browser)
         self.root.after(200, self._community_poll_embed)
+
+        def _rtdb_once():
+            try:
+                self._fetch_rtdb_counters()
+                self.root.after(0, self._update_tiles)
+            except Exception:
+                pass
+
+        threading.Thread(target=_rtdb_once, daemon=True).start()
         self._update_comm_tabs()
 
     def _exit_community(self):
@@ -2105,6 +2143,9 @@ class AdminApp:
                 self._community["refreshing"] = False
                 if name in ("reddit", "kofi"):
                     self._remember_linked(name, self._community["status"].get(name) in ("ok", "empty"))
+                st_now = self._community["status"].get(name)
+                if st_now and st_now not in ("ok", "empty", "idle", "hidden", "no_key"):
+                    self._community_action_needed("%s: %s" % (name, st_now))
                 self._log("[DEBUG][fetch] tab=%s -> %s" % (
                     name, self._community["status"].get(name)))
                 self.root.after(0, self._update_tiles)
@@ -2141,6 +2182,9 @@ class AdminApp:
                 self._remember_linked(name, False)
             finally:
                 self._community["refreshing"] = False
+                st_now = self._community["status"].get(name)
+                if st_now and st_now not in ("ok", "empty", "idle", "hidden", "no_key"):
+                    self._community_action_needed("%s: %s" % (name, st_now))
                 self._log("[DEBUG][link] %s -> %s linked=%s" % (
                     name, self._community["status"].get(name),
                     self._community["linked"].get(name)))
@@ -2296,10 +2340,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            try:
-                drv.switch_to.new_window("tab")
-            except Exception:
-                pass
+            _open_bg_tab(drv)
             try:
                 channel = self._community.get("yt_channel_id")
                 if not channel:
@@ -2423,10 +2464,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            try:
-                drv.switch_to.new_window("tab")
-            except Exception:
-                pass
+            _open_bg_tab(drv)
             try:
                 if not self._reddit_logged_in(drv):
                     st = self._login_reddit(drv)
@@ -2527,10 +2565,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            try:
-                drv.switch_to.new_window("tab")
-            except Exception:
-                pass
+            _open_bg_tab(drv)
             try:
                 if not self._kofi_logged_in(drv):
                     st = self._login_kofi(drv)
@@ -2794,16 +2829,9 @@ class AdminApp:
                                 self.t("notif_changes"),
                                 self.t("notif_changes_body", n=len(changed)))
                             self._do_generate(changed)
-                    if now - self._community["last_rtdb"] > 300:  # 5 min community RTDB counters
-                        self._community["last_rtdb"] = now
-                        try:
-                            self._fetch_rtdb_counters()
-                            self.root.after(0, self._update_tiles)
-                        except Exception:
-                            pass
-                    if now - self._community["last_comm"] > 600:  # 10 min community platforms
-                        self._community["last_comm"] = now
-                        self._refresh_community_background()
+                    # NO periodic community fetches: this is an admin tool —
+                    # all platform/RTDB data updates are manual (Refresh / Link
+                    # buttons on the tabs; one-shot counters on Community entry).
                 except Exception as e:
                     self._log(self.t("log_bg_error", err=e))
                 time.sleep(10)
