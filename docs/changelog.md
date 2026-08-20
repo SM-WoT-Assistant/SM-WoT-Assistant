@@ -4,6 +4,26 @@
 
 ---
 
+## Адмінка v1.0.23 (21.08.2026): програма бачить залогінену сесію Reddit/Ko-fi у вбудованому браузері
+
+Юзер повідомив: «Зайшов на сторінку Reddit і Ko-fi, але програма не підхоплює це» — у статусі вкладки Reddit було `login_form_missing`, Ko-fi — помилка автологіну. Діагноз через живу серію тестів на профілі юзера (headless AdminApp + fetch-методи + HTML-дампи): **перевірка сесії в обох фетчах була хибною** — програма не розпізнавала, що юзер уже залогінений у `community_chrome_profile`, і наосліп лізла в автологін.
+
+Факти (підтверджені дампами реальних сторінок 2026):
+1. **Reddit**: `reddit.com/api/v1/me` працює тільки з OAuth-токеном, cookie-сесію браузера НЕ бачить (завжди False); `reddit.com/login/` НЕ редиректить залогіненого юзера (форма-перевірка теж безсила). Натомість `reddit.com/settings/` — приватна: залогінений бачить її, не-залогіненого викидає на `/login`. Публічний `submitted.json` без OAuth — 403+HTML (перевірено живим запитом), АЛЕ з кукі залогіненої сесії браузера повертає валідний JSON.
+2. **Ko-fi**: старий шлях донатів `ko-fi.com/manage/donations` — **404 з 2026** (саме тому парсер бачив порожнє). Новий дашборд: залогіненого `ko-fi.com` редиректить на `https://ko-fi.com/Manage/`, самі донати — `/Manage/SupportReceived` (title «Ko-fi | Transactions»), суми — елементи з класом `transaction-row-amount` (тільки CSS у дампі — у юзера транзакцій поки 0; `$12` на сторінці — ціни підписок, не донати).
+
+**Фікс (тільки перевірка сесії + шляхи; парсери відповідно):**
+1. `_reddit_logged_in` → `drv.get("https://www.reddit.com/settings/")`; залогінений = url без `login` і title без `404` (редирект на `/login` = не залогінений).
+2. `_fetch_reddit_chrome` → замість HTML-парсингу профілю: `drv.get(".../submitted.json")` (з кукі сесії) + JSON-парсинг (той самий формат, що у `_fetch_reddit_http`); 0 постів → статус `empty` (чесний стан, не помилка).
+3. `_kofi_logged_in` → `drv.get("https://ko-fi.com/Manage/SupportReceived")`; залогінений = url без `/login` і title без `404`.
+4. `_fetch_kofi_chrome` → шлях `/Manage/SupportReceived` замість мертвого `/manage/donations`; **0 донатів на валідній сторінці — нормальний стан** (повертає `{"total": 0, "count": 0}`, статус OK) замість помилки `no_amounts_parsed`.
+5. `_parse_kofi_amounts` → додано клас `transaction-row-amount` у regex.
+6. [DEBUG]-логи fetch-статусів в admin.log (`[DEBUG][fetch] yt=... red=... kofi=... gh=...` у `_refresh_community_background` + `[DEBUG][fetch] tab=... -> ...` у `_community_refresh_tab`) — статуси тепер видно в логу (раніше не логувались зовсім).
+
+Верифікація: AST OK; тест на профілі юзера: `reddit_chrome -> empty` (сесія розпізнана, 0 постів), `kofi_chrome -> {'total': 0, 'count': 0}` (сесія розпізнана, 0 донатів) — помилок `login_form_missing`/`no_amounts_parsed` більше немає. Build v1.0.23 (8.6 MB, _internal 69) через TMP-обхід; адмінка запущена (21.08). Юзер має побачити вкладки Reddit/Ko-fi зі статусом OK (0 постів/0 донатів — чесний стан, поки даних нема) замість помилок логіну.
+
+---
+
 ## Адмінка v1.0.22 (20.08.2026): фікс регресії 1.0.21 — «термінал замість браузера»
 
 Юзер повідомив: «Замість браузера відкрився термінал». Живий лог v1.0.21 (юзерська сесія 20:18) показав: `[DEBUG][locate] pid=16664 hwnd=919816` + `[DEBUG][embed] ok=True` — embed СПРАЦЮВАВ, але вбудував НЕ те вікно. Розбір: у v1.0.21 я «оптимізував» `_locate` — pid брався з `drv.service.process.pid`, але у Selenium `service.process` — це процес **chromedriver, а не Chrome**. chromedriver — консольний процес; selenium запускає його `Popen`-ом без `CREATE_NO_WINDOW`, тому у windowed-адмінці він отримує **видиме консольне вікно**, і `_find_hwnd_by_pid` вбудував саме його (термінал у фреймі), а Chrome лишився поза екраном. У v1.0.18 працювало, бо pid брався через `_chrome_main_pid` (PowerShell → pid саме Chrome).

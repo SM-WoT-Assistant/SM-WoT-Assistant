@@ -524,7 +524,7 @@ def _parse_reddit_html(html):
 def _parse_kofi_amounts(html):
     """Best-effort donation amount extraction from Ko-fi dashboard HTML."""
     amounts = []
-    for m in re.finditer(r'<[^>]+class="[^"]*(?:amount|donation)[^"]*"[^>]*>\s*([€£$¥]\s*[\d.,]+)\s*<',
+    for m in re.finditer(r'<[^>]+class="[^"]*(?:amount|donation|transaction-row-amount)[^"]*"[^>]*>\s*([€£$¥]\s*[\d.,]+)\s*<',
                          html, re.I):
         txt = re.sub(r"[^\d.,]", "", m.group(1)).replace(",", ".")
         try:
@@ -1948,6 +1948,11 @@ class AdminApp:
                 self._log(self.t("log_comm_error", err=str(e)[:200]))
             finally:
                 self._community["refreshing"] = False
+                self._log("[DEBUG][fetch] yt=%s red=%s kofi=%s gh=%s" % (
+                    self._community["status"].get("youtube"),
+                    self._community["status"].get("reddit"),
+                    self._community["status"].get("kofi"),
+                    self._community["status"].get("github")))
                 self.root.after(0, self._update_tiles)
                 self.root.after(0, self._update_comm_tabs)
 
@@ -1984,6 +1989,8 @@ class AdminApp:
                 self._community["status"][name] = str(e)[:100]
             finally:
                 self._community["refreshing"] = False
+                self._log("[DEBUG][fetch] tab=%s -> %s" % (
+                    name, self._community["status"].get(name)))
                 self.root.after(0, self._update_tiles)
                 self.root.after(0, self._update_comm_tabs)
 
@@ -2187,9 +2194,16 @@ class AdminApp:
 
     def _reddit_logged_in(self, drv):
         try:
-            drv.get("https://www.reddit.com/api/v1/me")
-            time.sleep(2)
-            return '"name"' in drv.page_source and "login" not in drv.current_url.lower()
+            # /api/v1/me requires OAuth (never sees a cookie session), and
+            # /login/ does NOT redirect logged-in users on modern Reddit.
+            # /settings/ is private: logged-in users see it, others get sent
+            # to /login — that redirect is the session check.
+            drv.get("https://www.reddit.com/settings/")
+            time.sleep(3)
+            url = drv.current_url.lower()
+            if "login" in url:
+                return False
+            return "404" not in str(drv.title).lower()
         except Exception:
             return False
 
@@ -2201,6 +2215,8 @@ class AdminApp:
         try:
             drv.get("https://www.reddit.com/login/")
             time.sleep(3.5)
+            if "login" not in drv.current_url.lower():
+                return "ok"  # already logged in — /login redirected away
             u = self._find_elem(drv, [("css selector", "input[name='username']"),
                                       ("id", "login-username")])
             p = self._find_elem(drv, [("css selector", "input[name='password']"),
@@ -2240,25 +2256,40 @@ class AdminApp:
                     if st == "needs_reddit_creds":
                         self._community_action_needed("Reddit — " + self.t("tile_needs_login"))
                     return None, st
-            drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/")
-            time.sleep(4)
-            posts = _parse_reddit_html(drv.page_source)
+            # Public .json API is 403 without OAuth, but the logged-in browser
+            # session gets it with cookies — parse JSON, not HTML.
+            drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json")
+            time.sleep(3)
+            posts = []
+            m = re.search(r"<pre>(.*?)</pre>", drv.page_source, re.S)
+            if m:
+                data = json.loads(m.group(1))
+                for ch in (data.get("data", {}).get("children") or []):
+                    d = ch.get("data", {})
+                    posts.append({"title": d.get("title", ""),
+                                  "date": time.strftime("%Y-%m-%d",
+                                                         time.localtime(d.get("created_utc", 0))),
+                                  "score": d.get("score", 0),
+                                  "comments": d.get("num_comments", 0),
+                                  "url": "https://www.reddit.com" + (d.get("permalink") or "")})
             if not posts:
-                return None, "no_posts_parsed"
+                return None, "empty"
             return {"posts": posts}, None
         except Exception as e:
             return None, str(e)[:80]
 
     def _kofi_logged_in(self, drv):
         try:
-            drv.get("https://ko-fi.com/manage/donations")
-            time.sleep(3)
-            if "/login" in drv.current_url.lower():
+            # Old /manage/donations returns a 404 page since 2026; the live
+            # dashboard is /Manage/SupportReceived ("Ko-fi | Transactions").
+            # It is private: logged-in users see it, others get /login; a 404
+            # page must not count as a valid session.
+            drv.get("https://ko-fi.com/Manage/SupportReceived")
+            time.sleep(4)
+            url = drv.current_url.lower()
+            if "/login" in url:
                 return False
-            low = drv.page_source.lower()
-            if "sign in" in low and ("password" in low or "email" in low):
-                return False
-            return "donation" in low
+            return "404" not in str(drv.title).lower()
         except Exception:
             return False
 
@@ -2270,6 +2301,8 @@ class AdminApp:
         try:
             drv.get("https://ko-fi.com/login")
             time.sleep(3.5)
+            if "login" not in drv.current_url.lower():
+                return "ok"  # already logged in — /login redirected away
             u = self._find_elem(drv, [("css selector", "input[name='email'], input[type='email']"),
                                       ("id", "email")])
             p = self._find_elem(drv, [("css selector", "input[name='password'], input[type='password']"),
@@ -2309,13 +2342,14 @@ class AdminApp:
                     if st == "needs_kofi_creds":
                         self._community_action_needed("Ko-fi — " + self.t("tile_needs_login"))
                     return None, st
+                drv.get("https://ko-fi.com/Manage/SupportReceived")
+                time.sleep(4)
             amounts = _parse_kofi_amounts(drv.page_source)
             if not amounts:
-                drv.get("https://ko-fi.com/manage/donations")
+                drv.get("https://ko-fi.com/Manage/SupportReceived")
                 time.sleep(4)
                 amounts = _parse_kofi_amounts(drv.page_source)
-            if not amounts:
-                return None, "no_amounts_parsed"
+            # 0 donations on a valid dashboard is a normal state, not an error.
             return {"total": sum(amounts), "count": len(amounts), "amounts": amounts}, None
         except Exception as e:
             return None, str(e)[:80]
