@@ -437,7 +437,8 @@ def _kill_chrome_matching(pattern):
          "ForEach-Object {{ Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }}").format(pat)
     try:
         subprocess.run(["powershell", "-NoProfile", "-Command", q],
-                       capture_output=True, timeout=20)
+                       capture_output=True, timeout=20,
+                       creationflags=subprocess.CREATE_NO_WINDOW)
     except Exception:
         pass
 

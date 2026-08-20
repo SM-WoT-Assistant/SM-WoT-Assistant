@@ -15,8 +15,14 @@ def read_version():
         return f.read().strip()
 
 
-def build_admin_exe(version):
-    """Build admin_app.py as --onefile EXE."""
+def build_admin_exe(version, dist_dir=None):
+    """Build admin_app.py as --onedir EXE.
+    dist_dir: override output dir (used when the canonical ADMIN_DIR is
+    locked by the invisible handle incident #1546 — WinError 32 on the
+    folder itself while writing inside still works)."""
+    if dist_dir is None:
+        dist_dir = DIST_DIR
+    admin_exe_dir = os.path.join(dist_dir, "SM WoT Assistant Admin")
     print(f"[BUILD] Building Admin v{version}...")
     admin_py = os.path.join(BASE_DIR, "admin_app.py")
     if not os.path.exists(admin_py):
@@ -28,10 +34,11 @@ def build_admin_exe(version):
         "--onedir", "--windowed",
         "--icon", os.path.join(BASE_DIR, "admin_icon.ico"),
         "--name", "SM WoT Assistant Admin",
-        "--distpath", DIST_DIR,
+        "--distpath", dist_dir,
         "--workpath", os.path.join(BASE_DIR, "build", "admin_app"),
         "--specpath", os.path.join(BASE_DIR, "build"),
         "--clean",
+        "--noconfirm",
         "--add-data", f"{os.path.join(BASE_DIR, 'admin_icon.ico')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, 'admin_version.txt')}{os.pathsep}.",
         "--add-data", f"{os.path.join(BASE_DIR, '_fill_all_builds.py')}{os.pathsep}.",
@@ -64,14 +71,14 @@ def build_admin_exe(version):
         print("[BUILD] Admin EXE build FAILED")
         sys.exit(1)
 
-    exe = os.path.join(ADMIN_DIR, "SM WoT Assistant Admin.exe")
+    exe = os.path.join(admin_exe_dir, "SM WoT Assistant Admin.exe")
     if not os.path.exists(exe):
         print("[BUILD] FATAL: Admin EXE not found")
         sys.exit(1)
 
     # A broken COLLECT leaves an empty _internal — bootloader then dies with
     # "Failed to load Python DLL" on the next launch (13.08.2026 incident).
-    internal = os.path.join(ADMIN_DIR, "_internal")
+    internal = os.path.join(admin_exe_dir, "_internal")
     if not os.path.isdir(internal) or not os.path.exists(os.path.join(internal, "python312.dll")):
         print("[BUILD] FATAL: bundle incomplete — _internal missing python312.dll")
         sys.exit(1)
@@ -85,17 +92,42 @@ def build_admin_exe(version):
     return exe
 
 
+def _rmtree_tolerant(path):
+    """Remove a tree; a locked directory (invisible handle incident #1546 —
+    WinError 32 on the folder itself while writing inside still works) is left
+    EMPTY instead of failing the build — PyInstaller COLLECT overwrites it."""
+    if not os.path.isdir(path):
+        return
+    for root, dirs, files in os.walk(path, topdown=False):
+        for f in files:
+            p = os.path.join(root, f)
+            try:
+                os.remove(p)
+            except Exception:
+                pass
+        for d in dirs:
+            p = os.path.join(root, d)
+            try:
+                os.rmdir(p)
+            except Exception:
+                pass
+    try:
+        os.rmdir(path)
+    except Exception:
+        pass
+
+
 def clean():
     """Clean build artifacts."""
     for p in [os.path.join(BASE_DIR, "build", "admin_app"),
               os.path.join(BASE_DIR, "SM WoT Assistant Admin.spec")]:
         if os.path.exists(p):
             if os.path.isdir(p):
-                shutil.rmtree(p)
+                _rmtree_tolerant(p)
             else:
                 os.remove(p)
     if os.path.isdir(ADMIN_DIR):
-        shutil.rmtree(ADMIN_DIR)
+        _rmtree_tolerant(ADMIN_DIR)
     if os.path.exists(DIST_DIR):
         for f in os.listdir(DIST_DIR):
             if f.startswith("SM WoT Assistant Admin") and f.endswith(".exe"):
@@ -109,7 +141,20 @@ def main():
     print("=" * 60)
 
     clean()
-    build_admin_exe(version)
+    if os.path.isdir(ADMIN_DIR) and os.listdir(ADMIN_DIR):
+        # Invisible handle incident #1546: the canonical folder can't be
+        # removed — build into a temp dir and overwrite (writing inside the
+        # locked folder still works).
+        tmp_build = os.path.join(DIST_DIR, "Admin_TMP_BUILD")
+        if os.path.isdir(tmp_build):
+            shutil.rmtree(tmp_build, ignore_errors=True)
+        print("[BUILD] canonical dir locked — building into Admin_TMP_BUILD, then deploying")
+        build_admin_exe(version, dist_dir=tmp_build)
+        shutil.copytree(os.path.join(tmp_build, "SM WoT Assistant Admin"),
+                        ADMIN_DIR, dirs_exist_ok=True)
+        shutil.rmtree(tmp_build, ignore_errors=True)
+    else:
+        build_admin_exe(version)
 
     print()
     print(f"[BUILD] Admin v{version} built!")

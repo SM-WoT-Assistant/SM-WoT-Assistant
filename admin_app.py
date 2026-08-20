@@ -543,7 +543,8 @@ def _chrome_main_pid(profile_dir):
          "Select-Object -First 1 -ExpandProperty ProcessId").format(pat)
     try:
         out = subprocess.run(["powershell", "-NoProfile", "-Command", q],
-                             capture_output=True, text=True, timeout=20)
+                             capture_output=True, text=True, timeout=20,
+                             creationflags=subprocess.CREATE_NO_WINDOW)
         pid = out.stdout.strip()
         return int(pid) if pid.isdigit() else None
     except Exception:
@@ -551,7 +552,10 @@ def _chrome_main_pid(profile_dir):
 
 
 def _find_hwnd_by_pid(pid):
-    """Top-level window HWNDs belonging to a PID."""
+    """Top-level window HWNDs belonging to a PID.
+    Returns the LARGEST visible window (by area) — Chrome may show small
+    modal dialogs ('Restore pages?') alongside the main window, and the
+    main window must always win the embed selection."""
     result = []
     EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
 
@@ -566,9 +570,20 @@ def _find_hwnd_by_pid(pid):
         ctypes.windll.user32.EnumWindows(EnumProc(_cb), 0)
     except Exception:
         pass
+    best, best_area = None, 0
+    user32 = ctypes.windll.user32
+    user32.GetWindowRect.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.RECT)]
     for h in result:
-        if ctypes.windll.user32.IsWindowVisible(h):
-            return h
+        if not user32.IsWindowVisible(h):
+            continue
+        rect = wintypes.RECT()
+        if not user32.GetWindowRect(h, ctypes.byref(rect)):
+            continue
+        area = (rect.right - rect.left) * (rect.bottom - rect.top)
+        if area > best_area:
+            best_area, best = area, h
+    if best is not None:
+        return best
     return result[-1] if result else None
 
 
@@ -585,7 +600,6 @@ def _embed_hwnd(hwnd, parent_hwnd, w, h):
     user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
                                     ctypes.c_int, ctypes.c_int, wintypes.UINT]
     prev = user32.SetParent(hwnd, parent_hwnd)
-    print("[DEBUG][embed_hwnd] hwnd=%s parent=%s prev=%s" % (hwnd, parent_hwnd, prev))
     if prev is None:
         return False
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
@@ -626,18 +640,27 @@ def _move_hwnd(hwnd, x, y, w, h):
 
 def _fix_crashed_profile_prefs():
     """Chrome shows a 'Restore pages?' bubble when the profile was killed
-    (exit_type=Crashed) — a modal window that ignores --window-position and
-    pops up on screen. Rewrite Preferences to Normal before driver start."""
+    (exit_type=Crashed + stale Last Session/Current Session files) — a modal
+    window that ignores --window-position, pops up on screen, and can win the
+    embed HWND selection. Rewrite Preferences to Normal and delete the stale
+    session files before driver start."""
     try:
-        prefs = os.path.join(_COMMUNITY_PROFILE_DIR, CHROME_PROFILE_DIR, "Preferences")
-        if not os.path.isfile(prefs):
-            return
-        with open(prefs, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if data.get("exit_type") == "Crashed":
-            data["exit_type"] = "Normal"
-            with open(prefs, "w", encoding="utf-8") as f:
-                json.dump(data, f)
+        prof = os.path.join(_COMMUNITY_PROFILE_DIR, CHROME_PROFILE_DIR)
+        prefs = os.path.join(prof, "Preferences")
+        if os.path.isfile(prefs):
+            with open(prefs, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if data.get("exit_type") == "Crashed":
+                data["exit_type"] = "Normal"
+                with open(prefs, "w", encoding="utf-8") as f:
+                    json.dump(data, f)
+        for sess in ("Last Session", "Current Session", "Last Tabs", "Last Version"):
+            p = os.path.join(prof, sess)
+            try:
+                if os.path.isfile(p):
+                    os.remove(p)
+            except Exception:
+                pass
     except Exception:
         pass
 
@@ -1719,6 +1742,7 @@ class AdminApp:
                 self._community["hwnd"] = None
         try:
             self._log(self.t("log_comm_start"))
+            _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
             if not os.path.isdir(_COMMUNITY_PROFILE_DIR):
                 try:
                     _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
@@ -1787,12 +1811,20 @@ class AdminApp:
                 drv = self._community.get("driver")
                 if drv is None or self._community.get("visible"):
                     return
-                pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
+                pid = None
+                try:
+                    svc = drv.service
+                    if svc is not None and getattr(svc, "process", None) is not None:
+                        pid = svc.process.pid
+                except Exception:
+                    pass
+                if pid is None:
+                    pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
                 hwnd = _find_hwnd_by_pid(pid) if pid else None
                 if hwnd:
                     self._community["hwnd"] = hwnd
                     self._community["embed_pending"] = True
-                    print("[DEBUG][locate] pid=%s hwnd=%s" % (pid, hwnd))
+                    self._log("[DEBUG][locate] pid=%s hwnd=%s" % (pid, hwnd))
                     return
                 time.sleep(1)
 
@@ -1814,7 +1846,7 @@ class AdminApp:
                         w = max(self._browser_frame.winfo_width(), 200)
                         h = max(self._browser_frame.winfo_height(), 200)
                         ok = _embed_hwnd(hwnd, frame_id, w, h)
-                        print("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
+                        self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
                         if ok:
                             self._community["visible"] = True
                             return
