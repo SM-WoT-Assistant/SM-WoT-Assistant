@@ -21,6 +21,7 @@ os.chdir(_BUNDLE_DIR)
 sys.path.insert(0, _BUNDLE_DIR)
 
 import requests
+import admin_auth
 
 from admin_build_generator import (
     detect_changed_tanks, generate_builds, generate_popular,
@@ -175,6 +176,7 @@ _TR_EN = {
     "tab_github": "GitHub",
     "tab_kofi": "Ko-fi",
     "tab_apikeys": "API Keys",
+    "tab_errors": "Errors",
     "ov_social": "Social networks",
     "ov_donations": "Donations",
     "ov_rtdb": "Service counters (RTDB)",
@@ -208,6 +210,10 @@ _TR_EN = {
     "col_downloads": "Downloads",
     "col_amount": "Amount",
     "col_type": "Type",
+    "col_time": "Time",
+    "col_source": "Source",
+    "col_version": "Version",
+    "col_error": "Error",
     "key_youtube_api": "YouTube Data API key",
     "key_reddit_user": "Reddit username",
     "key_reddit_pass": "Reddit password",
@@ -399,6 +405,14 @@ def _fmt_money(v):
         return "%.2f" % float(v)
     except Exception:
         return "—"
+
+
+def _fmt_ts(iso):
+    """ISO '2026-08-20T10:00:00Z' → '20.08 10:00'. Returns '—' on garbage."""
+    m = re.match(r"(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})", str(iso or ""))
+    if not m:
+        return "—"
+    return "%s.%s %s:%s" % (m.group(3), m.group(2), m.group(4), m.group(5))
 
 
 def _parse_views(txt):
@@ -789,7 +803,7 @@ class AdminApp:
         try:
             now_utc = datetime.datetime.utcnow()
             cutoff = (now_utc - datetime.timedelta(days=60)).strftime("%Y-%m-%dT%H:%M:%SZ")
-            url = _rtdb_url("error_reports") + '?orderBy="timestamp"&endAt="' + cutoff + '"'
+            url = _rtdb_url("error_reports") + '&orderBy="timestamp"&endAt="' + cutoff + '"'
             old = _get_json(url) or {}
             n = 0
             for key, entry in list(old.items()):
@@ -1179,7 +1193,7 @@ class AdminApp:
         _tile("github", "github")
         _tile("kofi", "kofi")
         _tile("installs", "overview")
-        _tile("errors", "overview")
+        _tile("errors", "errors")
         return tiles
 
     def _tile_hint(self, status):
@@ -1270,11 +1284,20 @@ class AdminApp:
 
     def _build_community_ui(self):
         self._comm_root = tk.Frame(self.root, bg=BG)
-        hdr = tk.Frame(self._comm_root, bg=BG)
-        hdr.pack(fill="x", padx=12, pady=(8, 0))
+        main = tk.Frame(self._comm_root, bg=BG)
+        main.pack(fill="both", expand=True, padx=12, pady=(8, 6))
+        main.grid_columnconfigure(0, weight=3, minsize=480)
+        main.grid_columnconfigure(1, weight=2, minsize=480)
+        main.grid_rowconfigure(0, weight=1)
+        left = tk.Frame(main, bg=BG)
+        left.grid(row=0, column=0, sticky="nsew")
+        right = tk.Frame(main, bg=BG)
+        right.grid(row=0, column=1, sticky="nsew", padx=(6, 0))
+        hdr = tk.Frame(left, bg=BG)
+        hdr.pack(fill="x")
         tk.Label(hdr, text=self.t("comm_fs_hint"), font=("Segoe UI", 8), fg="#666", bg=BG).pack(side="left")
-        self._tiles_fs = self._build_tile_strip(self._comm_root)
-        self._tiles_fs["frame"].pack(fill="x", padx=12, pady=(4, 4))
+        self._tiles_fs = self._build_tile_strip(left)
+        self._tiles_fs["frame"].pack(fill="x", pady=(4, 4))
         self._update_tiles()
         style = ttk.Style()
         try:
@@ -1291,8 +1314,8 @@ class AdminApp:
         style.configure("Treeview.Heading", background="#333", foreground=FG,
                         font=("Segoe UI", 9, "bold"))
         style.map("Treeview", background=[("selected", "#444")], foreground=[("selected", FG)])
-        self._nb = ttk.Notebook(self._comm_root)
-        self._nb.pack(fill="both", expand=True, padx=12, pady=(4, 0))
+        self._nb = ttk.Notebook(left)
+        self._nb.pack(fill="both", expand=True, pady=(4, 0))
         self._tab_status = {}
         self._trees = {}
         self._tab_ix = {}
@@ -1327,18 +1350,33 @@ class AdminApp:
         self._nb.add(ak, text=self.t("tab_apikeys"))
         self._tab_ix["apikeys"] = i
         self._build_apikeys_tab(ak)
-        self._banner_lbl = tk.Label(self._comm_root, text="", bg="#1a1a1a", fg="#ffaaaa",
+        er = tk.Frame(self._nb, bg=BG)
+        self._nb.add(er, text=self.t("tab_errors"))
+        self._tab_ix["errors"] = i + 1
+        top = tk.Frame(er, bg=BG)
+        top.pack(fill="x", padx=8, pady=(6, 2))
+        st = tk.Label(top, text=self.t("st_loading"), font=("Segoe UI", 9), fg="#888", bg=BG)
+        st.pack(side="left")
+        self._tab_status["errors"] = st
+        tk.Button(top, text=self.t("btn_refresh"), bg="#333", fg=FG, bd=0,
+                  padx=10, pady=2, cursor="hand2",
+                  command=lambda: self._community_refresh_tab("errors")).pack(side="right")
+        tree_f, tree = self._make_tree(er, ("time", "type", "source", "version", "error"))
+        tree_f.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        self._trees["errors"] = tree
+        self._banner_lbl = tk.Label(left, text="", bg="#1a1a1a", fg="#ffaaaa",
                                     font=("Segoe UI", 10, "bold"))
-        self._banner_lbl.pack(fill="x", padx=12, pady=(4, 0))
-        self._browser_frame = tk.Frame(self._comm_root, bg="#000")
-        self._browser_frame.pack(fill="both", expand=True, padx=12, pady=6)
+        self._banner_lbl.pack(fill="x", pady=(4, 0))
+        self._browser_frame = tk.Frame(right, bg="#000")
+        self._browser_frame.pack(fill="both", expand=True)
         self._browser_frame.bind("<Configure>", self._on_browser_frame_configure)
         self._update_comm_tabs()
 
     def _make_tree(self, parent, cols):
         widths = {"video": 340, "date": 100, "views": 80, "likes": 70, "comments": 80,
                   "post": 360, "score": 70, "release": 150, "downloads": 100,
-                  "amount": 100, "type": 120}
+                  "amount": 100, "type": 120, "time": 110, "source": 170,
+                  "version": 90, "error": 300}
         frame = tk.Frame(parent, bg=BG)
         tree = ttk.Treeview(frame, columns=cols, show="headings", height=10)
         for c in cols:
@@ -1542,6 +1580,15 @@ class AdminApp:
                 rows.append(("", _fmt_money(a), "donation"))
         self._fill_tree(self._trees["kofi"], rows)
         self._set_tab_status("kofi", status.get("kofi"))
+        el = st.get("errors_list")
+        rows = []
+        if el:
+            for r_ in el:
+                rows.append((_fmt_ts(r_.get("time")), r_.get("type"),
+                             r_.get("source") or r_.get("stage"),
+                             r_.get("version"), r_.get("error")[:140]))
+        self._fill_tree(self._trees["errors"], rows)
+        self._set_tab_status("errors", status.get("errors"))
         ov = self._ov_labels
         ov["installs"].config(text=str(st.get("installs")) if st.get("installs") is not None else "—")
         ov["errors"].config(text=str(st.get("errors")) if st.get("errors") is not None else "—")
@@ -1781,6 +1828,12 @@ class AdminApp:
         def _work():
             try:
                 self._fetch_rtdb_counters()
+                el, st_e = self._fetch_errors_list()
+                if el:
+                    self._community["stats"]["errors_list"] = el
+                    self._community["status"]["errors"] = "ok"
+                elif st_e:
+                    self._community["status"]["errors"] = st_e
                 self._community["stats"]["github"], st = self._fetch_github()
                 self._community["status"]["github"] = st or "ok"
                 yt = None
@@ -1843,10 +1896,12 @@ class AdminApp:
                     res, st = self._fetch_reddit_http()
                     if not res:
                         res, st = self._fetch_reddit_chrome()
+                elif name == "errors":
+                    res, st = self._fetch_errors_list()
                 else:
                     res, st = self._fetch_kofi_chrome()
                 if res:
-                    self._community["stats"][name] = res
+                    self._community["stats"]["errors_list" if name == "errors" else name] = res
                     self._community["status"][name] = "ok"
                 else:
                     self._community["status"][name] = st or "error"
@@ -1859,20 +1914,55 @@ class AdminApp:
 
         threading.Thread(target=_work, daemon=True).start()
 
-    def _fetch_rtdb_counters(self):
-        st = self._community["stats"]
+    def _fetch_installations(self):
+        """installations/ закрита правилами (#1529, read auth!=null) — читається
+        тільки з адмін ID-токеном; без admin_creds.json повертає None (tile "—")."""
         try:
-            d = _get_json(_rtdb_url("installations")) or {}
+            url = admin_auth._rtdb_url_with_token(_rtdb_url("installations"))
+            if not url:
+                return None
+            d = _get_json(url) or {}
             if isinstance(d, dict):
-                st["installs"] = len(d)
                 by = {}
                 for v in d.values():
                     if isinstance(v, dict):
                         ver = str(v.get("version") or "?")
                         by[ver] = by.get(ver, 0) + 1
-                st["installs_by_ver"] = by
+                return {"total": len(d), "by_ver": by}
         except Exception:
             pass
+        return None
+
+    def _fetch_errors_list(self):
+        """Останні 200 записів error_reports/ (read-open, bare key OK)."""
+        try:
+            d = _get_json(_rtdb_url("error_reports") + '&orderBy="timestamp"&limitToLast=200') or {}
+            if not isinstance(d, dict):
+                return None, "empty"
+            rows = []
+            for rid, rec in d.items():
+                if not isinstance(rec, dict):
+                    continue
+                rows.append({
+                    "id": rid,
+                    "time": rec.get("timestamp", ""),
+                    "type": rec.get("type", ""),
+                    "stage": rec.get("stage", ""),
+                    "source": (rec.get("details") or {}).get("source", ""),
+                    "version": rec.get("version", ""),
+                    "error": rec.get("error", ""),
+                })
+            rows.sort(key=lambda r: r["time"], reverse=True)
+            return rows, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _fetch_rtdb_counters(self):
+        st = self._community["stats"]
+        ins = self._fetch_installations()
+        if ins is not None:
+            st["installs"] = ins["total"]
+            st["installs_by_ver"] = ins["by_ver"]
         for node, key in (("error_reports", "errors"), ("schemes", "schemes"), ("users", "users")):
             try:
                 d = _get_json(_rtdb_url(node))

@@ -4,6 +4,18 @@
 
 ---
 
+## Адмінка v1.0.19 (20.08.2026): Community Workspace — браузер справа + Errors tab + 401-фікс Installations
+
+Білд: `python build_admin.py` — PyInstaller onedir (`SM WoT Assistant Admin.exe` 8.6 MB, `_internal` 69 entries, guard PASSED), версія з `admin_version.txt` (1.0.19). `build_admin.py clean()` цього разу СПРАЦЮВАВ — невидимий хендл на `dist/SM WoT Assistant Admin/` (#1546) розблокувався після вбиття запущеної адмінки; in-place деплой не знадобився. Адмінка перезапущена: «Танків: 995, Промптів: 996», «Змін не виявлено».
+
+**Що зроблено:**
+1. **Браузер справа** (`admin_app.py:_build_community_ui`): замість вертикального паку всього в `_comm_root` — горизонтальний спліт `main` (grid): ліва колонка (hdr + tiles + Notebook + banner, weight 3, minsize 480) і права (`_browser_frame`, weight 2, minsize 480). Embed-ланцюг (`_community_poll_embed`/`_on_browser_frame_configure`/`_sync_browser_geometry`) читає розміри з `_browser_frame` через winfo — позиційно незалежний, без змін. Верифікація (#1463): smoke-геометрія на 1440×900 — left 892px / right 518px / browser_frame 518×886 (скриншот 22KB).
+2. **Errors tab** (нова вкладка після API Keys): Treeview (time/type/source/version/error, width dict розширено), Refresh-кнопка + статус, `_fetch_errors_list()` — `error_reports` з `&orderBy="timestamp"&limitToLast=200`, сорт за timestamp desc, останні 200. Оновлення в `_refresh_community_background` + `_community_refresh_tab("errors")`. Tile Errors тепер відкриває вкладку Errors (було overview). Нові i18n ключі: `tab_errors`, `col_time`, `col_source`, `col_version`, `col_error` — `_TR_EN` + `admin_uk_seed.json` (en_snapshot + uk, 192/192 без дифів).
+3. **Installations = 0 → 401 фікс** (`_fetch_installations`): `installations/` потребує auth!=null (правила #1529) — read через `admin_auth._rtdb_url_with_token()` (додано `import admin_auth`). Жива перевірка: 264 інсталяції + розбивка по версіях. Без `admin_creds.json` → None → tile «—» (не брехливий 0).
+4. **Знайдено і виправлено сусідній баг**: `_cleanup_old_error_reports()` і `_fetch_errors_list()` конкатенували query з `?`, а `_rtdb_url()` вже повертає `?auth=KEY` → RTDB 400 «orderBy must be defined» → автоочищення error_reports старших 60 днів ТИХО не працювало (перші спроби cleanup 400-ились). Фікс: `&orderBy=...`. Підтверджено: запит тепер повертає 59 записів.
+
+---
+
 ## Реліз v1.0.71 Alpha (19.08.2026, повний цикл build.py)
 
 Збірка: `python build.py 1.0.71` — PyInstaller (Python 3.12.7, onedir) → copy_data_files (3131 файли) → verify.json (30 танків) + popular_tanks_seed → launcher 35.8 MB (bundle verification PASSED: tcl86t/tk86t/_tkinter) → tray watcher 7.1 MB → NSIS installer 225.8 MB (`SM_WoT_Assistant_Setup_v1.0.71_Alpha.exe`) → portable ZIP 246.9 MB → verification PASSED (52 maps, 68 extracted_maps, 1246 icons) → manifest → **GitHub release v1.0.71 Alpha** (audit PASSED) → RTDB publish (HTTP 200, latest pointer оновлено, audit PASSED).

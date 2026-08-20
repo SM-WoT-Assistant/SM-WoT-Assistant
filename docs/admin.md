@@ -39,8 +39,8 @@
 
 ### 2. Повноекранний Community-режим
 - Кнопка **Community** в топбарі (поруч із ⚙) → `_enter_community()`: `root.attributes("-fullscreen", True)` + overlay-frame `place(relx=0,rely=0,relwidth=1,relheight=1)` поверх звичайного контенту (pack-лейаут не чіпається, `place_forget` при виході; ESC — вихід)
-- Склад: плитки (повторний ряд `_build_tile_strip`) + tk.Notebook (6 вкладок: Overview / YouTube / Reddit / GitHub / Ko-fi / API Keys; ttk clam-тема, Treeview dark) + червоний банер дій + вбудований браузер-фрейм
-- Вкладки з Treeview-списками матеріалів: YouTube (Відео|Дата|Views|Likes|Comments), Reddit (Пост|Дата|Score|Comments), GitHub (Реліз|Дата|Downloads), Ko-fi (сума + останні) — кнопка Refresh на кожній вкладці (`_community_refresh_tab`)
+- Склад: плитки (повторний ряд `_build_tile_strip`) + tk.Notebook (7 вкладок: Overview / YouTube / Reddit / GitHub / Ko-fi / API Keys / Errors; ttk clam-тема, Treeview dark) + червоний банер дій + вбудований браузер-фрейм. Розкладка (20.08.2026, v1.0.19): горизонтальний спліт grid — ліва колонка (плитки + Notebook + банер, weight 3, minsize 480), права (`_browser_frame`, weight 2, minsize 480); embed-ланцюг позиційно-незалежний (winfo-розміри з `_browser_frame`)
+- Вкладки з Treeview-списками матеріалів: YouTube (Відео|Дата|Views|Likes|Comments), Reddit (Пост|Дата|Score|Comments), GitHub (Реліз|Дата|Downloads), Ko-fi (сума + останні), Errors (Час|Тип|Джерело|Версія|Помилка) — кнопка Refresh на кожній вкладці (`_community_refresh_tab`); Errors: `_fetch_errors_list()` читає `error_reports` (`&orderBy="timestamp"&limitToLast=200`, сорт desc), оновлюється у фоновому циклі + Refresh; tile Errors відкриває вкладку Errors
 
 ### 3. Вбудований браузер (без окремих вікон)
 - Selenium-Chrome запускається з **постійним профілем** `%APPDATA%/SM WoT Assistant/community_chrome_profile/` (НЕ %TEMP% копія #1542 — цей профіль переживає рестарти, сід 1 раз з реального профілю через `_copy_chrome_profile`)
@@ -54,6 +54,7 @@
 - **Ko-fi**: Chrome: сесія-чек `_kofi_logged_in` (`ko-fi.com/manage/donations`, URL/login-детект) → автологін `_login_kofi` (vault email/password) → `_parse_kofi_amounts` (best-effort: елементи з class*="amount|donation" + валюта) — структура дашборда може мінятись, порожній парс → статус `no_amounts_parsed`
 - **GitHub**: публічний API `api.github.com/repos/SM-WoT-Assistant/SM-WoT-Assistant/releases` → per-release downloads (сума assets), total
 - RTDB лічильники: `installations/` (всього + розбивка по версіях), `error_reports/`, `schemes/`, `users/`, `builds/version` + `last_generated_at`
+- УВАГА (20.08.2026, v1.0.19): `installations/` має read `auth != null` (#1529) — лічильник читається через `admin_auth._rtdb_url_with_token()` (`_fetch_installations`); bare API key дає 401 → «0». Без `admin_creds.json` → tile «—». Також: `_rtdb_url()` вже містить `?auth=KEY` — query-параметри (orderBy/endAt/limitToLast) треба додавати через `&`, інакше RTDB 400 «orderBy must be defined» (баг `_cleanup_old_error_reports` та перших версій `_fetch_errors_list`)
 - Усі фетчі в daemon-потоках + `root.after(0, ...)`, статус кожного джерела: Loading… / ok / no_key / blocked / needs_* / error (ніколи не падає)
 
 ### 5. Зашифроване сховище admin_vault.py (DPAPI)
