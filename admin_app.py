@@ -1751,6 +1751,7 @@ class AdminApp:
                     self._log(self.t("log_comm_error", err="profile seed: %s" % e))
             from selenium import webdriver
             from selenium.webdriver.chrome.options import Options
+            from selenium.webdriver.chrome.service import Service
             opts = Options()
             opts.add_argument(f"--user-data-dir={_COMMUNITY_PROFILE_DIR}")
             opts.add_argument(f"--profile-directory={CHROME_PROFILE_DIR}")
@@ -1766,7 +1767,8 @@ class AdminApp:
             last_err = None
             for attempt in (1, 2, 3):
                 try:
-                    drv = webdriver.Chrome(options=opts)
+                    drv = webdriver.Chrome(options=opts,
+                                           service=Service(creation_flags=subprocess.CREATE_NO_WINDOW))
                     break
                 except Exception as e:
                     last_err = e
@@ -1811,15 +1813,7 @@ class AdminApp:
                 drv = self._community.get("driver")
                 if drv is None or self._community.get("visible"):
                     return
-                pid = None
-                try:
-                    svc = drv.service
-                    if svc is not None and getattr(svc, "process", None) is not None:
-                        pid = svc.process.pid
-                except Exception:
-                    pass
-                if pid is None:
-                    pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
+                pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
                 hwnd = _find_hwnd_by_pid(pid) if pid else None
                 if hwnd:
                     self._community["hwnd"] = hwnd
