@@ -573,7 +573,8 @@ def _find_hwnd_by_pid(pid):
 
 
 def _embed_hwnd(hwnd, parent_hwnd, w, h):
-    """Reparent a Chrome window into a tkinter frame (no stray windows)."""
+    """Reparent a Chrome window into a tkinter frame (no stray windows).
+    Returns True only when SetParent actually attached the window."""
     user32 = ctypes.windll.user32
     user32.SetParent.argtypes = [wintypes.HWND, wintypes.HWND]
     user32.SetParent.restype = wintypes.HWND
@@ -583,11 +584,33 @@ def _embed_hwnd(hwnd, parent_hwnd, w, h):
     user32.SetWindowLongPtrW.restype = ctypes.c_void_p
     user32.SetWindowPos.argtypes = [wintypes.HWND, wintypes.HWND, ctypes.c_int, ctypes.c_int,
                                     ctypes.c_int, ctypes.c_int, wintypes.UINT]
-    user32.SetParent(hwnd, parent_hwnd)
+    prev = user32.SetParent(hwnd, parent_hwnd)
+    print("[DEBUG][embed_hwnd] hwnd=%s parent=%s prev=%s" % (hwnd, parent_hwnd, prev))
+    if prev is None:
+        return False
     style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
     user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style & ~_WS_POPUP) | _WS_CHILD)
     user32.SetWindowPos(hwnd, 0, 0, 0, w, h,
                         _SWP_FRAMECHANGED | _SWP_SHOWWINDOW | _SWP_NOZORDER)
+    return True
+
+
+def _unembed_hwnd(hwnd):
+    """Detach a previously embedded window back to top-level (so EnumWindows
+    can find it again on the next embed attempt)."""
+    user32 = ctypes.windll.user32
+    user32.SetParent.argtypes = [wintypes.HWND, wintypes.HWND]
+    user32.SetParent.restype = wintypes.HWND
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongPtrW.restype = ctypes.c_void_p
+    user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+    user32.SetWindowLongPtrW.restype = ctypes.c_void_p
+    try:
+        user32.SetParent(hwnd, None)
+        style = user32.GetWindowLongPtrW(hwnd, _GWL_STYLE)
+        user32.SetWindowLongPtrW(hwnd, _GWL_STYLE, (style & ~_WS_CHILD) | _WS_POPUP)
+    except Exception:
+        pass
 
 
 def _move_hwnd(hwnd, x, y, w, h):
@@ -597,6 +620,24 @@ def _move_hwnd(hwnd, x, y, w, h):
     try:
         user32.SetWindowPos(hwnd, 0, x, y, w, h,
                             _SWP_SHOWWINDOW | _SWP_NOZORDER)
+    except Exception:
+        pass
+
+
+def _fix_crashed_profile_prefs():
+    """Chrome shows a 'Restore pages?' bubble when the profile was killed
+    (exit_type=Crashed) — a modal window that ignores --window-position and
+    pops up on screen. Rewrite Preferences to Normal before driver start."""
+    try:
+        prefs = os.path.join(_COMMUNITY_PROFILE_DIR, CHROME_PROFILE_DIR, "Preferences")
+        if not os.path.isfile(prefs):
+            return
+        with open(prefs, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if data.get("exit_type") == "Crashed":
+            data["exit_type"] = "Normal"
+            with open(prefs, "w", encoding="utf-8") as f:
+                json.dump(data, f)
     except Exception:
         pass
 
@@ -1694,6 +1735,8 @@ class AdminApp:
             opts.add_argument("--no-default-browser-check")
             opts.add_argument("--window-size=1400,900")
             opts.add_argument("--window-position=-32000,-32000")
+            opts.add_argument("--disable-session-crashed-bubble")
+            _fix_crashed_profile_prefs()
             opts.add_experimental_option("excludeSwitches", ["enable-automation"])
             opts.add_experimental_option("useAutomationExtension", False)
             last_err = None
@@ -1749,27 +1792,32 @@ class AdminApp:
                 if hwnd:
                     self._community["hwnd"] = hwnd
                     self._community["embed_pending"] = True
+                    print("[DEBUG][locate] pid=%s hwnd=%s" % (pid, hwnd))
                     return
                 time.sleep(1)
 
         threading.Thread(target=_locate, daemon=True).start()
 
     def _community_poll_embed(self):
-        """Main thread only (root.after loop): embed the located Chrome window."""
+        """Main thread only (root.after loop): embed the located Chrome window.
+        Retries every 200ms until the frame is mapped (winfo_id != 0) and
+        SetParent actually succeeded — a one-shot attempt used to silently
+        "succeed" with parent 0, leaving Chrome offscreen with a taskbar icon."""
         if not self._community.get("fs"):
             return
-        if (self._community.get("embed_pending") and self._community.get("hwnd")
-                and not self._community.get("visible")):
-            self._community["embed_pending"] = False
-            hwnd = self._community["hwnd"]
+        hwnd = self._community.get("hwnd")
+        if hwnd and not self._community.get("visible"):
             try:
                 if hasattr(self, "_browser_frame"):
                     frame_id = self._browser_frame.winfo_id()
-                    w = max(self._browser_frame.winfo_width(), 200)
-                    h = max(self._browser_frame.winfo_height(), 200)
-                    _embed_hwnd(hwnd, frame_id, w, h)
-                    self._community["visible"] = True
-                    return
+                    if frame_id:
+                        w = max(self._browser_frame.winfo_width(), 200)
+                        h = max(self._browser_frame.winfo_height(), 200)
+                        ok = _embed_hwnd(hwnd, frame_id, w, h)
+                        print("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
+                        if ok:
+                            self._community["visible"] = True
+                            return
             except Exception:
                 pass
         self.root.after(200, self._community_poll_embed)
@@ -1778,6 +1826,7 @@ class AdminApp:
         hwnd = self._community.get("hwnd")
         self._community["visible"] = False
         if hwnd:
+            _unembed_hwnd(hwnd)
             _move_hwnd(hwnd, -32000, -32000, 1400, 900)
 
     def _community_kill_browser(self):

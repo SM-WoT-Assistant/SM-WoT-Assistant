@@ -45,6 +45,8 @@
 ### 3. Вбудований браузер (без окремих вікон)
 - Selenium-Chrome запускається з **постійним профілем** `%APPDATA%/SM WoT Assistant/community_chrome_profile/` (НЕ %TEMP% копія #1542 — цей профіль переживає рестарти, сід 1 раз з реального профілю через `_copy_chrome_profile`)
 - Стартує завжди оф-скрін; у fullscreen — `SetParent(chrome_hwnd, browser_frame.winfo_id())` + WS_CHILD через `_embed_hwnd` (WinAPI), ресайз за Configure-подіями (`_sync_browser_geometry`) — Chrome стає дочірнім вікном адмінки
+- **Надійність embed (20.08.2026, v1.0.20):** `_community_poll_embed` циклічно повторює спробу кожні 200мс поки фрейм не замапований (`winfo_id()!=0`) і `SetParent` не поверне успіх (bool-результат `_embed_hwnd`); при виході (`_community_move_browser_offscreen`) вікно ВІД'ЄДНУЄТЬСЯ (`_unembed_hwnd` → SetParent NULL + WS_POPUP) — інакше повторний вхід не знайде WS_CHILD вікно через EnumWindows
+- **«Відновити сторінки?»**: після аварійного вбивства профіль отримує `exit_type=Crashed` → модальний діалог Chrome ігнорує `--window-position` і з'являється на екрані; `_fix_crashed_profile_prefs()` переписує Preferences на `Normal` + прапор `--disable-session-crashed-bubble`
 - `_find_chrome_hwnd_by_pid` → PowerShell Get-CimInstance (cmdline містить профіль-дир, без `--type=`) → EnumWindows
 - Потік дій: `_community_action_needed(msg)` → трей-балун + червоний банер + хінт плитки (CAPTCHA, потрібен логін); `_community_clear_action()` після розв'язання
 

@@ -4,6 +4,25 @@
 
 ---
 
+## Адмінка v1.0.20 (20.08.2026): фікс embed браузера — циклічний embed + unembed + Crashed-bubble
+
+Після v1.0.19 юзер повідомив: «Браузер стартує поза вікно програми — бачу тільки іконку в панелі завдань». Діагноз (підтверджено admin.log + поведінкою): Chrome стартує оф-скрін (-32000,-32000) і embed НЕ відбувається, вікно лишається top-level поза екраном з кнопкою в таскбарі. Два корені в embed-ланцюзі:
+
+1. **Одноразовий embed** (`_community_poll_embed`): прапорець `embed_pending` скидався ПЕРЕД спробою, і після неї `visible=True` ставився безумовно — якщо SetParent тихо «вдавався» з `frame_id=0` (фрейм ще не замапований у новій 3-рівневій ієрархії `_comm_root→main→right→_browser_frame`, `winfo_id()`=0 → SetParent(hwnd, 0) = від'єднання, не помилка), повторної спроби НЕ БУЛО НІКОЛИ.
+2. **Повторні входи**: `_exit_community` робив лише `SetWindowPos` оф-скрін — Chrome лишався `WS_CHILD`; `EnumWindows` (пошук hwnd у `_locate`) бачить тільки top-level → наступний вхід не міг знайти вікно назавжди.
+3. **Бонус — «Відновити сторінки?»**: при аварійному завершенні (вбивство адмінки/Task Manager) профіль Chrome отримує `exit_type=Crashed` → при наступному старті Chrome показує модальний діалог відновлення, який ІГНОРУЄ `--window-position` і з'являється в центрі екрана поверх адмінки.
+
+**Фікси (admin_app.py):**
+1. `_embed_hwnd` — повертає `bool`: `SetParent` повертає попередній батько; `None` = фейл → `visible` не ставиться наосліп.
+2. `_community_poll_embed` — циклічний embed: повторює спробу кожні 200мс, поки `winfo_id()!=0` і `SetParent` не вдасться; одноразовий `embed_pending`-гейт прибрано.
+3. `_unembed_hwnd` (новий) — від'єднання `SetParent(hwnd, NULL)` + повернення `WS_POPUP`; `_community_move_browser_offscreen` викликає його перед зсувом — повторний вхід знову знаходить вікно через EnumWindows.
+4. `_fix_crashed_profile_prefs` (новий) + `--disable-session-crashed-bubble` — профіль з `exit_type=Crashed` переписується на `Normal` перед стартом драйвера; діалог відновлення не з'являється.
+5. [DEBUG] принти в `_locate`/`_community_poll_embed`/`_embed_hwnd` — тимчасово, до живого підтвердження (#1463).
+
+Верифікація: ast OK; ізольований smoke механіки embed (без Chrome/fullscreen): embed#1 ok=True → unembed → embed#2 ok=True → PASS. Білд `build_admin.py` → 8.6 MB, `_internal` 69; адмінка перезапущена (19:14, «Змін не виявлено»). Чекає живої перевірки юзера (Community → браузер справа, ESC → знову Community).
+
+---
+
 ## Адмінка v1.0.19 (20.08.2026): Community Workspace — браузер справа + Errors tab + 401-фікс Installations
 
 Білд: `python build_admin.py` — PyInstaller onedir (`SM WoT Assistant Admin.exe` 8.6 MB, `_internal` 69 entries, guard PASSED), версія з `admin_version.txt` (1.0.19). `build_admin.py clean()` цього разу СПРАЦЮВАВ — невидимий хендл на `dist/SM WoT Assistant Admin/` (#1546) розблокувався після вбиття запущеної адмінки; in-place деплой не знадобився. Адмінка перезапущена: «Танків: 995, Промптів: 996», «Змін не виявлено».
