@@ -197,6 +197,9 @@ _TR_EN = {
     "st_updated": "updated {time}",
     "st_paypal_qr": "QR on website only",
     "btn_refresh": "Refresh",
+    "btn_link": "Link",
+    "st_linked": "Linked",
+    "st_not_linked": "Not linked",
     "btn_save_keys": "Save",
     "btn_reset_browser": "Reset browser data",
     "col_video": "Video",
@@ -381,8 +384,10 @@ _UA = "SM-WoT-Assistant-Admin/1.0"
 _APP_DATA_DIR = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
 
 _GWL_STYLE = -16
+_GWL_EXSTYLE = -20
 _WS_POPUP = 0x80000000
 _WS_CHILD = 0x40000000
+_WS_EX_TOOLWINDOW = 0x80
 _SWP_FRAMECHANGED = 0x0020
 _SWP_SHOWWINDOW = 0x0040
 _SWP_NOZORDER = 0x0004
@@ -638,6 +643,61 @@ def _move_hwnd(hwnd, x, y, w, h):
         pass
 
 
+def _top_level_windows(pid):
+    """All top-level HWNDs belonging to a PID."""
+    result = []
+    EnumProc = ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+
+    def _cb(hwnd, lparam):
+        pid_out = wintypes.DWORD()
+        ctypes.windll.user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid_out))
+        if pid_out.value == pid:
+            result.append(hwnd)
+        return True
+
+    try:
+        ctypes.windll.user32.EnumWindows(EnumProc(_cb), 0)
+    except Exception:
+        pass
+    return result
+
+
+def _toolwindow_hwnd(hwnd):
+    """WS_EX_TOOLWINDOW — removes the taskbar button for a window."""
+    user32 = ctypes.windll.user32
+    user32.GetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int]
+    user32.GetWindowLongPtrW.restype = ctypes.c_void_p
+    user32.SetWindowLongPtrW.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_void_p]
+    user32.SetWindowLongPtrW.restype = ctypes.c_void_p
+    try:
+        ex = user32.GetWindowLongPtrW(hwnd, _GWL_EXSTYLE)
+        user32.SetWindowLongPtrW(hwnd, _GWL_EXSTYLE, ex | _WS_EX_TOOLWINDOW)
+    except Exception:
+        pass
+
+
+def _pid_alive(pid):
+    """Quick ctypes check whether a PID exists (no PowerShell)."""
+    if not pid:
+        return False
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    h = kernel32.OpenProcess(0x1000, False, pid)
+    if not h:
+        return False
+    kernel32.CloseHandle(h)
+    return True
+
+
+def _hwnd_alive(hwnd):
+    try:
+        return bool(ctypes.windll.user32.IsWindow(hwnd))
+    except Exception:
+        return False
+
+
 def _fix_crashed_profile_prefs():
     """Chrome shows a 'Restore pages?' bubble when the profile was killed
     (exit_type=Crashed + stale Last Session/Current Session files) — a modal
@@ -831,9 +891,10 @@ class AdminApp:
 
         self._community = {
             "driver": None, "visible": False, "hwnd": None, "creating": False,
-            "embed_pending": False,
+            "embed_pending": False, "chrome_pid": None, "tg_started": False,
             "yt_channel_id": None, "fs": False, "refreshing": False,
             "action": None, "last_comm": 0.0, "last_rtdb": 0.0,
+            "linked": dict(self._admin_settings.get("community_linked") or {}),
             "stats": {"youtube": None, "reddit": None, "github": None, "kofi": None,
                       "installs": None, "installs_by_ver": {}, "errors": None,
                       "schemes": None, "users": None, "builds_ver": None,
@@ -1407,6 +1468,10 @@ class AdminApp:
             tk.Button(top, text=self.t("btn_refresh"), bg="#333", fg=FG, bd=0,
                       padx=10, pady=2, cursor="hand2",
                       command=lambda n=name: self._community_refresh_tab(n)).pack(side="right")
+            if name in ("reddit", "kofi"):
+                tk.Button(top, text=self.t("btn_link"), bg="#2a5a2a", fg=FG, bd=0,
+                          padx=10, pady=2, cursor="hand2",
+                          command=lambda n=name: self._community_link_platform(n)).pack(side="right")
             tree_f, tree = self._make_tree(tab, cols)
             tree_f.pack(fill="both", expand=True, padx=8, pady=(0, 8))
             self._trees[name] = tree
@@ -1591,7 +1656,12 @@ class AdminApp:
         lbl = self._tab_status.get(name)
         if not lbl:
             return
-        if status in (None, "ok"):
+        if name in ("reddit", "kofi") and status in (None, "ok", "idle", "empty"):
+            if self._community["linked"].get(name):
+                text, color = "\u2713 " + self.t("st_linked"), GREEN
+            else:
+                text, color = self.t("st_not_linked"), "#888"
+        elif status in (None, "ok"):
             text, color = self.t("st_ok"), GREEN
         elif status in ("idle", "hidden"):
             text, color = self.t("st_not_conf") if status == "hidden" else self.t("st_loading"), "#888"
@@ -1731,6 +1801,7 @@ class AdminApp:
                 drv = None
                 self._community["driver"] = None
                 self._community["hwnd"] = None
+                self._community["tg_started"] = False
             else:
                 if self._community.get("visible") == visible:
                     return drv
@@ -1740,6 +1811,7 @@ class AdminApp:
                     pass
                 self._community["driver"] = None
                 self._community["hwnd"] = None
+                self._community["tg_started"] = False
         try:
             self._log(self.t("log_comm_start"))
             _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
@@ -1788,6 +1860,7 @@ class AdminApp:
             self._community["driver"] = drv
             self._community["visible"] = False
             self._community["hwnd"] = None
+            self._start_toolwindow_guard()
         except Exception as e:
             self._log(self.t("log_comm_error", err=str(e)[:150]))
             self._community["driver"] = None
@@ -1817,6 +1890,7 @@ class AdminApp:
                 hwnd = _find_hwnd_by_pid(pid) if pid else None
                 if hwnd:
                     self._community["hwnd"] = hwnd
+                    self._community["chrome_pid"] = pid
                     self._community["embed_pending"] = True
                     self._log("[DEBUG][locate] pid=%s hwnd=%s" % (pid, hwnd))
                     return
@@ -1825,13 +1899,26 @@ class AdminApp:
         threading.Thread(target=_locate, daemon=True).start()
 
     def _community_poll_embed(self):
-        """Main thread only (root.after loop): embed the located Chrome window.
-        Retries every 200ms until the frame is mapped (winfo_id != 0) and
-        SetParent actually succeeded — a one-shot attempt used to silently
-        "succeed" with parent 0, leaving Chrome offscreen with a taskbar icon."""
+        """Main thread only (root.after loop): embed the located Chrome window
+        and keep it embedded. Retries every 200ms until the frame is mapped
+        (winfo_id != 0) and SetParent actually succeeded; keeps watching —
+        if Chrome re-creates its window (e.g. last-tab close), the new main
+        window is found and embedded again instead of lingering offscreen
+        with a taskbar icon."""
         if not self._community.get("fs"):
             return
         hwnd = self._community.get("hwnd")
+        if hwnd and not _hwnd_alive(hwnd):
+            hwnd = None
+            self._community["hwnd"] = None
+            self._community["visible"] = False
+        if hwnd is None:
+            pid = self._community.get("chrome_pid")
+            if pid:
+                new_hwnd = _find_hwnd_by_pid(pid)
+                if new_hwnd:
+                    self._community["hwnd"] = new_hwnd
+                    hwnd = new_hwnd
         if hwnd and not self._community.get("visible"):
             try:
                 if hasattr(self, "_browser_frame"):
@@ -1843,7 +1930,6 @@ class AdminApp:
                         self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
                         if ok:
                             self._community["visible"] = True
-                            return
             except Exception:
                 pass
         self.root.after(200, self._community_poll_embed)
@@ -1855,11 +1941,39 @@ class AdminApp:
             _unembed_hwnd(hwnd)
             _move_hwnd(hwnd, -32000, -32000, 1400, 900)
 
+    def _start_toolwindow_guard(self):
+        """Daemon while the driver lives: every Chrome window of the community
+        profile gets WS_EX_TOOLWINDOW (no taskbar buttons ever), and the
+        tracked Chrome pid is kept current so re-created windows are found."""
+        if self._community.get("tg_started"):
+            return
+        self._community["tg_started"] = True
+
+        def _loop():
+            while self._community.get("driver") is not None:
+                try:
+                    pid = self._community.get("chrome_pid")
+                    if pid and _pid_alive(pid):
+                        for h in _top_level_windows(pid):
+                            _toolwindow_hwnd(h)
+                    else:
+                        pid = _chrome_main_pid(_COMMUNITY_PROFILE_DIR)
+                        if pid:
+                            self._community["chrome_pid"] = pid
+                            for h in _top_level_windows(pid):
+                                _toolwindow_hwnd(h)
+                except Exception:
+                    pass
+                time.sleep(3)
+
+        threading.Thread(target=_loop, daemon=True).start()
+
     def _community_kill_browser(self):
         drv = self._community.get("driver")
         self._community["driver"] = None
         self._community["hwnd"] = None
         self._community["visible"] = False
+        self._community["tg_started"] = False
         if drv is not None:
             try:
                 drv.quit()
@@ -1917,7 +2031,7 @@ class AdminApp:
                     self._community["status"]["youtube"] = st or "ok"
                 else:
                     self._community["status"]["youtube"] = "no_key"
-                if not yt and self._app_visible() and not self._community.get("fs"):
+                if not yt and self._app_visible():
                     yt, st = self._fetch_yt_chrome()
                     self._community["status"]["youtube"] = st or "ok"
                 if yt:
@@ -1928,14 +2042,14 @@ class AdminApp:
                     self._community["status"]["reddit"] = "ok"
                 else:
                     self._community["status"]["reddit"] = st or "error"
-                    if self._app_visible() and not self._community.get("fs"):
+                    if self._app_visible():
                         red2, st2 = self._fetch_reddit_chrome()
                         if red2:
                             self._community["stats"]["reddit"] = red2
                             self._community["status"]["reddit"] = "ok"
                         else:
                             self._community["status"]["reddit"] = st2 or "error"
-                if self._app_visible() and not self._community.get("fs"):
+                if self._app_visible():
                     kf, st3 = self._fetch_kofi_chrome()
                     if kf:
                         self._community["stats"]["kofi"] = kf
@@ -1989,8 +2103,47 @@ class AdminApp:
                 self._community["status"][name] = str(e)[:100]
             finally:
                 self._community["refreshing"] = False
+                if name in ("reddit", "kofi"):
+                    self._remember_linked(name, self._community["status"].get(name) in ("ok", "empty"))
                 self._log("[DEBUG][fetch] tab=%s -> %s" % (
                     name, self._community["status"].get(name)))
+                self.root.after(0, self._update_tiles)
+                self.root.after(0, self._update_comm_tabs)
+
+        threading.Thread(target=_work, daemon=True).start()
+
+    def _remember_linked(self, name, linked):
+        """Persist the platform linked state forever (admin_settings.json)."""
+        self._community["linked"][name] = bool(linked)
+        self._admin_settings["community_linked"] = dict(self._community["linked"])
+        _save_admin_settings(self._admin_settings)
+
+    def _community_link_platform(self, name):
+        """Link button: verify the browser session for a platform and remember
+        the linked state forever, without waiting for the 10-min cycle."""
+        if self._community.get("refreshing"):
+            return
+        self._community["refreshing"] = True
+        self._set_tab_status(name, "idle")
+
+        def _work():
+            try:
+                if name == "reddit":
+                    res, st = self._fetch_reddit_chrome()
+                else:
+                    res, st = self._fetch_kofi_chrome()
+                if res:
+                    self._community["stats"][name] = res
+                self._community["status"][name] = st or "ok"
+                self._remember_linked(name, res is not None or st in ("ok", "empty"))
+            except Exception as e:
+                self._community["status"][name] = str(e)[:100]
+                self._remember_linked(name, False)
+            finally:
+                self._community["refreshing"] = False
+                self._log("[DEBUG][link] %s -> %s linked=%s" % (
+                    name, self._community["status"].get(name),
+                    self._community["linked"].get(name)))
                 self.root.after(0, self._update_tiles)
                 self.root.after(0, self._update_comm_tabs)
 
@@ -2177,7 +2330,8 @@ class AdminApp:
                 return {"videos": videos, "channel": {}}, None
             finally:
                 try:
-                    drv.close()
+                    if len(drv.window_handles) > 1:
+                        drv.close()
                 except Exception:
                     pass
                 if main_handle is not None:
@@ -2301,7 +2455,8 @@ class AdminApp:
                 return {"posts": posts}, None
             finally:
                 try:
-                    drv.close()
+                    if len(drv.window_handles) > 1:
+                        drv.close()
                 except Exception:
                     pass
                 if main_handle is not None:
@@ -2394,7 +2549,8 @@ class AdminApp:
                 return {"total": sum(amounts), "count": len(amounts), "amounts": amounts}, None
             finally:
                 try:
-                    drv.close()
+                    if len(drv.window_handles) > 1:
+                        drv.close()
                 except Exception:
                     pass
                 if main_handle is not None:
