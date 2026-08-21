@@ -4,6 +4,29 @@
 
 ---
 
+## Адмінка v1.0.34 (21.08.2026): Patreon — плитка/вкладка в Community, сайт, FUNDING, reddit-матеріал
+
+Юзер: «Треба додати патреон — https://www.patreon.com/cw/SMWoTAssistant».
+
+**Джерело даних (без auth/Chrome/vault):** Patreon має ПУБЛІЧНИЙ legacy-API `https://www.patreon.com/api/campaigns/16413892` (campaign id з og:image teaser сторінки; перевірено живим запитом — 200, повний JSON): `patron_count`, `paid_member_count`, `campaign_pledge_sum` (місячний дохід USD), `creation_count` (пости), `created_at`. Кампанія опублікована 21.08.2026, наразі 0 патронів.
+
+**Фікс (адмінка):**
+1. `admin_app.py`: `_PATREON_URL` + `_PATREON_API`; `_fetch_patreon()` → `{patrons, paid, pledge, currency, posts, created}` (ok/http_*/error); `_COMMUNITY_PAGE_URLS["patreon"]`.
+2. Плитка **Patreon** (кількість патронів) після Ko-fi; вкладка **Patreon** (field/value: Patrons / Paid members / Monthly pledge / Posts / Created) після Ko-fi — порядок плиток == порядок вкладок (правило v1.0.30); посилання в Overview (рядок Donations, між Monobank і PayPal); рядок статусу джерела.
+3. Проводка: `_refresh_community_background` + `_community_refresh_tab("patreon")` + `_update_tiles` + `_update_comm_tabs` + whitelist `community_cache.json` (+"patreon" в обох шляхах) + `h_comm_tiles_d`.
+4. i18n: `tile_patreon`, `tab_patreon`, `col_field`, `col_value`, `col_patrons`, `col_paid`, `col_pledge`, `col_posts`, `col_created`; seed 206/206 (EN+UK, h_comm_tiles_d оновлено).
+5. `admin_version.txt` 1.0.33 → 1.0.34, rebuild (8.6 MB, _internal 69, TMP-обхід), адмінка запущена.
+
+**Сайт (файли, без деплою):** 4-та картка "Patreon" в секції Support (`public/index.html`, 🤝 + посилання на /cw/SMWoTAssistant) + `public/img/qr_patreon.png` (api.qrserver.com 600×600 — як qr_monobank.png; чорний-ratio 52.5% — валідний QR, не помилка).
+
+**GitHub:** `.github/FUNDING.yml` + `patreon: SMWoTAssistant` (кнопка Sponsor; fast-forward на main після коміту, правило #1588).
+
+**Reddit:** `reddit_post.md` — Patreon у секції Support + `img_patreon.png` у `%TEMP%\opencode\reddit_upload\` (ручна публікація, #1570).
+
+Верифікація: AST OK; smoke — живий `_fetch_patreon` (patrons=0, paid=0, pledge=0, currency=USD, posts=1, created=2026-07-14), 9 i18n ключів на місці, `_COMMUNITY_PAGE_URLS["patreon"]` коректний, seed 206/206 у бандлі. Юзер має бачити: плитку Patreon з числом патронів (зараз 0), вкладку Patreon зі статистикою, вкладка відкриває сторінку /cw/SMWoTAssistant у вбудованому браузері; на сайті — 4-ту картку з QR.
+
+---
+
 ## Адмінка v1.0.33 (21.08.2026): моніторинг розбіжності «Танків/Промптів» 995/996 + надійний Ctrl+V у вбудованому браузері
 
 Юзер: «Танків 995 а промптів 996 — треба за цим слідкувати щоб цифри співпадали а якщо неспівпадають видавати помилку і шукати причину і виправляти. У встроєному браузері іноді не працює вставка з буфера горячими клавішами».

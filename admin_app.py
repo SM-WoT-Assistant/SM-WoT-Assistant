@@ -169,6 +169,7 @@ _TR_EN = {
     "tile_github": "GitHub",
     "tile_kofi": "Ko-fi",
     "tile_reddit": "Reddit",
+    "tile_patreon": "Patreon",
     "tile_installs": "Installs",
     "tile_errors": "Errors",
     "tile_needs_key": "⚠ needs API key",
@@ -182,6 +183,7 @@ _TR_EN = {
     "tab_reddit": "Reddit",
     "tab_github": "GitHub",
     "tab_kofi": "Ko-fi",
+    "tab_patreon": "Patreon",
     "tab_apikeys": "API Keys",
     "tab_errors": "Errors",
     "ov_social": "Social networks",
@@ -224,6 +226,13 @@ _TR_EN = {
     "col_source": "Source",
     "col_version": "Version",
     "col_error": "Error",
+    "col_field": "Field",
+    "col_value": "Value",
+    "col_patrons": "Patrons",
+    "col_paid": "Paid members",
+    "col_pledge": "Monthly pledge",
+    "col_posts": "Posts",
+    "col_created": "Created",
     "key_youtube_api": "YouTube Data API key",
     "key_reddit_user": "Reddit username",
     "key_reddit_pass": "Reddit password",
@@ -250,7 +259,7 @@ _TR_EN = {
     "log_gh_ok": "GitHub: {n} releases, {dl} downloads",
     "log_kofi_ok": "Ko-fi: {n} donations, total {total}",
     "h_sec_community": "Community",
-    "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
+    "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Patreon patrons, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
     "h_comm_fs_d": "The Community button or a tile click opens fullscreen Community: tiles, per-platform stats tables and the embedded Chrome browser (no separate windows appear).",
     "h_comm_login_d": "Reddit and Ko-fi log in automatically with vault credentials; Google login is manual. If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
     "h_comm_vault_d": "API keys and passwords are stored encrypted with Windows DPAPI in admin_vault.json (AppData). They are decrypted only on demand and never logged.",
@@ -366,7 +375,7 @@ def _load_community_cache():
                 stats = data.get("stats")
                 if isinstance(stats, dict):
                     return {k: v for k, v in stats.items() if k in
-                            ("youtube", "reddit", "github", "kofi")}
+                            ("youtube", "reddit", "github", "kofi", "patreon")}
     except Exception:
         pass
     return {}
@@ -375,7 +384,7 @@ def _save_community_cache(stats):
     """Validate + persist the platform stats cache."""
     try:
         valid = {}
-        for k in ("youtube", "reddit", "github", "kofi"):
+        for k in ("youtube", "reddit", "github", "kofi", "patreon"):
             v = stats.get(k)
             if isinstance(v, dict):
                 valid[k] = v
@@ -420,12 +429,17 @@ _YT_API = "https://www.googleapis.com/youtube/v3"
 _GITHUB_REPO = "SM-WoT-Assistant/SM-WoT-Assistant"
 _GITHUB_API = f"https://api.github.com/repos/{_GITHUB_REPO}"
 _REDDIT_USER = "SM-WoT-Assistant"
+_PATREON_URL = "https://www.patreon.com/cw/SMWoTAssistant"
+# Публічний legacy-API (без auth, без Chrome): campaign id 16413892 взято з
+# og:image teaser сторінки patreon.com/cw/SMWoTAssistant.
+_PATREON_API = "https://www.patreon.com/api/campaigns/16413892"
 
 _COMMUNITY_PAGE_URLS = {
     "overview": "https://sm-wot-assistant.web.app/admin.html",
     "reddit": "https://www.reddit.com/user/" + _REDDIT_USER + "/",
     "github": "https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases",
     "kofi": "https://ko-fi.com/Manage/",
+    "patreon": _PATREON_URL,
 }
 _UA = "SM-WoT-Assistant-Admin/1.0"
 _APP_DATA_DIR = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
@@ -1413,6 +1427,7 @@ class AdminApp:
         _tile("reddit", "reddit")
         _tile("github", "github")
         _tile("kofi", "kofi")
+        _tile("patreon", "patreon")
         _tile("installs", "overview")
         _tile("errors", "errors")
         return tiles
@@ -1457,6 +1472,9 @@ class AdminApp:
             red = st.get("reddit")
             vals["reddit"].config(text=_fmt_num(len(red.get("posts", []))) if red else "—")
             hints["reddit"].config(text=self._tile_hint(status.get("reddit")))
+            pr = st.get("patreon")
+            vals["patreon"].config(text=_fmt_num(pr.get("patrons", 0)) if pr else "—")
+            hints["patreon"].config(text=self._tile_hint(status.get("patreon")))
             vals["installs"].config(text=str(st.get("installs")) if st.get("installs") is not None else "—")
             hints["installs"].config(text="")
             vals["errors"].config(text=str(st.get("errors")) if st.get("errors") is not None else "—")
@@ -1614,6 +1632,7 @@ class AdminApp:
             ("reddit", ("post", "date", "score", "comments")),
             ("github", ("release", "date", "downloads")),
             ("kofi", ("date", "amount", "type")),
+            ("patreon", ("field", "value")),
         ]
         i = 1
         for name, cols in defs:
@@ -1666,7 +1685,7 @@ class AdminApp:
         widths = {"video": 340, "date": 100, "views": 80, "likes": 70, "comments": 80,
                   "post": 360, "score": 70, "release": 150, "downloads": 100,
                   "amount": 100, "type": 120, "time": 110, "source": 170,
-                  "version": 90, "error": 300}
+                  "version": 90, "error": 300, "field": 160, "value": 120}
         frame = tk.Frame(parent, bg=BG)
         tree = ttk.Treeview(frame, columns=cols, show="headings", height=10)
         for c in cols:
@@ -1701,6 +1720,7 @@ class AdminApp:
         row2.pack(anchor="w", pady=(2, 4))
         _link("Ko-fi", "https://ko-fi.com/smwotassistant")
         _link("Monobank", "https://send.monobank.ua/jar/WqyWjTRpy")
+        _link("Patreon", _PATREON_URL)
         tk.Label(row2, text="PayPal — " + self.t("st_paypal_qr"), font=("Segoe UI", 9),
                  fg="#888", bg=BG).pack(side="left", padx=(6, 0))
         tk.Label(body, text=self.t("ov_rtdb"), font=("Segoe UI", 10, "bold"),
@@ -1723,7 +1743,7 @@ class AdminApp:
         tk.Label(body, text=self.t("ov_sources"), font=("Segoe UI", 10, "bold"),
                  fg=ACCENT, bg=BG).pack(anchor="w", pady=(6, 2))
         self._ov_src = {}
-        for name in ("youtube", "reddit", "github", "kofi"):
+        for name in ("youtube", "reddit", "github", "kofi", "patreon"):
             r = tk.Frame(body, bg=BG)
             r.pack(anchor="w")
             tk.Label(r, text=self.t("tab_" + name) + ":", font=("Segoe UI", 9),
@@ -1875,6 +1895,17 @@ class AdminApp:
                 rows.append(("", _fmt_money(a), "donation"))
         self._fill_tree(self._trees["kofi"], rows)
         self._set_tab_status("kofi", status.get("kofi"))
+        pr = st.get("patreon")
+        rows = []
+        if pr:
+            rows.append((self.t("col_patrons"), _fmt_num(pr.get("patrons", 0))))
+            rows.append((self.t("col_paid"), _fmt_num(pr.get("paid", 0))))
+            rows.append((self.t("col_pledge"),
+                         _fmt_money(pr.get("pledge", 0)) + " " + str(pr.get("currency") or "").upper()))
+            rows.append((self.t("col_posts"), _fmt_num(pr.get("posts", 0))))
+            rows.append((self.t("col_created"), str(pr.get("created") or "—")))
+        self._fill_tree(self._trees["patreon"], rows)
+        self._set_tab_status("patreon", status.get("patreon"))
         el = st.get("errors_list")
         rows = []
         if el:
@@ -1899,7 +1930,7 @@ class AdminApp:
                                   ", ".join(f"{k} = {v}" for k, v in top))
         else:
             self._ov_byver.config(text="")
-        for name in ("youtube", "reddit", "github", "kofi"):
+        for name in ("youtube", "reddit", "github", "kofi", "patreon"):
             s = status.get(name)
             if s == "ok":
                 text, color = self.t("st_ok"), GREEN
@@ -2278,16 +2309,21 @@ class AdminApp:
                         self._community["status"]["kofi"] = st3 or "error"
                 else:
                     self._community["status"]["kofi"] = "hidden"
+                pr, stp = self._fetch_patreon()
+                if pr:
+                    self._community["stats"]["patreon"] = pr
+                self._community["status"]["patreon"] = stp or "ok"
             except Exception as e:
                 self._log(self.t("log_comm_error", err=str(e)[:200]))
             finally:
                 self._community["refreshing"] = False
                 _save_community_cache(self._community["stats"])
-                self._log("[DEBUG][fetch] yt=%s red=%s kofi=%s gh=%s" % (
+                self._log("[DEBUG][fetch] yt=%s red=%s kofi=%s gh=%s patreon=%s" % (
                     self._community["status"].get("youtube"),
                     self._community["status"].get("reddit"),
                     self._community["status"].get("kofi"),
-                    self._community["status"].get("github")))
+                    self._community["status"].get("github"),
+                    self._community["status"].get("patreon")))
                 self.root.after(0, self._update_tiles)
                 self.root.after(0, self._update_comm_tabs)
 
@@ -2313,6 +2349,8 @@ class AdminApp:
                         res, st = self._fetch_reddit_chrome()
                 elif name == "errors":
                     res, st = self._fetch_errors_list()
+                elif name == "patreon":
+                    res, st = self._fetch_patreon()
                 else:
                     res, st = self._fetch_kofi_chrome()
                 if res:
@@ -2459,6 +2497,29 @@ class AdminApp:
             if not releases:
                 return None, "empty"
             return {"releases": releases, "total": total}, None
+        except Exception as e:
+            return None, str(e)[:80]
+
+    def _fetch_patreon(self):
+        """Публічний Patreon API (legacy /api/campaigns/{id}) — без auth, без
+        Chrome: patron_count, paid_member_count, campaign_pledge_sum (місячний
+        дохід), creation_count (пости), created_at (#1587-розширення)."""
+        try:
+            r = requests.get(_PATREON_API, headers={"User-Agent": _UA}, timeout=15)
+            if r.status_code != 200:
+                return None, "http_" + str(r.status_code)
+            d = ((r.json().get("data") or {}).get("attributes")) or {}
+            pledge = d.get("campaign_pledge_sum")
+            if pledge is None:
+                pledge = d.get("pledge_sum", 0)
+            return {
+                "patrons": _safe_int(d.get("patron_count")),
+                "paid": _safe_int(d.get("paid_member_count")),
+                "pledge": pledge,
+                "currency": d.get("pledge_sum_currency") or "USD",
+                "posts": _safe_int(d.get("creation_count")),
+                "created": str(d.get("created_at") or "")[:10],
+            }, None
         except Exception as e:
             return None, str(e)[:80]
 

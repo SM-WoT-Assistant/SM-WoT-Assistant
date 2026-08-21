@@ -4,6 +4,16 @@
 
 ---
 
+## Patreon у Community Workspace + скрізь (21.08.2026, адмінка v1.0.34)
+
+**Джерело:** публічний legacy-API `https://www.patreon.com/api/campaigns/16413892` (campaign id з og:image teaser patreon.com/cw/SMWoTAssistant) — **без auth, без Chrome, без vault** (як GitHub): `patron_count`, `paid_member_count`, `campaign_pledge_sum`, `creation_count` (пости), `created_at`. Якщо API зламається — статус http_*/error, tile "—".
+
+**У адмінці:** плитка **Patreon** (патрони) після Ko-fi; вкладка **Patreon** (field/value: Patrons/Paid members/Monthly pledge/Posts/Created); навігація браузера → `https://www.patreon.com/cw/SMWoTAssistant`; Overview → посилання в рядку Donations; `_fetch_patreon()`; кеш `community_cache.json` (+patreon); i18n `tile_patreon`/`tab_patreon`/`col_field`/`col_value`/`col_patrons`/`col_paid`/`col_pledge`/`col_posts`/`col_created`; seed 206/206. Правило #1570-1572 дотримано: тільки read-only публічні дані, дашборд не автоматизується.
+
+**Скрізь:** сайт `public/index.html` — 4-та картка Support (QR `img/qr_patreon.png`, api.qrserver.com 600×600, файли без деплою); `.github/FUNDING.yml` — `patreon: SMWoTAssistant` (на main, #1588); `reddit_post.md` — секція Support + `img_patreon.png` у reddit_upload.
+
+---
+
 ## Розбіжність «Танків/Промптів» + Ctrl+V у вбудованому браузері (21.08.2026, адмінка v1.0.33)
 
 **Моніторинг розбіжності (користувач: «Танків 995 а промптів 996 — слідкувати щоб цифри співпадали, при розбіжності видавати помилку»):**
@@ -43,7 +53,7 @@
 **Що це:** розділ в адмінці для моніторингу соцмереж/донатів/статистики + зашифроване сховище креденціалів.
 
 ### 1. Плитки (головне вікно, завжди видимі)
-- Ряд із 5 плиток під статус-баром: **YouTube views | GitHub downloads | Ko-fi total | Installs | Errors**
+- Ряд плиток під статус-баром (v1.0.34): **Overview | YouTube views | Reddit posts | GitHub downloads | Ko-fi total | Patreon patrons | Installs | Errors**
 - Хінт на плитці (помаранчевий, `⚠`) якщо канал потребує підключення: `needs API key` / `needs login` / `blocked` / `action needed` — текст зі статусу фетча (`_tile_hint`, admin_app.py)
 - Клік по плитці → повноекранний Community-режим на відповідній вкладці
 - Оновлення: RTDB-лічильники 300с, платформи 600с (фоновий цикл `_start_background`; `_fetch_rtdb_counters`/`_refresh_community_background`)
@@ -51,7 +61,7 @@
 
 ### 2. Повноекранний Community-режим
 - Кнопка **Community** в топбарі (поруч із ⚙) → `_enter_community()`: `root.attributes("-fullscreen", True)` + overlay-frame `place(relx=0,rely=0,relwidth=1,relheight=1)` поверх звичайного контенту (pack-лейаут не чіпається, `place_forget` при виході; ESC — вихід)
-- Склад: плитки (повторний ряд `_build_tile_strip`) + tk.Notebook (7 вкладок: Overview / YouTube / Reddit / GitHub / Ko-fi / API Keys / Errors; ttk clam-тема, Treeview dark) + червоний банер дій + вбудований браузер-фрейм. Розкладка (20.08.2026, v1.0.19): горизонтальний спліт grid — ліва колонка (плитки + Notebook + банер, weight 3, minsize 480), права (`_browser_frame`, weight 2, minsize 480); embed-ланцюг позиційно-незалежний (winfo-розміри з `_browser_frame`)
+- Склад: плитки (повторний ряд `_build_tile_strip`) + tk.Notebook (8 вкладок: Overview / YouTube / Reddit / GitHub / Ko-fi / Patreon / API Keys / Errors; ttk clam-тема, Treeview dark) + червоний банер дій + вбудований браузер-фрейм. Розкладка (20.08.2026, v1.0.19): горизонтальний спліт grid — ліва колонка (плитки + Notebook + банер, weight 3, minsize 480), права (`_browser_frame`, weight 2, minsize 480); embed-ланцюг позиційно-незалежний (winfo-розміри з `_browser_frame`)
 - Вкладки з Treeview-списками матеріалів: YouTube (Відео|Дата|Views|Likes|Comments), Reddit (Пост|Дата|Score|Comments), GitHub (Реліз|Дата|Downloads), Ko-fi (сума + останні), Errors (Час|Тип|Джерело|Версія|Помилка) — кнопка Refresh на кожній вкладці (`_community_refresh_tab`); Errors: `_fetch_errors_list()` читає `error_reports` (`&orderBy="timestamp"&limitToLast=200`, сорт desc), оновлюється у фоновому циклі + Refresh; tile Errors відкриває вкладку Errors
 
 ### 3. Вбудований браузер (без окремих вікон)

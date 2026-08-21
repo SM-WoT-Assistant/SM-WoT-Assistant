@@ -192,11 +192,20 @@
     "log_gh_ok": "GitHub: {n} releases, {dl} downloads",
     "log_kofi_ok": "Ko-fi: {n} donations, total {total}",
     "h_sec_community": "Community",
-    "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
+    "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Patreon patrons, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
     "h_comm_fs_d": "The Community button or a tile click opens fullscreen Community: tiles, per-platform stats tables and the embedded Chrome browser (no separate windows appear).",
     "h_comm_login_d": "Reddit and Ko-fi log in automatically with vault credentials; Google login is manual. If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
     "h_comm_vault_d": "API keys and passwords are stored encrypted with Windows DPAPI in admin_vault.json (AppData). They are decrypted only on demand and never logged.",
-    "h_comm_profile_d": "Logins persist in the dedicated community Chrome profile (community_chrome_profile). You do not need to re-authorize after a restart; reset it with 'Reset browser data'."
+    "h_comm_profile_d": "Logins persist in the dedicated community Chrome profile (community_chrome_profile). You do not need to re-authorize after a restart; reset it with 'Reset browser data'.",
+    "tile_patreon": "Patreon",
+    "tab_patreon": "Patreon",
+    "col_field": "Field",
+    "col_value": "Value",
+    "col_patrons": "Patrons",
+    "col_paid": "Paid members",
+    "col_pledge": "Monthly pledge",
+    "col_posts": "Posts",
+    "col_created": "Created"
   },
   "uk": {
     "lang_en": "EN",
@@ -389,13 +398,22 @@
     "log_gh_ok": "GitHub: {n} релізів, {dl} завантажень",
     "log_kofi_ok": "Ko-fi: {n} донатів, всього {total}",
     "h_sec_community": "Спільнота",
-    "h_comm_tiles_d": "Ряд плиток показує загальну статистику: версію AI-білдів, перегляди YouTube, завантаження GitHub, донати Ko-fi, пости Reddit, встановлення та помилки. Клік по плитці відкриває перегляд Спільнота зі сторінкою цієї платформи у браузері.",
+    "h_comm_tiles_d": "??? ?????? ??????? ???????? ??????????: ?????? AI-??????, ????????? YouTube, ???????????? GitHub, ?????? Ko-fi, ???????? Patreon, ????? Reddit, ???????????? ?? ???????. ???? ?? ?????? ????????? ???????? ????????? ?? ????????? ???? ????????? ? ????????.",
     "h_comm_fs_d": "Кнопка Community або клік по плитці відкриває повноекранну Спільноту: плитки, таблиці статистики за платформами та вбудований браузер Chrome (жодних окремих вікон не з'являється).",
     "h_comm_login_d": "Reddit і Ko-fi входять автоматично з обліковими даними сховища; вхід у Google ручний. Якщо потрібна дія (CAPTCHA, форма входу) — програма сповістить, і ви розв'яжете її у вбудованому браузері.",
     "h_comm_vault_d": "API-ключі та паролі зберігаються зашифрованими через Windows DPAPI в admin_vault.json (AppData). Розшифровуються лише на вимогу і ніколи не логуються.",
     "h_comm_profile_d": "Входи зберігаються у виділеному профілі Chrome спільноти (community_chrome_profile). Після перезапуску авторизація не потрібна; скидання — кнопкою 'Скинути дані браузера'.",
     "log_sweep_queued": "Неповні білди поставлено в чергу на регенерацію",
-    "log_sweep_error": "Помилка свіпу неповних білдів: {err}"
+    "log_sweep_error": "Помилка свіпу неповних білдів: {err}",
+    "tile_patreon": "Patreon",
+    "tab_patreon": "Patreon",
+    "col_field": "????",
+    "col_value": "????????",
+    "col_patrons": "???????",
+    "col_paid": "?????? ??????????",
+    "col_pledge": "?????????? ??????",
+    "col_posts": "?????",
+    "col_created": "????????"
   },
   "updated_at": "2026-08-18 15:10:30"
 }

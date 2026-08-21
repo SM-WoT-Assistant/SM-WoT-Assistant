@@ -56,10 +56,12 @@ The app is free and always will be. If you want to support development, you can:
 
 - **Ko-fi** — https://ko-fi.com/smwotassistant
 - **Monobank jar** — https://send.monobank.ua/jar/WqyWjTRpy
+- **Patreon** — https://www.patreon.com/cw/SMWoTAssistant
 - **QR codes** (scan to donate):
   ![Ko-fi QR](img_kofi.png)
   ![Monobank QR](img_qr.png)
   ![PayPal QR](img_paypal.png)
+  ![Patreon QR](img_patreon.png)
 
 ---
 ⚠️ **Important:** set the game to **borderless window mode** before using the overlay!
