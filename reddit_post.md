@@ -29,6 +29,9 @@ The app automatically checks for new versions on startup and updates itself.
 ## 🎬 Video overview
 https://www.youtube.com/watch?v=4JlDkM65PxY
 
+## 📺 YouTube channel
+https://www.youtube.com/@SMWoTAssistant
+
 ## 📥 Download
 https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases
 

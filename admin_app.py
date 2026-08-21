@@ -410,6 +410,7 @@ def _read_admin_version():
 _COMMUNITY_PROFILE_DIR = os.path.join(os.environ.get("APPDATA", "."),
                                       "SM WoT Assistant", "community_chrome_profile")
 _YT_VIDEO_ID = "4JlDkM65PxY"
+_YT_CHANNEL_URL = "https://www.youtube.com/@SMWoTAssistant"
 _YT_API = "https://www.googleapis.com/youtube/v3"
 _GITHUB_REPO = "SM-WoT-Assistant/SM-WoT-Assistant"
 _GITHUB_API = f"https://api.github.com/repos/{_GITHUB_REPO}"
@@ -1436,11 +1437,8 @@ class AdminApp:
             return
         url = _COMMUNITY_PAGE_URLS.get(tab)
         if tab == "youtube":
-            channel = self._community.get("yt_channel_id")
-            if channel:
-                url = "https://www.youtube.com/channel/" + channel + "/videos"
-            else:
-                url = "https://www.youtube.com/"  # never autoplay a video
+            # The channel page (handle URL) — never autoplay a video.
+            url = _YT_CHANNEL_URL
         if not url:
             return
 
@@ -1644,7 +1642,7 @@ class AdminApp:
             tk.Button(row, text=txt, bg="#333", fg=FG, bd=0, padx=10, pady=3, cursor="hand2",
                       command=lambda: webbrowser.open(url)).pack(side="left", padx=(0, 6))
 
-        _link("YouTube", "https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
+        _link("YouTube", _YT_CHANNEL_URL)
         _link("Reddit", "https://www.reddit.com/user/" + _REDDIT_USER + "/")
         _link("GitHub", "https://github.com/" + _GITHUB_REPO + "/releases")
         _link("Website", "https://sm-wot-assistant.web.app")
