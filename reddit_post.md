@@ -1,30 +1,43 @@
-# SM WoT Assistant — free tactical assistant for World of Tanks (alpha test)
+# SM WoT Assistant — free tactical assistant for World of Tanks
 
-> **This is an ALPHA TEST** — not the final release of the app yet. Everyone willing is invited to try it out and share their experience!
-
-Tactical assistant for World of Tanks: maps with coordinate grids, tactical schemes, tank setups and a battle overlay — all in one lightweight app for Windows 10/11.
+Tactical assistant for World of Tanks: maps with coordinate grids, tactical schemes, tank builds and a battle overlay — all in one lightweight app for Windows 10/11.
 
 🌍 **Supports ALL World of Tanks client languages** — the app automatically detects your game language.
 
-<!-- IMAGES -->
+⚠️ **This is an ALPHA TEST** — not the final release yet. Everyone is invited to try it out and share their experience!
 
-## 🗺️ Maps
+<!-- IMAGES: drag & drop these files into the editor at the marked spots (PNG, from %TEMP%\opencode\reddit_upload\):
+  img_start.png  img_setup.png  img_maps.png  img_tactic.png  img_minimap.png -->
+
+## 🖥️ Screens
+
+### Start
+![Start screen](img_start.png)
+Tactical assistant for World of Tanks: maps with coordinate grids, tactical schemes, tank setups and a battle overlay — all in one lightweight app.
+
+### SETUP
+![SETUP screen](img_setup.png)
+Recommended tank builds: equipment, crew perks and consumables for every vehicle. Pick your tank and get a ready setup in seconds.
+
+### MAPS
+![MAPS screen](img_maps.png)
 60+ in-game maps with a 10×10 coordinate grid. All map data is extracted from the WoT client — nothing hardcoded.
 
-## ⚙️ SETUP — tank builds
-Recommended tank builds for every vehicle: equipment, crew perks and consumables. Pick your tank and get a ready setup in seconds.
+### TACTIC
+![TACTIC screen](img_tactic.png)
+Draw tactical schemes: markers, arrows, text, tree icons. JSON export/import, clan publishing. Map images from [wotmapsbyyaya.com](https://wotmapsbyyaya.com/maps).
 
-## 🎯 TACTIC — tactical schemes
-Draw your own tactical schemes: markers, arrows, text, tree icons. JSON export/import, clan publishing. Map images from wotmapsbyyaya.com.
+### Battle overlay
+![Battle overlay](img_minimap.png)
+Semi-transparent battle overlay on top of the game. Auto-detects the current map and battle mode from the game log during battle.
 
-## 👁️ Battle overlay
-Semi-transparent overlay on top of the game. Auto-detects the current map and battle mode from the game log during battle.
-
-## 📡 Community schemes
-Browse and download tactical schemes published by the community — directly from the website.
-
-## 🔄 Auto-update
-The app automatically checks for new versions on startup and updates itself.
+## 📋 Features
+- 🗺️ **Maps** — 60+ in-game maps with a 10×10 coordinate grid, all data extracted from the WoT client
+- ⚙️ **SETUP** — recommended tank builds: equipment, crew perks, consumables
+- 🎯 **TACTIC** — draw tactical schemes: markers, arrows, text, tree icons; JSON export/import, clan publishing
+- 👁️ **Battle overlay** — semi-transparent, auto-detects map and battle mode from the game log
+- 📡 **Community schemes** — browse and download tactical schemes published by the community, directly from the website
+- 🔄 **Auto-update** — the app automatically checks for new versions on startup and updates itself
 
 ## 🎬 Video overview
 https://www.youtube.com/watch?v=4JlDkM65PxY
@@ -44,9 +57,9 @@ The app is free and always will be. If you want to support development, you can:
 - **Ko-fi** — https://ko-fi.com/smwotassistant
 - **Monobank jar** — https://send.monobank.ua/jar/WqyWjTRpy
 - **QR codes** (scan to donate):
-  ![Ko-fi QR](https://sm-wot-assistant.web.app/img/qr_kofi.png)
-  ![Monobank QR](https://sm-wot-assistant.web.app/img/qr_monobank.png)
-  ![PayPal QR](https://sm-wot-assistant.web.app/img/paypal_qr.png)
+  ![Ko-fi QR](img_kofi.png)
+  ![Monobank QR](img_qr.png)
+  ![PayPal QR](img_paypal.png)
 
 ---
 ⚠️ **Important:** set the game to **borderless window mode** before using the overlay!

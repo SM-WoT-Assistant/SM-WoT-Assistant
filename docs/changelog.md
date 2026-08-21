@@ -4,6 +4,23 @@
 
 ---
 
+## Адмінка v1.0.32 (21.08.2026): вставка Ctrl+V працює у вбудованому браузері (SetFocus); reddit_post.md — матеріал як на домашній сторінці
+
+Юзер: «Не працює вставка з буфера обміну у вбудованому браузері. Підготуй мені текст з заголовками і зображеннями і посиланнями як на домашній сторінці сайту щоб я вставив все у редіт».
+
+**Корінь (підтверджено кодом):** Chrome вбудовано через `SetParent` + `WS_CHILD` (`_embed_hwnd`) — WS_CHILD-вікно іншого процесу НІКОЛИ не отримує фокус клавіатури від простого кліку: клік миші Chrome візуально обробляє, але Ctrl+V/набір тексту ідуть у Tk root (який тримає фокус через `focus_force()` при вході у fullscreen). Вбудований Chrome жодного разу не отримував `SetFocus` → клавіатурний ввід у браузер мертвий.
+
+**Фікс:**
+1. Новий helper `_cursor_over_hwnd(hwnd)` — `GetCursorPos` + `WindowFromPoint` + ланцюг `GetParent` (до 12 рівнів) — визначає, чи курсор над вікном Chrome (враховує дочірні renderer-вікна; патерн #1500 `_cursor_over_app` з window_manager.py).
+2. `_community_poll_embed` — після успішного embed: `after(150, SetFocus(hwnd))` — фокус у браузер одразу при вході.
+3. Той самий poll-цикл (200мс): якщо `hwnd` живий, `visible=True`, курсор над Chrome (`_cursor_over_hwnd`) і був клік (`GetAsyncKeyState(VK_LBUTTON/VK_RBUTTON)` — біт «натиснута зараз» АБО «була з минулого поллу») → `SetFocus(hwnd)`. Фокус повертається Chrome при кожному кліку в браузері; Tk-поля (API Keys) не чіпаються (курсор не над Chrome).
+
+**reddit_post.md — матеріал для публікації** (структура як index.html): заголовки секцій (Screens: Start/SETUP/MAPS/TACTIC/Battle overlay, Features, Video overview, YouTube channel, Download, Website, Support), markdown-плейсхолдери `![...](img_*.png)` — при drag&drop PNG у Reddit-редактор він підставить реальний URL i.redd.it; список зображень-файлів у коментарі; посилання: GitHub releases, сайт, YouTube канал @SMWoTAssistant + відео, Ko-fi, Monobank, QR-коди. PNG вже в `%TEMP%\opencode\reddit_upload\` (8 файлів, назви збігаються з плейсхолдерами).
+
+Верифікація: AST OK; smoke 4 сценарії (`_cursor_over_hwnd` bool без винятків, hwnd=0 → False; poll-цикл перепланується; після embed → `after(150, SetFocus)`). build v1.0.32 (8.6 MB, _internal 69) через TMP-обхід; адмінка запущена (15:21). Юзер має бачити: клік у вбудованому браузері → Ctrl+V вставляє з буфера обміну (Reddit-редактор, логіни, поля).
+
+---
+
 ## Адмінка v1.0.31 (21.08.2026): YouTube — сторінка каналу @SMWoTAssistant завжди; Reddit empty пояснено + матеріал для публікації
 
 Юзер: «На ютуб повинна завантажуватись сторінка мого каналу - https://www.youtube.com/@SMWoTAssistant і по посиланню теж. Підготуй на редіт матеріал для публікації - показує ерор - емпті - може тому що немає публікацій?»

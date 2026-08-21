@@ -656,6 +656,27 @@ def _embed_hwnd(hwnd, parent_hwnd, w, h):
     return True
 
 
+def _cursor_over_hwnd(hwnd):
+    """True, якщо курсор миші знаходиться над вікном (або його дочірніми).
+
+    WindowFromPoint повертає найглибше вікно під курсором (Chrome renderer
+    window, WS_CHILD canvas тощо), тому піднімаємося ланцюгом GetParent
+    (до 12 рівнів) і порівнюємо з цільовим hwnd — патерн #1500."""
+    try:
+        pt = wintypes.POINT()
+        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
+        h = ctypes.windll.user32.WindowFromPoint(pt)
+        for _ in range(12):
+            if h == hwnd:
+                return True
+            h = ctypes.windll.user32.GetParent(h)
+            if not h:
+                break
+        return False
+    except Exception:
+        return False
+
+
 def _unembed_hwnd(hwnd):
     """Detach a previously embedded window back to top-level (so EnumWindows
     can find it again on the next embed attempt)."""
@@ -2038,6 +2059,28 @@ class AdminApp:
                         self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
                         if ok:
                             self._community["visible"] = True
+                            # Give the embedded Chrome the keyboard focus so
+                            # typing / Ctrl+V works right away (a WS_CHILD
+                            # window of another process never gets focus from
+                            # a plain click).
+                            try:
+                                self.root.after(150, lambda: ctypes.windll.user32.SetFocus(hwnd))
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+        # While the user clicks inside the embedded browser, hand the
+        # keyboard focus to Chrome — otherwise Ctrl+V / typing goes to the
+        # Tk root (WS_CHILD windows of another process never steal focus
+        # from a click alone). Only when the cursor is over the browser AND
+        # a mouse button was pressed since the last poll.
+        if hwnd and self._community.get("visible"):
+            try:
+                if _cursor_over_hwnd(hwnd):
+                    lmb = ctypes.windll.user32.GetAsyncKeyState(0x01)
+                    rmb = ctypes.windll.user32.GetAsyncKeyState(0x02)
+                    if (lmb & 0x8000) or (lmb & 0x0001) or (rmb & 0x8000) or (rmb & 0x0001):
+                        ctypes.windll.user32.SetFocus(hwnd)
             except Exception:
                 pass
         self.root.after(200, self._community_poll_embed)
