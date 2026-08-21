@@ -159,6 +159,7 @@ _TR_EN = {
     # ── Community & Stats ──
     "btn_community": "Community",
     "comm_fs_hint": "ESC — exit fullscreen",
+    "tile_overview": "Overview",
     "tile_youtube": "YouTube",
     "tile_github": "GitHub",
     "tile_kofi": "Ko-fi",
@@ -244,7 +245,7 @@ _TR_EN = {
     "log_gh_ok": "GitHub: {n} releases, {dl} downloads",
     "log_kofi_ok": "Ko-fi: {n} donations, total {total}",
     "h_sec_community": "Community",
-    "h_comm_tiles_d": "The tile strip shows overall stats: YouTube views, GitHub downloads, Ko-fi donations, installations and errors. Click a tile to open the Community view.",
+    "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
     "h_comm_fs_d": "The Community button or a tile click opens fullscreen Community: tiles, per-platform stats tables and the embedded Chrome browser (no separate windows appear).",
     "h_comm_login_d": "Reddit and Ko-fi log in automatically with vault credentials; Google login is manual. If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
     "h_comm_vault_d": "API keys and passwords are stored encrypted with Windows DPAPI in admin_vault.json (AppData). They are decrypted only on demand and never logged.",
@@ -1357,6 +1358,7 @@ class AdminApp:
             tiles["vals"][key] = v
             tiles["hints"][key] = h
 
+        _tile("overview", "overview")
         _tile("youtube", "youtube")
         _tile("github", "github")
         _tile("kofi", "kofi")
@@ -1385,6 +1387,9 @@ class AdminApp:
             if not strip:
                 continue
             vals, hints = strip["vals"], strip["hints"]
+            vals["overview"].config(
+                text=str(st.get("builds_ver")) if st.get("builds_ver") is not None else "—")
+            hints["overview"].config(text="")
             yt = st.get("youtube")
             ytv = 0
             if yt and yt.get("channel", {}).get("views"):
@@ -1409,8 +1414,12 @@ class AdminApp:
 
     def _open_community_tab(self, tab):
         if not self._community.get("fs"):
-            self._enter_community()
-        self.root.after(250, lambda: self._select_tab(tab))
+            self._enter_community(target_tab=tab)
+            return
+        self._select_tab(tab)
+        # Explicit navigation — selecting the tab of the ALREADY active tab
+        # fires no <<NotebookTabChanged>> event, so the tile would do nothing.
+        self._navigate_platform_tab(tab)
 
     def _select_tab(self, tab):
         if hasattr(self, "_nb"):
@@ -1440,6 +1449,13 @@ class AdminApp:
                 drv = self._community_ensure_browser(self._community.get("fs"))
                 if drv is None:
                     return
+                handles = drv.window_handles
+                if handles:
+                    # Navigate the user's main tab only — a background fetch
+                    # tab (CDP createTarget) may be the current one mid-fetch;
+                    # navigation must never land there (and must not open a
+                    # new tab either).
+                    drv.switch_to.window(handles[0])
                 drv.get(url)
             except Exception:
                 pass
@@ -1462,7 +1478,7 @@ class AdminApp:
         else:
             self._enter_community()
 
-    def _enter_community(self):
+    def _enter_community(self, target_tab=None):
         if self._community.get("fs"):
             return
         self._community["fs"] = True
@@ -1474,17 +1490,20 @@ class AdminApp:
         self.root.bind("<Escape>", lambda e: self._exit_community())
         if self._community.get("driver") is None:
             threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
-        self._select_tab("overview")
+        # Tile entry (target_tab set): select the tile's tab immediately so
+        # the browser navigates straight to the tile's page — no Overview
+        # flash in between. Community-button entry: Overview as usual.
+        self._select_tab(target_tab or "overview")
         self.root.after(500, self._community_show_browser)
         self.root.after(200, self._community_poll_embed)
 
-        def _nav_overview():
+        def _nav_to():
             if self._community.get("creating"):
-                self.root.after(1000, _nav_overview)
+                self.root.after(1000, _nav_to)
                 return
-            self._navigate_platform_tab("overview")
+            self._navigate_platform_tab(target_tab or "overview")
 
-        self.root.after(1200, _nav_overview)
+        self.root.after(1200, _nav_to)
         self._refresh_community_background()
         self._update_comm_tabs()
 
