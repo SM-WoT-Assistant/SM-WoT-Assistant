@@ -347,6 +347,38 @@ def _save_admin_settings(settings):
     except:
         pass
 
+_COMMUNITY_CACHE_PATH = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "community_cache.json")
+
+def _load_community_cache():
+    """Community platform data cache — shown instantly at startup, refreshed
+    on Community entry / every 12h / manually. Validated on load."""
+    try:
+        if os.path.exists(_COMMUNITY_CACHE_PATH):
+            with open(_COMMUNITY_CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                stats = data.get("stats")
+                if isinstance(stats, dict):
+                    return {k: v for k, v in stats.items() if k in
+                            ("youtube", "reddit", "github", "kofi")}
+    except Exception:
+        pass
+    return {}
+
+def _save_community_cache(stats):
+    """Validate + persist the platform stats cache."""
+    try:
+        valid = {}
+        for k in ("youtube", "reddit", "github", "kofi"):
+            v = stats.get(k)
+            if isinstance(v, dict):
+                valid[k] = v
+        os.makedirs(os.path.dirname(_COMMUNITY_CACHE_PATH), exist_ok=True)
+        with open(_COMMUNITY_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"stats": valid, "updated_at": time.time()}, f, indent=2)
+    except Exception:
+        pass
+
 def _set_windows_startup(enable):
     """Add/remove HKCU\\Run entry for admin app."""
     import winreg
@@ -909,6 +941,8 @@ class AdminApp:
                       "last_generated_at": None},
             "status": {"youtube": "idle", "reddit": "idle", "github": "idle", "kofi": "idle"},
         }
+        for _ck, _cv in _load_community_cache().items():
+            self._community["stats"][_ck] = _cv
 
         self._build_ui()
         self._log(self.t("log_started", path=self._wot_path or self.t("not_set")))
@@ -1394,8 +1428,10 @@ class AdminApp:
         url = _COMMUNITY_PAGE_URLS.get(tab)
         if tab == "youtube":
             channel = self._community.get("yt_channel_id")
-            url = ("https://www.youtube.com/channel/" + channel + "/videos") if channel \
-                else "https://www.youtube.com/watch?v=" + _YT_VIDEO_ID
+            if channel:
+                url = "https://www.youtube.com/channel/" + channel + "/videos"
+            else:
+                url = "https://www.youtube.com/"  # never autoplay a video
         if not url:
             return
 
@@ -1438,6 +1474,7 @@ class AdminApp:
         self.root.bind("<Escape>", lambda e: self._exit_community())
         if self._community.get("driver") is None:
             threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
+        self._select_tab("overview")
         self.root.after(500, self._community_show_browser)
         self.root.after(200, self._community_poll_embed)
 
@@ -1448,15 +1485,7 @@ class AdminApp:
             self._navigate_platform_tab("overview")
 
         self.root.after(1200, _nav_overview)
-
-        def _rtdb_once():
-            try:
-                self._fetch_rtdb_counters()
-                self.root.after(0, self._update_tiles)
-            except Exception:
-                pass
-
-        threading.Thread(target=_rtdb_once, daemon=True).start()
+        self._refresh_community_background()
         self._update_comm_tabs()
 
     def _exit_community(self):
@@ -1869,15 +1898,11 @@ class AdminApp:
                 self._community["hwnd"] = None
                 self._community["tg_started"] = False
             else:
-                if self._community.get("visible") == visible:
-                    return drv
-                try:
-                    drv.quit()
-                except Exception:
-                    pass
-                self._community["driver"] = None
-                self._community["hwnd"] = None
-                self._community["tg_started"] = False
+                # Visibility is managed by the embed/offscreen lifecycle —
+                # NEVER quit here: calls during browser creation (visible=False
+                # while fs=True) used to kill the fresh browser repeatedly, so
+                # it never got embedded ('no browser at all' symptom).
+                return drv
         try:
             self._log(self.t("log_comm_start"))
             _kill_chrome_matching(_COMMUNITY_PROFILE_DIR)
@@ -2164,6 +2189,7 @@ class AdminApp:
                 self._log(self.t("log_comm_error", err=str(e)[:200]))
             finally:
                 self._community["refreshing"] = False
+                _save_community_cache(self._community["stats"])
                 self._log("[DEBUG][fetch] yt=%s red=%s kofi=%s gh=%s" % (
                     self._community["status"].get("youtube"),
                     self._community["status"].get("reddit"),
@@ -2205,6 +2231,7 @@ class AdminApp:
                 self._community["status"][name] = str(e)[:100]
             finally:
                 self._community["refreshing"] = False
+                _save_community_cache(self._community["stats"])
                 if name in ("reddit", "kofi"):
                     self._remember_linked(name, self._community["status"].get(name) in ("ok", "empty"))
                 st_now = self._community["status"].get(name)
@@ -2246,6 +2273,7 @@ class AdminApp:
                 self._remember_linked(name, False)
             finally:
                 self._community["refreshing"] = False
+                _save_community_cache(self._community["stats"])
                 st_now = self._community["status"].get(name)
                 if st_now and st_now not in ("ok", "empty", "idle", "hidden", "no_key"):
                     self._community_action_needed("%s: %s" % (name, st_now))
@@ -2408,8 +2436,13 @@ class AdminApp:
             try:
                 channel = self._community.get("yt_channel_id")
                 if not channel:
-                    drv.get("https://www.youtube.com/watch?v=" + _YT_VIDEO_ID)
-                    time.sleep(3.5)
+                    drv.get("https://www.youtube.com/watch?v=" + _YT_VIDEO_ID + "&autoplay=0")
+                    time.sleep(2.5)
+                    try:
+                        drv.execute_script(
+                            "var v=document.querySelector('video');if(v){v.pause();v.muted=true;}")
+                    except Exception:
+                        pass
                     m = re.search(r'"channelId":"(UC[0-9A-Za-z_-]{22})"', drv.page_source)
                     if not m:
                         return None, "no_channel_id"
@@ -2893,9 +2926,11 @@ class AdminApp:
                                 self.t("notif_changes"),
                                 self.t("notif_changes_body", n=len(changed)))
                             self._do_generate(changed)
-                    # NO periodic community fetches: this is an admin tool —
-                    # all platform/RTDB data updates are manual (Refresh / Link
-                    # buttons on the tabs; one-shot counters on Community entry).
+                    if now - self._community["last_comm"] > 43200:  # 12h community data refresh (cache keeps tiles fresh)
+                        self._community["last_comm"] = now
+                        self._refresh_community_background()
+                    # NO periodic 10-min community fetches: 12h cycle + manual
+                    # Refresh / Link buttons + cache at startup.
                 except Exception as e:
                     self._log(self.t("log_bg_error", err=e))
                 time.sleep(10)
