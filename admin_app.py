@@ -381,6 +381,13 @@ _YT_API = "https://www.googleapis.com/youtube/v3"
 _GITHUB_REPO = "SM-WoT-Assistant/SM-WoT-Assistant"
 _GITHUB_API = f"https://api.github.com/repos/{_GITHUB_REPO}"
 _REDDIT_USER = "SM-WoT-Assistant"
+
+_COMMUNITY_PAGE_URLS = {
+    "overview": "https://sm-wot-assistant.web.app/admin.html",
+    "reddit": "https://www.reddit.com/user/" + _REDDIT_USER + "/",
+    "github": "https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases",
+    "kofi": "https://ko-fi.com/Manage/",
+}
 _UA = "SM-WoT-Assistant-Admin/1.0"
 _APP_DATA_DIR = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
 
@@ -697,29 +704,6 @@ def _hwnd_alive(hwnd):
         return bool(ctypes.windll.user32.IsWindow(hwnd))
     except Exception:
         return False
-
-
-def _open_bg_tab(drv):
-    """Open a NEW BACKGROUND tab WITHOUT activating it in the UI (CDP
-    Target.createTarget), so the user's visible tab never jumps — closing it
-    later must not switch the UI to a neighbour tab (the 'page snaps to
-    Reddit' symptom). Falls back to a regular tab when CDP is unavailable.
-    Returns the new tab handle (or None)."""
-    try:
-        before = set(drv.window_handles)
-        drv.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
-        time.sleep(0.2)
-        new_handles = [h for h in drv.window_handles if h not in before]
-        if new_handles:
-            drv.switch_to.window(new_handles[-1])
-            return new_handles[-1]
-    except Exception:
-        pass
-    try:
-        drv.switch_to.new_window("tab")
-        return drv.current_window_handle
-    except Exception:
-        return None
 
 
 def _fix_crashed_profile_prefs():
@@ -1401,6 +1385,41 @@ class AdminApp:
             except Exception:
                 pass
 
+    def _navigate_platform_tab(self, tab):
+        """Load the platform's admin page into the visible embedded browser
+        when the user switches to that tab (manual control — the browser
+        always shows the page of the active tab)."""
+        if tab in ("apikeys", "errors"):
+            return
+        url = _COMMUNITY_PAGE_URLS.get(tab)
+        if tab == "youtube":
+            channel = self._community.get("yt_channel_id")
+            url = ("https://www.youtube.com/channel/" + channel + "/videos") if channel \
+                else "https://www.youtube.com/watch?v=" + _YT_VIDEO_ID
+        if not url:
+            return
+
+        def _go():
+            try:
+                drv = self._community_ensure_browser(self._community.get("fs"))
+                if drv is None:
+                    return
+                drv.get(url)
+            except Exception:
+                pass
+
+        threading.Thread(target=_go, daemon=True).start()
+
+    def _on_nb_tab_changed(self, event=None):
+        try:
+            ix = self._nb.index(self._nb.select())
+            for name, i in self._tab_ix.items():
+                if i == ix:
+                    self._navigate_platform_tab(name)
+                    return
+        except Exception:
+            pass
+
     def _toggle_community(self):
         if self._community.get("fs"):
             self._exit_community()
@@ -1421,6 +1440,14 @@ class AdminApp:
             threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
         self.root.after(500, self._community_show_browser)
         self.root.after(200, self._community_poll_embed)
+
+        def _nav_overview():
+            if self._community.get("creating"):
+                self.root.after(1000, _nav_overview)
+                return
+            self._navigate_platform_tab("overview")
+
+        self.root.after(1200, _nav_overview)
 
         def _rtdb_once():
             try:
@@ -1479,6 +1506,7 @@ class AdminApp:
         style.map("Treeview", background=[("selected", "#444")], foreground=[("selected", FG)])
         self._nb = ttk.Notebook(left)
         self._nb.pack(fill="both", expand=True, pady=(4, 0))
+        self._nb.bind("<<NotebookTabChanged>>", self._on_nb_tab_changed)
         self._tab_status = {}
         self._trees = {}
         self._tab_ix = {}
@@ -1972,6 +2000,42 @@ class AdminApp:
                 pass
         self.root.after(200, self._community_poll_embed)
 
+    def _open_bg_tab(self, drv):
+        """Open a NEW BACKGROUND tab WITHOUT activating it in the UI: CDP
+        Target.createTarget, then Target.activateTarget back to the user's
+        tab — fetch navigations never show in the visible tab (the 'settings
+        page -> black JSON page -> Google' symptom). Falls back to a regular
+        tab (immediately blanked) when CDP is unavailable. Returns the new
+        tab handle, or None to work in the current tab."""
+        try:
+            main_handle = drv.current_window_handle
+            before = set(drv.window_handles)
+            drv.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
+            time.sleep(0.3)
+            new_handles = [h for h in drv.window_handles if h not in before]
+            if new_handles:
+                bg = new_handles[-1]
+                try:
+                    drv.execute_cdp_cmd("Target.activateTarget", {"targetId": main_handle})
+                except Exception:
+                    pass
+                drv.switch_to.window(bg)
+                self._log("[DEBUG][bgtab] cdp=ok bg=%s" % bg)
+                return bg
+            self._log("[DEBUG][bgtab] cdp=no_new_tab")
+        except Exception as e:
+            self._log("[DEBUG][bgtab] cdp=fail:%s -> fallback" % str(e)[:80])
+            try:
+                drv.switch_to.new_window("tab")
+                try:
+                    drv.get("about:blank")
+                except Exception:
+                    pass
+                return drv.current_window_handle
+            except Exception:
+                return None
+        return None
+
     def _community_move_browser_offscreen(self):
         hwnd = self._community.get("hwnd")
         self._community["visible"] = False
@@ -2340,7 +2404,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            _open_bg_tab(drv)
+            self._open_bg_tab(drv)
             try:
                 channel = self._community.get("yt_channel_id")
                 if not channel:
@@ -2464,7 +2528,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            _open_bg_tab(drv)
+            self._open_bg_tab(drv)
             try:
                 if not self._reddit_logged_in(drv):
                     st = self._login_reddit(drv)
@@ -2565,7 +2629,7 @@ class AdminApp:
         main_handle = None
         try:
             main_handle = drv.current_window_handle
-            _open_bg_tab(drv)
+            self._open_bg_tab(drv)
             try:
                 if not self._kofi_logged_in(drv):
                     st = self._login_kofi(drv)
