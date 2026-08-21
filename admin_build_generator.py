@@ -39,6 +39,19 @@ DELAY_MIN, DELAY_MAX = 25, 35  # random delay between prompts
 PROGRESS_FILE = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant", "_fill_progress.json")
 PROMPTS_FILE = "prompts_cache.json"
 
+# Маркери тегів, виключених з tank_db (івент-клони: CFE/7x7/FL/SH/fallout/StoryMode…).
+# ОДНА точка правди для load_tank_db() і фільтрів генерації (#1604: розбіжність
+# 995 танків vs 996 промптів — промпти для відфільтрованих клонів рахувались, танки ні).
+_BAD_TAG_MARKERS = [
+    "_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test", "_training",
+    "tutorial", "observer", "r05_kv", "r70_t_50_2", "sherman_crab", "g00_",
+    "_cfe", "auto_s", "auto_test", "_shxxi", "_bomber", "pillbox", "env_artillery",
+    "a08_t23", "a26_t18", "a15_t57", "_newonboarding", "_storymode",
+]
+
+def _is_bad_tag(tag):
+    return any(b in tag.lower() for b in _BAD_TAG_MARKERS)
+
 # ── Helpers ─────────────────────────────────────────
 def _rtdb_url(path):
     return f"{FIREBASE_URL}/{path}.json?auth={API_KEY}"
@@ -67,13 +80,9 @@ def _get_json(url, timeout=10):
 def load_tank_db():
     with open("tank_db.json", "r", encoding="utf-8") as f:
         db = json.load(f)
-    bad = ["_7x7","_fallout","_fl","_sh","_bootcamp","_igr","_test","_training",
-           "tutorial","observer","r05_kv","r70_t_50_2","sherman_crab","g00_",
-           "_cfe","auto_s","auto_test","_shxxi","_bomber","pillbox","env_artillery",
-           "a08_t23","a26_t18","a15_t57","_newonboarding","_storymode"]
     clean = {}
     for k, v in db.items():
-        if any(b in k.lower() for b in bad) or any(b in v.get("name","").lower() for b in bad):
+        if _is_bad_tag(k) or any(b in v.get("name", "").lower() for b in _BAD_TAG_MARKERS):
             continue
         tier = v.get("tier", 0)
         if tier < 1 or tier > 11:
@@ -135,6 +144,20 @@ def save_prompt(tag, prompt):
     except Exception as e:
         print(f"    [WARN] prompt cache save failed: {e}")
 
+def check_prompt_tank_mismatch(tank_db=None, prompts=None):
+    """Диф ключів prompts_cache vs (відфільтрованого) tank_db.
+
+    Повертає (prompts_only, tanks_only) — теги з промптом без танка і танки
+    без промпта. Обидва списки мають бути порожніми: будь-яка розбіжність
+    означає, що лічильники «Танків/Промптів» не співпадають (#1604).
+    """
+    if tank_db is None:
+        tank_db = load_tank_db()
+    if prompts is None:
+        prompts = load_prompts()
+    tk, pk = set(tank_db), set(prompts)
+    return sorted(pk - tk), sorted(tk - pk)
+
 # ── Change detection ──────────────────────────────
 def _entry_fingerprint(info):
     return {"size": int(getattr(info, "file_size", 0)), "crc": int(getattr(info, "CRC", 0))}
@@ -180,6 +203,8 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             prev = old.get(name)
             if prev is None or not _fingerprint_equal(prev, fp):
                 tag = os.path.splitext(os.path.basename(name))[0]
+                if _is_bad_tag(tag):
+                    continue
                 changed.append(tag)
                 changed_names[tag] = name
                 fps[name] = fp
@@ -818,11 +843,16 @@ def strict_build_incomplete(tag, build_data):
     return missing
 
 def scan_incomplete_builds():
-    """Fetch all RTDB builds and return {tag: [missing sections]} for strictly incomplete ones."""
+    """Fetch all RTDB builds and return {tag: [missing sections]} for strictly incomplete ones.
+
+    Івент-клони (_is_bad_tag) пропускаються — їх білди невидимі в застосунку,
+    регенерація тільки відтворювала б розбіжність лічильників (#1604)."""
     all_builds = _get_json(_rtdb_url("builds/tanks")) or {}
     incomplete = {}
     for tag, entry in all_builds.items():
         if not isinstance(entry, dict):
+            continue
+        if _is_bad_tag(tag):
             continue
         missing = strict_build_incomplete(tag, entry.get("data", entry))
         if missing:

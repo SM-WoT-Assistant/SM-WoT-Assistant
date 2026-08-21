@@ -31,6 +31,7 @@ from admin_build_generator import (
     _WG_API_URL, _is_build_complete,
     check_wg_game_version, snapshot_manifest, update_manifest_for_tags,
     update_manifest_failures, exclude_failed_tags, scan_incomplete_builds,
+    check_prompt_tank_mismatch,
     _kill_chrome_matching, _copy_chrome_profile, CHROME_PROFILE,
     CHROME_PROFILE_DIR, _DRIVER_RETRY_MARKERS
 )
@@ -84,6 +85,10 @@ _TR_EN = {
     "dlg_save": "Save",
     "log_started": "Admin started (WoT: {path})",
     "log_tanks_prompts": "Tanks: {tanks}, Prompts: {prompts}",
+    "card_tp": "Tanks / Prompts",
+    "log_tp_mismatch": "[ERROR] Tanks/Prompts mismatch: {tanks} tanks vs {prompts} prompts",
+    "log_tp_orphan_prompt": "  prompt without tank: {tag}",
+    "log_tp_orphan_tank": "  tank without prompt: {tag}",
     "log_manifest_seeded": "Manifest seeded from dev copy",
     "log_manifest_baseline": "Manifest baseline created from scripts.pkg",
     "log_manifest_baseline_fail": "Manifest baseline failed: {err}",
@@ -969,7 +974,7 @@ class AdminApp:
 
         self._build_ui()
         self._log(self.t("log_started", path=self._wot_path or self.t("not_set")))
-        self._log(self.t("log_tanks_prompts", tanks=len(self.tank_db), prompts=len(self.prompts)))
+        self._check_tank_prompt_match()
         self._last_heartbeat = 0.0
         self._last_cleanup = 0.0
         self._last_sweep = -86280.0  # first fill sweep ~120s after start, then every 24h
@@ -1260,6 +1265,7 @@ class AdminApp:
         self._card_status = _card(left, "card_game_status")
         self._card_queue = _card(left, "card_queue")
         self._card_last = _card(left, "card_last_scan")
+        self._card_tp = _card(left, "card_tp")
 
         # Right panel: buttons + log
         right = tk.Frame(content, bg=BG)
@@ -1358,6 +1364,28 @@ class AdminApp:
         q = len(self._queue)
         self._card_queue.config(text=str(q), fg=ACCENT if q > 0 else "#888")
         self._card_last.config(text=time.strftime("%H:%M") if self._last_scan > 0 else "—")
+        try:
+            prompts_only, tanks_only = check_prompt_tank_mismatch(self.tank_db, self.prompts)
+            mismatch = bool(prompts_only or tanks_only)
+            self._card_tp.config(text=f"{len(self.tank_db)} / {len(self.prompts)}",
+                                 fg=RED if mismatch else GREEN)
+        except Exception:
+            self._card_tp.config(text=f"{len(self.tank_db)} / {len(self.prompts)}", fg="#888")
+
+    def _check_tank_prompt_match(self):
+        """Лог-перевірка розбіжності Танків/Промптів: [ERROR] з конкретними
+        тегами при розбіжності, звичайний рядок при співпадінні (#1604)."""
+        self.prompts = load_prompts()
+        prompts_only, tanks_only = check_prompt_tank_mismatch(self.tank_db, self.prompts)
+        if prompts_only or tanks_only:
+            self._log(self.t("log_tp_mismatch", tanks=len(self.tank_db), prompts=len(self.prompts)))
+            for tag in prompts_only:
+                self._log(self.t("log_tp_orphan_prompt", tag=tag))
+            for tag in tanks_only:
+                self._log(self.t("log_tp_orphan_tank", tag=tag))
+        else:
+            self._log(self.t("log_tanks_prompts", tanks=len(self.tank_db), prompts=len(self.prompts)))
+        self.root.after(0, self._update_cards)
 
     # ── Community & Stats ──────────────────────────
     def _build_tile_strip(self, parent):
@@ -2059,28 +2087,20 @@ class AdminApp:
                         self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
                         if ok:
                             self._community["visible"] = True
-                            # Give the embedded Chrome the keyboard focus so
-                            # typing / Ctrl+V works right away (a WS_CHILD
-                            # window of another process never gets focus from
-                            # a plain click).
-                            try:
-                                self.root.after(150, lambda: ctypes.windll.user32.SetFocus(hwnd))
-                            except Exception:
-                                pass
             except Exception:
                 pass
-        # While the user clicks inside the embedded browser, hand the
-        # keyboard focus to Chrome — otherwise Ctrl+V / typing goes to the
-        # Tk root (WS_CHILD windows of another process never steal focus
-        # from a click alone). Only when the cursor is over the browser AND
-        # a mouse button was pressed since the last poll.
+        # Keyboard focus belongs to the embedded Chrome whenever the cursor is
+        # over it (every poll, not only after a click). A WS_CHILD window of
+        # another process never takes focus from a plain click — without this,
+        # typing / Ctrl+V goes to the Tk root whenever the user hovers the
+        # browser without clicking (or right after Tk stole focus, e.g.
+        # _enter_community → root.focus_force()). The old one-shot SetFocus
+        # (150 ms after embed) and click-gated SetFocus raced the renderer and
+        # the poll window — paste "sometimes didn't work" (#1604).
         if hwnd and self._community.get("visible"):
             try:
                 if _cursor_over_hwnd(hwnd):
-                    lmb = ctypes.windll.user32.GetAsyncKeyState(0x01)
-                    rmb = ctypes.windll.user32.GetAsyncKeyState(0x02)
-                    if (lmb & 0x8000) or (lmb & 0x0001) or (rmb & 0x8000) or (rmb & 0x0001):
-                        ctypes.windll.user32.SetFocus(hwnd)
+                    ctypes.windll.user32.SetFocus(hwnd)
             except Exception:
                 pass
         self.root.after(200, self._community_poll_embed)
@@ -2918,6 +2938,7 @@ class AdminApp:
             self._generating = False
             self._report_admin_status(status="idle")
             self.root.after(0, lambda: self._gen_btn.config(state="normal"))
+            self.root.after(0, self._check_tank_prompt_match)
             self.root.after(0, self._update_cards)
 
     def _gen_popular(self):
