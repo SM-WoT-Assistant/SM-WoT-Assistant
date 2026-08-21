@@ -1360,15 +1360,15 @@ class AdminApp:
 
         _tile("overview", "overview")
         _tile("youtube", "youtube")
+        _tile("reddit", "reddit")
         _tile("github", "github")
         _tile("kofi", "kofi")
-        _tile("reddit", "reddit")
         _tile("installs", "overview")
         _tile("errors", "errors")
         return tiles
 
     def _tile_hint(self, status):
-        if status in (None, "ok", "idle", "hidden"):
+        if status in (None, "ok", "idle", "hidden", "empty"):
             return ""
         if status == "no_key":
             return self.t("tile_needs_key")
@@ -2053,17 +2053,25 @@ class AdminApp:
         tab handle, or None to work in the current tab."""
         try:
             main_handle = drv.current_window_handle
+        except Exception:
+            main_handle = None
+        try:
             before = set(drv.window_handles)
             drv.execute_cdp_cmd("Target.createTarget", {"url": "about:blank"})
             time.sleep(0.3)
             new_handles = [h for h in drv.window_handles if h not in before]
             if new_handles:
                 bg = new_handles[-1]
-                try:
-                    drv.execute_cdp_cmd("Target.activateTarget", {"targetId": main_handle})
-                except Exception:
-                    pass
+                # Order matters: switch_to.window() ACTIVATES the tab in the
+                # Chrome UI, so activateTarget(main) must come AFTER it —
+                # only then does the UI stay on the user's tab while the
+                # Selenium context keeps working on the background tab.
                 drv.switch_to.window(bg)
+                if main_handle:
+                    try:
+                        drv.execute_cdp_cmd("Target.activateTarget", {"targetId": main_handle})
+                    except Exception:
+                        pass
                 self._log("[DEBUG][bgtab] cdp=ok bg=%s" % bg)
                 return bg
             self._log("[DEBUG][bgtab] cdp=no_new_tab")
@@ -2071,6 +2079,11 @@ class AdminApp:
             self._log("[DEBUG][bgtab] cdp=fail:%s -> fallback" % str(e)[:80])
             try:
                 drv.switch_to.new_window("tab")
+                if main_handle:
+                    try:
+                        drv.execute_cdp_cmd("Target.activateTarget", {"targetId": main_handle})
+                    except Exception:
+                        pass
                 try:
                     drv.get("about:blank")
                 except Exception:
