@@ -234,8 +234,6 @@ _TR_EN = {
     "col_posts": "Posts",
     "col_created": "Created",
     "key_youtube_api": "YouTube Data API key",
-    "key_reddit_user": "Reddit username",
-    "key_reddit_pass": "Reddit password",
     "key_kofi_email": "Ko-fi email",
     "key_kofi_pass": "Ko-fi password",
     "key_kofi_client_id": "Ko-fi client ID",
@@ -246,7 +244,6 @@ _TR_EN = {
     "act_action_needed": "Action needed",
     "act_captcha": "CAPTCHA detected — solve it in the embedded browser",
     "act_login_google": "Log in to Google in the embedded browser (YouTube session)",
-    "act_login_reddit": "Reddit session expired — log in",
     "act_login_kofi": "Ko-fi session expired — log in",
     "notif_community_action": "Community — action needed",
     "st_yt_manual_login": "Google login is manual (auto-login is blocked by Google security)",
@@ -261,7 +258,7 @@ _TR_EN = {
     "h_sec_community": "Community",
     "h_comm_tiles_d": "The tile strip shows overall stats: AI builds version, YouTube views, GitHub downloads, Ko-fi donations, Patreon patrons, Reddit posts, installations and errors. Click a tile to open the Community view with that platform's page in the browser.",
     "h_comm_fs_d": "The Community button or a tile click opens fullscreen Community: tiles, per-platform stats tables and the embedded Chrome browser (no separate windows appear).",
-    "h_comm_login_d": "Reddit and Ko-fi log in automatically with vault credentials; Google login is manual. If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
+    "h_comm_login_d": "Ko-fi logs in automatically with vault credentials; Google login is manual; Reddit is never logged in by the app — the tile reads the public profile through the existing browser session (manual bot-account login). If action is needed (CAPTCHA, login form), the app notifies you and you solve it inside the embedded browser.",
     "h_comm_vault_d": "API keys and passwords are stored encrypted with Windows DPAPI in admin_vault.json (AppData). They are decrypted only on demand and never logged.",
     "h_comm_profile_d": "Logins persist in the dedicated community Chrome profile (community_chrome_profile). You do not need to re-authorize after a restart; reset it with 'Reset browser data'.",
 }
@@ -570,23 +567,6 @@ def _parse_yt_videos(data):
     return videos
 
 
-def _parse_reddit_html(html):
-    """Extract posts from shreddit-feed HTML (user profile page)."""
-    posts = []
-    for attrs_str, body in re.findall(r"<shreddit-post\b([^>]*)>(.*?)</shreddit-post>", html, re.S):
-        attrs = dict(re.findall(r'([a-z0-9-]+)="([^"]*)"', attrs_str))
-        title = ""
-        mt = re.search(r"<h3[^>]*>(.*?)</h3>", body, re.S)
-        if mt:
-            title = re.sub(r"<[^>]+>", "", mt.group(1)).strip()
-        ts = attrs.get("created-timestamp", "")
-        posts.append({"title": title, "date": ts[:10] if len(ts) >= 10 else "",
-                      "score": _safe_int(attrs.get("score")),
-                      "comments": _safe_int(attrs.get("comment-count")),
-                      "url": "https://www.reddit.com" + attrs.get("permalink", "")})
-    return posts
-
-
 def _parse_kofi_amounts(html):
     """Best-effort donation amount extraction from Ko-fi dashboard HTML."""
     amounts = []
@@ -673,27 +653,6 @@ def _embed_hwnd(hwnd, parent_hwnd, w, h):
     user32.SetWindowPos(hwnd, 0, 0, 0, w, h,
                         _SWP_FRAMECHANGED | _SWP_SHOWWINDOW | _SWP_NOZORDER)
     return True
-
-
-def _cursor_over_hwnd(hwnd):
-    """True, якщо курсор миші знаходиться над вікном (або його дочірніми).
-
-    WindowFromPoint повертає найглибше вікно під курсором (Chrome renderer
-    window, WS_CHILD canvas тощо), тому піднімаємося ланцюгом GetParent
-    (до 12 рівнів) і порівнюємо з цільовим hwnd — патерн #1500."""
-    try:
-        pt = wintypes.POINT()
-        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
-        h = ctypes.windll.user32.WindowFromPoint(pt)
-        for _ in range(12):
-            if h == hwnd:
-                return True
-            h = ctypes.windll.user32.GetParent(h)
-            if not h:
-                break
-        return False
-    except Exception:
-        return False
 
 
 def _unembed_hwnd(hwnd):
@@ -1553,6 +1512,11 @@ class AdminApp:
         self.root.attributes("-fullscreen", True)
         self.root.focus_force()
         self.root.bind("<Escape>", lambda e: self._exit_community())
+        # Alt+F4 / system close while in Community exits fullscreen instead of
+        # running the regular close-to-tray handler.
+        if getattr(self, "_fs_prev_close", None) is None:
+            self._fs_prev_close = self._on_close
+        self.root.protocol("WM_DELETE_WINDOW", self._fs_on_close)
         if self._community.get("driver") is None:
             threading.Thread(target=lambda: self._community_ensure_browser(True), daemon=True).start()
         # Tile entry (target_tab set): select the tile's tab immediately so
@@ -1569,8 +1533,14 @@ class AdminApp:
             self._navigate_platform_tab(target_tab or "overview")
 
         self.root.after(1200, _nav_to)
-        self._refresh_community_background()
+        # HTTP-only refresh on entry: browser platforms are NOT fetched here —
+        # their background tabs popped in/out in the embedded browser while
+        # expanding fullscreen. Browser data: program start / 12h / Refresh.
+        self._refresh_community_background(http_only=True)
         self._update_comm_tabs()
+
+    def _fs_on_close(self):
+        self._exit_community()
 
     def _exit_community(self):
         if not self._community.get("fs"):
@@ -1582,6 +1552,10 @@ class AdminApp:
         except Exception:
             pass
         self.root.unbind("<Escape>")
+        prev = getattr(self, "_fs_prev_close", None)
+        if prev is not None:
+            self.root.protocol("WM_DELETE_WINDOW", prev)
+            self._fs_prev_close = None
         self._community_move_browser_offscreen()
         self._community_clear_action()
 
@@ -1599,6 +1573,9 @@ class AdminApp:
         hdr = tk.Frame(left, bg=BG)
         hdr.pack(fill="x")
         tk.Label(hdr, text=self.t("comm_fs_hint"), font=("Segoe UI", 8), fg="#666", bg=BG).pack(side="left")
+        tk.Button(hdr, text="✕", bg="#553333", fg=FG, bd=0, padx=11, pady=1,
+                  cursor="hand2", font=("Segoe UI", 9, "bold"),
+                  command=self._exit_community).pack(side="right")
         self._tiles_fs = self._build_tile_strip(left)
         self._tiles_fs["frame"].pack(fill="x", pady=(4, 4))
         self._update_tiles()
@@ -1761,8 +1738,6 @@ class AdminApp:
                  ).pack(anchor="w", pady=(0, 6))
         fields = [
             ("youtube", "api_key", "key_youtube_api", False),
-            ("reddit", "username", "key_reddit_user", False),
-            ("reddit", "password", "key_reddit_pass", True),
             ("kofi", "username", "key_kofi_email", False),
             ("kofi", "password", "key_kofi_pass", True),
             ("kofi", "client_id", "key_kofi_client_id", False),
@@ -1968,14 +1943,12 @@ class AdminApp:
             self._banner_lbl.config(text=msg, bg="#552222" if msg else "#1a1a1a")
         self._update_tiles()
 
-    def _app_visible(self):
-        try:
-            return self.root.state() == "normal"
-        except Exception:
-            return False
-
     def _community_ensure_browser(self, visible):
-        """Lazy driver lifecycle bound to app visibility (no Chrome in tray)."""
+        """Lazy driver lifecycle. Since v1.0.37 the full community refresh at
+        program start runs in the tray too — Chrome then starts OFFSCREEN
+        (visible=False); visible=True only matters when Community fullscreen
+        wants it embedded. After a background refresh completes, the browser
+        is stopped (see _refresh_community_background) — no idle residency."""
         if self._community.get("creating"):
             return None
         self._community["creating"] = True
@@ -2092,46 +2065,69 @@ class AdminApp:
         (winfo_id != 0) and SetParent actually succeeded; keeps watching —
         if Chrome re-creates its window (e.g. last-tab close), the new main
         window is found and embedded again instead of lingering offscreen
-        with a taskbar icon."""
+        with a taskbar icon. Additional Chrome windows (e.g. a CAPTCHA popup)
+        are embedded into the frame too — the largest-window selection alone
+        left them floating and unreachable (flash-and-disappear, #1733)."""
         if not self._community.get("fs"):
             return
+        pid = self._community.get("chrome_pid")
         hwnd = self._community.get("hwnd")
         if hwnd and not _hwnd_alive(hwnd):
             hwnd = None
             self._community["hwnd"] = None
             self._community["visible"] = False
         if hwnd is None:
-            pid = self._community.get("chrome_pid")
             if pid:
                 new_hwnd = _find_hwnd_by_pid(pid)
                 if new_hwnd:
                     self._community["hwnd"] = new_hwnd
                     hwnd = new_hwnd
+        frame_id = 0
+        try:
+            if hasattr(self, "_browser_frame"):
+                frame_id = self._browser_frame.winfo_id()
+        except Exception:
+            pass
         if hwnd and not self._community.get("visible"):
+            if frame_id:
+                try:
+                    w = max(self._browser_frame.winfo_width(), 200)
+                    h = max(self._browser_frame.winfo_height(), 200)
+                    ok = _embed_hwnd(hwnd, frame_id, w, h)
+                    self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
+                    if ok:
+                        self._community["visible"] = True
+                except Exception:
+                    pass
+        if pid and self._community.get("visible") and frame_id:
             try:
-                if hasattr(self, "_browser_frame"):
-                    frame_id = self._browser_frame.winfo_id()
-                    if frame_id:
-                        w = max(self._browser_frame.winfo_width(), 200)
-                        h = max(self._browser_frame.winfo_height(), 200)
-                        ok = _embed_hwnd(hwnd, frame_id, w, h)
-                        self._log("[DEBUG][embed] frame_id=%s %sx%s ok=%s" % (frame_id, w, h, ok))
-                        if ok:
-                            self._community["visible"] = True
+                embedded = set(h for h in self._community.get("embeded_windows", set())
+                               if _hwnd_alive(h))
+                for h in _top_level_windows(pid):
+                    if h == hwnd or h in embedded:
+                        continue
+                    if not ctypes.windll.user32.IsWindowVisible(h):
+                        continue
+                    rect = wintypes.RECT()
+                    if not ctypes.windll.user32.GetWindowRect(h, ctypes.byref(rect)):
+                        continue
+                    w = max(rect.right - rect.left, 200)
+                    h = max(rect.bottom - rect.top, 200)
+                    if _embed_hwnd(h, frame_id, w, h):
+                        embedded.add(h)
+                        self._log("[DEBUG][embed] extra window %s %sx%s" % (h, w, h))
+                self._community["embeded_windows"] = embedded
             except Exception:
                 pass
-        # Keyboard focus belongs to the embedded Chrome whenever the cursor is
-        # over it (every poll, not only after a click). A WS_CHILD window of
-        # another process never takes focus from a plain click — without this,
-        # typing / Ctrl+V goes to the Tk root whenever the user hovers the
-        # browser without clicking (or right after Tk stole focus, e.g.
-        # _enter_community → root.focus_force()). The old one-shot SetFocus
-        # (150 ms after embed) and click-gated SetFocus raced the renderer and
-        # the poll window — paste "sometimes didn't work" (#1604).
+        # Keyboard focus belongs to the embedded Chrome whenever it is
+        # visible (every poll, not only when the cursor is over it). A
+        # WS_CHILD window of another process never takes focus from a plain
+        # click — without this, typing / Ctrl+V goes to the Tk root whenever
+        # the user hovers the browser without clicking, and ESC for exiting
+        # fullscreen never reaches Tk (#1733).
         if hwnd and self._community.get("visible"):
             try:
-                if _cursor_over_hwnd(hwnd):
-                    ctypes.windll.user32.SetFocus(hwnd)
+                ctypes.windll.user32.SetFocus(hwnd)
             except Exception:
                 pass
         self.root.after(200, self._community_poll_embed)
@@ -2188,6 +2184,20 @@ class AdminApp:
     def _community_move_browser_offscreen(self):
         hwnd = self._community.get("hwnd")
         self._community["visible"] = False
+        # Extra embedded windows (e.g. CAPTCHA popups): unembed and move them
+        # offscreen too, so they never float visible after leaving Community.
+        for h in list(self._community.get("embeded_windows") or ()):
+            try:
+                if _hwnd_alive(h):
+                    r = wintypes.RECT()
+                    ok = ctypes.windll.user32.GetWindowRect(h, ctypes.byref(r))
+                    ww = max(r.right - r.left, 100) if ok else 400
+                    wh = max(r.bottom - r.top, 100) if ok else 300
+                    _unembed_hwnd(h)
+                    _move_hwnd(h, -32000, -32000, ww, wh)
+            except Exception:
+                pass
+        self._community["embeded_windows"] = set()
         if hwnd:
             _unembed_hwnd(hwnd)
             _move_hwnd(hwnd, -32000, -32000, 1400, 900)
@@ -2225,6 +2235,7 @@ class AdminApp:
         self._community["hwnd"] = None
         self._community["visible"] = False
         self._community["tg_started"] = False
+        self._community["embeded_windows"] = set()
         if drv is not None:
             try:
                 drv.quit()
@@ -2260,7 +2271,16 @@ class AdminApp:
                 continue
         return None
 
-    def _refresh_community_background(self):
+    def _refresh_community_background(self, http_only=False):
+        """http_only=True (Community entry): refresh only the HTTP sources —
+        RTDB counters, Errors list, GitHub, Patreon, YT via API key. Browser
+        platforms (YT fallback / Reddit / Ko-fi) are intentionally NOT fetched
+        here: they open background tabs in the embedded Chrome, which showed
+        up as tabs popping in/out while expanding fullscreen. The full path
+        (program start first pass + 12h cycle) fetches them too — the browser
+        starts OFFSCREEN even while the app sits in the tray. Once the refresh
+        completes, the browser is stopped again (unless Community fullscreen
+        is active) — no invisible Chrome lingers while the app idles."""
         if self._community.get("refreshing"):
             return
         self._community["refreshing"] = True
@@ -2282,33 +2302,25 @@ class AdminApp:
                     self._community["status"]["youtube"] = st or "ok"
                 else:
                     self._community["status"]["youtube"] = "no_key"
-                if not yt and self._app_visible():
+                if not yt and not http_only:
                     yt, st = self._fetch_yt_chrome()
                     self._community["status"]["youtube"] = st or "ok"
                 if yt:
                     self._community["stats"]["youtube"] = yt
-                red, st = self._fetch_reddit_http()
-                if red:
-                    self._community["stats"]["reddit"] = red
-                    self._community["status"]["reddit"] = "ok"
-                else:
-                    self._community["status"]["reddit"] = st or "error"
-                    if self._app_visible():
-                        red2, st2 = self._fetch_reddit_chrome()
-                        if red2:
-                            self._community["stats"]["reddit"] = red2
-                            self._community["status"]["reddit"] = "ok"
-                        else:
-                            self._community["status"]["reddit"] = st2 or "error"
-                if self._app_visible():
+                if not http_only:
+                    red, st = self._fetch_reddit_browser()
+                    if red:
+                        self._community["stats"]["reddit"] = red
+                        self._community["status"]["reddit"] = "ok"
+                    else:
+                        self._community["status"]["reddit"] = st or "error"
+                if not http_only:
                     kf, st3 = self._fetch_kofi_chrome()
                     if kf:
                         self._community["stats"]["kofi"] = kf
                         self._community["status"]["kofi"] = "ok"
                     else:
                         self._community["status"]["kofi"] = st3 or "error"
-                else:
-                    self._community["status"]["kofi"] = "hidden"
                 pr, stp = self._fetch_patreon()
                 if pr:
                     self._community["stats"]["patreon"] = pr
@@ -2326,6 +2338,13 @@ class AdminApp:
                     self._community["status"].get("patreon")))
                 self.root.after(0, self._update_tiles)
                 self.root.after(0, self._update_comm_tabs)
+                # No resident offscreen Chrome while the app idles in the
+                # tray: stop the browser after every completed background
+                # refresh unless Community fullscreen needs it. An offscreen
+                # window parked at -32000 shows as an un-openable taskbar
+                # entry (25.08.2026 incident).
+                if not self._community.get("fs"):
+                    self._community_kill_browser()
 
         threading.Thread(target=_work, daemon=True).start()
 
@@ -2344,9 +2363,7 @@ class AdminApp:
                     if not res:
                         res, st = self._fetch_yt_chrome()
                 elif name == "reddit":
-                    res, st = self._fetch_reddit_http()
-                    if not res:
-                        res, st = self._fetch_reddit_chrome()
+                    res, st = self._fetch_reddit_browser()
                 elif name == "errors":
                     res, st = self._fetch_errors_list()
                 elif name == "patreon":
@@ -2392,7 +2409,7 @@ class AdminApp:
         def _work():
             try:
                 if name == "reddit":
-                    res, st = self._fetch_reddit_chrome()
+                    res, st = self._fetch_reddit_browser()
                 else:
                     res, st = self._fetch_kofi_chrome()
                 if res:
@@ -2634,81 +2651,13 @@ class AdminApp:
         except Exception as e:
             return None, str(e)[:80]
 
-    def _fetch_reddit_http(self):
-        try:
-            r = requests.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json",
-                             headers={"User-Agent": _UA}, timeout=20)
-            ctype = r.headers.get("Content-Type", "")
-            if r.status_code != 200 or "json" not in ctype.lower():
-                return None, "blocked"
-            posts = []
-            for ch in (r.json().get("data", {}).get("children") or []):
-                d = ch.get("data", {})
-                posts.append({"title": d.get("title", ""),
-                              "date": time.strftime("%Y-%m-%d",
-                                                     time.localtime(d.get("created_utc", 0))),
-                              "score": d.get("score", 0), "comments": d.get("num_comments", 0),
-                              "url": "https://www.reddit.com" + (d.get("permalink") or "")})
-            if not posts:
-                return None, "empty"
-            return {"posts": posts}, None
-        except Exception as e:
-            return None, str(e)[:80]
-
-    def _reddit_logged_in(self, drv):
-        try:
-            # /api/v1/me requires OAuth (never sees a cookie session), and
-            # /login/ does NOT redirect logged-in users on modern Reddit.
-            # /settings/ is private: logged-in users see it, others get sent
-            # to /login — that redirect is the session check.
-            drv.get("https://www.reddit.com/settings/")
-            time.sleep(3)
-            url = drv.current_url.lower()
-            if "login" in url:
-                return False
-            return "404" not in str(drv.title).lower()
-        except Exception:
-            return False
-
-    def _login_reddit(self, drv):
-        user = vault_get("reddit", "username")
-        pw = vault_get("reddit", "password")
-        if not user or not pw:
-            return "needs_reddit_creds"
-        try:
-            drv.get("https://www.reddit.com/login/")
-            time.sleep(3.5)
-            if "login" not in drv.current_url.lower():
-                return "ok"  # already logged in — /login redirected away
-            u = self._find_elem(drv, [("css selector", "input[name='username']"),
-                                      ("id", "login-username")])
-            p = self._find_elem(drv, [("css selector", "input[name='password']"),
-                                      ("id", "login-password")])
-            if not u or not p:
-                return "login_form_missing"
-            u.clear()
-            u.send_keys(user)
-            p.clear()
-            p.send_keys(pw)
-            btn = self._find_elem(drv, [("css selector", "button[type='submit']"),
-                                        ("id", "login-submit")])
-            if not btn:
-                return "login_form_missing"
-            btn.click()
-            for _ in range(20):
-                time.sleep(2)
-                low = drv.page_source.lower()
-                if "captcha" in low or ("verify" in low and "human" in low):
-                    self._community_action_needed(self.t("act_captcha"))
-                    return "needs_captcha"
-                if "login" not in drv.current_url.lower():
-                    if self._reddit_logged_in(drv):
-                        return "ok"
-            return "login_timeout"
-        except Exception as e:
-            return "login_error: " + str(e)[:80]
-
-    def _fetch_reddit_chrome(self):
+    def _fetch_reddit_browser(self):
+        """Reddit posts via the embedded browser session. The app NEVER logs
+        in automatically (form-fill login was the cause of the 'automated
+        activity' account flag) — it rides whatever session exists in the
+        persistent profile (manual bot-account login). The public profile
+        .json is 403 without OAuth and anonymous access is CAPTCHA-gated;
+        a logged-in browser session gets it with cookies."""
         drv = self._community_ensure_browser(self._community.get("fs"))
         if drv is None:
             return None, "no_browser"
@@ -2717,14 +2666,6 @@ class AdminApp:
             main_handle = drv.current_window_handle
             self._open_bg_tab(drv)
             try:
-                if not self._reddit_logged_in(drv):
-                    st = self._login_reddit(drv)
-                    if st != "ok":
-                        if st == "needs_reddit_creds":
-                            self._community_action_needed("Reddit — " + self.t("tile_needs_login"))
-                        return None, st
-                # Public .json API is 403 without OAuth, but the logged-in browser
-                # session gets it with cookies — parse JSON, not HTML.
                 drv.get("https://www.reddit.com/user/" + _REDDIT_USER + "/submitted.json")
                 time.sleep(3)
                 posts = []
@@ -2740,6 +2681,9 @@ class AdminApp:
                                       "comments": d.get("num_comments", 0),
                                       "url": "https://www.reddit.com" + (d.get("permalink") or "")})
                 if not posts:
+                    low = drv.page_source.lower()
+                    if "captcha" in low or "js_challenge" in low or "solution" in low:
+                        return None, "blocked"
                     return None, "empty"
                 return {"posts": posts}, None
             finally:
