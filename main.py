@@ -969,6 +969,13 @@ class WotAssistantHQ:
         self._last_mode_hotkey_ts = now
 
         new_state = not self.win_mgr.format_mode_enabled
+        # Бойове вікно під замком прозоре для кліків: кнопка замка досяжна
+        # тільки з затиснутою Ctrl (поллер _update_lock_clickthrough тимчасово
+        # знімає WS_EX_TRANSPARENT). Гард відсікає випадковий клік без Ctrl.
+        if (from_lock_button and new_state and self.mode == "norm"):
+            import ctypes as _ctypes
+            if not (_ctypes.windll.user32.GetAsyncKeyState(0x11) & 0x8000):
+                return
         self.win_mgr.set_format_mode(new_state)
 
         if new_state:

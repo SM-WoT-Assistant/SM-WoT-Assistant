@@ -85,6 +85,7 @@ class WindowManager:
         self.format_mode_enabled = False  # Ручний режим форматування (вмикається в edit)
         self._drag_mode = None  # Режим (edit/norm), у якому почався drag — при зміні режиму drag скасовується
         self._last_tomato_size = None
+        self._ct_transparent = None  # Останній застосований стан WS_EX_TRANSPARENT кореневого вікна
         
         # Запуск моніторингу миші для drag
         self.start_mouse_drag_monitor()
@@ -130,6 +131,10 @@ class WindowManager:
                 # Перевіряємо чи натиснута Ctrl + ЛКМ
                 ctrl_pressed = bool(ctypes.windll.user32.GetAsyncKeyState(0x11) & 0x8000)  # VK_CONTROL
                 lmb_pressed = bool(ctypes.windll.user32.GetAsyncKeyState(0x01) & 0x8000)  # VK_LBUTTON
+
+                # Замковане бойове вікно: Ctrl робить його клікабельним
+                # (Ctrl+клік по замку для розблокування)
+                self._update_lock_clickthrough(ctrl_pressed)
                 
                 # Відслідковуємо подвійне натиснення Ctrl
                 if ctrl_pressed and not ctrl_was_pressed:
@@ -512,6 +517,27 @@ class WindowManager:
             else:
                 style &= ~WS_EX_TRANSPARENT
             _set_window_long(hwnd, GWL_EXSTYLE, style)
+            self._ct_transparent = bool(enabled)
+        except Exception:
+            pass
+
+    def _update_lock_clickthrough(self, ctrl_pressed):
+        """Замковане бойове вікно (mode="norm" + формат OFF): повний
+        click-through, але поки затиснута Ctrl вікно стає клікабельним —
+        так працює Ctrl+клік по кнопці замка для розблокування. Стиль
+        міняється тільки при зміні бажаного стану. В інших станах (edit,
+        формат ON, drag, діалог, згорнуте вікно) не втручається — стилями
+        володіє існуюча логіка."""
+        try:
+            if (self.format_mode_enabled
+                    or self.app.mode != "norm"
+                    or self.mouse_drag_active
+                    or getattr(self.app, "dialog_open", False)
+                    or not self.app.root.winfo_viewable()):
+                return
+            want = not ctrl_pressed
+            if want != self._ct_transparent:
+                self.set_clickthrough(want)
         except Exception:
             pass
 
