@@ -155,8 +155,7 @@ class WotAssistantHQ:
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
-        self.sync_schemes_with_mode = tk.BooleanVar(value=self.settings.get("sync_schemes_with_mode", True))
-        
+
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення
         if self._launch_on_game_start_var.get():
@@ -450,7 +449,6 @@ class WotAssistantHQ:
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
         self.settings["close_with_game"] = self._close_with_game_var.get()
-        self.settings["sync_schemes_with_mode"] = self.sync_schemes_with_mode.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):

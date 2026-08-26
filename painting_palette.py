@@ -1550,11 +1550,6 @@ class DrawingPalette(tk.Toplevel):
             cw = self.painter.canvas.winfo_width()
             ch = self.painter.canvas.winfo_height()
             sc = min(cw, ch) / 800.0 if cw >= 10 and ch >= 10 else 1.0
-            if obj.get("classes") and not obj.get("class_icon_coords") and len(coords) >= 2:
-                obj["class_icon_coords"] = [
-                    coords[0],
-                    min(max(coords[1] + (int(22 * sc) / max(ch, 1)), 0.0), 1.0),
-                ]
             if obj.get("text") and not obj.get("text_coords") and len(coords) >= 4:
                 obj["text_coords"] = [
                     (coords[0] + coords[2]) / 2,
@@ -1568,11 +1563,6 @@ class DrawingPalette(tk.Toplevel):
         elif obj.get("type") in ("marker", "arrow"):
             sc = min(cw, ch) / 800.0 if cw >= 10 and ch >= 10 else 1.0
             coords = obj.get("coords", [])
-            if obj.get("classes") and not obj.get("class_icon_coords") and len(coords) >= 2:
-                obj["class_icon_coords"] = [
-                    coords[0],
-                    min(max(coords[1] + (int(22 * sc) / max(ch, 1)), 0.0), 1.0),
-                ]
             if obj.get("text") and not obj.get("text_coords") and len(coords) >= 4:
                 obj["text_coords"] = [
                     (coords[0] + coords[2]) / 2,

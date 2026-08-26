@@ -36,13 +36,6 @@ class MapPainter:
         self._creation_history = []
         self._move_history = []
         self._deletion_history = []
-        self.class_icon_codes = {
-            "LT": 0x3A,
-            "MT": 0x3B,
-            "HT": 0x3F,
-            "TD": 0x2E,
-            "SPG": 0x2D,
-        }
 
         self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
@@ -315,15 +308,6 @@ class MapPainter:
         proj_y = y1 + t * dy
         return math.hypot(px - proj_x, py - proj_y)
 
-    def _get_marker_class_anchor(self, obj, cw, ch, sc=1.0):
-        icon_coords = obj.get("class_icon_coords")
-        if isinstance(icon_coords, list) and len(icon_coords) >= 2:
-            return icon_coords[0] * cw, icon_coords[1] * ch
-        coords = obj.get("coords", [])
-        if len(coords) >= 2:
-            return coords[0] * cw, coords[1] * ch + int(22 * sc)
-        return None, None
-
     def _get_marker_text_pos(self, obj, cw, ch, sc=1.0):
         text_coords = obj.get("text_coords")
         if isinstance(text_coords, list) and len(text_coords) >= 2:
@@ -379,14 +363,6 @@ class MapPainter:
                     if d < special_dist:
                         special_dist = d
                         special_kind = "marker_text"
-
-            if obj.get("type") in maker_types and obj.get("classes"):
-                icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch)
-                if icon_x is not None:
-                    d = math.hypot((icon_x / cw) - click_px, (icon_y / ch) - click_py)
-                    if d < special_dist:
-                        special_dist = d
-                        special_kind = "class_icons"
 
             if obj.get("type") in ("marker", "arrow") and len(coords) >= 4:
                 d = math.hypot(coords[2] - click_px, coords[3] - click_py)
@@ -517,15 +493,6 @@ class MapPainter:
             self.redraw()
             return "break"
 
-        if target_kind == "class_icons" and obj.get("type") in ("marker", "arrow"):
-            class_anchor = self.move_drag.get("original_class_icon_coords")
-            if not class_anchor or len(class_anchor) < 2:
-                icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch)
-                class_anchor = [icon_x / cw, icon_y / ch]
-            obj["class_icon_coords"] = [
-                min(max(class_anchor[0] + dx, 0.0), 1.0),
-                min(max(class_anchor[1] + dy, 0.0), 1.0),
-            ]
             self.redraw()
             return "break"
 
@@ -569,32 +536,6 @@ class MapPainter:
         self.app.root.after(50, self._edit_object_at, idx)
         return "break"
 
-    def _draw_class_icons(self, canvas, x, y, class_list, color, sc=1.0):
-        active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
-        ordered_classes = [cls for cls in ("LT", "MT", "HT", "TD", "SPG")
-                           if cls in class_list and cls in active_classes]
-        if not ordered_classes:
-            return
-
-        base_sz = max(10, int(29 * sc))
-        gap = max(5, int(21 * sc))
-        class_scale = {"LT": 1.2, "MT": 1.3, "TD": 1.3, "SPG": 1.3}
-        sizes = [base_sz * class_scale.get(cls, 1.0) for cls in ordered_classes]
-        gaps = [gap * class_scale.get(cls, 1.0) for cls in ordered_classes]
-        total_w = sum(gaps) - gaps[-1] if gaps else 0
-        start_x = x - total_w / 2
-
-        curr_x = start_x
-        for idx, cls in enumerate(ordered_classes):
-            code = self.class_icon_codes.get(cls)
-            if not code:
-                continue
-            sz = int(sizes[idx])
-            g = int(gaps[idx])
-            canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz), fill="black", tags=("painter_obj", "class_icon_bg"))
-            canvas.create_text(curr_x, y, text=chr(code), font=("XVMSymbol", sz - 4), fill=color, tags=("painter_obj", "class_icon_fg"))
-            curr_x += g
-            
     def on_drag(self, event):
         if not self.temp_item or self.app.mode != "edit": return
         if self.active_tool in ("marker", "arrow"):
@@ -821,9 +762,6 @@ class MapPainter:
     _UKR_TO_EN = {"ЛТ": "LT", "СТ": "MT", "ТТ": "HT", "ПТ": "TD", "САУ": "SPG"}
 
     def is_visible(self, obj):
-        if hasattr(self.app, 'sync_schemes_with_mode') and not self.app.sync_schemes_with_mode.get():
-            return True
-        
         current_mode = self.app.selected_battle_mode.get()
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
         
@@ -871,13 +809,6 @@ class MapPainter:
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
                 canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
 
-                if obj.get("classes"):
-                    icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
-                    if offset_x or offset_y:
-                        icon_x += offset_x
-                        icon_y += offset_y
-                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
-
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
                     if mx is not None:
@@ -891,13 +822,6 @@ class MapPainter:
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
                 canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
-
-                if obj.get("classes"):
-                    icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
-                    if offset_x or offset_y:
-                        icon_x += offset_x
-                        icon_y += offset_y
-                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -918,13 +842,6 @@ class MapPainter:
                 elif obj.get("arrow_end"):
                     arr = tk.LAST
                 canvas.create_line(*flat_px, arrow=arr, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
-
-                if obj.get("classes"):
-                    icon_x, icon_y = self._get_marker_class_anchor(obj, cw, ch, sc)
-                    if offset_x or offset_y:
-                        icon_x += offset_x
-                        icon_y += offset_y
-                    self._draw_class_icons(canvas, icon_x, icon_y, obj["classes"], c, sc)
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
