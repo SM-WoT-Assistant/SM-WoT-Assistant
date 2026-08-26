@@ -333,9 +333,9 @@ class MapPainter:
             return
         if self._select_all:
             palette = getattr(self.app, 'drawing_palette', None)
-        self._select_all = False
-        if palette:
-            palette._update_select_all_btn()
+            self._select_all = False
+            if palette:
+                palette._update_select_all_btn()
             self.redraw()
             return
 
