@@ -71,6 +71,7 @@ class DrawingPalette(tk.Toplevel):
         self.after(0, self._refresh_linked_schemes_list)
         self.after(50, self._update_sliders_state)
         self.bind("<Escape>", lambda e: self.exit_edit_mode())
+        self.bind("<Control-KeyPress>", self._on_clipboard_key)
 
     def _build_ui(self):
         bg = "#222"
@@ -1511,6 +1512,19 @@ class DrawingPalette(tk.Toplevel):
             self._status_lbl.config(text=f"{label}")
         finally:
             self._loading_obj = False
+
+    def set_status(self, text):
+        """Оновлення статус-рядка палітри (буфер обміну тощо)."""
+        try:
+            self._status_lbl.config(text=text)
+        except Exception:
+            pass
+
+    def _on_clipboard_key(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p._on_clipboard_key(event)
+        return None
 
     def exit_edit_mode(self):
         if self._edit_obj is None:

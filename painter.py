@@ -42,6 +42,11 @@ class MapPainter:
         self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
         self._thickness = int(self.app.settings.get("draw_thickness", 3))
         self._select_all = False
+        self._clipboard_obj = None
+        # Ctrl+C/V через <Control-KeyPress> + keycode (VK 67/86) — працює в
+        # будь-якій розкладці. Keysym-імена (cyrillic_es/ve) Windows Tk
+        # відкидає прямо в bind() — крах старту (інцидент 26.08.2026).
+        self.app.root.bind("<Control-KeyPress>", self._on_clipboard_key)
 
     def apply_thickness_to_all(self, value):
         """Apply thickness to ALL existing drawings on current map."""
@@ -131,6 +136,91 @@ class MapPainter:
     def select_all_active(self):
         return self._select_all
 
+    def _clipboard_focus_in_field(self):
+        """Ctrl+C/V не перехоплюємо, коли фокус у текстовому віджеті — там
+        має працювати звичайне копіювання тексту."""
+        try:
+            w = self.app.root.focus_get()
+        except Exception:
+            return False
+        return getattr(w, "widgetName", "") in ("entry", "text", "spinbox", "combobox")
+
+    def _on_clipboard_key(self, event=None):
+        """Ctrl+C/V через keycode (VK 67/86) — розкладконезалежно.
+        Повертає "break" для C/V (стоп поширення bindtags — без подвійного
+        спрацювання canvas+root), None для решти клавіш."""
+        try:
+            state = int(getattr(event, "state", 0) or 0)
+            code = int(getattr(event, "keycode", 0) or 0)
+        except Exception:
+            return None
+        if not (state & 0x4):  # Control не затиснуто
+            return None
+        if state & 0x8:  # Alt затиснуто — не перехоплюємо
+            return None
+        if code == 67:
+            return self.on_clipboard_copy(event)
+        if code == 86:
+            return self.on_clipboard_paste(event)
+        return None
+
+    def copy_selected(self):
+        """Копіює вибраний локальний елемент у буфер (Ctrl+C)."""
+        map_id = self.app.current_map_eng
+        if not map_id or self.app.mode != "edit":
+            return False
+        idx = getattr(self, "_editing_idx", -1)
+        objects = self.drawings.get(map_id, [])
+        if idx < 0 or idx >= len(objects):
+            return False
+        self._clipboard_obj = copy.deepcopy(objects[idx])
+        return True
+
+    def paste_clipboard(self):
+        """Вставляє копію на ту саму позицію; класи беруться з поточних
+        чекбоксів палітри, режими успадковуються з оригінала."""
+        if self._clipboard_obj is None:
+            return False
+        map_id = self.app.current_map_eng
+        if not map_id or self.app.mode != "edit":
+            return False
+        new_obj = copy.deepcopy(self._clipboard_obj)
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            new_obj["classes"] = [k for k, v in palette.class_vars.items() if v.get()]
+        if map_id not in self.drawings:
+            self.drawings[map_id] = []
+        self.drawings[map_id].append(new_obj)
+        self._creation_history.append(len(self.drawings[map_id]) - 1)
+        self.save_drawings()
+        self.redraw()
+        self._edit_object_at(len(self.drawings[map_id]) - 1)
+        return True
+
+    def on_clipboard_copy(self, event=None):
+        if self._clipboard_focus_in_field():
+            return "break"
+        palette = getattr(self.app, 'drawing_palette', None)
+        if self.copy_selected():
+            if palette:
+                palette.set_status(self.app.t('ui', 'element_copied'))
+        else:
+            if palette:
+                palette.set_status(self.app.t('ui', 'element_copy_none'))
+        return "break"
+
+    def on_clipboard_paste(self, event=None):
+        if self._clipboard_focus_in_field():
+            return "break"
+        palette = getattr(self.app, 'drawing_palette', None)
+        if self.paste_clipboard():
+            if palette:
+                palette.set_status(self.app.t('ui', 'element_pasted'))
+        else:
+            if palette:
+                palette.set_status(self.app.t('ui', 'element_paste_none'))
+        return "break"
+
     def bind_events_to(self, target_canvas):
         """Прив'язка подій малювання до конкретного канвасу."""
         for ev, cb in [
@@ -142,6 +232,7 @@ class MapPainter:
             ("<Control-ButtonRelease-1>", self.on_move_release),
             ("<Button-3>", self.on_right_click),
             ("<Escape>", self.on_escape_deselect),
+            ("<Control-KeyPress>", self._on_clipboard_key),
         ]:
             target_canvas.bind(ev, cb, add="+")
 
@@ -242,9 +333,9 @@ class MapPainter:
             return
         if self._select_all:
             palette = getattr(self.app, 'drawing_palette', None)
-            self._select_all = False
-            if palette:
-                palette._update_select_all_btn()
+        self._select_all = False
+        if palette:
+            palette._update_select_all_btn()
             self.redraw()
             return
 
