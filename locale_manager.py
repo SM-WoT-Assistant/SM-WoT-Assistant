@@ -84,9 +84,13 @@ class LocaleManager:
         for key, en_val in en_ui.items():
             cached = curr_ui.get(key)
             stored_en = en_snapshot.get(key)
-            # Re-translate if: no cache, value is still English, OR EN source changed
-            # OR cached starts with "Delete" (Google Translate partial failure)
-            needs_retranslate = (cached is None or cached == en_val or stored_en != en_val or
+            # Свіжість: нема кешу АБО EN-джерело змінилось (snapshot).
+            # `cached == en_val` ЗНЯТО: тотожні ключі (class_lt="LT", bind,
+            # btn_ok="OK", "[BATTLE]", h1 з "\") мають переклад == джерело,
+            # тому ця умова ставила їх у чергу ЩОСТАРТУ і отруювала чанк
+            # для Google (фейл чанку = весь UI англійською). Сід-EN-fallback
+            # від _ensure_ui_keys ловиться через відсутність snapshot.
+            needs_retranslate = (cached is None or stored_en != en_val or
                                  (en_val.startswith("Delete") and isinstance(cached, str) and cached.startswith("Delete")))
             if needs_retranslate:
                 missing[key] = en_val
@@ -107,8 +111,14 @@ class LocaleManager:
         translated = translate_batch(missing, self.lang, progress_cb)
 
         if not translated:
+            # Hard fail (нема мережі / Google відмовив чанк). Раніше тут
+            # _batch_ui_done лишався False і t_ui повертав англійську для ВСІХ
+            # ключів, навіть закешованих українських — весь UI «став
+            # англійським» на флаковому Google. Тепер віддаємо кеш одразу;
+            # неперекладені нові ключі підхопить наступний успішний батч.
             print(f"[SERVICE] Batch translate FAILED: 0 keys returned")
-            print(f"[SERVICE] UI will remain in English")
+            print(f"[SERVICE] Serving cached translations; new keys stay English until next successful batch")
+            self._batch_ui_done = True
             return
 
         for key, val in translated.items():

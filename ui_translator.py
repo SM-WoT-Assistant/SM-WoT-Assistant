@@ -5,7 +5,6 @@ import os
 import json
 import re
 import time
-import traceback
 import config
 
 _cache = {}
@@ -133,39 +132,81 @@ def translate_batch(en_dict, target_lang, progress_cb=None):
     done = 0
     try:
         t = gt(source="en", target=target_lang)
-        for ci, (chunk_keys, chunk_phs, _) in enumerate(chunks):
-            if ci > 0:
-                time.sleep(0.5)
-            chunk_texts = [shielded_list[i] for i in chunk_keys]
-            joined = _BATCH_SEP.join(chunk_texts)
+    except Exception as e:
+        print(f"[SERVICE] translator init ERROR for {target_lang}: {e}")
+        return {}
+    for ci, (chunk_keys, chunk_phs, _) in enumerate(chunks):
+        if ci > 0:
+            time.sleep(0.5)
+        chunk_texts = [shielded_list[i] for i in chunk_keys]
+        joined = _BATCH_SEP.join(chunk_texts)
+        # Фейл одного чанку раніше губив ВСІ ключі ВСІХ чанків (return {}).
+        # Тепер розрізняємо тип фейлу:
+        #  - TranslationNotFound (Google повернув дослівно = тотожний текст,
+        #    напр. "BIND", "MT") → ретрай по-ключово: перекладні перекладаються,
+        #    тотожні фіксуються як en (Fix C оздоровить їх назавжди),
+        #    мережеві фейли окремого ключа ПРОПУСКАЮТЬСЯ (лишаються в черзі).
+        #  - інші фейли (мережа тощо) → чанк пропускається ЦІЛКОМ: жоден ключ
+        #    не фіксується як en, інакше з Fix C вони б назавжди залишились
+        #    англійськими.
+        try:
             raw = t.translate(joined)
-            if raw:
-                parts = raw.split(_BATCH_SEP)
-                for pi, orig_idx in enumerate(chunk_keys):
-                    trans = parts[pi] if pi < len(parts) else None
-                    key, en_val = untranslated[orig_idx]
-                    if trans:
-                        trans = _unshield(trans, chunk_phs[pi] if pi < len(chunk_phs) else ph_list[orig_idx])
-                        if trans and trans != en_val:
-                            cache[en_val] = trans
-                            result[key] = trans
-                            done += 1
-                            continue
-                    result[key] = en_val
-                    done += 1
-            else:
+        except Exception as e:
+            if type(e).__name__ == "TranslationNotFound":
+                print(f"[SERVICE] chunk {ci + 1}/{len(chunks)} identity-rejected — retrying key-by-key")
                 for orig_idx in chunk_keys:
                     key, en_val = untranslated[orig_idx]
-                    result[key] = en_val
+                    try:
+                        single = t.translate(shielded_list[orig_idx])
+                    except Exception as e2:
+                        if type(e2).__name__ == "TranslationNotFound":
+                            result[key] = en_val
+                        else:
+                            print(f"[SERVICE] key {key!r} failed ({type(e2).__name__}) — retry next start")
+                        done += 1
+                        continue
+                    if not single:
+                        done += 1
+                        continue
+                    trans = _unshield(single, ph_list[orig_idx])
+                    if trans and trans != en_val:
+                        cache[en_val] = trans
+                        result[key] = trans
+                    else:
+                        result[key] = en_val
+                    done += 1
+            else:
+                print(f"[SERVICE] chunk {ci + 1}/{len(chunks)} failed ({type(e).__name__}) — keys will retry next start")
+                for orig_idx in chunk_keys:
                     done += 1
             if progress_cb:
                 pct = min(99, int(done * 100 / total_items))
                 progress_cb(pct, f"Translating ({done}/{total_items})...")
-        _save_cache(target_lang, cache)
-    except Exception as e:
-        print(f"[SERVICE] translate_batch ERROR for {target_lang}: {e}")
-        traceback.print_exc()
-        return {}
+            continue
+        if raw:
+            parts = raw.split(_BATCH_SEP)
+            for pi, orig_idx in enumerate(chunk_keys):
+                trans = parts[pi] if pi < len(parts) else None
+                key, en_val = untranslated[orig_idx]
+                if trans:
+                    trans = _unshield(trans, chunk_phs[pi] if pi < len(chunk_phs) else ph_list[orig_idx])
+                    if trans and trans != en_val:
+                        cache[en_val] = trans
+                        result[key] = trans
+                        done += 1
+                        continue
+                    result[key] = en_val
+                    done += 1
+                else:
+                    # Google усік частини — ключ не фіксуємо, спробуємо далі.
+                    done += 1
+        else:
+            for orig_idx in chunk_keys:
+                done += 1
+        if progress_cb:
+            pct = min(99, int(done * 100 / total_items))
+            progress_cb(pct, f"Translating ({done}/{total_items})...")
+    _save_cache(target_lang, cache)
 
     return result
 
