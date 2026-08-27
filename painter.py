@@ -189,8 +189,8 @@ class MapPainter:
         return True
 
     def paste_clipboard(self):
-        """Вставляє копію на ту саму позицію; класи беруться з поточних
-        чекбоксів палітри, режими успадковуються з оригінала."""
+        """Вставляє копію на ту саму позицію; теги modes/classes беруться з
+        поточних чекбоксів палітри (паста = новий елемент)."""
         if self._clipboard_obj is None:
             return False
         map_id = self.app.current_map_eng
@@ -199,12 +199,24 @@ class MapPainter:
         new_obj = copy.deepcopy(self._clipboard_obj)
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
+            # Успадкування modes від оригінала ховало копію на поточному
+            # режимі («в інший режим вставляє, на поточну мапу ні», 28.08).
+            new_obj["modes"] = [k for k, v in palette.mode_vars.items() if v.get()]
             new_obj["classes"] = [k for k, v in palette.class_vars.items() if v.get()]
+        # [CLIP] тимчасова діагностика (28.08.2026)
+        try:
+            print(f"[CLIP] pasted map={map_id} modes={new_obj.get('modes')} "
+                  f"classes={new_obj.get('classes')} radio={self.app.selected_battle_mode.get()}")
+        except Exception:
+            pass
         if map_id not in self.drawings:
             self.drawings[map_id] = []
         self.drawings[map_id].append(new_obj)
         self._creation_history.append(len(self.drawings[map_id]) - 1)
-        self.save_drawings()
+        # Паста — свідоме дублювання: зберігаємо БЕЗ _strip_duplicates,
+        # інакше копія, тотожна оригіналу (типові порожні теги), мовчазно
+        # зрізалась і «паста не вставляла на поточну мапу» (28.08.2026).
+        self.data_mgr.save_drawings(self.drawings)
         self.redraw()
         self._edit_object_at(len(self.drawings[map_id]) - 1)
         return True
