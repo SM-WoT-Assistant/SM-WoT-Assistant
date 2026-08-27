@@ -154,13 +154,24 @@ class MapPainter:
             code = int(getattr(event, "keycode", 0) or 0)
         except Exception:
             return None
+        # [CLIP] тимчасова діагностика (28.08.2026) — прибрати після підтвердження
+        try:
+            fw = self.app.root.focus_get()
+            fw_name = getattr(fw, "widgetName", "?")
+            fw_tl = fw.winfo_toplevel().winfo_class() if fw is not None else "?"
+        except Exception:
+            fw_name = "?"
+            fw_tl = "?"
+        print(f"[CLIP] keycode={code} state={state} focus={fw_name}/{fw_tl} idx={getattr(self, '_editing_idx', -1)}")
         if not (state & 0x4):  # Control не затиснуто
             return None
         if state & 0x8:  # Alt затиснуто — не перехоплюємо
             return None
         if code == 67:
+            print("[CLIP] -> copy")
             return self.on_clipboard_copy(event)
         if code == 86:
+            print("[CLIP] -> paste")
             return self.on_clipboard_paste(event)
         return None
 
@@ -199,9 +210,12 @@ class MapPainter:
 
     def on_clipboard_copy(self, event=None):
         if self._clipboard_focus_in_field():
+            print("[CLIP] copy blocked: focus in text field")  # [CLIP] тимчасова діагностика
             return "break"
         palette = getattr(self.app, 'drawing_palette', None)
-        if self.copy_selected():
+        ok = self.copy_selected()
+        print(f"[CLIP] copy_selected={ok}")  # [CLIP] тимчасова діагностика
+        if ok:
             if palette:
                 palette.set_status(self.app.t('ui', 'element_copied'))
         else:
@@ -211,9 +225,12 @@ class MapPainter:
 
     def on_clipboard_paste(self, event=None):
         if self._clipboard_focus_in_field():
+            print("[CLIP] paste blocked: focus in text field")  # [CLIP] тимчасова діагностика
             return "break"
         palette = getattr(self.app, 'drawing_palette', None)
-        if self.paste_clipboard():
+        ok = self.paste_clipboard()
+        print(f"[CLIP] paste_clipboard={ok}")  # [CLIP] тимчасова діагностика
+        if ok:
             if palette:
                 palette.set_status(self.app.t('ui', 'element_pasted'))
         else:

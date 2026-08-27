@@ -335,6 +335,10 @@ class WotAssistantHQ:
         self._po_canvas.pack(fill="both", expand=True)
         self.painter.bind_events_to(self._po_canvas)
         self.painter.canvas = self._po_canvas
+        # Ctrl+C/V на Toplevel оверлея: після кліку по елементу фокус Windows
+        # належить _po_win, і root-бінд у його bindtags-ланцюг не входить —
+        # без цього бінда буфер мовчазно не спрацьовував (28.08.2026).
+        self._po_win.bind("<Control-KeyPress>", self.painter._on_clipboard_key)
         self.canvas.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Unmap>", self._on_root_hide, "+")
