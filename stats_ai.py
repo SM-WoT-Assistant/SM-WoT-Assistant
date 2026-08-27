@@ -2143,7 +2143,7 @@ class StatsAI:
                 il = tk.Label(row_f, image=row_icon, bg=row_bg)
                 il.image = row_icon
                 il.pack(side="left", padx=(0, 5))
-            tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
+            tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
 
         # Слідкування за ресайзом: ширина ТТХ-блока = ширині кадра (= нижній блок)
