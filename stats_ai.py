@@ -792,20 +792,6 @@ class StatsAI:
         self.ai_ammo_frame_2.grid(row=0, column=1, sticky="ew", padx=(1, 1))
         self.ai_consumables_frame_2.grid(row=0, column=2, sticky="ew", padx=(2, 0))
 
-    def _on_tth_frame_configure(self, event=None):
-        """ТТХ-блок слідкує за шириною кадра (= ширина нижнього блока) при ресайзі."""
-        w = getattr(self, "_tth_wrapper", None)
-        if w is None:
-            return
-        # Транзитні <Configure> невідображених кадрів дають width=1 (#1296) —
-        # ігноруємо, інакше блок схлопується.
-        if event is None or (event.width or 0) < self._detail_info_fixed_width:
-            return
-        try:
-            w.configure(width=event.width)
-        except Exception:
-            pass
-
     def _layout_tile_grid(self, container, slots, min_cell=68, gap=0, stretch=False):
         if not slots:
             return
@@ -2115,12 +2101,13 @@ class StatsAI:
             tth_rows.append(("relativeVisibility.png", self._mo_label("vehicleInfo/params/circularVisionRadius", "View range"), str(tth['view_range'])))
         
         tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0)
-        # Ширина = ширині кадра на момент побудови (але не менше 440 — кадр може
-        # бути ще не розмірений на старті, див. #1296); <Configure>-хендлер
-        # тримає збіг з нижнім блоком при ресайзі. Раніше фіксований width=440
-        # розходився з нижнім блоком на широкому вікні (28.08.2026).
-        tth_wrapper.configure(width=max(self.ai_tth_frame.winfo_width(), self._detail_info_fixed_width))
-        tth_wrapper.pack(side="top", anchor="center", padx=0)
+        # Grid, НЕ pack: pack фіксує парсел на момент пакування — якщо кадр ще
+        # не розмірений (frame_w=1 на побудові), wrapper назавжди лишається 1px
+        # (зникнення блока ТТХ, 28.08.2026). Grid слідкує за клітинкою автоматично:
+        # ширина = ширині кадра (= нижній блок), висота = контенту.
+        tth_wrapper.grid(row=0, column=0, sticky="nsew")
+        self.ai_tth_frame.grid_rowconfigure(0, weight=1)
+        self.ai_tth_frame.grid_columnconfigure(0, weight=1)
         tth_wrapper.grid_columnconfigure(0, weight=0)
         tth_wrapper.grid_columnconfigure(1, weight=1, minsize=self._detail_tth_fixed_width)
         tth_wrapper.grid_columnconfigure(2, weight=1)
@@ -2146,11 +2133,8 @@ class StatsAI:
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
 
-        # Слідкування за ресайзом: ширина ТТХ-блока = ширині кадра (= нижній блок)
-        self._tth_wrapper = tth_wrapper
-        if not getattr(self, "_tth_bound", False):
-            self.ai_tth_frame.bind("<Configure>", self._on_tth_frame_configure)
-            self._tth_bound = True
+        # Слідкування за ресайзом не потрібне: wrapper у grid sticky nsew слідує
+        # за кадром автоматично (pack фіксував парсел — баг зникнення 28.08.2026).
         
         equip_body = self._make_tiles_section(self.ai_equipment_frame, self._mo_label("easyTankEquipView/optDevices/title", "EQUIPMENT"), "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, self._mo_label("easyTankEquipView/consumables/title", "CONSUMABLES"), "consumables")
