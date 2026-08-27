@@ -186,6 +186,7 @@ class MapPainter:
         if idx < 0 or idx >= len(objects):
             return False
         self._clipboard_obj = copy.deepcopy(objects[idx])
+        self._paste_count = 0
         return True
 
     def paste_clipboard(self):
@@ -197,6 +198,22 @@ class MapPainter:
         if not map_id or self.app.mode != "edit":
             return False
         new_obj = copy.deepcopy(self._clipboard_obj)
+        # Копія зі зсувом +20px — інакше вона лягає РІВНО на оригінал і паста
+        # виглядає «непрацюючою» (28.08.2026); повторні пасти каскадуються
+        # (кожна наступна +20px від попередньої).
+        try:
+            cw = self.canvas.winfo_width() or 800
+            ch = self.canvas.winfo_height() or 600
+            off = getattr(self, "_paste_count", 0) + 1
+            self._paste_count = off
+            dx = 20.0 * off / max(cw, 1)
+            dy = 20.0 * off / max(ch, 1)
+            for key in ("coords", "text_coords"):
+                c = new_obj.get(key)
+                if isinstance(c, list) and len(c) >= 2:
+                    new_obj[key] = [c[i] + (dx if i % 2 == 0 else dy) for i in range(len(c))]
+        except Exception:
+            pass
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             # Успадкування modes від оригінала ховало копію на поточному
