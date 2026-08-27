@@ -150,6 +150,8 @@ class HelpManager:
         l_row("Ctrl + \u2193", self.app.t('ui', 'help_ctrl_down'))
         l_row("Ctrl + Z", self.app.t('ui', 'help_ctrl_z'))
         l_row("Ctrl + A", self.app.t('ui', 'help_select_all'))
+        l_row("Ctrl + C", self.app.t('ui', 'help_copy'))
+        l_row("Ctrl + V", self.app.t('ui', 'help_paste'))
 
         l_section(self.app.t('ui', 'help_section_palette'))
         l_row(self.app.t('ui', 'help_hotkey_row1'), self.app.t('ui', 'help_palette_row1'))
