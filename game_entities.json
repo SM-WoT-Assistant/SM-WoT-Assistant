@@ -203,342 +203,6 @@
       "type": "standard",
       "price": "750"
     },
-    "artillery_aoe_fort_6lvl_1": {
-      "id": "artillery_aoe_fort_6lvl_1",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_2": {
-      "id": "artillery_aoe_fort_6lvl_2",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_3": {
-      "id": "artillery_aoe_fort_6lvl_3",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_4": {
-      "id": "artillery_aoe_fort_6lvl_4",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_5": {
-      "id": "artillery_aoe_fort_6lvl_5",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_6": {
-      "id": "artillery_aoe_fort_6lvl_6",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_7": {
-      "id": "artillery_aoe_fort_6lvl_7",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_8": {
-      "id": "artillery_aoe_fort_6lvl_8",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_9": {
-      "id": "artillery_aoe_fort_6lvl_9",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_10": {
-      "id": "artillery_aoe_fort_6lvl_10",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_11": {
-      "id": "artillery_aoe_fort_6lvl_11",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_6lvl_12": {
-      "id": "artillery_aoe_fort_6lvl_12",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_1": {
-      "id": "artillery_aoe_fort_8lvl_1",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_2": {
-      "id": "artillery_aoe_fort_8lvl_2",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_3": {
-      "id": "artillery_aoe_fort_8lvl_3",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_4": {
-      "id": "artillery_aoe_fort_8lvl_4",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_5": {
-      "id": "artillery_aoe_fort_8lvl_5",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_6": {
-      "id": "artillery_aoe_fort_8lvl_6",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_7": {
-      "id": "artillery_aoe_fort_8lvl_7",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_8": {
-      "id": "artillery_aoe_fort_8lvl_8",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_9": {
-      "id": "artillery_aoe_fort_8lvl_9",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_10": {
-      "id": "artillery_aoe_fort_8lvl_10",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_11": {
-      "id": "artillery_aoe_fort_8lvl_11",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_8lvl_12": {
-      "id": "artillery_aoe_fort_8lvl_12",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_1": {
-      "id": "artillery_aoe_fort_10lvl_1",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_2": {
-      "id": "artillery_aoe_fort_10lvl_2",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_3": {
-      "id": "artillery_aoe_fort_10lvl_3",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_4": {
-      "id": "artillery_aoe_fort_10lvl_4",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_5": {
-      "id": "artillery_aoe_fort_10lvl_5",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_6": {
-      "id": "artillery_aoe_fort_10lvl_6",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_7": {
-      "id": "artillery_aoe_fort_10lvl_7",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_8": {
-      "id": "artillery_aoe_fort_10lvl_8",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_9": {
-      "id": "artillery_aoe_fort_10lvl_9",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_10": {
-      "id": "artillery_aoe_fort_10lvl_10",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_11": {
-      "id": "artillery_aoe_fort_10lvl_11",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_aoe_fort_10lvl_12": {
-      "id": "artillery_aoe_fort_10lvl_12",
-      "name": "\t#artefacts:fort_aoe_artillery/name\t",
-      "icon": "artillery 0 0",
-      "type": "standard",
-      "price": "150"
-    },
-    "inspire_fort1": {
-      "id": "inspire_fort1",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort2": {
-      "id": "inspire_fort2",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort3": {
-      "id": "inspire_fort3",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort4": {
-      "id": "inspire_fort4",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort5": {
-      "id": "inspire_fort5",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort6": {
-      "id": "inspire_fort6",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort7": {
-      "id": "inspire_fort7",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort8": {
-      "id": "inspire_fort8",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort9": {
-      "id": "inspire_fort9",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort10": {
-      "id": "inspire_fort10",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort11": {
-      "id": "inspire_fort11",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_fort12": {
-      "id": "inspire_fort12",
-      "name": "\t#artefacts:fort_inspire/name\t",
-      "icon": "inspire 0 0",
-      "type": "standard",
-      "price": "750"
-    },
     "improvedConfigurationBattleBooster": {
       "id": "improvedConfigurationBattleBooster",
       "name": "\t#artefacts:improvedConfigurationBattleBooster/name\t",
@@ -679,579 +343,12 @@
       "type": "standard",
       "price": "10000"
     },
-    "artillery_epic": {
-      "id": "artillery_epic",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "bomber_epic": {
-      "id": "bomber_epic",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic": {
-      "id": "recon_epic",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8_9lvl_level1": {
-      "id": "recon_epic_8_9lvl_level1",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8_9lvl_level2": {
-      "id": "recon_epic_8_9lvl_level2",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8_9lvl_level3": {
-      "id": "recon_epic_8_9lvl_level3",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8lvl_level1": {
-      "id": "recon_epic_8lvl_level1",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8lvl_level2": {
-      "id": "recon_epic_8lvl_level2",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8lvl_level3": {
-      "id": "recon_epic_8lvl_level3",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8_9lvl_level1": {
-      "id": "bomber_epic_8_9lvl_level1",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8_9lvl_level2": {
-      "id": "bomber_epic_8_9lvl_level2",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8_9lvl_level3": {
-      "id": "bomber_epic_8_9lvl_level3",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8lvl_level1": {
-      "id": "bomber_epic_8lvl_level1",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8lvl_level2": {
-      "id": "bomber_epic_8lvl_level2",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8lvl_level3": {
-      "id": "bomber_epic_8lvl_level3",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "artillery_epic_8_9lvl_level1": {
-      "id": "artillery_epic_8_9lvl_level1",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8_9lvl_level2": {
-      "id": "artillery_epic_8_9lvl_level2",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8_9lvl_level3": {
-      "id": "artillery_epic_8_9lvl_level3",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8lvl_level1": {
-      "id": "artillery_epic_8lvl_level1",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8lvl_level2": {
-      "id": "artillery_epic_8lvl_level2",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8lvl_level3": {
-      "id": "artillery_epic_8lvl_level3",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "smoke_epic_8_9lvl_level1": {
-      "id": "smoke_epic_8_9lvl_level1",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8_9lvl_level2": {
-      "id": "smoke_epic_8_9lvl_level2",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8_9lvl_level3": {
-      "id": "smoke_epic_8_9lvl_level3",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8lvl_level1": {
-      "id": "smoke_epic_8lvl_level1",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8lvl_level2": {
-      "id": "smoke_epic_8lvl_level2",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8lvl_level3": {
-      "id": "smoke_epic_8lvl_level3",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8_9lvl_level1": {
-      "id": "inspire_8_9lvl_level1",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8_9lvl_level2": {
-      "id": "inspire_8_9lvl_level2",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8_9lvl_level3": {
-      "id": "inspire_8_9lvl_level3",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8lvl_level1": {
-      "id": "inspire_8lvl_level1",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8lvl_level2": {
-      "id": "inspire_8lvl_level2",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8lvl_level3": {
-      "id": "inspire_8lvl_level3",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "passive_engineering_8_9lvl_level1": {
-      "id": "passive_engineering_8_9lvl_level1",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "consumable",
-      "price": "750"
-    },
-    "passive_engineering_8_9lvl_level2": {
-      "id": "passive_engineering_8_9lvl_level2",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "consumable",
-      "price": "750"
-    },
-    "passive_engineering_8_9lvl_level3": {
-      "id": "passive_engineering_8_9lvl_level3",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "standard",
-      "price": "750"
-    },
-    "passive_engineering_8lvl_level1": {
-      "id": "passive_engineering_8lvl_level1",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "consumable",
-      "price": "750"
-    },
-    "passive_engineering_8lvl_level2": {
-      "id": "passive_engineering_8lvl_level2",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "consumable",
-      "price": "750"
-    },
-    "passive_engineering_8lvl_level3": {
-      "id": "passive_engineering_8lvl_level3",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8_9lvl_level1": {
-      "id": "arcade_minefield_epic_battle_8_9lvl_level1",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8_9lvl_level2": {
-      "id": "arcade_minefield_epic_battle_8_9lvl_level2",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8_9lvl_level3": {
-      "id": "arcade_minefield_epic_battle_8_9lvl_level3",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8lvl_level1": {
-      "id": "arcade_minefield_epic_battle_8lvl_level1",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8lvl_level2": {
-      "id": "arcade_minefield_epic_battle_8lvl_level2",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8lvl_level3": {
-      "id": "arcade_minefield_epic_battle_8lvl_level3",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8_9lvl_level1": {
-      "id": "fl_regenerationKit_8_9lvl_level1",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8_9lvl_level2": {
-      "id": "fl_regenerationKit_8_9lvl_level2",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8_9lvl_level3": {
-      "id": "fl_regenerationKit_8_9lvl_level3",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8lvl_level1": {
-      "id": "fl_regenerationKit_8lvl_level1",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8lvl_level2": {
-      "id": "fl_regenerationKit_8lvl_level2",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8lvl_level3": {
-      "id": "fl_regenerationKit_8lvl_level3",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8_9lvl_level1": {
-      "id": "stealth_radar_8_9lvl_level1",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8_9lvl_level2": {
-      "id": "stealth_radar_8_9lvl_level2",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8_9lvl_level3": {
-      "id": "stealth_radar_8_9lvl_level3",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8lvl_level1": {
-      "id": "stealth_radar_8lvl_level1",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8lvl_level2": {
-      "id": "stealth_radar_8lvl_level2",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8lvl_level3": {
-      "id": "stealth_radar_8lvl_level3",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8_9lvl_level4": {
-      "id": "bomber_epic_8_9lvl_level4",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "bomber_epic_8lvl_level4": {
-      "id": "bomber_epic_8lvl_level4",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "artillery_epic_8_9lvl_level4": {
-      "id": "artillery_epic_8_9lvl_level4",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "artillery_epic_8lvl_level4": {
-      "id": "artillery_epic_8lvl_level4",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "arcade_minefield_epic_battle_8_9lvl_level4": {
-      "id": "arcade_minefield_epic_battle_8_9lvl_level4",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "arcade_minefield_epic_battle_8lvl_level4": {
-      "id": "arcade_minefield_epic_battle_8lvl_level4",
-      "name": "\t#artefacts:eb_minefield/name\t",
-      "icon": "arcade_minefield",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8_9lvl_level4": {
-      "id": "recon_epic_8_9lvl_level4",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "recon_epic_8lvl_level4": {
-      "id": "recon_epic_8lvl_level4",
-      "name": "\t#artefacts:recon/name\t",
-      "icon": "recon",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8_9lvl_level4": {
-      "id": "stealth_radar_8_9lvl_level4",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "stealth_radar_8lvl_level4": {
-      "id": "stealth_radar_8lvl_level4",
-      "name": "\t#artefacts:stealthRadar/name\t",
-      "icon": "stealthRadar",
-      "type": "standard",
-      "price": "750"
-    },
-    "passive_engineering_8_9lvl_level4": {
-      "id": "passive_engineering_8_9lvl_level4",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "standard",
-      "price": "750"
-    },
-    "passive_engineering_8lvl_level4": {
-      "id": "passive_engineering_8lvl_level4",
-      "name": "\t#artefacts:passive_engineering/name\t",
-      "icon": "passive_engineering",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8_9lvl_level4": {
-      "id": "inspire_8_9lvl_level4",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "inspire_8lvl_level4": {
-      "id": "inspire_8lvl_level4",
-      "name": "\t#artefacts:inspire/name\t",
-      "icon": "inspire",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8_9lvl_level4": {
-      "id": "smoke_epic_8_9lvl_level4",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "smoke_epic_8lvl_level4": {
-      "id": "smoke_epic_8lvl_level4",
-      "name": "\t#artefacts:smoke/name\t",
-      "icon": "smoke",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8_9lvl_level4": {
-      "id": "fl_regenerationKit_8_9lvl_level4",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "fl_regenerationKit_8lvl_level4": {
-      "id": "fl_regenerationKit_8lvl_level4",
-      "name": "\t#artefacts:eb_regenerationKit/name\t",
-      "icon": "regenerationKit",
-      "type": "standard",
-      "price": "750"
-    },
-    "epic_empty_slot": {
-      "id": "epic_empty_slot",
-      "name": "\t#artefacts:empty_slot/name\t",
-      "icon": "empty_slot",
-      "type": "standard",
-      "price": "0"
-    },
     "builtinRepairkit": {
       "id": "builtinRepairkit",
       "name": "\t#artefacts:builtinRepairkit/name\t",
       "icon": "largeRepairkit",
       "type": "standard",
       "price": "0"
-    },
-    "poi_artillery_aoe": {
-      "id": "poi_artillery_aoe",
-      "name": "\t#artefacts:poi_artillery_aoe/name\t",
-      "icon": "poi_artillery 0 0",
-      "type": "standard",
-      "price": "0"
-    },
-    "poi_radar": {
-      "id": "poi_radar",
-      "name": "\t#artefacts:poi_radar/name\t",
-      "icon": "poi_radar 0 0",
-      "type": "standard",
-      "price": "0"
-    },
-    "arcade_artillery_aoe": {
-      "id": "arcade_artillery_aoe",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
-    },
-    "arcade_bomber_aoe": {
-      "id": "arcade_bomber_aoe",
-      "name": "\t#artefacts:bomber/name\t",
-      "icon": "bomber",
-      "type": "standard",
-      "price": "750"
-    },
-    "artillery_deathzone_aoe": {
-      "id": "artillery_deathzone_aoe",
-      "name": "\t#artefacts:artillery/name\t",
-      "icon": "artillery",
-      "type": "standard",
-      "price": "150"
     },
     "exampleAbility": {
       "id": "exampleAbility",
@@ -1260,215 +357,628 @@
       "type": "standard",
       "price": "0"
     },
-    "comp7_aoe_heal": {
-      "id": "comp7_aoe_heal",
-      "name": "\t#comp7.artefacts.extend:comp7_aoe_heal/name\t",
-      "icon": "comp7_aoe_heal 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxImprovedConfiguration": {
+      "id": "deluxImprovedConfiguration",
+      "name": "\t#artefacts:deluxImprovedConfiguration/name\t",
+      "icon": "improvedConfiguration",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_ally_support": {
-      "id": "comp7_ally_support",
-      "name": "\t#comp7.artefacts.extend:comp7_ally_support/name\t",
-      "icon": "comp7_ally_support 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxImprovedVentilation": {
+      "id": "deluxImprovedVentilation",
+      "name": "\t#artefacts:deluxImprovedVentilation/name\t",
+      "icon": "improvedVentilation",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_hunter": {
-      "id": "comp7_hunter",
-      "name": "\t#comp7.artefacts.extend:comp7_hunter/name\t",
-      "icon": "comp7_hunter 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxRammer": {
+      "id": "deluxRammer",
+      "name": "\t#artefacts:deluxRammer/name\t",
+      "icon": "rammer",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_concentration": {
-      "id": "comp7_concentration",
-      "name": "\t#comp7.artefacts.extend:comp7_concentration/name\t",
-      "icon": "comp7_concentration 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxCoatedOptics": {
+      "id": "deluxCoatedOptics",
+      "name": "\t#artefacts:deluxCoatedOptics/name\t",
+      "icon": "coatedOptics",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_berserk": {
-      "id": "comp7_berserk",
-      "name": "\t#comp7.artefacts.extend:comp7_berserk/name\t",
-      "icon": "comp7_berserk 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxAimingStabilizer": {
+      "id": "deluxAimingStabilizer",
+      "name": "\t#artefacts:deluxAimingStabilizer/name\t",
+      "icon": "aimingStabilizer",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_aoe_inspire": {
-      "id": "comp7_aoe_inspire",
-      "name": "\t#comp7.artefacts.extend:comp7_aoe_inspire/name\t",
-      "icon": "comp7_aoe_inspire 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxEnhancedAimDrives": {
+      "id": "deluxEnhancedAimDrives",
+      "name": "\t#artefacts:deluxEnhancedAimDrives/name\t",
+      "icon": "enhancedAimDrives",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_redline": {
-      "id": "comp7_redline",
-      "name": "\t#comp7.artefacts.extend:comp7_redline/name\t",
-      "icon": "comp7_redline 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeTurbocharger": {
+      "id": "deluxeTurbocharger",
+      "name": "\t#artefacts:deluxeTurbocharger/name\t",
+      "icon": "turbocharger",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_fast_recharge": {
-      "id": "comp7_fast_recharge",
-      "name": "\t#comp7.artefacts.extend:comp7_fast_recharge/name\t",
-      "icon": "comp7_fast_recharge 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeExtraHealthReserve": {
+      "id": "deluxeExtraHealthReserve",
+      "name": "\t#artefacts:deluxeExtraHealthReserve/name\t",
+      "icon": "extraHealthReserve",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_juggernaut": {
-      "id": "comp7_juggernaut",
-      "name": "\t#comp7.artefacts.extend:comp7_juggernaut/name\t",
-      "icon": "comp7_juggernaut 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeImprovedRotationMechanism": {
+      "id": "deluxeImprovedRotationMechanism",
+      "name": "\t#artefacts:deluxeImprovedRotationMechanism/name\t",
+      "icon": "improvedRotationMechanism",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_sure_shot": {
-      "id": "comp7_sure_shot",
-      "name": "\t#comp7.artefacts.extend:comp7_sure_shot/name\t",
-      "icon": "comp7_sure_shot 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeImprovedSights": {
+      "id": "deluxeImprovedSights",
+      "name": "\t#artefacts:deluxeImprovedSights/name\t",
+      "icon": "improvedSights",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_sniper": {
-      "id": "comp7_sniper",
-      "name": "\t#comp7.artefacts.extend:comp7_sniper/name\t",
-      "icon": "comp7_sniper 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeAdditionalInvisibilityDevice": {
+      "id": "deluxeAdditionalInvisibilityDevice",
+      "name": "\t#artefacts:deluxeAdditionalInvisibilityDevice/name\t",
+      "icon": "additionalInvisibilityDevice",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_risky_attack": {
-      "id": "comp7_risky_attack",
-      "name": "\t#comp7.artefacts.extend:comp7_risky_attack/name\t",
-      "icon": "comp7_risky_attack 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeStereoscope": {
+      "id": "deluxeStereoscope",
+      "name": "\t#artefacts:deluxeStereoscope/name\t",
+      "icon": "stereoscope",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_recon": {
-      "id": "comp7_recon",
-      "name": "\t#comp7.artefacts.extend:comp7_recon/name\t",
-      "icon": "comp7_recon 0 0",
-      "type": "standard",
-      "price": "0"
+    "deluxeCamouflageNet": {
+      "id": "deluxeCamouflageNet",
+      "name": "\t#artefacts:deluxeCamouflageNet/name\t",
+      "icon": "camouflageNet",
+      "type": "deluxe",
+      "price": ""
     },
-    "comp7_aggressive_detection": {
-      "id": "comp7_aggressive_detection",
-      "name": "\t#comp7.artefacts.extend:comp7_aggressive_detection/name\t",
-      "icon": "comp7_aggressive_detection 0 0",
+    "trophyBasicAimDrives": {
+      "id": "trophyBasicAimDrives",
+      "name": "\t#artefacts:trophyBasicAimDrives/name\t",
+      "icon": "enhancedAimDrives",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_march": {
-      "id": "comp7_march",
-      "name": "\t#comp7.artefacts.extend:comp7_march/name\t",
-      "icon": "comp7_march 0 0",
+    "trophyUpgradedAimDrives": {
+      "id": "trophyUpgradedAimDrives",
+      "name": "\t#artefacts:trophyBasicAimDrives/name\t",
+      "icon": "enhancedAimDrives",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_aoe_heal": {
-      "id": "comp7_light_aoe_heal",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_aoe_heal/name\t",
-      "icon": "comp7_light_aoe_heal 0 0",
+    "trophyBasicTankRammer": {
+      "id": "trophyBasicTankRammer",
+      "name": "\t#artefacts:trophyBasicTankRammer/name\t",
+      "icon": "rammer",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_ally_support": {
-      "id": "comp7_light_ally_support",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_ally_support/name\t",
-      "icon": "comp7_light_ally_support 0 0",
+    "trophyUpgradedTankRammer": {
+      "id": "trophyUpgradedTankRammer",
+      "name": "\t#artefacts:trophyBasicTankRammer/name\t",
+      "icon": "rammer",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_hunter": {
-      "id": "comp7_light_hunter",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_hunter/name\t",
-      "icon": "comp7_light_hunter 0 0",
+    "trophyBasicImprovedVentilation": {
+      "id": "trophyBasicImprovedVentilation",
+      "name": "\t#artefacts:trophyBasicImprovedVentilation/name\t",
+      "icon": "improvedVentilation",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_concentration": {
-      "id": "comp7_light_concentration",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_concentration/name\t",
-      "icon": "comp7_light_concentration 0 0",
+    "trophyUpgradedImprovedVentilation": {
+      "id": "trophyUpgradedImprovedVentilation",
+      "name": "\t#artefacts:trophyUpgradedImprovedVentilation/name\t",
+      "icon": "improvedVentilation",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_berserk": {
-      "id": "comp7_light_berserk",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_berserk/name\t",
-      "icon": "comp7_light_berserk 0 0",
+    "trophyBasicAimingStabilizer": {
+      "id": "trophyBasicAimingStabilizer",
+      "name": "\t#artefacts:trophyBasicAimingStabilizer/name\t",
+      "icon": "aimingStabilizer",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_aoe_inspire": {
-      "id": "comp7_light_aoe_inspire",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_aoe_inspire/name\t",
-      "icon": "comp7_light_aoe_inspire 0 0",
+    "trophyUpgradedAimingStabilizer": {
+      "id": "trophyUpgradedAimingStabilizer",
+      "name": "\t#artefacts:trophyUpgradedAimingStabilizer/name\t",
+      "icon": "aimingStabilizer",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_redline": {
-      "id": "comp7_light_redline",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_redline/name\t",
-      "icon": "comp7_light_redline 0 0",
+    "trophyBasicCoatedOptics": {
+      "id": "trophyBasicCoatedOptics",
+      "name": "\t#artefacts:trophyBasicCoatedOptics/name\t",
+      "icon": "coatedOptics",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_fast_recharge": {
-      "id": "comp7_light_fast_recharge",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_fast_recharge/name\t",
-      "icon": "comp7_light_fast_recharge 0 0",
+    "trophyUpgradedCoatedOptics": {
+      "id": "trophyUpgradedCoatedOptics",
+      "name": "\t#artefacts:trophyUpgradedCoatedOptics/name\t",
+      "icon": "coatedOptics",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_juggernaut": {
-      "id": "comp7_light_juggernaut",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_juggernaut/name\t",
-      "icon": "comp7_light_juggernaut 0 0",
-      "type": "standard",
-      "price": "0"
+    "trophyBasicImprovedConfiguration": {
+      "id": "trophyBasicImprovedConfiguration",
+      "name": "\t#artefacts:trophyBasicImprovedConfiguration/name\t",
+      "icon": "improvedConfiguration",
+      "type": "deluxe",
+      "price": "100000"
     },
-    "comp7_light_sure_shot": {
-      "id": "comp7_light_sure_shot",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_sure_shot/name\t",
-      "icon": "comp7_light_sure_shot 0 0",
-      "type": "standard",
-      "price": "0"
+    "trophyUpgradedImprovedConfiguration": {
+      "id": "trophyUpgradedImprovedConfiguration",
+      "name": "\t#artefacts:trophyUpgradedImprovedConfiguration/name\t",
+      "icon": "improvedConfiguration",
+      "type": "deluxe",
+      "price": "100000"
     },
-    "comp7_light_sniper": {
-      "id": "comp7_light_sniper",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_sniper/name\t",
-      "icon": "comp7_light_sniper 0 0",
+    "trophyBasicImprovedRotationMechanism": {
+      "id": "trophyBasicImprovedRotationMechanism",
+      "name": "\t#artefacts:trophyBasicImprovedRotationMechanism/name\t",
+      "icon": "improvedRotationMechanism",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_risky_attack": {
-      "id": "comp7_light_risky_attack",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_risky_attack/name\t",
-      "icon": "comp7_light_risky_attack 0 0",
+    "trophyUpgradedImprovedRotationMechanism": {
+      "id": "trophyUpgradedImprovedRotationMechanism",
+      "name": "\t#artefacts:trophyUpgradedImprovedRotationMechanism/name\t",
+      "icon": "improvedRotationMechanism",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
     },
-    "comp7_light_recon": {
-      "id": "comp7_light_recon",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_recon/name\t",
-      "icon": "comp7_light_recon 0 0",
-      "type": "standard",
-      "price": "0"
+    "trophyBasicImprovedSights": {
+      "id": "trophyBasicImprovedSights",
+      "name": "\t#artefacts:trophyBasicImprovedSights/name\t",
+      "icon": "improvedSights",
+      "type": "deluxe",
+      "price": "100000"
     },
-    "comp7_light_aggressive_detection": {
-      "id": "comp7_light_aggressive_detection",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_aggressive_detection/name\t",
-      "icon": "comp7_light_aggressive_detection 0 0",
-      "type": "standard",
-      "price": "0"
+    "trophyUpgradedImprovedSights": {
+      "id": "trophyUpgradedImprovedSights",
+      "name": "\t#artefacts:trophyUpgradedImprovedSights/name\t",
+      "icon": "improvedSights",
+      "type": "deluxe",
+      "price": "100000"
     },
-    "comp7_light_march": {
-      "id": "comp7_light_march",
-      "name": "\t#comp7_light.artefacts.extend:comp7_light_march/name\t",
-      "icon": "comp7_light_march 0 0",
+    "trophyBasicAdditionalInvisibilityDevice": {
+      "id": "trophyBasicAdditionalInvisibilityDevice",
+      "name": "\t#artefacts:trophyBasicAdditionalInvisibilityDevice/name\t",
+      "icon": "additionalInvisibilityDevice",
       "type": "standard",
-      "price": "0"
+      "price": "100000"
+    },
+    "trophyUpgradedAdditionalInvisibilityDevice": {
+      "id": "trophyUpgradedAdditionalInvisibilityDevice",
+      "name": "\t#artefacts:trophyUpgradedAdditionalInvisibilityDevice/name\t",
+      "icon": "additionalInvisibilityDevice",
+      "type": "standard",
+      "price": "100000"
+    },
+    "trophyBasicTurbocharger": {
+      "id": "trophyBasicTurbocharger",
+      "name": "\t#artefacts:trophyBasicTurbocharger/name\t",
+      "icon": "turbocharger",
+      "type": "standard",
+      "price": "100000"
+    },
+    "trophyUpgradedTurbocharger": {
+      "id": "trophyUpgradedTurbocharger",
+      "name": "\t#artefacts:trophyUpgradedTurbocharger/name\t",
+      "icon": "turbocharger",
+      "type": "standard",
+      "price": "100000"
+    },
+    "trophyBasicExtraHealthReserve": {
+      "id": "trophyBasicExtraHealthReserve",
+      "name": "\t#artefacts:trophyBasicExtraHealthReserve/name\t",
+      "icon": "extraHealthReserve",
+      "type": "standard",
+      "price": "100000"
+    },
+    "trophyUpgradedExtraHealthReserve": {
+      "id": "trophyUpgradedExtraHealthReserve",
+      "name": "\t#artefacts:trophyUpgradedExtraHealthReserve/name\t",
+      "icon": "extraHealthReserve",
+      "type": "standard",
+      "price": "100000"
+    },
+    "improvedConfiguration_tier2": {
+      "id": "improvedConfiguration_tier2",
+      "name": "\t#artefacts:improvedConfiguration_tier2/name\t",
+      "icon": "improvedConfiguration",
+      "type": "deluxe",
+      "price": "200000"
+    },
+    "improvedConfiguration_tier1": {
+      "id": "improvedConfiguration_tier1",
+      "name": "\t#artefacts:improvedConfiguration_tier1/name\t",
+      "icon": "improvedConfiguration",
+      "type": "deluxe",
+      "price": "600000"
+    },
+    "antifragmentationLining_tier4": {
+      "id": "antifragmentationLining_tier4",
+      "name": "\t#artefacts:antifragmentationLining_tier4/name\t",
+      "icon": "antifragmentationLining",
+      "type": "standard",
+      "price": "50000"
+    },
+    "antifragmentationLining_tier3": {
+      "id": "antifragmentationLining_tier3",
+      "name": "\t#artefacts:antifragmentationLining_tier3/name\t",
+      "icon": "antifragmentationLining",
+      "type": "standard",
+      "price": "200000"
+    },
+    "antifragmentationLining_tier2": {
+      "id": "antifragmentationLining_tier2",
+      "name": "\t#artefacts:antifragmentationLining_tier2/name\t",
+      "icon": "antifragmentationLining",
+      "type": "standard",
+      "price": "500000"
+    },
+    "antifragmentationLining_tier1": {
+      "id": "antifragmentationLining_tier1",
+      "name": "\t#artefacts:antifragmentationLining_tier1/name\t",
+      "icon": "antifragmentationLining",
+      "type": "standard",
+      "price": "750000"
+    },
+    "stereoscope_tier3": {
+      "id": "stereoscope_tier3",
+      "name": "\t#artefacts:stereoscope_tier3/name\t",
+      "icon": "stereoscope",
+      "type": "standard",
+      "price": "50000"
+    },
+    "stereoscope_tier2": {
+      "id": "stereoscope_tier2",
+      "name": "\t#artefacts:stereoscope_tier2/name\t",
+      "icon": "stereoscope",
+      "type": "standard",
+      "price": "200000"
+    },
+    "stereoscope_tier1": {
+      "id": "stereoscope_tier1",
+      "name": "\t#artefacts:stereoscope_tier1/name\t",
+      "icon": "stereoscope",
+      "type": "standard",
+      "price": "600000"
+    },
+    "coatedOptics_tier3": {
+      "id": "coatedOptics_tier3",
+      "name": "\t#artefacts:coatedOptics_tier3/name\t",
+      "icon": "coatedOptics",
+      "type": "standard",
+      "price": "50000"
+    },
+    "coatedOptics_tier2": {
+      "id": "coatedOptics_tier2",
+      "name": "\t#artefacts:coatedOptics_tier2/name\t",
+      "icon": "coatedOptics",
+      "type": "standard",
+      "price": "200000"
+    },
+    "coatedOptics_tier1": {
+      "id": "coatedOptics_tier1",
+      "name": "\t#artefacts:coatedOptics_tier1/name\t",
+      "icon": "coatedOptics",
+      "type": "standard",
+      "price": "600000"
+    },
+    "camouflageNet_tier3": {
+      "id": "camouflageNet_tier3",
+      "name": "\t#artefacts:camouflageNet_tier3/name\t",
+      "icon": "camouflageNet",
+      "type": "standard",
+      "price": "50000"
+    },
+    "camouflageNet_tier2": {
+      "id": "camouflageNet_tier2",
+      "name": "\t#artefacts:camouflageNet_tier2/name\t",
+      "icon": "camouflageNet",
+      "type": "standard",
+      "price": "100000"
+    },
+    "improvedVentilation_tier3": {
+      "id": "improvedVentilation_tier3",
+      "name": "\t#artefacts:improvedVentilation_tier3/name\t",
+      "icon": "improvedVentilation",
+      "type": "standard",
+      "price": "50000"
+    },
+    "improvedVentilation_tier2": {
+      "id": "improvedVentilation_tier2",
+      "name": "\t#artefacts:improvedVentilation_tier2/name\t",
+      "icon": "improvedVentilation",
+      "type": "standard",
+      "price": "200000"
+    },
+    "improvedVentilation_tier1": {
+      "id": "improvedVentilation_tier1",
+      "name": "\t#artefacts:improvedVentilation_tier1/name\t",
+      "icon": "improvedVentilation",
+      "type": "standard",
+      "price": "600000"
+    },
+    "grousers_tier3": {
+      "id": "grousers_tier3",
+      "name": "\t#artefacts:grousers_tier3/name\t",
+      "icon": "grousers",
+      "type": "standard",
+      "price": "50000"
+    },
+    "grousers_tier2": {
+      "id": "grousers_tier2",
+      "name": "\t#artefacts:grousers_tier2/name\t",
+      "icon": "grousers",
+      "type": "standard",
+      "price": "250000"
+    },
+    "grousers_tier1": {
+      "id": "grousers_tier1",
+      "name": "\t#artefacts:grousers_tier1/name\t",
+      "icon": "grousers",
+      "type": "standard",
+      "price": "500000"
+    },
+    "tankRammer_tier2": {
+      "id": "tankRammer_tier2",
+      "name": "\t#artefacts:tankRammer_tier2/name\t",
+      "icon": "rammer",
+      "type": "standard",
+      "price": "300000"
+    },
+    "tankRammer_tier1": {
+      "id": "tankRammer_tier1",
+      "name": "\t#artefacts:tankRammer_tier1/name\t",
+      "icon": "rammer",
+      "type": "standard",
+      "price": "600000"
+    },
+    "enhancedAimDrives_tier3": {
+      "id": "enhancedAimDrives_tier3",
+      "name": "\t#artefacts:enhancedAimDrives_tier3/name\t",
+      "icon": "enhancedAimDrives",
+      "type": "standard",
+      "price": "50000"
+    },
+    "enhancedAimDrives_tier2": {
+      "id": "enhancedAimDrives_tier2",
+      "name": "\t#artefacts:enhancedAimDrives_tier2/name\t",
+      "icon": "enhancedAimDrives",
+      "type": "standard",
+      "price": "200000"
+    },
+    "enhancedAimDrives_tier1": {
+      "id": "enhancedAimDrives_tier1",
+      "name": "\t#artefacts:enhancedAimDrives_tier1/name\t",
+      "icon": "enhancedAimDrives",
+      "type": "standard",
+      "price": "600000"
+    },
+    "aimingStabilizer_tier2": {
+      "id": "aimingStabilizer_tier2",
+      "name": "\t#artefacts:aimingStabilizer_tier2/name\t",
+      "icon": "aimingStabilizer",
+      "type": "standard",
+      "price": "200000"
+    },
+    "aimingStabilizer_tier1": {
+      "id": "aimingStabilizer_tier1",
+      "name": "\t#artefacts:aimingStabilizer_tier1/name\t",
+      "icon": "aimingStabilizer",
+      "type": "standard",
+      "price": "600000"
+    },
+    "additionalInvisibilityDevice_tier3": {
+      "id": "additionalInvisibilityDevice_tier3",
+      "name": "\t#artefacts:additionalInvisibilityDevice_tier3/name\t",
+      "icon": "additionalInvisibilityDevice",
+      "type": "standard",
+      "price": "50000"
+    },
+    "additionalInvisibilityDevice_tier2": {
+      "id": "additionalInvisibilityDevice_tier2",
+      "name": "\t#artefacts:additionalInvisibilityDevice_tier2/name\t",
+      "icon": "additionalInvisibilityDevice",
+      "type": "standard",
+      "price": "200000"
+    },
+    "additionalInvisibilityDevice_tier1": {
+      "id": "additionalInvisibilityDevice_tier1",
+      "name": "\t#artefacts:additionalInvisibilityDevice_tier1/name\t",
+      "icon": "additionalInvisibilityDevice",
+      "type": "standard",
+      "price": "600000"
+    },
+    "extraHealthReserve_tier3": {
+      "id": "extraHealthReserve_tier3",
+      "name": "\t#artefacts:extraHealthReserve_tier3/name\t",
+      "icon": "extraHealthReserve",
+      "type": "standard",
+      "price": "40000"
+    },
+    "extraHealthReserve_tier2": {
+      "id": "extraHealthReserve_tier2",
+      "name": "\t#artefacts:extraHealthReserve_tier2/name\t",
+      "icon": "extraHealthReserve",
+      "type": "standard",
+      "price": "200000"
+    },
+    "extraHealthReserve_tier1": {
+      "id": "extraHealthReserve_tier1",
+      "name": "\t#artefacts:extraHealthReserve_tier1/name\t",
+      "icon": "extraHealthReserve",
+      "type": "standard",
+      "price": "600000"
+    },
+    "improvedRadioCommunication": {
+      "id": "improvedRadioCommunication",
+      "name": "\t#artefacts:improvedRadioCommunication/name\t",
+      "icon": "improvedRadioCommunication",
+      "type": "standard",
+      "price": "600000"
+    },
+    "improvedRotationMechanism_tier2": {
+      "id": "improvedRotationMechanism_tier2",
+      "name": "\t#artefacts:improvedRotationMechanism_tier2/name\t",
+      "icon": "improvedRotationMechanism",
+      "type": "standard",
+      "price": "200000"
+    },
+    "improvedRotationMechanism_tier1": {
+      "id": "improvedRotationMechanism_tier1",
+      "name": "\t#artefacts:improvedRotationMechanism_tier1/name\t",
+      "icon": "improvedRotationMechanism",
+      "type": "standard",
+      "price": "600000"
+    },
+    "turbocharger_tier3": {
+      "id": "turbocharger_tier3",
+      "name": "\t#artefacts:turbocharger_tier3/name\t",
+      "icon": "turbocharger",
+      "type": "standard",
+      "price": "50000"
+    },
+    "turbocharger_tier2": {
+      "id": "turbocharger_tier2",
+      "name": "\t#artefacts:turbocharger_tier2/name\t",
+      "icon": "turbocharger",
+      "type": "standard",
+      "price": "200000"
+    },
+    "turbocharger_tier1": {
+      "id": "turbocharger_tier1",
+      "name": "\t#artefacts:turbocharger_tier1/name\t",
+      "icon": "turbocharger",
+      "type": "standard",
+      "price": "600000"
+    },
+    "commandersView": {
+      "id": "commandersView",
+      "name": "\t#artefacts:commandersView/name\t",
+      "icon": "commandersView",
+      "type": "standard",
+      "price": "600000"
+    },
+    "improvedSights_tier2": {
+      "id": "improvedSights_tier2",
+      "name": "\t#artefacts:improvedSights_tier2/name\t",
+      "icon": "improvedSights",
+      "type": "deluxe",
+      "price": "200000"
+    },
+    "improvedSights_tier1": {
+      "id": "improvedSights_tier1",
+      "name": "\t#artefacts:improvedSights_tier1/name\t",
+      "icon": "improvedSights",
+      "type": "deluxe",
+      "price": "600000"
+    },
+    "modernizedAimDrivesAimingStabilizer1": {
+      "id": "modernizedAimDrivesAimingStabilizer1",
+      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer1/name\t",
+      "icon": "modernizedAimDrivesAimingStabilizer",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedAimDrivesAimingStabilizer2": {
+      "id": "modernizedAimDrivesAimingStabilizer2",
+      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer2/name\t",
+      "icon": "modernizedAimDrivesAimingStabilizer",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedAimDrivesAimingStabilizer3": {
+      "id": "modernizedAimDrivesAimingStabilizer3",
+      "name": "\t#artefacts:modernizedAimDrivesAimingStabilizer3/name\t",
+      "icon": "modernizedAimDrivesAimingStabilizer",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedTurbochargerRotationMechanism1": {
+      "id": "modernizedTurbochargerRotationMechanism1",
+      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism1/name\t",
+      "icon": "modernizedTurbochargerRotationMechanism",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedTurbochargerRotationMechanism2": {
+      "id": "modernizedTurbochargerRotationMechanism2",
+      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism2/name\t",
+      "icon": "modernizedTurbochargerRotationMechanism",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedTurbochargerRotationMechanism3": {
+      "id": "modernizedTurbochargerRotationMechanism3",
+      "name": "\t#artefacts:modernizedTurbochargerRotationMechanism3/name\t",
+      "icon": "modernizedTurbochargerRotationMechanism",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedExtraHealthReserveAntifragmentationLining1": {
+      "id": "modernizedExtraHealthReserveAntifragmentationLining1",
+      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining1/name\t",
+      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedExtraHealthReserveAntifragmentationLining2": {
+      "id": "modernizedExtraHealthReserveAntifragmentationLining2",
+      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining2/name\t",
+      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedExtraHealthReserveAntifragmentationLining3": {
+      "id": "modernizedExtraHealthReserveAntifragmentationLining3",
+      "name": "\t#artefacts:modernizedExtraHealthReserveAntifragmentationLining3/name\t",
+      "icon": "modernizedExtraHealthReserveAntifragmentationLining",
+      "type": "standard",
+      "price": ""
+    },
+    "modernizedImprovedSightsEnhancedAimDrives1": {
+      "id": "modernizedImprovedSightsEnhancedAimDrives1",
+      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives1/name\t",
+      "icon": "modernizedImprovedSightsEnhancedAimDrives",
+      "type": "deluxe",
+      "price": ""
+    },
+    "modernizedImprovedSightsEnhancedAimDrives2": {
+      "id": "modernizedImprovedSightsEnhancedAimDrives2",
+      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives2/name\t",
+      "icon": "modernizedImprovedSightsEnhancedAimDrives",
+      "type": "deluxe",
+      "price": ""
+    },
+    "modernizedImprovedSightsEnhancedAimDrives3": {
+      "id": "modernizedImprovedSightsEnhancedAimDrives3",
+      "name": "\t#artefacts:modernizedImprovedSightsEnhancedAimDrives3/name\t",
+      "icon": "modernizedImprovedSightsEnhancedAimDrives",
+      "type": "deluxe",
+      "price": ""
     }
   },
   "consumables": {

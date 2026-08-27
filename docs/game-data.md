@@ -4,6 +4,15 @@
 
 ---
 
+## Санітайзинг декодера + фільтр battleAbilities (28.08.2026)
+
+1. `decode_xml.py:sanitize_xml_text` — XML 1.0 забороняє контрольні символи 0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F. Декодер інколи емітував їх з бінарних значень (напр. 0x0B у `<crystal>` optional_devices.xml — 29 шт. у свіжому декоді) → ET ParseError → game_entities.json зберігався БЕЗ секції deluxe/experimental обладнання (тиха втрата даних). `decode_file` санітайзить вивід; `parse_game_entities.parse_xml_file` санітайзить вхід (лагодить вже записані файли без ре-екстракції).
+2. `extract_equipment_from_xml` пропускає `<type>battleAbilities</type>` — івент-здібності (Onslaught comp7_*/POI: notForSale + roleEquipment/poiEquipment) НЕ обладнання; раніше лежали в game_entities як «standard» (210→140 записів у equipments-1: −159 abilities). Прецедент: `generate_prompt_v2.py:422` пропускає comp7_ у промптах.
+3. Нормалізація path-style icon: `"../maps/icons/artefact/turbocharger.png"` → `"turbocharger"` (нові записи WG використовують шлях замість `"name 0 0"`).
+4. `radioman_lastEffort` (lastEffortBattleBooster) — іконки НЕМАЄ в жодному pkg клієнта (перевірено всі gui-part) — інформаційна згадка в `_check_icons`, не фікситься.
+
+---
+
 ## Механіки гри (з клієнта)
 1. Слоти обладнання: Tier 1→0, Tier 2→1, Tier 3→1, Tier 4-5→2, Tier 6-11→3 (tank_slots_full.json: equipment_slots)
 2. Кількість перків: Tier 1-4→1, Tier 5-6→2, Tier 7→4, Tier 8-11→6 (crew_builds.json: _perk_policy.primary_perk_count_by_tier)

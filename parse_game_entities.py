@@ -17,6 +17,7 @@ import struct
 import base64
 import xml.etree.ElementTree as ET
 from pathlib import Path
+from decode_xml import sanitize_xml_text
 
 class BWXmlDecoder:
     """Native Python BigWorld XML decoder"""
@@ -195,6 +196,11 @@ class GameEntitiesExtractor:
             
             if not xml_text:
                 return None
+
+            # Санітайзинг контрольних символів (артефакти декодера, див.
+            # decode_xml.sanitize_xml_text) — інакше ET.parse падає ParseError
+            # (optional_devices.xml, 28.08.2026).
+            xml_text = sanitize_xml_text(xml_text)
             
             # Перевіряємо encoding
             if xml_text.startswith('<equipments.xml>') or '<xmlns:xmlref>' in xml_text:
@@ -248,9 +254,25 @@ class GameEntitiesExtractor:
             user_string = elem.findtext('userString', '')
             tags = elem.findtext('tags', '')
             
+            # Нормалізація path-style icon ("../maps/icons/artefact/turbocharger.png"
+            # → "turbocharger") — нові записи WG використовують шлях замість
+            # "name 0 0"; інакше іконка не знаходиться (28.08.2026).
+            icon_first = icon.split()[0] if icon else ''
+            if '/' in icon_first and icon_first.lower().endswith('.png'):
+                icon = os.path.basename(icon_first)[:-4]
+            
             if not item_id:
                 continue
-                
+
+            # Івент-здібності (Onslaught comp7_*/POI battleAbilities) — не
+            # обладнання: клієнт маркує <type>battleAbilities</type> + notForSale
+            # + roleEquipment/poiEquipment (generate_prompt_v2 вже пропускає
+            # comp7_ у промптах; 28.08.2026). Без фільтра вони лежали в
+            # game_entities як «standard» обладнання з відсутніми іконками.
+            raw_type = elem.findtext('type', '').strip()
+            if raw_type == "battleAbilities":
+                continue
+
             # Визначаємо тип обладнання
             equip_type = "standard"
             if 'deluxe' in tags.lower() or 'improved' in tags.lower():

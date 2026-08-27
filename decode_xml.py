@@ -2,6 +2,17 @@ import os
 import struct
 import base64
 
+# XML 1.0 забороняє контрольні символи 0x00-0x08, 0x0B, 0x0C, 0x0E-0x1F.
+# Декодер інколи емітує їх з бінарних значень (напр. 0x0B у <crystal>
+# optional_devices.xml) — це ламало ET.parse (28.08.2026).
+_XML_INVALID_CHARS = dict.fromkeys(list(range(0x00, 0x09)) + [0x0B, 0x0C] + list(range(0x0E, 0x20)))
+
+
+def sanitize_xml_text(text):
+    """Прибирає символи, невалідні в XML 1.0 (поза \t \n \r)."""
+    return text.translate(_XML_INVALID_CHARS)
+
+
 class WotXmlParser:
     def __init__(self):
         self.dictionary = []
@@ -40,7 +51,7 @@ class WotXmlParser:
         
         with open(output_path, 'w', encoding='utf-8') as f:
             f.write("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n")
-            f.write(xml_content)
+            f.write(sanitize_xml_text(xml_content))
         
         return True
     
