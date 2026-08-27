@@ -202,7 +202,7 @@ class StatsAI:
         self._detail_side_by_side = False
         self._detail_compact_min_width = 440
         self._detail_compact_max_width = 440
-        self._detail_tth_fixed_width = 250
+        self._detail_tth_fixed_width = 350
         self._detail_info_fixed_width = 440
         self._detail_top_row_fixed_width = 440
         self._detail_image_lift_px = 10
@@ -791,6 +791,15 @@ class StatsAI:
         self.ai_equipment_frame_2.grid(row=0, column=0, sticky="ew")
         self.ai_ammo_frame_2.grid(row=0, column=1, sticky="ew", padx=(1, 1))
         self.ai_consumables_frame_2.grid(row=0, column=2, sticky="ew", padx=(2, 0))
+
+    def _on_tth_frame_configure(self, event=None):
+        """ТТХ-блок слідкує за шириною кадра (= ширина нижнього блока) при ресайзі."""
+        w = getattr(self, "_tth_wrapper", None)
+        if w is not None:
+            try:
+                w.configure(width=event.width)
+            except Exception:
+                pass
 
     def _layout_tile_grid(self, container, slots, min_cell=68, gap=0, stretch=False):
         if not slots:
@@ -2100,8 +2109,11 @@ class StatsAI:
         if tth.get('view_range'):
             tth_rows.append(("relativeVisibility.png", self._mo_label("vehicleInfo/params/circularVisionRadius", "View range"), str(tth['view_range'])))
         
-        tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0, width=self._detail_info_fixed_width)
-        tth_wrapper.pack(side="top", anchor="center", padx=0)
+        tth_wrapper = tk.Frame(self.ai_tth_frame, bg="#1a1a1a", bd=0, relief="flat", highlightthickness=0)
+        # fill="x" + <Configure>-слідкування: блок ТТХ+зображення = ширині нижнього
+        # блока (раніше anchor="center" з фіксованим width=440 розходився з
+        # нижнім блоком на широкому вікні; 28.08.2026).
+        tth_wrapper.pack(side="top", fill="x", padx=0)
         tth_wrapper.grid_columnconfigure(0, weight=0)
         tth_wrapper.grid_columnconfigure(1, weight=1, minsize=self._detail_tth_fixed_width)
         tth_wrapper.grid_columnconfigure(2, weight=1)
@@ -2126,6 +2138,12 @@ class StatsAI:
                 il.pack(side="left", padx=(0, 5))
             tk.Label(row_f, text=label_text, fg="#9a9a9a", bg=row_bg, font=("Arial", 9), width=15, anchor="w").pack(side="left")
             tk.Label(row_f, text=value_text, fg="#e6e6e6", bg=row_bg, font=("Arial", 10, "bold"), anchor="e").pack(side="right", padx=(0, 4))
+
+        # Слідкування за ресайзом: ширина ТТХ-блока = ширині кадра (= нижній блок)
+        self._tth_wrapper = tth_wrapper
+        if not getattr(self, "_tth_bound", False):
+            self.ai_tth_frame.bind("<Configure>", self._on_tth_frame_configure)
+            self._tth_bound = True
         
         equip_body = self._make_tiles_section(self.ai_equipment_frame, self._mo_label("easyTankEquipView/optDevices/title", "EQUIPMENT"), "equipment")
         cons_body = self._make_tiles_section(self.ai_consumables_frame, self._mo_label("easyTankEquipView/consumables/title", "CONSUMABLES"), "consumables")
