@@ -165,8 +165,9 @@ class MapPainter:
         print(f"[CLIP] keycode={code} state={state} focus={fw_name}/{fw_tl} idx={getattr(self, '_editing_idx', -1)}")
         if not (state & 0x4):  # Control не затиснуто
             return None
-        if state & 0x8:  # Alt затиснуто — не перехоплюємо
-            return None
+        # УВАГА: біт 0x8 (який я вважав Alt) на реальних системах супроводжує
+        # звичайний Ctrl (state=12 на Ctrl+C з доказів [CLIP] 28.08.2026) —
+        # гард на 0x8 блокував би ВСІ Ctrl+C/V. Alt не перехоплюємо окремо.
         if code == 67:
             print("[CLIP] -> copy")
             return self.on_clipboard_copy(event)
