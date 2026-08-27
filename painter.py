@@ -154,25 +154,14 @@ class MapPainter:
             code = int(getattr(event, "keycode", 0) or 0)
         except Exception:
             return None
-        # [CLIP] тимчасова діагностика (28.08.2026) — прибрати після підтвердження
-        try:
-            fw = self.app.root.focus_get()
-            fw_name = getattr(fw, "widgetName", "?")
-            fw_tl = fw.winfo_toplevel().winfo_class() if fw is not None else "?"
-        except Exception:
-            fw_name = "?"
-            fw_tl = "?"
-        print(f"[CLIP] keycode={code} state={state} focus={fw_name}/{fw_tl} idx={getattr(self, '_editing_idx', -1)}")
         if not (state & 0x4):  # Control не затиснуто
             return None
         # УВАГА: біт 0x8 (який я вважав Alt) на реальних системах супроводжує
         # звичайний Ctrl (state=12 на Ctrl+C з доказів [CLIP] 28.08.2026) —
         # гард на 0x8 блокував би ВСІ Ctrl+C/V. Alt не перехоплюємо окремо.
         if code == 67:
-            print("[CLIP] -> copy")
             return self.on_clipboard_copy(event)
         if code == 86:
-            print("[CLIP] -> paste")
             return self.on_clipboard_paste(event)
         return None
 
@@ -216,16 +205,11 @@ class MapPainter:
             pass
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
-            # Успадкування modes від оригінала ховало копію на поточному
-            # режимі («в інший режим вставляє, на поточну мапу ні», 28.08).
-            new_obj["modes"] = [k for k, v in palette.mode_vars.items() if v.get()]
+            # Копія універсальна: modes порожні (видна в усіх режимах — чекбоксів
+            # режимів у палітрі більше нема, режим задається у вікні редагування),
+            # класи з поточних чекбоксів палітри.
+            new_obj["modes"] = []
             new_obj["classes"] = [k for k, v in palette.class_vars.items() if v.get()]
-        # [CLIP] тимчасова діагностика (28.08.2026)
-        try:
-            print(f"[CLIP] pasted map={map_id} modes={new_obj.get('modes')} "
-                  f"classes={new_obj.get('classes')} radio={self.app.selected_battle_mode.get()}")
-        except Exception:
-            pass
         if map_id not in self.drawings:
             self.drawings[map_id] = []
         self.drawings[map_id].append(new_obj)
@@ -240,12 +224,9 @@ class MapPainter:
 
     def on_clipboard_copy(self, event=None):
         if self._clipboard_focus_in_field():
-            print("[CLIP] copy blocked: focus in text field")  # [CLIP] тимчасова діагностика
             return "break"
         palette = getattr(self.app, 'drawing_palette', None)
-        ok = self.copy_selected()
-        print(f"[CLIP] copy_selected={ok}")  # [CLIP] тимчасова діагностика
-        if ok:
+        if self.copy_selected():
             if palette:
                 palette.set_status(self.app.t('ui', 'element_copied'))
         else:
@@ -255,12 +236,9 @@ class MapPainter:
 
     def on_clipboard_paste(self, event=None):
         if self._clipboard_focus_in_field():
-            print("[CLIP] paste blocked: focus in text field")  # [CLIP] тимчасова діагностика
             return "break"
         palette = getattr(self.app, 'drawing_palette', None)
-        ok = self.paste_clipboard()
-        print(f"[CLIP] paste_clipboard={ok}")  # [CLIP] тимчасова діагностика
-        if ok:
+        if self.paste_clipboard():
             if palette:
                 palette.set_status(self.app.t('ui', 'element_pasted'))
         else:
