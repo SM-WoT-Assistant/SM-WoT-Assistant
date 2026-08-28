@@ -4,6 +4,18 @@
 
 ---
 
+## Реліз v1.0.72 Beta (28.08.2026, повний цикл build.py)
+
+Збірка: `python build.py 1.0.72` — PyInstaller (Python 3.12.7, onedir) → copy_data_files (3142 файли) → verify.json (30 танків) + popular_tanks_seed → launcher 35.8 MB (bundle verification PASSED: tcl86t/tk86t/_tkinter) → tray watcher 7.1 MB → NSIS installer 226.8 MB (`SM_WoT_Assistant_Setup_v1.0.72_Beta.exe`) → portable ZIP 246.8 MB → verification PASSED (52 maps, 68 extracted_maps, 1249 icons) → manifest → **GitHub release v1.0.72 Beta** (audit PASSED: name='v1.0.72 Beta', prerelease=True) → RTDB publish (HTTP 200, display_version "1.0.72 Beta", latest pointer оновлено, audit PASSED). Перший реліз після реверсу Alpha→Beta (#1658).
+
+**Smoke:** зібраний EXE запущено — процес живий 32+ сек (пройшов стартові верифікації), коректно зупинено.
+
+**Cleanup (#1497):** локально dist/ → 5 папок (1.0.68–1.0.72) + Setup/Portable/manifest; GitHub → 5 релізів (v1.0.67 видалено, тег лишився); RTDB versions/ → 5 ключів (1_0_68..1_0_72) + latest (PUT null через `_put_json(url, None)`, #1470).
+
+**Вміст релізу (з v1.0.71, 19.08–28.08):** click-through бойового вікна + Ctrl+клік розблокування (#1666); lang phase 1 fix (кеш перекладів більше не глушить весь UI до англійської); painter clipboard (Ctrl+C/Ctrl+V, +20px каскад, stamping з палітри); зняття class-icon штампів + is_visible unconditional + видалення sync_schemes_with_mode; палітра: mode-чекбокси видалені; data pipeline sanitize (контроль-символи у XML, battleAbilities фільтр, path-style іконки) + game_entities.json регенерований; SETUP TTH блок (grid-фікс unmapped-парсела, autowidth колонка); RTDB builds 998→995.
+
+---
+
 ## Перехід Alpha → Beta у всіх релізах (28.08.2026)
 
 **Рішення користувача:** реверс «Alpha назавжди» (#1658, 16.08.2026) — напис "Beta" повертається у цьому та всіх наступних релізах.
