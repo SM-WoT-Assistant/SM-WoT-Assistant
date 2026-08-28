@@ -516,7 +516,7 @@ def generate_verify_json(version):
         print(f"[BUILD] WARNING: verify.json generation failed: {e}")
 
 
-def run_nsis(version, makensis_exe, is_alpha=False):
+def run_nsis(version, makensis_exe, is_beta=False):
     if not makensis_exe:
         print("[BUILD] NSIS not found, skipping installer.")
         return None
@@ -531,10 +531,10 @@ def run_nsis(version, makensis_exe, is_alpha=False):
         print("[BUILD] NSIS FAILED")
         return None
 
-    if is_alpha and os.path.exists(out_exe):
-        alpha_exe = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}_Alpha.exe")
-        os.rename(out_exe, alpha_exe)
-        out_exe = alpha_exe
+    if is_beta and os.path.exists(out_exe):
+        beta_exe = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}_Beta.exe")
+        os.rename(out_exe, beta_exe)
+        out_exe = beta_exe
 
     if os.path.exists(out_exe):
         size_mb = os.path.getsize(out_exe) / (1024 * 1024)
@@ -555,7 +555,7 @@ def rename_onedir(version):
     return versioned
 
 
-def create_portable_zip(version, is_alpha=False):
+def create_portable_zip(version, is_beta=False):
     """Create a portable ZIP from the versioned onedir (no admin required)."""
     onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
     if not os.path.exists(onedir):
@@ -567,10 +567,10 @@ def create_portable_zip(version, is_alpha=False):
     shutil.make_archive(zip_base, "zip", DIST_DIR, f"SM WoT Assistant v{version}")
 
     zip_path = zip_base + ".zip"
-    if is_alpha and os.path.exists(zip_path):
-        alpha_zip = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}_Alpha.zip")
-        os.rename(zip_path, alpha_zip)
-        zip_path = alpha_zip
+    if is_beta and os.path.exists(zip_path):
+        beta_zip = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}_Beta.zip")
+        os.rename(zip_path, beta_zip)
+        zip_path = beta_zip
 
     if os.path.exists(zip_path):
         size_mb = os.path.getsize(zip_path) / (1024 * 1024)
@@ -698,17 +698,17 @@ def generate_manifest(version):
 #  Release Artifacts Verification
 # ═══════════════════════════════════════════════════════════════════
 
-def verify_release_artifacts(version, is_alpha=False):
+def verify_release_artifacts(version, is_beta=False):
     """Перевіряє всі артефакти релізу ПЕРЕД створенням GitHub release.
     При помилці — друкує детальний звіт і завершує build з exit code 1."""
     errors = []
-    alpha_suffix = "_Alpha" if is_alpha else ""
+    beta_suffix = "_Beta" if is_beta else ""
     onedir = os.path.join(DIST_DIR, f"SM WoT Assistant v{version}")
 
     # 1. Файли артефактів — всі існують
     expected = {
-        "Installer": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"),
-        "Portable ZIP": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{alpha_suffix}.zip"),
+        "Installer": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"),
+        "Portable ZIP": os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{beta_suffix}.zip"),
         "Build manifest": os.path.join(DIST_DIR, f"build_manifest_v{version}.txt"),
         "Main EXE": os.path.join(onedir, f"SM WoT Assistant v{version}.exe"),
         "Launcher": os.path.join(onedir, "SM WoT Assistant Launcher.exe"),
@@ -731,19 +731,19 @@ def verify_release_artifacts(version, is_alpha=False):
             errors.append(f"installer.nsi PRODUCT_VERSION mismatch: expected '{version}', got '{m.group(1)}'")
 
     # 3. Release title format: create_github_release() має створити правильний title
-    expected_title = f"v{version} Alpha" if is_alpha else f"v{version}"
+    expected_title = f"v{version} Beta" if is_beta else f"v{version}"
     # Це перевірка що код create_github_release() згенерує саме такий title
-    display_tag = f"v{version} Alpha" if is_alpha else f"v{version}"
+    display_tag = f"v{version} Beta" if is_beta else f"v{version}"
     if display_tag != expected_title:
         errors.append(f"Release title format mismatch: '{display_tag}' != '{expected_title}'")
 
-    # 4. Prerelease flag: is_alpha має правильно впливати на --prerelease
-    expected_pr = is_alpha  # True для Alpha, False для stable
-    if expected_pr != is_alpha:
-        errors.append(f"Prerelease flag mismatch: expected {expected_pr}, got is_alpha={is_alpha}")
+    # 4. Prerelease flag: is_beta має правильно впливати на --prerelease
+    expected_pr = is_beta  # True для Beta, False для stable
+    if expected_pr != is_beta:
+        errors.append(f"Prerelease flag mismatch: expected {expected_pr}, got is_beta={is_beta}")
 
     # 5. Консистентність імен: RTDB download_url співпадає з реальним файлом
-    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
+    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
     expected_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
     print(f"  RTDB URL check: {expected_url}")
     dl_url_check = os.path.join(DIST_DIR, expected_filename)
@@ -774,10 +774,10 @@ def verify_release_artifacts(version, is_alpha=False):
 #  GitHub Release
 # ═══════════════════════════════════════════════════════════════════
 
-def create_github_release(version, is_alpha=False):
-    alpha_suffix = "_Alpha" if is_alpha else ""
-    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe")
-    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{alpha_suffix}.zip")
+def create_github_release(version, is_beta=False):
+    beta_suffix = "_Beta" if is_beta else ""
+    installer = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe")
+    portable = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Portable_v{version}{beta_suffix}.zip")
     manifest = os.path.join(DIST_DIR, f"build_manifest_v{version}.txt")
 
     assets = []
@@ -793,7 +793,7 @@ def create_github_release(version, is_alpha=False):
         return False
 
     tag = f"v{version}"
-    display_tag = f"v{version} Alpha" if is_alpha else tag
+    display_tag = f"v{version} Beta" if is_beta else tag
     changelog = os.path.join(BASE_DIR, "CHANGELOG.md")
     notes_flag = ["--notes-file", changelog] if os.path.exists(changelog) else ["--notes", f"Release {tag}"]
     pr_flag = ["--prerelease"]  # всі релізи prerelease до скасування
@@ -813,11 +813,11 @@ def create_github_release(version, is_alpha=False):
 #  Post-release Audit
 # ═══════════════════════════════════════════════════════════════════
 
-def audit_github_release(version, is_alpha=False):
+def audit_github_release(version, is_beta=False):
     """Перевіряє GitHub release після створення — назва та prerelease flag.
     Якщо не співпадає — видаляє реліз і завершує build з помилкою."""
     tag = f"v{version}"
-    expected_name = f"v{version} Alpha" if is_alpha else f"v{version}"
+    expected_name = f"v{version} Beta" if is_beta else f"v{version}"
     print(f"[BUILD] Auditing GitHub release {tag}...")
 
     try:
@@ -837,8 +837,8 @@ def audit_github_release(version, is_alpha=False):
         problems = []
         if actual_name != expected_name:
             problems.append(f"title='{actual_name}' (expected '{expected_name}')")
-        if actual_pr != is_alpha:
-            problems.append(f"prerelease={actual_pr} (expected {is_alpha})")
+        if actual_pr != is_beta:
+            problems.append(f"prerelease={actual_pr} (expected {is_beta})")
 
         if problems:
             print("[BUILD] AUDIT FAILED — release created with wrong metadata:")
@@ -862,10 +862,10 @@ def audit_github_release(version, is_alpha=False):
         sys.exit(1)
 
 
-def audit_rtdb_entry(version, is_alpha=False):
+def audit_rtdb_entry(version, is_beta=False):
     """Перевіряє RTDB download_url після запису."""
-    alpha_suffix = "_Alpha" if is_alpha else ""
-    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
+    beta_suffix = "_Beta" if is_beta else ""
+    expected_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
     expected_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{expected_filename}"
 
     try:
@@ -904,7 +904,7 @@ def audit_rtdb_entry(version, is_alpha=False):
 #  Main
 # ═══════════════════════════════════════════════════════════════════
 
-def write_version_to_rtdb(version, release_date=None, is_alpha=False):
+def write_version_to_rtdb(version, release_date=None, is_beta=False):
     import urllib.request
     import urllib.parse
     RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
@@ -915,16 +915,16 @@ def write_version_to_rtdb(version, release_date=None, is_alpha=False):
               "(admin_creds.json у %APPDATA%/SM WoT Assistant/)")
         return False
 
-    display_ver = version + (" Alpha" if is_alpha else "")
-    alpha_suffix = "_Alpha" if is_alpha else ""
+    display_ver = version + (" Beta" if is_beta else "")
+    beta_suffix = "_Beta" if is_beta else ""
     today = release_date or time.strftime("%Y-%m-%d")
-    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe")
+    installer_path = os.path.join(DIST_DIR, f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe")
     installer_size = ""
     if os.path.exists(installer_path):
         sz = os.path.getsize(installer_path)
         installer_size = f"{sz / (1024*1024):.0f} MB"
 
-    dl_filename = f"SM_WoT_Assistant_Setup_v{version}{alpha_suffix}.exe"
+    dl_filename = f"SM_WoT_Assistant_Setup_v{version}{beta_suffix}.exe"
     dl_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/download/v{version}/{dl_filename}"
 
     data = json.dumps({
@@ -970,7 +970,7 @@ def write_version_to_rtdb(version, release_date=None, is_alpha=False):
 def main():
     new_version = None
     release_date = None
-    is_alpha = True  # всі релізи Alpha до скасування
+    is_beta = True  # всі релізи Beta до скасування
 
     for a in sys.argv[1:]:
         if a.startswith("--date="):
@@ -979,8 +979,8 @@ def main():
             new_version = a
 
     version = new_version if new_version else read_version()
-    is_alpha_suffix = " Alpha" if is_alpha else ""
-    display_ver = version + is_alpha_suffix
+    is_beta_suffix = " Beta" if is_beta else ""
+    display_ver = version + is_beta_suffix
 
     # Phase 0: Pre-flight checks
     makensis_exe = preflight(version)
@@ -1003,7 +1003,7 @@ def main():
     build_launcher()
     build_tray_watcher()
 
-    # Rename EXE to include version (clean, без Alpha)
+    # Rename EXE to include version (clean, без Beta)
     exe_plain = os.path.join(FIXED_ONEDIR, "SM WoT Assistant.exe")
     exe_ver = os.path.join(FIXED_ONEDIR, f"SM WoT Assistant v{version}.exe")
     if os.path.exists(exe_plain):
@@ -1013,11 +1013,11 @@ def main():
         print(f"[BUILD] EXE renamed: SM WoT Assistant v{version}.exe")
 
     # Phase 3: NSIS installer (чистий version)
-    installer = run_nsis(version, makensis_exe, is_alpha)
+    installer = run_nsis(version, makensis_exe, is_beta)
 
     # Phase 4: Rename to versioned directory + portable ZIP (чистий version)
     rename_onedir(version)
-    portable_zip = create_portable_zip(version, is_alpha)
+    portable_zip = create_portable_zip(version, is_beta)
 
     # Phase 5: Verification
     verify_build(version)
@@ -1025,7 +1025,7 @@ def main():
     # Phase 6: Manifest
     generate_manifest(version)
 
-    # Phase 7: Summary — display_ver з Alpha тільки для показу
+    # Phase 7: Summary — display_ver з Beta тільки для показу
     print()
     print("=" * 60)
     print(f"  BUILD COMPLETE — SM WoT Assistant v{display_ver}")
@@ -1041,16 +1041,16 @@ def main():
     print()
 
     # Phase 7b: Verify release artifacts before publishing
-    verify_release_artifacts(version, is_alpha)
+    verify_release_artifacts(version, is_beta)
 
     # Always create GitHub release (required for auto-update download URL)
-    if create_github_release(version, is_alpha):
+    if create_github_release(version, is_beta):
         # Post-release audit: verify title & prerelease flag
-        audit_github_release(version, is_alpha)
+        audit_github_release(version, is_beta)
         # Write version to RTDB only after successful GitHub release + audit
-        if write_version_to_rtdb(version, release_date, is_alpha):
+        if write_version_to_rtdb(version, release_date, is_beta):
             # RTDB audit: verify download_url
-            audit_rtdb_entry(version, is_alpha)
+            audit_rtdb_entry(version, is_beta)
 
     print(f"[BUILD] Done: v{display_ver}")
 

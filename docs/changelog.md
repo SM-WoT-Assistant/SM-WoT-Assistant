@@ -4,6 +4,19 @@
 
 ---
 
+## Перехід Alpha → Beta у всіх релізах (28.08.2026)
+
+**Рішення користувача:** реверс «Alpha назавжди» (#1658, 16.08.2026) — напис "Beta" повертається у цьому та всіх наступних релізах.
+
+- `config.py:19` — `load_version()` повертає `" Beta"` замість `" Alpha"` (заголовки вікон → "SM WoT Assistant v1.0.72 Beta")
+- `build.py` — механічний rename `is_alpha` → `is_beta`; `" Alpha"` → `" Beta"` (GitHub release title `v1.0.72 Beta`, RTDB `display_version`); `_Alpha` → `_Beta` (назви installer/portable: `SM_WoT_Assistant_Setup_v1.0.72_Beta.exe`); `--prerelease` лишається True (Beta = prerelease); змінні в snake_case (`beta_exe`/`beta_zip`/`beta_suffix`)
+- `launcher.py:88` + `main.py:2508` — regex EXE-імен вже приймає `(?: Beta| Alpha)?` (легасі-сумісність; реальні EXE завжди чисті) — без змін
+- `firebase_reporter.py:304` — `v.split()[0]` вже відсікає будь-який суфікс — без змін
+
+**Верифікація (#1471):** AST-parse config.py + build.py OK; `load_version()` → "1.0.71 Beta"; grep-аудит build.py: 0 залишків `alpha`/`Alpha`.
+
+---
+
 ## RTDB-чистка івент-білдів: builds/tanks 998→995 (28.08.2026)
 
 За питанням юзера «чому танків 995, було 996?» встановлено: 995 = tank_db.json (1141 сирих) мінус 146 івент-клонів (`_BAD_TAG_MARKERS`, admin_build_generator.py:42-53); «996» — історичне число промптів у стані розбіжності (#1604). RTDB builds/tanks мав 998 — 3 «зайві» білди без локальних танків. Видалено (PUT null через `_put_json(url, None)`, #1470): `A168_XM_57_CFE_I`, `Ch47_BZ_176_CFE_B` (CFE-клони), `Ch74_Waffentrager_15` (нема в локальному clean-сеті). Після: RTDB builds = **995**, 0 розбіжностей.
