@@ -174,6 +174,14 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
     update_manifest_failures) are excluded — a persistent failure must not
     spin an hourly re-detection loop. A fingerprint change of the tank's XML
     (new game version) resets the counter and re-enables detection.
+
+    Bug 7 (02.09.2026 #1692 follow-up): Tags in manifest `_pending` are SKIPPED
+    on every subsequent detect until `update_manifest_for_tags` removes them
+    (after a successful generation). Without this guard, when generate_builds
+    fails (Chrome 183 race, network SSL EOF, AI parse fail), the manifest is
+    NOT advanced for the failed tags — next detect re-detects the same tags
+    forever. The admin.log 16:19:55 '693 zminenyx tankiv' was the result: a
+    detect -> generate failure -> next detect re-detected the same 693.
     """
     pkg_path = os.path.join(wot_path, "res", "packages", "scripts.pkg")
     if not os.path.exists(pkg_path):
@@ -185,10 +193,17 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             pass
         return []
     old = {}
+    pending_tags = set()
     if os.path.exists(manifest_path):
         with _MANIFEST_LOCK:
             with open(manifest_path, "r", encoding="utf-8") as f:
                 old = json.load(f)
+        # _pending is a top-level dict {tag: {fp, ts}} — tags already detected
+        # but still waiting for successful generation. Skip them on re-detect.
+        if isinstance(old, dict):
+            _pending_obj = old.get("_pending")
+            if isinstance(_pending_obj, dict):
+                pending_tags = {str(t) for t in _pending_obj.keys()}
     changed = []
     changed_names = {}
     fps = {}
@@ -204,6 +219,9 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             if prev is None or not _fingerprint_equal(prev, fp):
                 tag = os.path.splitext(os.path.basename(name))[0]
                 if _is_bad_tag(tag):
+                    continue
+                # Bug 7: skip tags already in _pending (waiting for generation)
+                if tag in pending_tags:
                     continue
                 changed.append(tag)
                 changed_names[tag] = name
@@ -223,12 +241,55 @@ def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
             if excluded:
                 print(f"[DETECT] {len(excluded)} tanks excluded after {_FAIL_THRESHOLD} failed generations: "
                       f"{', '.join(excluded[:10])}{'...' if len(excluded) > 10 else ''}")
+    # Bug 7: stash the detected tags in manifest._pending so next detect skips
+    # them. update_manifest_for_tags removes them on success. Without this,
+    # every detect returns the same tags (admin.log 15:18:41 / 19:51:55 cycle).
     if changed:
         names = ", ".join(changed[:10])
         print(f"[DETECT] {len(changed)} changed: {names}{'...' if len(changed) > 10 else ''}")
+        _mark_pending(manifest_path, changed_names, fps)
     else:
-        print(f"[DETECT] No changed tanks ({len(old)} entries checked)")
+        if pending_tags:
+            print(f"[DETECT] No new changes; {len(pending_tags)} tags still in _pending (awaiting generation)")
+        else:
+            print(f"[DETECT] No changed tanks ({len(old)} entries checked)")
     return changed
+
+
+def _mark_pending(manifest_path, changed_names, fps):
+    """Persist detected tags in manifest._pending (Bug 7).
+
+    Side-effect: writes a {tag: {fp, ts}} entry per detected tag so the next
+    detect_changed_tanks() invocation skips them. update_manifest_for_tags()
+    clears the entry on successful generation.
+    """
+    if not changed_names or not manifest_path:
+        return
+    try:
+        with _MANIFEST_LOCK:
+            try:
+                with open(manifest_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+            except Exception:
+                data = {}
+            if not isinstance(data, dict):
+                data = {}
+            pending = data.get("_pending")
+            if not isinstance(pending, dict):
+                pending = {}
+            ts = int(time.time())
+            for tag, name in changed_names.items():
+                fp = fps.get(name) if name else None
+                if fp is None:
+                    fp = {"size": 0, "crc": 0}
+                pending[tag] = {"fp": fp, "ts": ts, "arcname": name}
+            data["_pending"] = pending
+            tmp = manifest_path + ".tmp"
+            with open(tmp, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+            os.replace(tmp, manifest_path)
+    except Exception as e:
+        print(f"[WARN] _mark_pending failed: {e}")
 
 
 _MANIFEST_LOCK = threading.Lock()
@@ -289,6 +350,14 @@ def update_manifest_for_tags(wot_path, manifest_path, tags):
                 for tag in tags_set:
                     fails.pop(tag, None)
                 data["_failures"] = fails
+            # Bug 7 (02.09.2026): cleanup _pending for successfully generated
+            # tags. Without this, the next detect re-detects the same tags
+            # because they stay marked as 'waiting for generation' forever.
+            pending = data.get("_pending")
+            if isinstance(pending, dict) and pending:
+                for tag in tags_set:
+                    pending.pop(tag, None)
+                data["_pending"] = pending
             with open(manifest_path, "w", encoding="utf-8") as f:
                 json.dump(data, f)
             return True

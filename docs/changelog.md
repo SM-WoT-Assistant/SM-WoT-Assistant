@@ -4,7 +4,50 @@
 
 ---
 
-## Tank manifest в %APPDATA%/SM WoT Assistant/ (02.09.2026)
+## Admin v1.0.39: manifest _pending field breaks infinite new-file detection loop (02.09.2026)
+
+**Проблема (Bug 7, #1692 follow-up):** `admin_build_generator.detect_changed_tanks()` повертав **693 «зміни»** на кожному запуску (`admin.log:15:18:41 / 19:51:55`) — manifest не мав способу запам'ятати «цей файл вже виявлено, очікує генерації». Коли `generate_builds` падав (Chrome WinError 183, network SSL EOF, AI parse fail), manifest НЕ оновлювався → наступний `detect_changed_tanks` (60-хв цикл listen_mode, або 30-хв WG scan) повертав ті самі теги → нескінченний re-trigger `pending_updates/builds` → admin вічно бачив «693 змінених» і генерував 1-2 танки, потім знову 693.
+
+**Фікс (admin_build_generator.py):**
+- **detect_changed_tanks (рядки 196-241)**: при старті читає `manifest._pending` (`{tag: {fp, ts, arcname}}`); при скануванні scripts.pkg, тег що є в `_pending` — `continue` (пропускаємо).
+- **Нова функція `_mark_pending` (рядки 244-280)**: при виявленні нових тегів — atomic write `manifest._pending[tag] = {fp, ts, arcname}` через `tmp + os.replace`. Запобігає partial-write corruption (#1346, аналог `save_prompt`).
+- **update_manifest_for_tags (рядки 354-359)**: cleanup `_pending` для done_tags (`pending.pop(tag, None)`) — успішна генерація прибирає тег з pending, наступний detect не побачить його.
+
+**Цикл тепер:**
+```
+detect: new file F141 → not in _pending → add to changed → _mark_pending
+  → write _pending[F141]
+generate: F141 OK → update_manifest_for_tags([F141])
+  → data.update(fp) AND pending.pop(F141)
+  → next detect: F141 has fp matching current → NOT in changed ✓
+  → manifest stays clean
+```
+
+**Цикл БЕЗ _pending (раніше):**
+```
+detect: new file F141 → not in manifest → add to changed
+generate: F141 FAIL (Chrome race / network / AI parse)
+  → done_tags = [] → manifest NOT updated
+  → next detect: F141 still not in manifest → STILL in changed (693 again)
+  → infinite loop
+```
+
+**Тепер:**
+```
+detect: new file F141 → not in manifest, not in _pending → add to changed → _mark_pending
+generate: F141 FAIL
+  → done_tags = [] → manifest NOT updated → BUT _pending[F141] still present
+  → next detect: F141 in _pending → SKIP ✓
+  → no infinite loop
+```
+
+**Верифікація (live, 02.09.2026):**
+- `detect_changed_tanks` з тестовим manifest (містить `F28_105_leFH18B2` у `_pending`) → повернув 0 тегів (бо `F28` пропущено через `_pending` filter)
+- `_mark_pending` додав теги до `_pending` (atomic write через `tmp + os.replace`)
+- `update_manifest_for_tags(['F28_105_leFH18B2'])` → `F28` **видалено** з `_pending` (cleanup працює)
+- `admin_version.txt` 1.0.38 → **1.0.39** (admin v1.0.39 rebuild після цих змін)
+
+---
 
 **Проблема (Bug 1, #1692):** `tank_extractor.py:12 BASE_DIR = os.getcwd()` — manifest-и `.tank_extract_manifest.json` + `.icon_extract_manifest.json` писалися в `BASE_DIR = CWD`. У frozen onefile EXE CWD = `%TEMP%\_MEIxxxxx` (PyInstaller bootloader extraction), у dev CWD = залежна від способу запуску (різні ярлики → різні папки). У `admin_app.py:1143-1168` (`_resolve_manifest`) вже є правильний патерн — manifest у `%APPDATA%/SM WoT Assistant/`, але `tank_extractor.py` (використовується в main.py + listen-mode daemon + CLI) мав свій власний шлях. Наслідок: `detect_changed_tanks` в `admin_build_generator.py:170-231` (викликається з AppData manifest) повертав **693 змінених** на кожному запуску (`admin.log:15:18:41`) — `manifest` (AppData, 20.08) не відповідав `scripts.pkg` (оновлений 02.09). main.py бачив manifest у `D:\!\WORK\...` (root, 28.08), а адмінка — в AppData. **Розбіжність локацій.**
 
