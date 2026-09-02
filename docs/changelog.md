@@ -4,6 +4,28 @@
 
 ---
 
+## Stability_mode: rebuild tank_db.json + decode list.xml (02.09.2026)
+
+**Проблема (#1692 follow-up, admin.log:15:18:39 + 15:18:41 «693 змінених танків» + 16:19:30 «1023 vs 1010»):** `pause_tank_auto_rebuild=True` (stability_mode, default) викликав лише `extract_metadata` + `update_tth_database_safe` (інкрементальний merge TTH) — але **НІКОЛИ** `build_database()`. Коли WG додавав новий танк у `scripts.pkg` (`extract_metadata` витягав новий XML у `extracted_data/<nation>/`), `tank_db.json` лишався застарілим (останнє повне оновлення — 13.08.2026). Admin `generate_builds()` фільтрував queue по `tank_db`: `all_tags = [t for t in queue if t in tank_db]` → повертав `[]` → хибний `"All tanks already cached!"` → manifest НЕ оновлювався → новий танк (аналог F141_Durendal #41ec299) назавжди ховався від автооновлення. Підтверджено: 12 нових німецьких танків (G183/G193/G195/G196/G197/G198 + 5 _siege_mode клонів) + 9 інших у `scripts.pkg` (02.09.2026 v.2.4.0.0 #930) відсутні в `tank_db.json` від 13.08.
+
+**Три підбаги виправлені в одному коміті:**
+
+**Bug 3 (map_manager.py:295-302)** — у stability_mode гілці після `extract_metadata` додано guard `if force_full or tex.changed_metadata_count > 0: tex.build_database()`. Gate запобігає повній перебудові на КОЖНОМУ старті — спрацьовує лише при реальних змінах або при `force_full=True` (`need_tank_rebuild` / `should_force_refresh`).
+
+**Bug 3.x (tank_extractor.py:898-919, build_database)** — попередній regex `r'^<[^>]+>'` замінював XML declaration `<?xml ... ?>` на `<root>`, а реальний root tag `<list>` лишався без заміни → ET.fromstring падав з `mismatched tag`. Виправлення: спочатку викидаємо `<?xml ... ?>` declaration regex'ом, потім через `re.search` знаходимо справжній root tag і обгортаємо `<root>...</root>` навколо нього (раніше перший-ліпший tag).
+
+**Bug 3.y (tank_extractor.py:212-249, extract_metadata)** — `extract_metadata` раніше обробляв тільки `item_defs/vehicles/*.xml` (vehicle XML), але НЕ `list.xml` (index танків нації). list.xml лежав у `extracted_data/<nation>/` як BigWorld binary (`EN\xa1b` signature) з 28.07.2026. Новий блок всередині `with zipfile.ZipFile(...) as z`: для кожного `item_defs/vehicles/<nation>/list.xml` — pull з pkg, write raw, якщо binary — `WotXmlParser.decode_file(target, target)` (in-place decode). Germany вже був декодований (звідси +12 нових одразу), 10 інших націй теж тепер декодовані.
+
+**Верифікація (live, 02.09.2026):** simulation зі stale `tank_db.json` (1141) + manifest видаленим:
+- `extract_metadata(force_full=False)` повернув `changed_metadata_count=1525` (бо manifest застарів)
+- Bug 3 guard спрацював → `build_database()` запустився
+- Усі 11 list.xml декодовані (signature `3c3f786d` = `<?xm`, Germany: `3c3f786d`; раніше всі крім Germany мали `454ea162` = binary)
+- `tank_db.json`: 1141 → **1189** танків (+48 нових)
+- Перевірено PRESENT: G183_Fossa_VM_68, G193_Pz_Kpfw_55, G195_HWK_40, G196_Versuchspanzer_57, G197_Pz_Kpfw_Neu, G198_Kampfpanzer_67, G204_PzVI_Tiger_P_CFE_A, G200_Chi_Go, G56_E-100_7x7, A195_Gorilla, A197_Jezevec, A71_T21_MapsTraining_Dummy_LT_2 (фільтрується by design `technical_tags=["mapstraining","dummy"]`), GB151_Headshaker, GB155_Pike, GB158_Executor, It43_CAV_mod_71, Pl38_63TP_Rycerski, R233_NK_1, R234_T_13, R236_Object_265_II, S37_Ambassador, S41_BV_111
+- `admin_build_generator.load_tank_db()` тепер поверне 1141 (raw) - 118 (bad_tags) = ~1023, плюс 12 нових німецьких = ~1035 (точне число буде відоме після першого admin restart)
+
+---
+
 ## Реліз v1.0.72 Beta (28.08.2026, повний цикл build.py)
 
 Збірка: `python build.py 1.0.72` — PyInstaller (Python 3.12.7, onedir) → copy_data_files (3142 файли) → verify.json (30 танків) + popular_tanks_seed → launcher 35.8 MB (bundle verification PASSED: tcl86t/tk86t/_tkinter) → tray watcher 7.1 MB → NSIS installer 226.8 MB (`SM_WoT_Assistant_Setup_v1.0.72_Beta.exe`) → portable ZIP 246.8 MB → verification PASSED (52 maps, 68 extracted_maps, 1249 icons) → manifest → **GitHub release v1.0.72 Beta** (audit PASSED: name='v1.0.72 Beta', prerelease=True) → RTDB publish (HTTP 200, display_version "1.0.72 Beta", latest pointer оновлено, audit PASSED). Перший реліз після реверсу Alpha→Beta (#1658).

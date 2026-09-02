@@ -209,6 +209,40 @@ class TankExtractor:
                     except PermissionError:
                         print(f"[WARN] Пропущено (нема доступу на запис): {target_path}")
 
+            # list.xml for each nation: extract + decode via WotXmlParser.
+            # Previously extract_metadata skipped list.xml, leaving it in BigWorld
+            # binary form on disk; build_database then failed to ET.fromstring it
+            # and silently fell through to the 53-tank fallback (root cause of
+            # "1023/1010" + "693 змінених" loops — admin never saw new tanks).
+            # New: pull list.xml from pkg, decode through WotXmlParser (idempotent —
+            # safe to re-decode an already-decoded file), overwrite on disk.
+            # Bug 3.y (02.09.2026 #1692 follow-up).
+            try:
+                from decode_xml import WotXmlParser
+            except Exception:
+                WotXmlParser = None
+            if WotXmlParser is not None:
+                list_decoder = WotXmlParser()
+                for name in z.namelist():
+                    if not (name.startswith("scripts/item_defs/vehicles/")
+                            and name.endswith("/list.xml")):
+                        continue
+                    try:
+                        raw = z.read(name)
+                        target = os.path.join(EXTRACT_DIR,
+                                              name.replace("scripts/item_defs/vehicles/", ""))
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        with open(target, "wb") as f:
+                            f.write(raw)
+                        with open(target, "rb") as f:
+                            head = f.read(4)
+                        is_binary = head[:2] in (b"\x62\xa1", b"EN") or head == b"\x62\xa1\x4e\x45"
+                        if is_binary:
+                            list_decoder.decode_file(target, target)
+                    except Exception as e:
+                        print(f"[WARN] list.xml extract failed for {name}: {e}")
+        # END of zipfile.ZipFile context — list.xml extraction must be inside!
+
         removed_files = 0
         for old_name in old_manifest.keys():
             if old_name in new_manifest:
@@ -899,15 +933,25 @@ class TankExtractor:
             if not os.path.exists(list_xml): continue
 
             try:
-                with open(list_xml, "r", encoding="utf-8", errors="ignore") as f:
+                with open(list_xml, "r", encoding="utf-8") as f:
                     xml_text = f.read().strip()
-                
+
                 xml_text = _sanitize_list_xml(xml_text)
-                # ВИПРАВЛЕННЯ: Видаляємо проблемні xmlns теги та огортаємо в root
+                # ВИПРАВЛЕННЯ: Видаляємо проблемні xmlns теги та огортаємо в root.
+                # list.xml починається з <?xml version="1.0" ...?> declaration —
+                # попередній regex r'^<[^>]+>' замінював саме declaration на <root>,
+                # а реальний <list> лишався без заміни → mismatched tag ET.fromstring.
+                # Новий підхід: спочатку викидаємо <?xml ... ?> declaration (якщо є),
+                # потім обертаємо перший знайдений root-tag у <root>...</root>.
+                xml_text = re.sub(r'<\?xml[^>]*\?>\s*', '', xml_text, count=1, flags=re.DOTALL)
                 xml_text = re.sub(r'<xmlns:xmlref>.*?</xmlns:xmlref>', '', xml_text, flags=re.DOTALL)
-                if xml_text.startswith("<"):
-                    xml_text = re.sub(r'^<[^>]+>', '<root>', xml_text, count=1)
-                    xml_text = re.sub(r'</[^>]+>\s*$', '</root>', xml_text)
+                m = re.search(r'<\s*([A-Za-z_][\w:.-]*)', xml_text)
+                if m:
+                    root_tag = m.group(1)
+                    # Replace the opening of the root tag with <root> and the closing
+                    # with </root> so ET.fromstring sees a single-element document.
+                    xml_text = re.sub(r'^<\s*' + re.escape(root_tag) + r'\b[^>]*>', '<root>', xml_text, count=1, flags=re.DOTALL)
+                    xml_text = re.sub(r'</\s*' + re.escape(root_tag) + r'\s*>\s*$', '</root>', xml_text, count=1, flags=re.DOTALL)
 
                 root = ET.fromstring(xml_text)
                 for tank in root:

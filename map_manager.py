@@ -290,6 +290,20 @@ class MapManager:
                         tex = tank_extractor.TankExtractor(ext.wot_path)
                         force_full = bool(need_tank_rebuild or should_force_refresh)
                         if tex.extract_metadata(force_full=force_full):
+                            # stability_mode Bug 3 (28.08.2026 #1692 follow-up): after
+                            # extract_metadata pulls new/changed XML, tank_db.json must be
+                            # rebuilt from extracted_data/<nation>/list.xml so admin's
+                            # generate_builds() sees the new tag (it filters by tank_db).
+                            # Without this, new tank like F141_Durendal (#41ec299) is hidden
+                            # forever — root cause of "1023 vs 1010" + "693 змінених" loops.
+                            # Gate on force_full or any change: no every-start full rebuild.
+                            if force_full or tex.changed_metadata_count > 0:
+                                if tex.build_database():
+                                    print(f"[MAP_MGR] tank_db.json rebuilt "
+                                          f"(force_full={force_full}, "
+                                          f"changed={tex.changed_metadata_count})")
+                                else:
+                                    print(f"[WARN] build_database failed in stability_mode")
                             emit(88, "stats_ai_updating_icons")
                             if not tex.extract_icons():
                                 emit(90, "stats_ai_tth_done", "orange")
