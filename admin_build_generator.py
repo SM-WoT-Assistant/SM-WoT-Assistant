@@ -119,6 +119,40 @@ def load_prompts():
             pass
     return {}
 
+
+def load_prompts_merged(timeout=10):
+    """Local + RTDB merge: local prompts_cache.json + GET prompts/tanks from RTDB.
+
+    Bug 6 (02.09.2026 #1692): load_prompts() read only local file. After admin
+    rebuild + backfill (v1.0.8 #1537), the local file lags behind RTDB —
+    _check_tank_prompt_match reported '1023 vs 1010' (admin.log:15:18:39
+    [ПОМИЛКА] 'Невідповідність резервуарів/підказок: 1023 tanks vs 1010 prompts')
+    even though RTDB has 1023+ prompts. Card stayed red, log printed
+    [ПОМИЛКА] on every restart.
+
+    RTDB has 'auth != null' WRITE only; READ is open (database.rules.json
+    per #1529) — no admin token needed for GET, the API key from FIREBASE_URL
+    is sufficient. Source of truth: RTDB (overrides local, same rule as
+    save_prompt gating on _upload_prompt success in v1.0.9 #1537).
+
+    Silent fallback: any network/parse error returns local dict unchanged.
+    No exception propagates to the GUI thread.
+    """
+    local = load_prompts()
+    try:
+        import requests as _req
+        url = _rtdb_url("prompts/tanks")
+        r = _req.get(url, timeout=timeout)
+        if r.status_code == 200:
+            rtdb = r.json() if r.content else None
+            if isinstance(rtdb, dict) and rtdb:
+                merged = dict(local)
+                merged.update(rtdb)
+                return merged
+    except Exception as e:
+        print(f"[WARN] load_prompts_merged: RTDB fetch failed, using local: {e}")
+    return local
+
 def save_prompt(tag, prompt):
     """Зберігає згенерований промпт у prompts_cache.json (самолікування кешу).
 

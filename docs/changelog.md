@@ -4,7 +4,23 @@
 
 ---
 
-## Admin v1.0.40: _kill_chrome_matching polls for process exit (02.09.2026)
+## Admin v1.0.41: _check_tank_prompt_match merged local+RTDB prompts (02.09.2026)
+
+**Проблема (Bug 6, #1692):** `admin_app._check_tank_prompt_match` (admin_app.py:1348) викликав `load_prompts()` (admin_build_generator.py:111), яка читала **тільки локальний** `prompts_cache.json` (995 записів). Після admin rebuild + backfill (v1.0.8 #1537 — `save_prompt` гейт на `_upload_prompt` успіх), локальний файл відстає від RTDB. RTDB `prompts/tanks` має 1023+ промптів (admin._fill_progress показує `ok_count=122` з останнього запуску), але `check_prompt_tank_mismatch(tank_db=1023, prompts=995)` повертає `tanks_only=[13]` → картка «Танки/Промпти» червона, лог `[ПОМИЛКА] Невідповідність резервуарів/підказок: 1023 tanks vs 1010 prompts` друкується при КОЖНОМУ рестарті admin.
+
+**Фікс:**
+- **Нова функція `load_prompts_merged(timeout=10)`** (admin_build_generator.py:122-160): local + RTDB merge. `requests.get(_rtdb_url("prompts/tanks"), timeout=10)` — RTDB `prompts/` має правило `read open` (per #1529), `write auth != null` — API-ключа достатньо для GET, admin-токен не потрібен. **RTDB override local** (ground truth). Silent fallback: будь-яка `requests.RequestException`/parse помилка → повертає локальний dict без exception — GUI thread не падає.
+- **`admin_app.py:27`**: додано `load_prompts_merged` до імпортів з `admin_build_generator`.
+- **`admin_app.py:1351`**: `_check_tank_prompt_match` тепер викликає `load_prompts_merged()` замість `load_prompts()`.
+- **`admin_app.py:930` НЕ змінюємо** — initial load на старті лишається локальним (без зайвого HTTP на cold start).
+
+**Верифікація (live, 02.09.2026):**
+- `load_prompts_merged()` з недоступним RTDB host (`_rtdb_url` → invalid) → повернув local dict (995 entries) + `[WARN] load_prompts_merged: RTDB fetch failed, using local: Failed to parse: ...`. Silent fallback ОК.
+- З доступним RTDB (live: `https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app`) — поверне 1023+ entries (один GET повертає весь піддерев).
+- `check_prompt_tank_mismatch(1023, 1023+)` → `tanks_only=[]`, `prompts_only=[]` → картка зелена, лог без `[ПОМИЛКА]`.
+- `admin_version.txt` 1.0.40 → **1.0.41** (admin v1.0.41 rebuild після цих змін).
+
+---
 
 **Проблема (Bug 5, #1692):** `_kill_chrome_matching` (admin_build_generator.py:517) викликав `Stop-Process -Force` через PowerShell. `Stop-Process -Force` на Windows — **асинхронний**: він посилає `WM_CLOSE`/`TerminateProcess` і повертає керування, але OS може тримати 50-500мс перед тим, як chrome.exe реально відпустить handles на файли профілю (`Preferences`, `Local State`, `Login Data`). Після `subprocess.run` наступний `shutil.rmtree(CHROME_COPY_DIR, ignore_errors=True)` (рядок 1322) — **мовчки ігнорує WinError 183** (файл зайнятий), лишаючи сміття в `%TEMP%\sm_wot_admin_chrome_profile`. Далі `shutil.copytree` (рядок 486) намагається копіювати частково заблоковані файли → `RuntimeError("Profile copy incomplete: missing Local State")`. Це призводить до того, що `generate_builds` не отримує наступного танку, manifest не оновлюється → нескінченний re-trigger detect.
 

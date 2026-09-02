@@ -25,7 +25,7 @@ import admin_auth
 
 from admin_build_generator import (
     detect_changed_tanks, generate_builds, generate_popular,
-    load_tank_db, load_prompts, _create_driver,
+    load_tank_db, load_prompts, load_prompts_merged, _create_driver,
     _put_json, _get_json, _rtdb_url,
     _update_pending_status, check_wg_tanks_version,
     _WG_API_URL, _is_build_complete,
@@ -1348,7 +1348,13 @@ class AdminApp:
     def _check_tank_prompt_match(self):
         """Лог-перевірка розбіжності Танків/Промптів: [ERROR] з конкретними
         тегами при розбіжності, звичайний рядок при співпадінні (#1604)."""
-        self.prompts = load_prompts()
+        # Bug 6 (02.09.2026 #1692): use load_prompts_merged (local + RTDB) so
+        # the count reflects ground truth. With pure local file, the card
+        # stayed red (1023 vs 1010) even though RTDB has 1023+ prompts —
+        # admin.log:15:18:39 [ПОМИЛКА] 'Невідповідність резервуарів/підказок:
+        # 1023 tanks vs 1010 prompts'. RTDB merge has silent fallback to
+        # local on any network/parse failure.
+        self.prompts = load_prompts_merged()
         prompts_only, tanks_only = check_prompt_tank_mismatch(self.tank_db, self.prompts)
         if prompts_only or tanks_only:
             self._log(self.t("log_tp_mismatch", tanks=len(self.tank_db), prompts=len(self.prompts)))
