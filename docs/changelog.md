@@ -4,7 +4,29 @@
 
 ---
 
-## Admin v1.0.39: manifest _pending field breaks infinite new-file detection loop (02.09.2026)
+## Admin v1.0.40: _kill_chrome_matching polls for process exit (02.09.2026)
+
+**Проблема (Bug 5, #1692):** `_kill_chrome_matching` (admin_build_generator.py:517) викликав `Stop-Process -Force` через PowerShell. `Stop-Process -Force` на Windows — **асинхронний**: він посилає `WM_CLOSE`/`TerminateProcess` і повертає керування, але OS може тримати 50-500мс перед тим, як chrome.exe реально відпустить handles на файли профілю (`Preferences`, `Local State`, `Login Data`). Після `subprocess.run` наступний `shutil.rmtree(CHROME_COPY_DIR, ignore_errors=True)` (рядок 1322) — **мовчки ігнорує WinError 183** (файл зайнятий), лишаючи сміття в `%TEMP%\sm_wot_admin_chrome_profile`. Далі `shutil.copytree` (рядок 486) намагається копіювати частково заблоковані файли → `RuntimeError("Profile copy incomplete: missing Local State")`. Це призводить до того, що `generate_builds` не отримує наступного танку, manifest не оновлюється → нескінченний re-trigger detect.
+
+**Підтверджено в admin.log:**
+- 16:19:26 `Помилка генерації: Profile copy failed (WinError 183)` — після 122 успішних танків
+- 16:19:30 `Невідповідність резервуарів/підказок: 1023 проти 1010`
+- 19:51:39 `HTTPSConnectionPool ... SSLEOFError` — на G151_Pz_Sfl_IC (123-й танк) — SSL EOF, не Chrome race, але manifest через _pending НЕ оновлюється → 19:51:55 `Виявлено 693 змінених танків!` — повторно ті самі теги
+
+**Фікс (admin_build_generator.py):**
+- **Нова функція `_wait_chrome_dead(pattern, timeout=10, interval=0.2)`** (рядки 540-575): після `Stop-Process` викликає `Get-CimInstance Win32_Process` (той самий PowerShell pipeline, що й kill) кожні 200мс — повертає коли process зник або timeout (10с). Caller не блокується назавжди (hard timeout).
+- **`_kill_chrome_matching` (рядки 540-545)**: після `subprocess.run([powershell, ...])` викликає `_wait_chrome_dead(pat, timeout=10)`. Гарантує, що `shutil.rmtree` наступного рядка бачить повністю звільнений профіль.
+
+**Використання (auto-applied всюди де викликається `_kill_chrome_matching`):**
+- `admin_build_generator.py:602, 635, 1410` — 3 вхідні точки (`_create_driver` retry, mid-run reconnect, listen_mode)
+- `admin_app.py:2018, 2021, 2052, 2284` — community-браузер (4 вхідні точки) — **ОКРЕМА підсистема**, не змінюється (community_chrome_profile має свої специфічні таймаути)
+
+**Верифікація (live, 02.09.2026):**
+- `_wait_chrome_dead('NONEXISTENT_PROFILE_xyz', timeout=2, interval=0.2)` повернулась за **0.94с** (один PowerShell call підтверджує відсутність процесу → early return). Smoke ОК.
+- py_compile + import smoke для всього admin_build_generator.py → ОК
+- `admin_version.txt` 1.0.39 → **1.0.40** (admin v1.0.40 rebuild після цих змін)
+
+---
 
 **Проблема (Bug 7, #1692 follow-up):** `admin_build_generator.detect_changed_tanks()` повертав **693 «зміни»** на кожному запуску (`admin.log:15:18:41 / 19:51:55`) — manifest не мав способу запам'ятати «цей файл вже виявлено, очікує генерації». Коли `generate_builds` падав (Chrome WinError 183, network SSL EOF, AI parse fail), manifest НЕ оновлювався → наступний `detect_changed_tanks` (60-хв цикл listen_mode, або 30-хв WG scan) повертав ті самі теги → нескінченний re-trigger `pending_updates/builds` → admin вічно бачив «693 змінених» і генерував 1-2 танки, потім знову 693.
 

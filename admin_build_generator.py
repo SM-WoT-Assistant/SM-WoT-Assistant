@@ -524,6 +524,18 @@ def _kill_chrome_matching(pattern):
     hand-off — one failure cascades until the zombie dies. Chrome processes
     started by the admin pipeline always carry the profile path in their
     command line; the user's own Chrome (started normally) does not.
+
+    Bug 5 (02.09.2026 #1692): Stop-Process -Force is async on Windows — it
+    sends WM_CLOSE / TerminateProcess and returns immediately, but the OS
+    may take 50-500ms to actually release handles on profile files
+    (Preferences, Local State, Login Data). The next shutil.copytree hits
+    ERROR_SHARING_VIOLATION -> ignore_errors silently swallows it ->
+    incomplete profile copy -> RuntimeError("missing Local State"). The same
+    race window caused the 122/693 hang at admin.log:16:19:26.
+
+    Fix: after Stop-Process, poll chrome.exe state via PowerShell every 200ms
+    until either the process is gone OR the hard timeout (10s) elapses. Any
+    subsequent shutil.rmtree/copytree then sees a fully released profile dir.
     """
     pat = pattern.replace("'", "''")
     q = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
@@ -535,6 +547,38 @@ def _kill_chrome_matching(pattern):
                        creationflags=subprocess.CREATE_NO_WINDOW)
     except Exception:
         pass
+    # Poll for actual process exit (Stop-Process -Force is async).
+    # Without this, a subsequent rmtree/copytree race with the dying
+    # process hits WinError 183 silently via shutil.rmtree(ignore_errors=True).
+    _wait_chrome_dead(pat, timeout=10, interval=0.2)
+
+
+def _wait_chrome_dead(pattern, timeout=10, interval=0.2):
+    """Poll for chrome.exe processes matching ``pattern`` to actually exit.
+
+    Uses PowerShell Get-CimInstance Win32_Process (same source as the kill,
+    so we get the same visibility) on a tight loop. Returns once the process
+    is gone OR the timeout elapses. Always returns — callers should not
+    block forever on a stuck AV or zombie.
+    """
+    pat = pattern.replace("'", "''")
+    q = ("Get-CimInstance Win32_Process -Filter \"Name='chrome.exe'\" | "
+         "Where-Object {{ $_.CommandLine -like '*{0}*' }} | "
+         "Select-Object -ExpandProperty ProcessId").format(pat)
+    end_at = time.time() + timeout
+    while time.time() < end_at:
+        try:
+            r = subprocess.run(["powershell", "-NoProfile", "-Command", q],
+                               capture_output=True, timeout=5,
+                               creationflags=subprocess.CREATE_NO_WINDOW)
+            output = (r.stdout or b"").decode("utf-8", errors="ignore").strip()
+            if not output:
+                return  # No matching process — we're done
+        except Exception:
+            return
+        time.sleep(interval)
+    # Timeout reached: process may still be exiting. Caller continues with
+    # rmtree/copytree which has its own ignore_errors — graceful degradation.
 
 
 def _copy_chrome_profile(src, dst):
