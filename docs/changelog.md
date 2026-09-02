@@ -4,7 +4,27 @@
 
 ---
 
-## Stability_mode: rebuild tank_db.json + decode list.xml (02.09.2026)
+## Tank manifest в %APPDATA%/SM WoT Assistant/ (02.09.2026)
+
+**Проблема (Bug 1, #1692):** `tank_extractor.py:12 BASE_DIR = os.getcwd()` — manifest-и `.tank_extract_manifest.json` + `.icon_extract_manifest.json` писалися в `BASE_DIR = CWD`. У frozen onefile EXE CWD = `%TEMP%\_MEIxxxxx` (PyInstaller bootloader extraction), у dev CWD = залежна від способу запуску (різні ярлики → різні папки). У `admin_app.py:1143-1168` (`_resolve_manifest`) вже є правильний патерн — manifest у `%APPDATA%/SM WoT Assistant/`, але `tank_extractor.py` (використовується в main.py + listen-mode daemon + CLI) мав свій власний шлях. Наслідок: `detect_changed_tanks` в `admin_build_generator.py:170-231` (викликається з AppData manifest) повертав **693 змінених** на кожному запуску (`admin.log:15:18:41`) — `manifest` (AppData, 20.08) не відповідав `scripts.pkg` (оновлений 02.09). main.py бачив manifest у `D:\!\WORK\...` (root, 28.08), а адмінка — в AppData. **Розбіжність локацій.**
+
+**Фікс (tank_extractor.py:1-30, 60-87):**
+- `BASE_DIR = config.BASE_DIR` (BUNDLE_DIR у frozen, `dirname(__file__)` у dev — стабільний шлях)
+- Manifest paths → `config.USER_DATA_DIR/.tank_extract_manifest.json` та `config.USER_DATA_DIR/.icon_extract_manifest.json` (як в `admin_app.py:1143-1168`)
+- Одноразова міграція `_migrate_legacy_manifest()` у `TankExtractor.__init__`: якщо AppData manifest відсутній і legacy manifest існує в `BASE_DIR` — `shutil.copy2` у AppData. Idempotent. Той самий патерн, що `admin_app.py:1149-1161` (seed на старті).
+
+**BUILD artifacts залишаються в `BASE_DIR`:**
+- `EXTRACT_DIR` (= `extracted_data/`) — build data, копіюється `build.py:336-343` у бандл
+- `ICONS_DIR` (= `extracted_icons/`) — build data, копіюється `build.py:336-343`
+- `tank_db.json` / `tank_tth.json` — `data_manager.py:load_tank_db` 3-level fallback (read тільки) — лишаються в `BASE_DIR` (= `BUNDLE_DIR`)
+
+**Верифікація (live, 02.09.2026):**
+- `python -c '... TankExtractor(...)'` → `meta_manifest_path = C:\Users\PRO\AppData\Roaming\SM WoT Assistant\.tank_extract_manifest.json` ✓
+- Міграція: legacy `D:\!\WORK\...\tank_extract_manifest.json` (28.08) → AppData (копійовано через `shutil.copy2`, `[MIGRATE]` log)
+- `extract_metadata(force_full=False)` після інстанса → AppData manifest mtime **оновлено** (`before: 1788387220.22064` → `after: 1788387645.734969`); BASE_DIR manifest лишається без змін
+- Тепер `admin_build_generator.detect_changed_tanks(wot_path)` (який приймає `manifest_path` як параметр) може бути викликаний з `config.USER_DATA_DIR/.tank_extract_manifest.json` — той самий файл, що й `tank_extractor.py:extract_metadata` щойно оновив. **Ніяких 693-зміних-хибних-позитивів.**
+
+---
 
 **Проблема (#1692 follow-up, admin.log:15:18:39 + 15:18:41 «693 змінених танків» + 16:19:30 «1023 vs 1010»):** `pause_tank_auto_rebuild=True` (stability_mode, default) викликав лише `extract_metadata` + `update_tth_database_safe` (інкрементальний merge TTH) — але **НІКОЛИ** `build_database()`. Коли WG додавав новий танк у `scripts.pkg` (`extract_metadata` витягав новий XML у `extracted_data/<nation>/`), `tank_db.json` лишався застарілим (останнє повне оновлення — 13.08.2026). Admin `generate_builds()` фільтрував queue по `tank_db`: `all_tags = [t for t in queue if t in tank_db]` → повертав `[]` → хибний `"All tanks already cached!"` → manifest НЕ оновлювався → новий танк (аналог F141_Durendal #41ec299) назавжди ховався від автооновлення. Підтверджено: 12 нових німецьких танків (G183/G193/G195/G196/G197/G198 + 5 _siege_mode клонів) + 9 інших у `scripts.pkg` (02.09.2026 v.2.4.0.0 #930) відсутні в `tank_db.json` від 13.08.
 

@@ -2,16 +2,32 @@ import os
 import zipfile
 import time
 import json
+import shutil
 import xml.etree.ElementTree as ET
 import re
 from pathlib import Path
 from tth_updater import safe_merge_tth_from_extracted, safe_merge_tth_from_file_list
 from decode_xml import WotXmlParser
+import config
 
 # Шляхи
-BASE_DIR = os.getcwd()
+# BASE_DIR раніше = os.getcwd() — це давало різний шлях у frozen onefile EXE
+# (CWD = %TEMP%\_MEIxxxxx) і в dev (CWD = repo). Заміна на config.BASE_DIR
+# дає стабільний шлях: BUNDLE_DIR (frozen) або dirname(__file__) (dev).
+BASE_DIR = config.BASE_DIR
 EXTRACT_DIR = os.path.join(BASE_DIR, "extracted_data")
 ICONS_DIR = os.path.join(BASE_DIR, "extracted_icons")
+# manifest-и (.tank_extract_manifest.json, .icon_extract_manifest.json) — це
+# per-user STATE (fingerprint-и залежать від scripts.pkg клієнта, не від бандла).
+# Раніше писались у BASE_DIR (= CWD) → при frozen onefile CWD=%TEMP% — manifest
+# губився при наступному запуску, а при запуску з різних CWD (різні ярлики)
+# кожен процес бачив СВІЙ manifest. admin_app.py:1143-1168 вже використовує
+# %APPDATA%/SM WoT Assistant/.tank_extract_manifest.json — main.py (а відтак
+# listen_mode daemon) мав розбіжність через BASE_DIR. Тепер обидва manifest-и
+# в одному місці. Bug 1 (02.09.2026 #1692).
+_MANIFEST_DIR = config.USER_DATA_DIR
+_TANK_MANIFEST_PATH = os.path.join(_MANIFEST_DIR, ".tank_extract_manifest.json")
+_ICON_MANIFEST_PATH = os.path.join(_MANIFEST_DIR, ".icon_extract_manifest.json")
 
 def _sanitize_list_xml(xml_text):
     """Очищення декодованого list.xml перед ET.fromstring.
@@ -29,14 +45,48 @@ class TankExtractor:
     def __init__(self, wot_path):
         self.wot_path = wot_path
         self.pkg_dir = os.path.join(wot_path, "res", "packages")
-        self.meta_manifest_path = os.path.join(BASE_DIR, ".tank_extract_manifest.json")
-        self.icon_manifest_path = os.path.join(BASE_DIR, ".icon_extract_manifest.json")
+        self.meta_manifest_path = _TANK_MANIFEST_PATH
+        self.icon_manifest_path = _ICON_MANIFEST_PATH
+        # One-time migration: legacy manifest in BASE_DIR (frozen onefile CWD
+        # or dev CWD) -> UserData. Without this, post-upgrade first run would
+        # see no manifest in AppData, treat EVERY script.pkg XML as new, and
+        # trigger 1300+ false-positive changes (same as the original Bug 1).
+        # Idempotent: copies only if AppData manifest is missing AND legacy
+        # exists. Same logic admin_app.py:1143-1168 has been using for a while.
+        os.makedirs(_MANIFEST_DIR, exist_ok=True)
+        self._migrate_legacy_manifest()
         self.changed_vehicle_dirs = set()
         self.changed_vehicle_files = set()
         self.removed_vehicle_tags = set()
         self.changed_metadata_count = 0
         os.makedirs(EXTRACT_DIR, exist_ok=True)
         os.makedirs(ICONS_DIR, exist_ok=True)
+
+    def _migrate_legacy_manifest(self):
+        """Copy legacy manifest from BASE_DIR to USER_DATA_DIR if needed.
+
+        Sources to try (in order, most recent wins):
+          1. .tank_extract_manifest.json in BASE_DIR (legacy path)
+          2. .tank_extract_manifest.json in BASE_DIR/.tank_extract_manifest.json
+             (defensive — old version saved under BUNDLE_DIR sometimes)
+        Only copies if the AppData copy does not already exist.
+        """
+        if os.path.exists(self.meta_manifest_path):
+            return  # AppData copy exists — no migration needed
+        candidates = [
+            os.path.join(BASE_DIR, ".tank_extract_manifest.json"),
+        ]
+        for legacy in candidates:
+            if os.path.exists(legacy) and legacy != self.meta_manifest_path:
+                try:
+                    shutil.copy2(legacy, self.meta_manifest_path)
+                    print(f"[MIGRATE] tank manifest: {legacy} -> {self.meta_manifest_path}")
+                except Exception as e:
+                    print(f"[WARN] tank manifest migration failed: {e}")
+                break
+        # icon_manifest_path: only migrate if user has a legacy one (very
+        # old versions). Skip migration for icons — that one is purely a
+        # build artifact, less critical to preserve across path changes.
 
     def _is_vehicle_nation_dir(self, path):
         try:
