@@ -47,6 +47,31 @@
 - **`admin_app.py:1351`**: `_check_tank_prompt_match` тепер викликає `load_prompts_merged()` замість `load_prompts()`.
 - **`admin_app.py:930` НЕ змінюємо** — initial load на старті лишається локальним (без зайвого HTTP на cold start).
 
+## Admin app ↔ website event-driven sync (02.09.2026 #1692)
+
+**Проблема:** адмінпрограма показувала `1023/1010`, а сайт — тільки 1010 (count of `builds/tanks`). Після генерації 37 нових білдів цифри **не змінювались одразу ні в адмінці, ні на сайті** — користувач бачив застарілі дані навіть після перезапуску.
+
+**Корінь (3 незалежні баги):**
+
+1. **`_upload_prompt` умовний на `prompt_new=True`** (admin_build_generator.py:1509-1511): танки з вже-валідним локальним prompt ніколи не перепублікували в RTDB → `prompts/tanks` відставав від `builds/tanks`.
+2. **Website `loadBuildsData` НЕ мав live listener** на RTDB version change — тільки event-driven `pollPendingUpdates` (5s під час генерації), після завершення — кеш.
+3. **Website не показував `prompts/tanks` count** взагалі — card "Tanks" = `Object.keys(builds/tanks).length` (тільки builds).
+
+**Фікс:**
+
+- **`admin_build_generator.py:1509-1533` (Commit 1)**: `_upload_prompt` тепер викликається **ЗАВЖДИ** після `_upload_build` успіху (раніше тільки на `prompt_new=True`). Зразу після upload викликається нова функція `_update_prompts_version()` — bump `prompts/version` в RTDB.
+- **`admin_build_generator.py:929-953` (Commit 1)**: нова функція `_update_prompts_version()` — аналог `_update_builds_version()`, але для prompts. Викликається одразу після `_upload_prompt` (рядок 1530), НЕ в final `if ok_count > 0` блоці (per-tank, не per-run).
+- **`public/admin.html:817-855` (Commit 2)**: `loadBuildsData()` тепер читає `prompts/tanks` count (новий stat-box "Tanks (prompts)") + `prompts/version` (stat-box "Prompts Version").
+- **`public/admin.html:858-861` (Commit 2)**: нові event-driven listeners `db.ref("prompts/version").on("value", loadBuildsData)` + `db.ref("builds/version").on("value", loadBuildsData)` — миттєвий refresh website після кожного RTDB version bump, БЕЗ polling.
+- **`AGENTS.md` "Soft-delete (Корзина)"** (Commit 3): нове правило для депрекації файлів — 3-фазний процес (DEPRECATED marker → 30 днів спостереження → підтверджене `git rm`).
+- **`tank_slots_db.json.deprecated` (Commit 3)**: sidecar marker для orphan-файлу `tank_slots_db.json` (0 імпортерів, 22.05.2026, план видалення v1.0.74). Файл лишається на диску, всі runtime посилання відсутні.
+
+**Результати:**
+- `prompts/tanks` в RTDB: 1010 → **1010+37=1047** (якщо запустити generation зараз)
+- Website показує `Tanks (prompts)`, `Prompts Version`, `Tanks (builds)` — всі 3 синхронно оновлюються на кожен RTDB bump
+- Admin app показує коректний `tank_db / merged_prompts` одразу після `_do_generate` finally block
+- `tank_slots_db.json` soft-deleted, файл лишається на диску 30 днів (план: v1.0.74 = 02.10.2026)
+
 **Верифікація (live, 02.09.2026):**
 - `load_prompts_merged()` з недоступним RTDB host (`_rtdb_url` → invalid) → повернув local dict (995 entries) + `[WARN] load_prompts_merged: RTDB fetch failed, using local: Failed to parse: ...`. Silent fallback ОК.
 - З доступним RTDB (live: `https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app`) — поверне 1023+ entries (один GET повертає весь піддерев).
