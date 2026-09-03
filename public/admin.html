@@ -123,7 +123,9 @@
             <div class="section-body">
                 <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
                     <div class="stat-box"><div class="num" id="builds-version">—</div><div class="label">Builds Version</div></div>
-                    <div class="stat-box"><div class="num" id="builds-count">—</div><div class="label">Tanks</div></div>
+                    <div class="stat-box"><div class="num" id="builds-count">—</div><div class="label">Tanks (builds)</div></div>
+                    <div class="stat-box"><div class="num" id="prompts-count">—</div><div class="label">Tanks (prompts)</div></div>
+                    <div class="stat-box"><div class="num" id="prompts-version">—</div><div class="label">Prompts Version</div></div>
                     <div class="stat-box"><div class="num" id="popular-version">—</div><div class="label">Popular Version</div></div>
                     <div class="stat-box"><div class="num" id="builds-fingerprint">—</div><div class="label">Fingerprint</div></div>
                 </div>
@@ -828,6 +830,16 @@ function loadBuildsData() {
         const count = data ? Object.keys(data).length : 0;
         document.getElementById("builds-count").textContent = count || '—';
     }).catch(() => {});
+    // Prompts count (02.09.2026 #1692 — show prompts/tanks size)
+    db.ref("prompts/tanks").once("value").then(s => {
+        const data = s.val();
+        const count = data ? Object.keys(data).length : 0;
+        document.getElementById("prompts-count").textContent = count || '—';
+    }).catch(() => {});
+    // Prompts version
+    db.ref("prompts/version").once("value").then(s => {
+        document.getElementById("prompts-version").textContent = s.val() || '—';
+    }).catch(() => {});
     // Fingerprint
     db.ref("builds/scripts_fingerprint").once("value").then(s => {
         const fp = s.val() || '';
@@ -838,6 +850,11 @@ function loadBuildsData() {
         document.getElementById("popular-version").textContent = s.val() || '—';
     }).catch(() => {});
 }
+
+// Event-driven sync (02.09.2026 #1692): re-fetch on prompts/version or
+// builds/version change (no polling, instant refresh when admin publishes).
+db.ref("prompts/version").on("value", () => loadBuildsData());
+db.ref("builds/version").on("value", () => loadBuildsData());
 
 function fmtDateTime(iso) {
     if (!iso) return '—';
