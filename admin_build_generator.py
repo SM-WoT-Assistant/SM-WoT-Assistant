@@ -935,6 +935,24 @@ def _update_builds_version():
     _put_json(_rtdb_url("builds/scripts_fingerprint"), fp)
     print(f"[VERSION] Builds v{new_ver}, fingerprint: {fp[:16]}...")
 
+
+def _update_prompts_version():
+    """Bump prompts/version after any _upload_prompt success.
+
+    Event-driven sync (02.09.2026 #1692 follow-up): without this bump, the
+    website has no way to know when new prompts are published. Builds
+    advance on builds/version (line 1532), but prompts had no equivalent.
+    Now website listener on prompts/version triggers loadBuildsData() and
+    the admin app's _check_tank_prompt_match sees fresh counts on next cycle.
+    """
+    try:
+        cur = _get_json(_rtdb_url("prompts/version")) or 0
+        new_ver = int(cur) + 1
+        _put_json(_rtdb_url("prompts/version"), new_ver)
+        print(f"[VERSION] Prompts v{new_ver}")
+    except Exception as e:
+        print(f"[WARN] _update_prompts_version failed: {e}")
+
 def _update_pending_status(path, status, message="", progress=None):
     data = {"status": status, "updated_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "message": message}
     if progress:
@@ -1506,8 +1524,14 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         ok = _upload_build(tag, build_data)
         if ok:
             print(f"    [OK] uploaded")
-            if prompt_new:
-                if _upload_prompt(tag, prompt):
+            # Event-driven sync (02.09.2026 #1692): always upload prompt to RTDB,
+            # not just on prompt_new=True. Old behavior: tanks with already-valid
+            # local prompts never re-uploaded, so RTDB prompts/tanks lagged
+            # behind builds/tanks. Now: each build success publishes its prompt,
+            # website listener on prompts/version triggers loadBuildsData().
+            if _upload_prompt(tag, prompt):
+                _update_prompts_version()
+                if prompt_new:
                     save_prompt(tag, prompt)
             ok_count += 1
             done_tags.append(tag)
