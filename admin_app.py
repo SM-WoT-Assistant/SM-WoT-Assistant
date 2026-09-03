@@ -67,6 +67,8 @@ _TR_EN = {
     "card_game_status": "Game Status",
     "card_queue": "Queue",
     "card_last_scan": "Last Scan",
+    "card_total_raw": "Tanks (raw)",
+    "card_total_db": "Tanks (db)",
     "btn_scan": "Scan Now",
     "btn_gen_queue": "Generate Queue",
     "btn_gen_popular": "Generate Popular",
@@ -1236,6 +1238,8 @@ class AdminApp:
         self._card_ver = _card(left, "card_admin_ver")
         self._card_wg = _card(left, "card_wg_ver")
         self._card_status = _card(left, "card_game_status")
+        self._card_total = _card(left, "card_total_raw")
+        self._card_db = _card(left, "card_total_db")
         self._card_queue = _card(left, "card_queue")
         self._card_last = _card(left, "card_last_scan")
         self._card_tp = _card(left, "card_tp")
@@ -1324,6 +1328,36 @@ class AdminApp:
         else:
             print(line)
 
+    def _count_raw_tanks(self):
+        """Count vehicle XML files in extracted_data/<nation>/ folders.
+
+        Returns int — the number of <tag>.xml files (excluding list.xml,
+        common/, components/). Used by the Tanks (raw) card to show the
+        total tanks present in the WoT client BEFORE filtering by
+        _is_bad_tag (which is what tank_db uses).
+
+        For frozen EXE: extracted_data is in BASE_DIR (set by
+        os.chdir in __init__). For dev: it's relative to the project root.
+        """
+        try:
+            base = os.path.dirname(os.path.abspath(__file__))
+            ed = os.path.join(base, "extracted_data")
+            if not os.path.isdir(ed):
+                return 0
+            total = 0
+            for nation in os.listdir(ed):
+                nd = os.path.join(ed, nation)
+                if not os.path.isdir(nd):
+                    continue
+                if nation.startswith("common_") or nation == "common":
+                    continue
+                for f in os.listdir(nd):
+                    if f.endswith(".xml") and f != "list.xml":
+                        total += 1
+            return total
+        except Exception:
+            return 0
+
     def _update_cards(self):
         self._card_ver.config(text=_read_admin_version())
         self._card_wg.config(text=self._wg_ver or "—")
@@ -1334,6 +1368,11 @@ class AdminApp:
             status = self.t("status_no_wot")
             color = RED
         self._card_status.config(text=status, fg=color)
+        # 4-box system (02.09.2026 #1692): raw / db / prompts / queue
+        raw = self._count_raw_tanks()
+        db_n = len(self.tank_db)
+        self._card_total.config(text=str(raw), fg="#ccc")
+        self._card_db.config(text=str(db_n), fg=ACCENT if db_n > 0 else "#888")
         q = len(self._queue)
         self._card_queue.config(text=str(q), fg=ACCENT if q > 0 else "#888")
         self._card_last.config(text=time.strftime("%H:%M") if self._last_scan > 0 else "—")

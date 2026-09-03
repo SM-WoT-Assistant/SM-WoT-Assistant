@@ -126,6 +126,7 @@
                     <div class="stat-box"><div class="num" id="builds-count">—</div><div class="label">Tanks (builds)</div></div>
                     <div class="stat-box"><div class="num" id="prompts-count">—</div><div class="label">Tanks (prompts)</div></div>
                     <div class="stat-box"><div class="num" id="prompts-version">—</div><div class="label">Prompts Version</div></div>
+                    <div class="stat-box"><div class="num" id="queue-count">—</div><div class="label">Queue</div></div>
                     <div class="stat-box"><div class="num" id="popular-version">—</div><div class="label">Popular Version</div></div>
                     <div class="stat-box"><div class="num" id="builds-fingerprint">—</div><div class="label">Fingerprint</div></div>
                 </div>
@@ -840,6 +841,17 @@ function loadBuildsData() {
     db.ref("prompts/version").once("value").then(s => {
         document.getElementById("prompts-version").textContent = s.val() || '—';
     }).catch(() => {});
+    // Queue count (02.09.2026 #1692): pending_updates/builds.queue
+    db.ref("pending_updates/builds").once("value").then(s => {
+        const data = s.val();
+        let q = 0;
+        if (data && data.queue && Array.isArray(data.queue)) {
+            q = data.queue.length;
+        } else if (data && data.progress && data.progress.total) {
+            q = data.progress.total - (data.progress.done || 0);
+        }
+        document.getElementById("queue-count").textContent = q || '—';
+    }).catch(() => {});
     // Fingerprint
     db.ref("builds/scripts_fingerprint").once("value").then(s => {
         const fp = s.val() || '';
@@ -855,6 +867,8 @@ function loadBuildsData() {
 // builds/version change (no polling, instant refresh when admin publishes).
 db.ref("prompts/version").on("value", () => loadBuildsData());
 db.ref("builds/version").on("value", () => loadBuildsData());
+// pending_updates/builds change: admin writes here on start/end/error.
+db.ref("pending_updates/builds").on("value", () => loadBuildsData());
 
 function fmtDateTime(iso) {
     if (!iso) return '—';
