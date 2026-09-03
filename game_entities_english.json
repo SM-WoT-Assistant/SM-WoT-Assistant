@@ -2003,6 +2003,11 @@
       "name": "reinforcedStructure",
       "icon": "reinforcedStructure",
       "original_ukr": "Reinforced Structure"
+    },
+    "improvedProjectileRifling": {
+      "name": "improvedProjectileRifling",
+      "icon": "improvedProjectileRifling",
+      "original_ukr": "Improved Projectile Rifling"
     }
   },
   "ammo_types": {}

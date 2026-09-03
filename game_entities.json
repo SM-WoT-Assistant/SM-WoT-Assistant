@@ -1504,6 +1504,12 @@
       "icon": "improvedObservationDevice",
       "type": "standard"
     },
+    "improvedProjectileRifling": {
+      "id": "improvedProjectileRifling",
+      "name": "Improved Projectile Rifling",
+      "icon": "improvedProjectileRifling",
+      "type": "standard"
+    },
     "improvedReflexScopes": {
       "id": "improvedReflexScopes",
       "name": "Improved Reflex Scopes",
