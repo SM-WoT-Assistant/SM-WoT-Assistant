@@ -259,23 +259,30 @@ class TankExtractor:
                     except PermissionError:
                         print(f"[WARN] Пропущено (нема доступу на запис): {target_path}")
 
-            # list.xml for each nation: extract + decode via WotXmlParser.
-            # Previously extract_metadata skipped list.xml, leaving it in BigWorld
-            # binary form on disk; build_database then failed to ET.fromstring it
-            # and silently fell through to the 53-tank fallback (root cause of
-            # "1023/1010" + "693 змінених" loops — admin never saw new tanks).
-            # New: pull list.xml from pkg, decode through WotXmlParser (idempotent —
-            # safe to re-decode an already-decoded file), overwrite on disk.
-            # Bug 3.y (02.09.2026 #1692 follow-up).
+            # Decode all item_defs/vehicles/*.xml files in scripts.pkg through
+            # WotXmlParser before writing to disk. Previously extract_metadata
+            # wrote raw bytes from scripts.pkg without decoding, leaving all
+            # files in BigWorld binary form (EN\xa1b signature). That broke
+            # _parse_tth_from_vehicle_xml (which reads as UTF-8 + decode error
+            # ignore -> mixed text/binary -> ET.fromstring fails -> TTH = None)
+            # AND broke tank_db's regeneration cycle for the next extract.
+            # Bug 3.z.D (02.09.2026 #1692 follow-up): decode every XML file
+            # in extracted_data/<nation>/, not just list.xml. Skips
+            # common/ and components/ subdirs (those are handled by
+            # parse_game_entities / extract_equipment_loadouts, not here).
+            # Idempotent: re-decode on text XML is a fast no-op.
             try:
                 from decode_xml import WotXmlParser
             except Exception:
                 WotXmlParser = None
             if WotXmlParser is not None:
-                list_decoder = WotXmlParser()
+                decoder = WotXmlParser()
                 for name in z.namelist():
-                    if not (name.startswith("scripts/item_defs/vehicles/")
-                            and name.endswith("/list.xml")):
+                    if not name.startswith("scripts/item_defs/vehicles/"):
+                        continue
+                    if not name.endswith(".xml"):
+                        continue
+                    if "common/" in name or "components/" in name:
                         continue
                     try:
                         raw = z.read(name)
@@ -288,10 +295,9 @@ class TankExtractor:
                             head = f.read(4)
                         is_binary = head[:2] in (b"\x62\xa1", b"EN") or head == b"\x62\xa1\x4e\x45"
                         if is_binary:
-                            list_decoder.decode_file(target, target)
+                            decoder.decode_file(target, target)
                     except Exception as e:
-                        print(f"[WARN] list.xml extract failed for {name}: {e}")
-        # END of zipfile.ZipFile context — list.xml extraction must be inside!
+                        print(f"[WARN] XML extract/decode failed for {name}: {e}")
 
         removed_files = 0
         for old_name in old_manifest.keys():
@@ -468,11 +474,34 @@ class TankExtractor:
         return None
 
     def _parse_tth_from_vehicle_xml(self, xml_path):
+        # Client v.2.4.0.0 #930 (02.09.2026) #1692 follow-up: vehicle XML files in
+        # extracted_data/<nation>/*.xml are now written in BigWorld binary form
+        # (EN\xa1b signature) because extract_metadata writes raw bytes from
+        # scripts.pkg without decoding. Reading as UTF-8 with errors='ignore'
+        # silently strips the binary header, leaving a mix of valid UTF-8
+        # strings and binary that ET.fromstring cannot parse -> TTH = None.
+        # Fix: detect binary header and decode in place via WotXmlParser
+        # (same pattern admin_build_generator._slots_and_crew_from_client uses).
         try:
-            with open(xml_path, 'r', encoding='utf-8', errors='ignore') as f:
+            with open(xml_path, "rb") as f:
+                head = f.read(4)
+            # Skip decode if file is already text XML (avoids re-decoding
+            # on every TTH rebuild — a single decode_file call is ~50-200ms).
+            is_binary = head[:2] in (b"\x62\xa1", b"EN") or head == b"\x62\xa1\x4e\x45"
+            if is_binary:
+                try:
+                    from decode_xml import WotXmlParser
+                    decoder = WotXmlParser()
+                    if not decoder.decode_file(xml_path, xml_path):
+                        # decode failed: fall through to text read (may still
+                        # work if file was already text in a prior run)
+                        pass
+                except Exception:
+                    pass
+            with open(xml_path, "r", encoding="utf-8", errors="ignore") as f:
                 content = f.read()
 
-            if not content.strip() or '<' not in content:
+            if not content.strip() or "<" not in content:
                 return None
 
             root = self._parse_xml_root_safe(content)
@@ -606,20 +635,33 @@ class TankExtractor:
                 if tth:
                     out[tag] = tth
 
-        # Не підміняємо реальні ТТХ синтетичними значеннями.
-        # Якщо новий парсинг порожній, залишаємо існуючий tank_tth.json як стабільний fallback.
-        if not out:
-            try:
-                if os.path.exists('tank_tth.json'):
-                    with open('tank_tth.json', 'r', encoding='utf-8') as f:
-                        existing = json.load(f)
-                    if isinstance(existing, dict) and existing:
-                        print(f"[DATABASE] TTH парсинг порожній, залишаю поточний tank_tth.json: {len(existing)} записів")
-                        return True
-            except Exception as e:
-                print(f"[WARN] Не вдалося прочитати існуючий tank_tth.json: {e}")
+        # Load existing TTH for regression guard (client v.2.4.0.0 #930
+        # follow-up #1692: without this guard, a partial parse regression
+        # silently overwrites a complete tank_tth.json with a smaller dict,
+        # losing 50+ entries. Example: pre-fix 1264 -> post-fix 1211).
+        existing = {}
+        try:
+            if os.path.exists('tank_tth.json'):
+                with open('tank_tth.json', 'r', encoding='utf-8') as f:
+                    existing = json.load(f)
+                if not isinstance(existing, dict):
+                    existing = {}
+        except Exception:
+            existing = {}
 
+        # Regression guard: never overwrite a larger valid TTH with a smaller
+        # result. Reject if new parse is significantly smaller (less than 50%
+        # of existing) — indicates parse regression, not a real shrink.
+        if existing and len(out) < int(len(existing) * 0.5):
+            print(f"[DATABASE] TTH regression guard: new={len(out)} < 50% of existing={len(existing)}. "
+                  f"Keeping existing tank_tth.json")
+            return True
+
+        # If parse is empty AND no existing data, nothing to write.
         if not out:
+            if existing:
+                print(f"[DATABASE] TTH парсинг порожній, залишаю поточний tank_tth.json: {len(existing)} записів")
+                return True
             print("[ERROR] tank_tth порожній після побудови. Збереження скасовано.")
             return False
 

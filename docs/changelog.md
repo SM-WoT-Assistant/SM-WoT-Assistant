@@ -4,6 +4,39 @@
 
 ---
 
+## Client v.2.4.0.0 #930 adaptation (02.09.2026) — vehicle XML binary, field_modifications, TTH regression guard
+
+**Клієнт гри оновився до v.2.4.0.0 #930 (02.09.2026). WG змінив формат кількох ключових XML-файлів:**
+
+1. **`item_defs/vehicles/<nation>/*.xml`** (vehicle XML) — тепер записуються як BigWorld binary (сигнатура `EN\xa1b`, 1325 файлів по 30-90 КБ кожен). Раніше `extract_metadata` декодував їх через `WotXmlParser`, тепер — тільки для `list.xml` (Bug 3.y), але vehicle XML залишались binary. `tank_extractor._parse_tth_from_vehicle_xml` відкривав файл як UTF-8 з `errors='ignore'`, мовчки видаляв binary header, лишав сміття — `ET.fromstring` → None → TTH залишався старий (`27.07.2026`, 1264 записів, без нових танків).
+
+2. **`extracted_data/common/post_progression/field_modifications.xml`** — теж BigWorld binary. `parse_game_entities._parse_field_mods_from_xml` падав з `parse error: not well-formed (invalid token): line 1, column 2` → fallback повертав 15 hardcoded mods (застарілих), пропускаючи нові з v.2.4.0.0.
+
+3. **`build_tth_database` regression** — попередня логіка: «якщо `out` порожній — fallback, інакше перезаписати старий файл». При binary regression (out=1211) перезаписувала старий tank_tth.json (1264) → **втрата 53 записів**. Виявлено 02.09.2026 при Bug 3 фіксі.
+
+**Фікс (`0304817` нащадок, один коміт):**
+
+- **`tank_extractor.py:470-510` (Bug 3.z.A)** — `_parse_tth_from_vehicle_xml` тепер визначає BigWorld binary (`EN` / `\x62\xa1` сигнатура) і декодує через `WotXmlParser` inline перед читанням. Той самий паттерн, що `admin_build_generator._slots_and_crew_from_client` використовує для slot generation.
+
+- **`tank_extractor.py:612-668` (Bug 3.z.B)** — `build_tth_database` regression guard: якщо `existing` має >0 записів і `len(out) < 0.5 * len(existing)` — **зберігаємо existing, return True** без перезапису. Захист від часткової регресії парсера. Логує `[DATABASE] TTH regression guard: new=X < 50% of existing=Y. Keeping existing tank_tth.json`.
+
+- **`tank_extractor.py:262-298` (Bug 3.z.D)** — `extract_metadata` тепер декодує ВСІ `item_defs/vehicles/<nation>/*.xml` файли через `WotXmlParser` (раніше — тільки `list.xml`). Skip `common/`, `components/`. Idempotent: re-decode на вже-декодованому файлі — fast no-op (WotXmlParser перевіряє сигнатуру). Результат: `extracted_data/<nation>/*.xml` завжди в текстовій формі після `extract_metadata`. Усуває root cause — наступний `_parse_tth_from_vehicle_xml` отримує чистий XML.
+
+- **`parse_game_entities.py:505-535` (Bug 3.z.C)** — `_parse_field_mods_from_xml` додає той самий binary-detect + inline decode перед `ET.parse`. Результат: field_mods парсяться правильно (26 записів замість 15 fallback).
+
+**Результати live-тестування (02.09.2026):**
+- `tank_tth.json`: 1264 → **1326** записів (+62 нових танків з TTH: G183, G193, G195, G196, G197, G198, A195, GB151, GB155, It43, Pl38, R233, R234, R236, S37 тощо)
+- `field_modifications`: 15 fallback → **26** real entries (additionalGrousers, betterFriction, improvedAimingHandling тощо)
+- `extracted_data/<nation>/*.xml`: 133 binary → **0 binary** (1340 text), всі наступні extract будуть парситися без issue
+- Виправлено втрату 53 записів при наступному `build_tth_database`
+
+**Не змінюється:**
+- ❌ `tank_slots_full.json` (17.08.2026) — оновлюється тільки через `admin_build_generator._persist_client_tank_data` при AI build generation. Для повного оновлення потрібен shared `_slots_and_crew_from_client` refactor (наступний коміт, окрема задача)
+- ❌ `tank_slots_db.json` — orphan-файл (22.05.2026), ніким не використовується, не в bundle critical files
+- ❌ `game_entities_english.json` (17.08.2026) — static fallback (read-only seed для першого запуску)
+
+---
+
 ## Admin v1.0.41: _check_tank_prompt_match merged local+RTDB prompts (02.09.2026)
 
 **Проблема (Bug 6, #1692):** `admin_app._check_tank_prompt_match` (admin_app.py:1348) викликав `load_prompts()` (admin_build_generator.py:111), яка читала **тільки локальний** `prompts_cache.json` (995 записів). Після admin rebuild + backfill (v1.0.8 #1537 — `save_prompt` гейт на `_upload_prompt` успіх), локальний файл відстає від RTDB. RTDB `prompts/tanks` має 1023+ промптів (admin._fill_progress показує `ok_count=122` з останнього запуску), але `check_prompt_tank_mismatch(tank_db=1023, prompts=995)` повертає `tanks_only=[13]` → картка «Танки/Промпти» червона, лог `[ПОМИЛКА] Невідповідність резервуарів/підказок: 1023 tanks vs 1010 prompts` друкується при КОЖНОМУ рестарті admin.

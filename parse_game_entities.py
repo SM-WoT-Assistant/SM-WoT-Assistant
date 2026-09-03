@@ -506,12 +506,28 @@ class GameEntitiesExtractor:
         """Парсить field_modifications.xml і повертає список унікальних imgName.
 
         Використовує decoded XML з extracted_data/common/post_progression/.
-        Повертає [] при помилці."""
+        Повертає [] при помилці.
+
+        Client v.2.4.0.0 #930 (02.09.2026) #1692 follow-up: this file is
+        now BigWorld binary (EN\xa1b) because extract_metadata writes raw
+        bytes from scripts.pkg. ET.parse fails on the binary header. Fix:
+        detect binary and decode in place via WotXmlParser (same pattern as
+        _parse_tth_from_vehicle_xml in tank_extractor).
+        """
         xml_path = self.project_root / "extracted_data" / "common" / "post_progression" / "field_modifications.xml"
         if not xml_path.exists():
             return []
 
         try:
+            # Bug 3.z.C (02.09.2026): detect binary, decode before parse
+            try:
+                with open(str(xml_path), "rb") as f:
+                    head = f.read(4)
+                if head[:2] in (b"\x62\xa1", b"EN") or head == b"\x62\xa1\x4e\x45":
+                    from decode_xml import WotXmlParser
+                    WotXmlParser().decode_file(str(xml_path), str(xml_path))
+            except Exception:
+                pass
             import xml.etree.ElementTree as ET
             tree = ET.parse(str(xml_path))
             root = tree.getroot()
