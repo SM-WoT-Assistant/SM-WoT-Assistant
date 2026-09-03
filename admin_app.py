@@ -28,7 +28,7 @@ from admin_build_generator import (
     load_tank_db, load_prompts, load_prompts_merged, _create_driver,
     _put_json, _get_json, _rtdb_url,
     _update_pending_status, check_wg_tanks_version,
-    _WG_API_URL, _is_build_complete,
+    _WG_API_URL, _is_build_complete, save_prompt,
     check_wg_game_version, snapshot_manifest, update_manifest_for_tags,
     update_manifest_failures, exclude_failed_tags, scan_incomplete_builds,
     check_prompt_tank_mismatch,
@@ -69,6 +69,7 @@ _TR_EN = {
     "card_last_scan": "Last Scan",
     "card_total_raw": "Tanks (raw)",
     "card_total_db": "Tanks (db)",
+    "card_errors": "Errors",
     "btn_scan": "Scan Now",
     "btn_gen_queue": "Generate Queue",
     "btn_gen_popular": "Generate Popular",
@@ -952,6 +953,9 @@ class AdminApp:
         self._check_tank_prompt_match()
         self._last_heartbeat = 0.0
         self._last_cleanup = 0.0
+        self._last_sweep = 0.0
+        self._last_errors_poll = 0.0
+        self._errors_count = 0
         self._last_sweep = -86280.0  # first fill sweep ~120s after start, then every 24h
         threading.Thread(target=self._report_admin_status,
                          kwargs={"status": "idle"}, daemon=True).start()
@@ -966,6 +970,17 @@ class AdminApp:
                 _put_json(_rtdb_url("admin_app/status"), status)
             _put_json(_rtdb_url("admin_app/version"), _read_admin_version())
             _put_json(_rtdb_url("admin_app/last_seen"), int(time.time()))
+        except Exception:
+            pass
+
+    def _poll_errors_count(self):
+        """Poll RTDB error_reports/ for current count and update card (02.09.2026 #1692)."""
+        try:
+            data = _get_json(_rtdb_url("error_reports"))
+            n = len(data) if isinstance(data, dict) else 0
+            if n != self._errors_count:
+                self._errors_count = n
+                self.root.after(0, self._update_cards)
         except Exception:
             pass
 
@@ -1243,6 +1258,7 @@ class AdminApp:
         self._card_queue = _card(left, "card_queue")
         self._card_last = _card(left, "card_last_scan")
         self._card_tp = _card(left, "card_tp")
+        self._card_errors = _card(left, "card_errors")
 
         # Right panel: buttons + log
         right = tk.Frame(content, bg=BG)
@@ -1383,26 +1399,86 @@ class AdminApp:
                                  fg=RED if mismatch else GREEN)
         except Exception:
             self._card_tp.config(text=f"{len(self.tank_db)} / {len(self.prompts)}", fg="#888")
+        # Errors count (02.09.2026 #1692): live count of error_reports/
+        self._card_errors.config(text=str(getattr(self, "_errors_count", 0)),
+                                 fg=RED if getattr(self, "_errors_count", 0) > 0 else "#888")
 
     def _check_tank_prompt_match(self):
-        """Лог-перевірка розбіжності Танків/Промптів: [ERROR] з конкретними
-        тегами при розбіжності, звичайний рядок при співпадінні (#1604)."""
-        # Bug 6 (02.09.2026 #1692): use load_prompts_merged (local + RTDB) so
-        # the count reflects ground truth. With pure local file, the card
-        # stayed red (1023 vs 1010) even though RTDB has 1023+ prompts —
-        # admin.log:15:18:39 [ПОМИЛКА] 'Невідповідність резервуарів/підказок:
-        # 1023 tanks vs 1010 prompts'. RTDB merge has silent fallback to
-        # local on any network/parse failure.
+        """Log-check Tanks/Prompts mismatch with auto-heal (02.09.2026 #1692).
+
+        Self-healing pipeline (no user action required):
+          1. Load merged prompts (local + RTDB), commit 6d56ef4.
+          2. Cleanup: PUT null on RTDB prompts/tanks/{tag} for tags that are
+             in merged but NOT in tank_db OR are in _is_bad_tag (CFE/training
+             dummies — should never have been generated in the first place).
+          3. Auto-create: for tags in tank_db (after _is_bad_tag filter) but
+             NOT in merged, call generate_prompt_v2.generate_prompt() (LOCAL,
+             no Chrome) and upload to RTDB. Bumps prompts/version.
+          4. Reload merged + check_prompt_tank_mismatch.
+          5. report_fallback for each step (mismatch or cleanup/create counts).
+          6. _update_cards on the UI thread.
+        """
+        from admin_build_generator import _is_bad_tag, _upload_prompt, _update_prompts_version, _rtdb_url, _put_json
+        from generate_prompt_v2 import generate_prompt
+        from firebase_reporter import report_fallback
+
+        # 1. Load merged
+        self.prompts = load_prompts_merged()
+
+        # 2. Cleanup orphan / bad-tag prompts (PUT null on RTDB)
+        prompt_tags = set(self.prompts.keys())
+        db_tags = set(self.tank_db.keys())
+        orphans = {t for t in prompt_tags if (t not in db_tags) or _is_bad_tag(t)}
+        for tag in orphans:
+            try:
+                _put_json(_rtdb_url(f"prompts/tanks/{tag}"), None)
+            except Exception:
+                pass
+        if orphans:
+            _update_prompts_version()
+            report_fallback("admin_app.orphan_cleanup", "auto",
+                            f"Removed {len(orphans)} phantom prompts: {sorted(orphans)[:5]}{'...' if len(orphans) > 5 else ''}",
+                            level="info")
+            self._log(f"[CLEANUP] Removed {len(orphans)} phantom prompts")
+
+        # 3. Auto-create missing prompts (LOCAL, no Chrome)
+        self.prompts = load_prompts_merged()
+        prompt_tags = set(self.prompts.keys())
+        missing = {t for t in db_tags if t not in prompt_tags and not _is_bad_tag(t)}
+        for tag in missing:
+            name = self.tank_db[tag].get("name", tag)
+            try:
+                prompt = generate_prompt(tag, name)
+                if prompt and len(prompt) >= 50:
+                    save_prompt(tag, prompt)
+                    _upload_prompt(tag, prompt)
+            except Exception as e:
+                self._log(f"[AUTO-PROMPT] {tag}: {e}")
+        if missing:
+            _update_prompts_version()
+            report_fallback("admin_app.auto_prompts", "missing_tanks",
+                            f"Created {len(missing)} prompts: {sorted(missing)[:5]}{'...' if len(missing) > 5 else ''}",
+                            level="info")
+            self._log(f"[AUTO-PROMPT] Created {len(missing)} prompts for new tanks")
+
+        # 4. Reload merged
         self.prompts = load_prompts_merged()
         prompts_only, tanks_only = check_prompt_tank_mismatch(self.tank_db, self.prompts)
+
+        # 5. Report + log
         if prompts_only or tanks_only:
             self._log(self.t("log_tp_mismatch", tanks=len(self.tank_db), prompts=len(self.prompts)))
             for tag in prompts_only:
                 self._log(self.t("log_tp_orphan_prompt", tag=tag))
             for tag in tanks_only:
                 self._log(self.t("log_tp_orphan_tank", tag=tag))
+            report_fallback("admin_app.mismatch", "tank_prompt",
+                            f"tanks={len(self.tank_db)} prompts={len(self.prompts)} prompts_only={len(prompts_only)} tanks_only={len(tanks_only)}",
+                            level="error")
         else:
             self._log(self.t("log_tanks_prompts", tanks=len(self.tank_db), prompts=len(self.prompts)))
+
+        # 6. Update cards
         self.root.after(0, self._update_cards)
 
     # ── Community & Stats ──────────────────────────
@@ -3032,6 +3108,9 @@ class AdminApp:
                     if now - self._last_heartbeat > 60:
                         self._last_heartbeat = now
                         self._report_admin_status()
+                    if now - self._last_errors_poll > 30:  # 30s error_reports poll
+                        self._last_errors_poll = now
+                        self._poll_errors_count()
                     if now - self._last_cleanup > 86400:  # 24 h
                         self._last_cleanup = now
                         self._cleanup_old_error_reports()
