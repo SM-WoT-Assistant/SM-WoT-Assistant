@@ -44607,5 +44607,704 @@
       1
     ],
     "post_progression_tree": "role_HT_assault"
+  },
+  "A195_Gorilla": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner",
+      "loader",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "usa",
+    "equipment_slot_types": [
+      4,
+      1,
+      1
+    ],
+    "post_progression_tree": "A195_Gorilla"
+  },
+  "A197_Jezevec": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "usa",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_MT_support"
+  },
+  "Ch72_Yongshi": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "china",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_universal"
+  },
+  "F142_M47_Chevalier": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "france",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_MT_universal"
+  },
+  "GB151_Headshaker": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "uk",
+    "equipment_slot_types": [
+      4,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_ATSPG_universal"
+  },
+  "GB155_Pike": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "uk",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_assault"
+  },
+  "GB158_Executor": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "uk",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "GB158_Executor"
+  },
+  "It38_Donnola": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "italy",
+    "equipment_slot_types": [
+      3,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_LT_universal"
+  },
+  "It41_Cerbero": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "italy",
+    "equipment_slot_types": [
+      4,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_ATSPG_assault"
+  },
+  "It43_CAV_mod_71": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "italy",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "It43_CAV_mod_71"
+  },
+  "Pl38_63TP_Rycerski": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "poland",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_universal"
+  },
+  "Pl39_Husarz": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "poland",
+    "equipment_slot_types": [
+      4,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_ATSPG_assault"
+  },
+  "Pl40_Krazownik": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "poland",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_assault"
+  },
+  "Pl44_Kolczatka": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "poland",
+    "equipment_slot_types": [
+      4,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_ATSPG_sniper"
+  },
+  "R233_NK_1": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner",
+      "loader",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "ussr",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_break"
+  },
+  "R234_T_13": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "ussr",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_break"
+  },
+  "R236_Object_265_II": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "ussr",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_assault"
+  },
+  "R239_Object_Veles": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "ussr",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_assault"
+  },
+  "S37_Ambassador": {
+    "crew_roles": [
+      "commander",
+      "gunner",
+      "driver",
+      "loader"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "sweden",
+    "equipment_slot_types": [
+      5,
+      1,
+      1
+    ],
+    "post_progression_tree": "role_HT_support"
+  },
+  "S41_BV_111": {
+    "crew_roles": [
+      "commander",
+      "driver",
+      "gunner"
+    ],
+    "equipment_slots": 3,
+    "consumable_slots": [
+      "6",
+      "6",
+      "6",
+      "7",
+      "8",
+      "8",
+      "8"
+    ],
+    "available_equipment": [
+      "additionalInvisibilityDevice",
+      "camouflageNet",
+      "deluxeAdditionalInvisibilityDevice",
+      "deluxeCamouflageNet",
+      "trophyBasicAdditionalInvisibilityDevice",
+      "trophyUpgradedAdditionalInvisibilityDevice"
+    ],
+    "has_post_progression": true,
+    "field_mods": [],
+    "nation": "sweden",
+    "equipment_slot_types": [
+      2,
+      1,
+      1
+    ],
+    "post_progression_tree": "S41_BV_111"
   }
 }
