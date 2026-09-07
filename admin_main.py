@@ -59,30 +59,55 @@ def _find_icon_path() -> str:
     return ""
 
 
-def _set_window_icon(hwnd: int, ico_path: str) -> bool:
-    if not hwnd or not ico_path or not os.path.isfile(ico_path):
+def _configure_window(hwnd: int, ico_path: str) -> bool:
+    """Set window icon + WS_EX_TOOLWINDOW (no taskbar) + fix focus."""
+    if not hwnd:
         return False
+    user32 = ctypes.windll.user32
     try:
-        user32 = ctypes.windll.user32
-        hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
-        if hicon:
-            user32.SendMessageW(hwnd, 0x0080, 0, hicon)
-            user32.SendMessageW(hwnd, 0x0080, 1, hicon)
-            print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
-            return True
-        print("[ADMIN] LoadImageW failed for icon")
+        exstyle = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
+        new_exstyle = (exstyle | WS_EX_TOOLWINDOW) & ~WS_EX_NOACTIVATEAPP & ~WS_EX_APPWINDOW
+        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_exstyle)
+        print(f"[ADMIN] WS_EX_TOOLWINDOW set (no taskbar icon)")
     except Exception as e:
-        print(f"[ADMIN] Icon set failed: {e}")
-    return False
+        print(f"[ADMIN] SetWindowLongW failed: {e}")
+    if ico_path and os.path.isfile(ico_path):
+        try:
+            hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
+            if hicon:
+                user32.SendMessageW(hwnd, 0x0080, 0, hicon)
+                user32.SendMessageW(hwnd, 0x0080, 1, hicon)
+                print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
+        except Exception as e:
+            print(f"[ADMIN] Icon set failed: {e}")
+    try:
+        user32.SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
+                            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
+    except Exception:
+        pass
+    return True
+
+
+GWL_EXSTYLE = -20
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_NOACTIVATEAPP = 0x08000000
+WS_EX_APPWINDOW = 0x00040000
+HWND_TOP = 0
+SWP_NOMOVE = 0x0002
+SWP_NOSIZE = 0x0001
+SWP_SHOWWINDOW = 0x0040
 
 
 def _get_webview_hwnd() -> int:
     try:
         import webview as wv
         if wv.windows:
-            handle = getattr(wv.windows[0], "native_handle", None)
-            if handle:
-                return int(handle)
+            w = wv.windows[0]
+            native = getattr(w, "native", None)
+            if native is not None:
+                handle = getattr(native, "Handle", None)
+                if handle is not None:
+                    return int(handle.ToInt32())
     except Exception:
         pass
     try:
@@ -171,15 +196,16 @@ def main():
             )
             print("[ADMIN] Starting webview GUI...")
             ico_path = _find_icon_path()
-            def _set_icon_delayed():
+            def _configure_window_delayed():
                 for _ in range(30):
                     time.sleep(0.5)
                     hwnd = _get_webview_hwnd()
                     if hwnd:
-                        _set_window_icon(hwnd, ico_path)
+                        _configure_window(hwnd, ico_path)
                         return
+                print("[ADMIN] Could not find webview HWND after 15s")
             if ico_path:
-                threading.Thread(target=_set_icon_delayed, daemon=True).start()
+                threading.Thread(target=_configure_window_delayed, daemon=True).start()
             else:
                 print("[ADMIN] admin_icon.ico not found")
             webview.start()
