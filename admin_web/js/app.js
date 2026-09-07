@@ -186,18 +186,23 @@ async function refreshBuildsCard() {
   setText('stat-tanks-db', tanks && tanks.count !== undefined ? tanks.count : '\u2014');
   setText('stat-builds', builds && builds.count !== undefined ? builds.count : '\u2014');
   setText('stat-prompts', prompts ? Object.keys(prompts).length : '\u2014');
-  setText('stat-queue', (builds && builds.queue !== undefined) ? builds.queue : '0');
+  setText('stat-queue', builds && builds.queue !== undefined ? builds.queue : '\u2014');
   setText('stat-errors', errs ? (Array.isArray(errs) ? errs.length : errs.count || 0) : '0');
 }
 
 async function refreshCommunity() {
   const tiles = await apiGet('/api/community');
   if (tiles) {
-    setText('stat-yt', tiles.youtube && tiles.youtube.views);
-    setText('stat-rd', tiles.reddit && tiles.reddit.karma);
-    setText('stat-gh', tiles.github && tiles.github.downloads);
-    setText('stat-kofi', tiles.kofi && tiles.kofi.donations);
-    setText('stat-patreon', tiles.patreon && tiles.patreon.patrons);
+    const yt = tiles.youtube || {};
+    const rd = tiles.reddit || {};
+    const gh = tiles.github || {};
+    const kf = tiles.kofi || {};
+    const pt = tiles.patreon || {};
+    setText('stat-yt', yt.ok === false ? '\u2014' : (yt.views || '\u2014'));
+    setText('stat-rd', rd.ok === false ? '\u2014' : (rd.karma || '\u2014'));
+    setText('stat-gh', gh.ok === false ? '\u2014' : (gh.downloads || '\u2014'));
+    setText('stat-kofi', kf.ok === false ? '\u2014' : (kf.donations || kf.total || '\u2014'));
+    setText('stat-patreon', pt.ok === false ? '\u2014' : (pt.patrons || '\u2014'));
   } else {
     ['stat-yt', 'stat-rd', 'stat-gh', 'stat-kofi', 'stat-patreon'].forEach(id => setText(id, '\u2014'));
   }
@@ -227,11 +232,12 @@ async function refreshBuilds() {
   tbody.innerHTML = '<tr><td colspan="3" class="muted">' + dict.loading + '</td></tr>';
   const builds = await apiGet('/api/builds') || {};
   const prompts = await apiGet('/api/prompts') || {};
-  const buildKeys = builds.data ? Object.keys(builds.data) : Object.keys(builds);
-  const rows = buildKeys.map(tag => {
-    const isComplete = prompts[tag] || (prompts.data && prompts.data[tag]);
-    const statusKey = isComplete ? 'complete_st' : 'no_prompt_st';
-    const statusCls = isComplete ? 'success' : 'warn';
+  const buildTags = builds.tags || Object.keys(builds.builds_data || builds);
+  const promptKeys = Object.keys(prompts);
+  const rows = buildTags.map(tag => {
+    const hasPrompt = promptKeys.includes(tag);
+    const statusKey = hasPrompt ? 'complete_st' : 'no_prompt_st';
+    const statusCls = hasPrompt ? 'success' : 'warn';
     return '<tr><td>' + escapeHtml(tag) + '</td><td><span class="' + statusCls + '">' + escapeHtml(dict[statusKey]) + '</span></td><td>\u2014</td></tr>';
   });
   tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="3" class="muted">' + dict.no_data + '</td></tr>';
@@ -261,7 +267,7 @@ async function refreshErrors() {
   const errs = await apiGet('/api/errors') || [];
   const list = Array.isArray(errs) ? errs : (errs.data || []);
   const rows = list.map(e => {
-    return '<tr><td>' + escapeHtml(e.type || '') + '</td><td>' + escapeHtml(e.stage || '') + '</td><td>' + escapeHtml((e.error_text || '').substring(0, 80)) + '</td><td>' + escapeHtml(e.timestamp || '') + '</td></tr>';
+    return '<tr><td>' + escapeHtml(e.type || '') + '</td><td>' + escapeHtml(e.stage || '') + '</td><td>' + escapeHtml((e.error || '').substring(0, 120)) + '</td><td>' + escapeHtml((e.time || '').substring(0, 19)) + '</td></tr>';
   });
   tbody.innerHTML = rows.length ? rows.join('') : '<tr><td colspan="4" class="muted">' + dict.no_errors + '</td></tr>';
 }
@@ -355,45 +361,50 @@ async function loadDrilldownData(key) {
   let rows = [];
   let headers = [dict.tag];
 
-  if (key === 'tanks-db' || key === 'builds' || key === 'prompts' || key === 'queue') {
-    const prompts = await apiGet('/api/prompts') || {};
+  if (key === 'tanks-db') {
+    const tanks = await apiGet('/api/tanks') || {};
+    const tags = tanks.tags || Object.keys(tanks);
+    rows = tags.map(tag => ({ tag: tag }));
+    headers = [dict.tag];
+  } else if (key === 'builds') {
     const builds = await apiGet('/api/builds') || {};
-    const promptsData = prompts.data || prompts;
-    const buildsData = builds.data || builds;
-
-    if (key === 'builds') {
-      rows = Object.keys(buildsData).map(tag => ({
-        tag: tag,
-        status: promptsData[tag] ? dict.complete_st : dict.no_prompt_st
-      }));
-      headers = [dict.tag, dict.status_col];
-    } else if (key === 'prompts') {
-      rows = Object.entries(promptsData).map(([tag, txt]) => ({
-        tag: tag,
-        preview: String(txt).substring(0, 60)
-      }));
-      headers = [dict.tag, dict.preview];
-    } else if (key === 'queue') {
-      rows = [];
-      headers = [dict.tag];
-    } else {
-      rows = Object.keys(promptsData).map(tag => ({ tag: tag }));
-      headers = [dict.tag];
-    }
+    const prompts = await apiGet('/api/prompts') || {};
+    const buildTags = builds.tags || Object.keys(builds.builds_data || builds);
+    const promptKeys = Object.keys(prompts);
+    rows = buildTags.map(tag => ({
+      tag: tag,
+      status: promptKeys.includes(tag) ? dict.complete_st : dict.no_prompt_st
+    }));
+    headers = [dict.tag, dict.status_col];
+  } else if (key === 'prompts') {
+    const prompts = await apiGet('/api/prompts') || {};
+    const entries = Object.entries(prompts);
+    rows = entries.slice(0, 500).map(([tag, txt]) => ({
+      tag: tag,
+      preview: String(txt).substring(0, 60)
+    }));
+    headers = [dict.tag, dict.preview];
+  } else if (key === 'queue') {
+    const builds = await apiGet('/api/builds') || {};
+    const missing = builds.missing_tags || [];
+    rows = missing.map(tag => ({ tag: tag }));
+    headers = [dict.tag];
   } else if (key === 'errors') {
     const errs = await apiGet('/api/errors') || [];
     const list = Array.isArray(errs) ? errs : (errs.data || []);
     rows = list.map(e => ({
+      time: (e.time || '').substring(0, 19),
       type: e.type || '',
       stage: e.stage || '',
-      text: (e.error_text || '').substring(0, 60)
+      error: (e.error || '').substring(0, 80)
     }));
-    headers = [dict.type, dict.stage, dict.text];
+    headers = [dict.time, dict.type, dict.stage, dict.error];
   } else if (key.startsWith('community-')) {
     const platform = key.replace('community-', '');
     const tiles = await apiGet('/api/community') || {};
     const data = tiles[platform] || {};
-    rows = Object.entries(data).map(([k, v]) => ({ key: k, value: String(v) }));
+    const detail = data.ok === false ? [{key: 'status', value: data.error || 'unavailable'}] : Object.entries(data).map(([k, v]) => ({ key: k, value: String(v) }));
+    rows = detail;
     headers = ['Key', 'Value'];
   }
 

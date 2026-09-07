@@ -188,11 +188,23 @@ def _create_flask_app():
     @flask_app.route("/api/builds")
     def api_builds():
         if _APP is None:
-            return jsonify({})
+            return jsonify({"count": 0, "tags": [], "queue": 0})
         try:
-            return jsonify(_APP.get_builds() or {})
+            builds = _APP.get_builds() or {}
+            prompts_data = {}
+            try:
+                from admin_backend.prompts import load_prompts_merged
+                prompts_data = load_prompts_merged() or {}
+            except Exception:
+                pass
+            build_tags = set(builds.get("tags", []))
+            prompt_tags = set(prompts_data.keys())
+            missing = build_tags - prompt_tags
+            builds["queue"] = len(missing)
+            builds["missing_tags"] = sorted(missing)[:100]
+            return jsonify(builds)
         except Exception:
-            return jsonify({})
+            return jsonify({"count": 0, "tags": [], "queue": 0})
 
     @flask_app.route("/api/settings", methods=["GET", "POST"])
     def api_settings():
@@ -236,8 +248,12 @@ def _create_flask_app():
 
     @flask_app.route("/api/errors")
     def api_errors():
-        # Stub: real impl reads RTDB error_reports/ with admin_auth token
-        return jsonify([])
+        if _APP is None:
+            return jsonify([])
+        try:
+            return jsonify(_APP.get_errors() or [])
+        except Exception:
+            return jsonify([])
 
     @flask_app.route("/api/queue")
     def api_queue():
