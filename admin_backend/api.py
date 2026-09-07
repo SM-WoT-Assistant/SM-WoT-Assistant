@@ -52,7 +52,7 @@ def get_app():
 def _create_flask_app():
     if not _HAS_FLASK:
         raise RuntimeError("Flask is not installed. Run: pip install flask flask-cors")
-    flask_app = Flask(__name__, static_folder=os.path.join(_bundle_dir(), "admin_web"), static_url_path="")
+    flask_app = Flask(__name__, static_folder=_bundle_dir(), static_url_path="")
     CORS(flask_app)
 
     @flask_app.route("/")

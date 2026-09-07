@@ -68,17 +68,28 @@ def main():
     api_thread = run_api_threaded(port=args.port)
     print(f"[ADMIN] API listening on http://127.0.0.1:{args.port}/")
 
-    # Start webview
+    # Wait for Flask to start listening (avoid race with webview)
+    import socket
+    for _ in range(50):
+        try:
+            with socket.create_connection(("127.0.0.1", args.port), timeout=0.1):
+                break
+        except OSError:
+            time.sleep(0.1)
+    print(f"[ADMIN] Flask API ready on 127.0.0.1:{args.port}")
+
+    # Start webview (create_window + start blocks main thread on GUI event loop)
     if not args.no_webview:
         try:
             import webview
-            def open_window():
-                webview.create_window(
-                    "SM WoT Assistant Admin",
-                    f"http://127.0.0.1:{args.port}/",
-                    width=1100, height=700,
-                )
-            threading.Thread(target=open_window, daemon=True).start()
+            webview.create_window(
+                "SM WoT Assistant Admin",
+                f"http://127.0.0.1:{args.port}/",
+                width=1100, height=700,
+            )
+            print("[ADMIN] Starting webview GUI...")
+            webview.start()  # BLOCKS until window is closed
+            print("[ADMIN] webview closed")
         except ImportError:
             print("[ADMIN] pywebview not available, skipping GUI")
 
