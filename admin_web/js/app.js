@@ -17,9 +17,7 @@ document.querySelectorAll(".tabs .tab").forEach(btn => {
 function onTabActivated(tab) {
   if (tab === "builds") refreshBuilds();
   if (tab === "prompts") refreshPrompts();
-  if (tab === "community") refreshCommunity();
   if (tab === "errors") refreshErrors();
-  if (tab === "settings") refreshSettings();
 }
 
 // --- API helpers ---
@@ -39,6 +37,16 @@ async function apiPost(path) {
 }
 
 // --- Overview ---
+async function refreshCommunity() {
+  const tiles = await apiGet("/api/community") || {};
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val || "\u2014"; };
+  set("stat-yt", tiles.youtube && tiles.youtube.views);
+  set("stat-rd", tiles.reddit && tiles.reddit.karma);
+  set("stat-gh", tiles.github && tiles.github.downloads);
+  set("stat-kofi", tiles.kofi && tiles.kofi.donations);
+  set("stat-patreon", tiles.patreon && tiles.patreon.patrons);
+}
+
 async function refreshOverview() {
   const status = await apiGet("/api/status");
   if (status) {
@@ -160,13 +168,7 @@ async function refreshErrors() {
 }
 
 // --- Settings ---
-async function refreshSettings() {
-  const s = await apiGet("/api/settings") || {};
-  document.getElementById("setting-wot-path").value = s.wot_path || "";
-  document.getElementById("setting-launch-on-game-start").checked = !!s.launch_on_game_start;
-  document.getElementById("setting-close-with-game").checked = !!s.close_with_game;
-  document.getElementById("setting-sync-schemes-with-mode").checked = !!s.sync_schemes_with_mode;
-}
+/* old refreshSettings removed - replaced by loadSettings dialog */
 document.getElementById("settings-form").addEventListener("submit", async (e) => {
   e.preventDefault();
   const data = {
@@ -178,6 +180,39 @@ document.getElementById("settings-form").addEventListener("submit", async (e) =>
   await apiPost("/api/settings", data);
   alert("Settings saved");
 });
+
+
+// --- Settings dialog ---
+async function loadSettings() {
+  const s = await apiGet("/api/settings") || {};
+  document.getElementById("set-wot-path").value = s.wot_path || "";
+  document.getElementById("set-launch-windows").checked = !!s.launch_with_windows;
+  document.getElementById("set-sync-schemes").checked = !!s.sync_schemes_with_mode;
+  document.getElementById("set-lang").value = s.language || "uk";
+}
+
+document.getElementById("settings-btn").addEventListener("click", async () => {
+  await loadSettings();
+  document.getElementById("settings-modal").showModal();
+});
+document.getElementById("settings-cancel").addEventListener("click", () => {
+  document.getElementById("settings-modal").close();
+});
+document.getElementById("settings-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const payload = {
+    wot_path: document.getElementById("set-wot-path").value,
+    launch_with_windows: document.getElementById("set-launch-windows").checked,
+    sync_schemes_with_mode: document.getElementById("set-sync-schemes").checked,
+    language: document.getElementById("set-lang").value,
+  };
+  await apiPost("/api/settings", payload);
+  document.getElementById("settings-modal").close();
+  alert("Settings saved");
+});
+
+// Community refresh button
+document.getElementById("btn-refresh-community").addEventListener("click", refreshCommunity);
 
 // --- Drilldown (stat click) ---
 document.querySelectorAll(".stat[data-detail]").forEach(stat => {
@@ -220,9 +255,12 @@ async function loadDrilldownData(key) {
     const errs = await apiGet("/api/errors") || [];
     rows = errs.map(e => ({ type: e.type, stage: e.stage, text: (e.error_text || "").substring(0, 60) }));
     headers = ["Type", "Stage", "Text"];
-  } else if (key === "youtube" || key === "reddit" || key === "github" || key === "kofi" || key === "patreon") {
-    rows = [{ value: "—", source: key }];
-    headers = ["Value", "Source"];
+  } else if (key.startsWith("community-")) {
+    const platform = key.replace("community-", "");
+    const tiles = await apiGet("/api/community") || {};
+    const data = tiles[platform] || {};
+    rows = Object.entries(data).map(([k, v]) => ({ key: k, value: String(v) }));
+    headers = ["Key", "Value"];
   }
   thead.innerHTML = "<tr>" + headers.map(h => `<th>${h}</th>`).join("") + "</tr>";
   tbody.innerHTML = rows.length ? rows.map(r =>

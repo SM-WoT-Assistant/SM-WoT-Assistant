@@ -11,6 +11,7 @@
     <nav>
       <span id="status">Status: <span id="status-value">—</span></span>
       <span id="version">v<span id="version-value">—</span></span>
+      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
     </nav>
   </header>
 
@@ -18,13 +19,10 @@
     <button class="tab active" data-tab="overview">Overview</button>
     <button class="tab" data-tab="builds">Builds</button>
     <button class="tab" data-tab="prompts">Prompts</button>
-    <button class="tab" data-tab="community">Community</button>
     <button class="tab" data-tab="errors">Errors</button>
-    <button class="tab" data-tab="settings">Settings</button>
   </nav>
 
   <main>
-    <!-- Overview tab -->
     <section class="tab-content active" id="tab-overview">
       <div class="card">
         <h2>📊 Build status</h2>
@@ -59,6 +57,35 @@
       </div>
 
       <div class="card">
+        <h2>🌐 Community</h2>
+        <div class="row">
+          <div class="stat" data-detail="community-youtube">
+            <div class="num" id="stat-yt">—</div>
+            <div class="label">YouTube views</div>
+          </div>
+          <div class="stat" data-detail="community-reddit">
+            <div class="num" id="stat-rd">—</div>
+            <div class="label">Reddit karma</div>
+          </div>
+          <div class="stat" data-detail="community-github">
+            <div class="num" id="stat-gh">—</div>
+            <div class="label">GH downloads</div>
+          </div>
+          <div class="stat" data-detail="community-kofi">
+            <div class="num" id="stat-kofi">—</div>
+            <div class="label">Ko-fi</div>
+          </div>
+          <div class="stat" data-detail="community-patreon">
+            <div class="num" id="stat-patreon">—</div>
+            <div class="label">Patreon</div>
+          </div>
+        </div>
+        <div class="actions">
+          <button id="btn-refresh-community">Refresh</button>
+        </div>
+      </div>
+
+      <div class="card">
         <h2>📜 Log (last 100 lines)</h2>
         <pre id="log-view">—</pre>
         <div class="actions">
@@ -68,7 +95,6 @@
       </div>
     </section>
 
-    <!-- Builds tab -->
     <section class="tab-content" id="tab-builds">
       <div class="card">
         <h2>🔧 Builds</h2>
@@ -89,7 +115,6 @@
       </div>
     </section>
 
-    <!-- Prompts tab -->
     <section class="tab-content" id="tab-prompts">
       <div class="card">
         <h2>📝 Prompts</h2>
@@ -105,24 +130,6 @@
       </div>
     </section>
 
-    <!-- Community tab -->
-    <section class="tab-content" id="tab-community">
-      <div class="card">
-        <h2>🌐 Community stats</h2>
-        <div class="row">
-          <div class="stat" data-detail="youtube"><div class="num" id="stat-yt">—</div><div class="label">YouTube views</div></div>
-          <div class="stat" data-detail="reddit"><div class="num" id="stat-rd">—</div><div class="label">Reddit karma</div></div>
-          <div class="stat" data-detail="github"><div class="num" id="stat-gh">—</div><div class="label">GH downloads</div></div>
-          <div class="stat" data-detail="kofi"><div class="num" id="stat-kofi">—</div><div class="label">Ko-fi donations</div></div>
-          <div class="stat" data-detail="patreon"><div class="num" id="stat-patreon">—</div><div class="label">Patreon patrons</div></div>
-        </div>
-        <div class="actions">
-          <button id="btn-refresh-community">Refresh</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Errors tab -->
     <section class="tab-content" id="tab-errors">
       <div class="card">
         <h2>❌ Recent errors (last 50)</h2>
@@ -134,37 +141,8 @@
         </div>
       </div>
     </section>
-
-    <!-- Settings tab -->
-    <section class="tab-content" id="tab-settings">
-      <div class="card">
-        <h2>⚙️ Settings</h2>
-        <form id="settings-form">
-          <label>
-            WoT path:
-            <input type="text" id="setting-wot-path" />
-          </label>
-          <label>
-            <input type="checkbox" id="setting-launch-on-game-start" />
-            Launch on game start (tray_watcher autostart)
-          </label>
-          <label>
-            <input type="checkbox" id="setting-close-with-game" />
-            Close with game (tray_watcher kills on WoT exit)
-          </label>
-          <label>
-            <input type="checkbox" id="setting-sync-schemes-with-mode" />
-            Sync schemes with battle mode
-          </label>
-          <div class="actions">
-            <button type="submit" class="primary">Save</button>
-          </div>
-        </form>
-      </div>
-    </section>
   </main>
 
-  <!-- Drilldown modal (generic) -->
   <dialog id="drilldown-modal">
     <h3 id="drilldown-title">—</h3>
     <input type="text" id="drilldown-search" placeholder="Search..." />
@@ -176,6 +154,35 @@
     </div>
     <div id="drilldown-status">0 / 0</div>
     <button id="drilldown-close">Close</button>
+  </dialog>
+
+  <dialog id="settings-modal">
+    <h3>⚙️ Settings</h3>
+    <form id="settings-form">
+      <label>
+        WoT path:
+        <input type="text" id="set-wot-path" />
+      </label>
+      <label class="check">
+        <input type="checkbox" id="set-launch-windows" />
+        Start with Windows (autostart via HKCU\Run registry)
+      </label>
+      <label class="check">
+        <input type="checkbox" id="set-sync-schemes" />
+        Sync schemes with battle mode
+      </label>
+      <label>
+        Language:
+        <select id="set-lang">
+          <option value="uk">Українська</option>
+          <option value="en">English</option>
+        </select>
+      </label>
+      <div class="actions">
+        <button type="button" id="settings-cancel">Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
   </dialog>
 
   <script src="js/app.js"></script>

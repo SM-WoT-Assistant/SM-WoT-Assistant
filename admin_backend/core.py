@@ -88,6 +88,45 @@ class Application:
         """Signal all background threads to stop."""
         self._stop_event.set()
 
+
+    def save_settings(self):
+        """Save current settings to admin_settings.json in AppData."""
+        import json
+        appdata = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
+        path = os.path.join(appdata, "admin_settings.json")
+        try:
+            os.makedirs(appdata, exist_ok=True)
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(self.settings, f, ensure_ascii=False, indent=2)
+            self.log(f"Settings saved to {path}")
+            return True
+        except Exception as e:
+            self.log(f"Failed to save settings: {e}")
+            return False
+
+    def apply_launch_with_windows(self):
+        """Apply 'launch with Windows' setting to HKCU\Run registry."""
+        if not getattr(self, "settings", None):
+            return False
+        if not getattr(sys, "frozen", False):
+            return False  # only meaningful for frozen EXE
+        try:
+            import winreg
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            exe_path = sys.executable
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE) as key:
+                if self.settings.get("launch_with_windows"):
+                    winreg.SetValueEx(key, "SMWoTAssistantAdmin", 0, winreg.REG_SZ, f'""{exe_path}""')
+                else:
+                    try:
+                        winreg.DeleteValue(key, "SMWoTAssistantAdmin")
+                    except FileNotFoundError:
+                        pass
+            return True
+        except Exception as e:
+            self.log(f"Registry update failed: {e}")
+            return False
+
     def is_running(self) -> bool:
         return not self._stop_event.is_set()
 
