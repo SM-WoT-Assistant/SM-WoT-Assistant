@@ -555,21 +555,26 @@ class WotAssistantHQ:
         from firebase_reporter import report_error
 
         # ── Фаза 0: Bundle Integrity ──────────────────────────────
+        # Search chain: BUNDLE_DIR (frozen/_MEIPASS) → CWD (dev) → BUNDLE_DIR/..
+        # (PyInstaller onedir launches from _internal/ subdir). Any hit counts as OK.
+        def _find_critical(rel_path):
+            for base in (config.BUNDLE_DIR, os.getcwd(), os.path.dirname(config.BUNDLE_DIR)):
+                p = os.path.join(base, rel_path)
+                if os.path.exists(p):
+                    return p
+            return None
+
         missing = []
         for fname in config.CRITICAL_BUNDLE_FILES:
-            fpath = os.path.join(config.BUNDLE_DIR, fname)
-            if not os.path.exists(fpath):
+            if not _find_critical(fname):
                 missing.append(fname)
         # Додатково: extracted_maps
-        maps_dir = os.path.join(config.BUNDLE_DIR, "extracted_maps")
-        map_data_path = os.path.join(maps_dir, "map_data.json")
-        map_dict_path = os.path.join(maps_dir, "map_dictionary.json")
-        if not os.path.exists(map_data_path):
+        if not _find_critical(os.path.join("extracted_maps", "map_data.json")):
             missing.append("extracted_maps/map_data.json")
-        if not os.path.exists(map_dict_path):
+        if not _find_critical(os.path.join("extracted_maps", "map_dictionary.json")):
             missing.append("extracted_maps/map_dictionary.json")
         if missing:
-            details = {"missing_files": missing}
+            details = {"missing_files": missing, "frozen": getattr(sys, 'frozen', False)}
             report_error("bundle_integrity", "startup",
                          f"Missing critical files: {', '.join(missing)}",
                          blocked=True, details=details)
@@ -578,6 +583,11 @@ class WotAssistantHQ:
                 "Файли програми пошкоджені. Зверніться в службу підтримки.\n\n"
                 f"Відсутні: {', '.join(missing[:5])}"
             )
+            # Exit only when frozen (production build). Dev mode can survive
+            # missing files (partial checkout, runtime extracted from a snapshot, etc.)
+            # by running with whatever files happen to be present.
+            if getattr(sys, 'frozen', False):
+                sys.exit(0)
 
         # ── Фаза 1: Seed popular_tanks з бандла ──────────────────
         seed_file = os.path.join(config.BUNDLE_DIR, "popular_tanks_seed.json")
