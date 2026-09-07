@@ -19,9 +19,10 @@
         table { width: 100%; border-collapse: collapse; }
         th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #222; font-size: 13px; }
         th { color: #aaa; font-weight: normal; background: #181818; }
-        .stat-box { display: inline-block; background: #222; padding: 16px 24px; border-radius: 8px; margin-right: 16px; margin-bottom: 12px; text-align: center; min-width: 110px; }
-        .stat-box .num { font-size: 28px; color: #ff4500; font-weight: bold; }
-        .stat-box .label { font-size: 11px; color: #888; margin-top: 4px; }
+        .stat-box { display: inline-block; background: #222; padding: 8px 12px; border-radius: 6px; margin-right: 8px; margin-bottom: 8px; text-align: center; min-width: 90px; cursor: pointer; transition: background 0.1s; }
+        .stat-box:hover { background: #2a2a2a; }
+        .stat-box .num { font-size: 18px; color: #ff4500; font-weight: bold; }
+        .stat-box .label { font-size: 10px; color: #888; margin-top: 2px; }
         .btn { background: #333; color: #ccc; border: none; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-size: 13px; }
         .btn:hover { background: #444; }
         .btn-danger { background: #553333; }
@@ -46,6 +47,20 @@
         #login-screen { text-align: center; padding: 60px; }
         #login-screen input { background: #222; color: #ccc; border: 1px solid #333; padding: 8px 12px; border-radius: 4px; font-size: 14px; margin: 6px; }
         #dashboard { display: none; }
+        #drilldownModal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 1000; align-items: center; justify-content: center; }
+        #drilldownModal.open { display: flex; }
+        #drilldownBox { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 16px; width: 720px; max-width: 90vw; max-height: 80vh; display: flex; flex-direction: column; }
+        #drilldownBox h3 { color: #ffaa00; margin: 0 0 8px 0; font-size: 14px; }
+        #drilldownControls { display: flex; gap: 8px; margin-bottom: 8px; }
+        #drilldownControls input, #drilldownControls select { background: #222; color: #ccc; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+        #drilldownSearch { flex: 1; }
+        #drilldownTableWrap { flex: 1; overflow: auto; border: 1px solid #222; border-radius: 4px; }
+        #drilldownTable { width: 100%; border-collapse: collapse; }
+        #drilldownTable th { position: sticky; top: 0; background: #181818; color: #aaa; padding: 6px 10px; font-size: 11px; text-align: left; font-weight: normal; border-bottom: 1px solid #333; }
+        #drilldownTable td { padding: 4px 10px; font-size: 11px; color: #ccc; border-bottom: 1px solid #1a1a1a; font-family: 'Consolas', monospace; }
+        #drilldownTable tr:hover { background: #222; }
+        #drilldownStatus { font-size: 10px; color: #888; margin-top: 6px; }
+        #drilldownClose { align-self: flex-end; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -244,6 +259,7 @@ function loadDashboard() {
         Notification.requestPermission();
     }
     _lastVisit = localStorage.getItem("admin_last_visit") || "2000-01-01T00:00:00Z";
+    setupDrilldowns();
     renderAdminSchemes();
     loadStats();
     loadErrors();
@@ -822,6 +838,22 @@ function _checkBuildsNew(ver) {
     return false;
 }
 
+function setupDrilldowns() {
+    // AI Builds stat-boxes: clickable -> drilldown modal
+    const map = [
+        { sel: '.stat-box:has(#builds-count)', key: 'builds', title: 'Tanks (builds) — RTDB builds/tanks' },
+        { sel: '.stat-box:has(#prompts-count)', key: 'prompts', title: 'Tanks (prompts) — RTDB prompts/tanks' },
+        { sel: '.stat-box:has(#queue-count)', key: 'prompts', title: 'Queue (not yet generated)' },
+        { sel: '.stat-box:has(#admin-version)', key: 'installations', title: 'Admin App installations' },
+    ];
+    map.forEach(({ sel, key, title }) => {
+        const el = document.querySelector(sel);
+        if (el) el.onclick = () => openDrilldown(key, title);
+    });
+    // Errors / Installations boxes rendered by loadErrors/loadInstallations
+    const errBox = document.querySelector('.stat-box:has(.label)');
+}
+
 function loadBuildsData() {
     // Builds version
     db.ref("builds/version").once("value").then(s => {
@@ -1024,7 +1056,127 @@ function pollPendingUpdates() {
 
 
 
+// Drilldown modal: stat-box click -> show modal with search + table
+const _drilldownState = { key: null, allRows: [] };
+
+function openDrilldown(key, title) {
+    const modal = document.getElementById('drilldownModal');
+    document.getElementById('drilldownTitle').textContent = title;
+    document.getElementById('drilldownSearch').value = '';
+    document.getElementById('drilldownFilter').value = 'all';
+    _drilldownState.key = key;
+    _drilldownState.allRows = [];
+    modal.classList.add('open');
+    _loadDrilldownData();
+}
+
+function closeDrilldown() {
+    document.getElementById('drilldownModal').classList.remove('open');
+}
+
+function _loadDrilldownData() {
+    const key = _drilldownState.key;
+    const filterEl = document.getElementById('drilldownFilter');
+    if (key === 'builds') {
+        filterEl.style.display = '';
+        db.ref('builds/tanks').once('value', snap => {
+            const rows = [];
+            snap.forEach(c => rows.push({ tag: c.key }));
+            _drilldownState.allRows = rows;
+            _renderDrilldown();
+        });
+    } else if (key === 'prompts') {
+        filterEl.style.display = '';
+        db.ref('prompts/tanks').once('value', snap => {
+            const rows = [];
+            snap.forEach(c => rows.push({ tag: c.key }));
+            _drilldownState.allRows = rows;
+            _renderDrilldown();
+        });
+    } else if (key === 'installations') {
+        filterEl.style.display = 'none';
+        db.ref('installations').once('value', snap => {
+            const rows = [];
+            snap.forEach(c => {
+                const v = c.val() || {};
+                rows.push({ tag: c.key, version: v.version || '—', last: v.last_seen || '—' });
+            });
+            _drilldownState.allRows = rows;
+            _renderDrilldown();
+        });
+    } else if (key === 'errors') {
+        filterEl.style.display = 'none';
+        db.ref('error_reports').orderByChild('timestamp').limitToLast(50).once('value', snap => {
+            const rows = [];
+            snap.forEach(c => {
+                const v = c.val() || {};
+                rows.push({ tag: c.key, type: v.type || '—', level: v.level || '—', text: (v.error_text || '').slice(0, 80) });
+            });
+            rows.reverse();
+            _drilldownState.allRows = rows;
+            _renderDrilldown();
+        });
+    } else {
+        _drilldownState.allRows = [];
+        _renderDrilldown();
+    }
+}
+
+function _renderDrilldown() {
+    const q = (document.getElementById('drilldownSearch').value || '').toLowerCase().trim();
+    const f = document.getElementById('drilldownFilter').value;
+    const rows = _drilldownState.allRows.filter(r => {
+        if (q && !Object.values(r).some(v => String(v).toLowerCase().includes(q))) return false;
+        if (f === 'missing-builds' && r.tag && r.built) return false;
+        if (f === 'has-builds' && r.tag && !r.built) return false;
+        return true;
+    });
+    const key = _drilldownState.key;
+    let headers, cols;
+    if (key === 'installations') { headers = ['UID', 'Version', 'Last seen']; cols = ['tag', 'version', 'last']; }
+    else if (key === 'errors') { headers = ['Key', 'Type', 'Level', 'Text']; cols = ['tag', 'type', 'level', 'text']; }
+    else { headers = ['Tag']; cols = ['tag']; }
+    const wrap = document.getElementById('drilldownTableWrap');
+    let html = '<table id="drilldownTable"><thead><tr>';
+    headers.forEach(h => html += `<th>${h}</th>`);
+    html += '</tr></thead><tbody>';
+    rows.forEach(r => {
+        html += '<tr>';
+        cols.forEach(c => html += `<td>${_esc(r[c] || '')}</td>`);
+        html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+    document.getElementById('drilldownStatus').textContent = `${rows.length} / ${_drilldownState.allRows.length}`;
+}
+
+function _esc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+document.getElementById('drilldownSearch').addEventListener('input', _renderDrilldown);
+document.getElementById('drilldownFilter').addEventListener('change', _renderDrilldown);
+document.getElementById('drilldownClose').addEventListener('click', closeDrilldown);
+document.getElementById('drilldownModal').addEventListener('click', (e) => {
+    if (e.target.id === 'drilldownModal') closeDrilldown();
+});
+
 </script>
+
+<div id="drilldownModal">
+    <div id="drilldownBox">
+        <h3 id="drilldownTitle">—</h3>
+        <div id="drilldownControls">
+            <input type="text" id="drilldownSearch" placeholder="Search...">
+            <select id="drilldownFilter">
+                <option value="all">All</option>
+            </select>
+        </div>
+        <div id="drilldownTableWrap"></div>
+        <div id="drilldownStatus">0 / 0</div>
+        <button class="btn" id="drilldownClose">Close</button>
+    </div>
+</div>
 
 </body>
 </html>
