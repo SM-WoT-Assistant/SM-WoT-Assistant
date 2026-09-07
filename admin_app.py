@@ -8,6 +8,7 @@ Usage:
 """
 import os, sys, json, time, re, threading, shutil, datetime, subprocess, tkinter as tk
 from tkinter import ttk, scrolledtext
+import config
 import ctypes
 from ctypes import wintypes
 import webbrowser
@@ -92,6 +93,15 @@ _TR_EN = {
     "log_tp_mismatch": "[ERROR] Tanks/Prompts mismatch: {tanks} tanks vs {prompts} prompts",
     "log_tp_orphan_prompt": "  prompt without tank: {tag}",
     "log_tp_orphan_tank": "  tank without prompt: {tag}",
+    "drill_search": "Search:",
+    "drill_filter_all": "All",
+    "drill_col_nation": "Nation",
+    "drill_detail_title": "Detail",
+    "drill_tanks_raw": "Tanks (raw) — XML files in extracted_data/",
+    "drill_tanks_db": "Tanks (db) — local tank database",
+    "drill_queue": "Queue — tanks awaiting build generation",
+    "drill_tanks_prompts": "Tanks (prompts) — local prompts cache",
+    "drill_errors": "Errors — last reported fallback events",
     "log_manifest_seeded": "Manifest seeded from dev copy",
     "log_manifest_baseline": "Manifest baseline created from scripts.pkg",
     "log_manifest_baseline_fail": "Manifest baseline failed: {err}",
@@ -1283,25 +1293,30 @@ class AdminApp:
         left = tk.Frame(content, bg=BG2, padx=12, pady=10)
         left.pack(side="left", fill="y", padx=(0, 8))
 
-        def _card(parent, key):
-            f = tk.Frame(parent, bg=BG2, bd=1, relief="solid", highlightbackground="#333")
-            lbl = tk.Label(f, text=self.t(key), font=("Segoe UI", 9), fg="#888", bg=BG2)
+        def _card(parent, key, drill_key=None):
+            f = tk.Frame(parent, bg=BG2, bd=1, relief="solid", highlightbackground="#333",
+                        cursor="hand2" if drill_key else "")
+            lbl = tk.Label(f, text=self.t(key), font=("Segoe UI", 8), fg="#888", bg=BG2)
             lbl.pack(anchor="w")
             self._tr_widgets.append((lbl, key))
-            v = tk.Label(f, text="—", font=("Segoe UI", 18, "bold"), fg=ACCENT, bg=BG2)
-            v.pack(anchor="w", pady=(2, 0))
-            f.pack(fill="x", pady=3)
+            v = tk.Label(f, text="—", font=("Segoe UI", 12, "bold"), fg=ACCENT, bg=BG2)
+            v.pack(anchor="w", pady=(1, 0))
+            f.pack(fill="x", pady=2)
+            if drill_key:
+                f.bind("<Button-1>", lambda e, dk=drill_key: self._show_stat_drilldown(dk))
+                v.bind("<Button-1>", lambda e, dk=drill_key: self._show_stat_drilldown(dk))
+                lbl.bind("<Button-1>", lambda e, dk=drill_key: self._show_stat_drilldown(dk))
             return v
 
         self._card_ver = _card(left, "card_admin_ver")
         self._card_wg = _card(left, "card_wg_ver")
         self._card_status = _card(left, "card_game_status")
-        self._card_total = _card(left, "card_total_raw")
-        self._card_db = _card(left, "card_total_db")
-        self._card_queue = _card(left, "card_queue")
+        self._card_total = _card(left, "card_total_raw", drill_key="tanks_raw")
+        self._card_db = _card(left, "card_total_db", drill_key="tanks_db")
+        self._card_queue = _card(left, "card_queue", drill_key="queue")
         self._card_last = _card(left, "card_last_scan")
-        self._card_tp = _card(left, "card_tp")
-        self._card_errors = _card(left, "card_errors")
+        self._card_tp = _card(left, "card_tp", drill_key="tanks_prompts")
+        self._card_errors = _card(left, "card_errors", drill_key="errors")
 
         # Right panel: buttons + log
         right = tk.Frame(content, bg=BG)
@@ -1354,6 +1369,176 @@ class AdminApp:
             m.tk_popup(event.x_root, event.y_root)
         finally:
             m.grab_release()
+
+    def _drilldown_data(self, key):
+        """Return (rows, title_key) for a given drilldown key, or (None, None)."""
+        if key == "tanks_raw":
+            base = os.path.join(config.BUNDLE_DIR if hasattr(config, "BUNDLE_DIR") else os.getcwd(), "extracted_data")
+            tags = []
+            if os.path.isdir(base):
+                for nation in os.listdir(base):
+                    nat_dir = os.path.join(base, nation)
+                    if not os.path.isdir(nat_dir):
+                        continue
+                    for f in os.listdir(nat_dir):
+                        if f.endswith(".xml") and not f.startswith("."):
+                            tag = f[:-4]
+                            tags.append((tag, nation))
+            return tags, "drill_tanks_raw"
+        if key == "tanks_db":
+            tb = getattr(self, "tank_db", None) or {}
+            rows = [(tag, (info.get("nation") if isinstance(info, dict) else "")) for tag, info in tb.items()]
+            return rows, "drill_tanks_db"
+        if key == "queue":
+            q = list(getattr(self, "_queue", []) or [])
+            return [(t, "") for t in q], "drill_queue"
+        if key == "tanks_prompts":
+            p = getattr(self, "prompts", None) or {}
+            return [(t, "") for t in p.keys()], "drill_tanks_prompts"
+        if key == "errors":
+            # Errors come from RTDB error_reports/ — fetch in background, return empty for now
+            return [], "drill_errors"
+        return None, None
+
+    def _show_stat_drilldown(self, key):
+        """Open Toplevel with search + filter + scroll + treeview for a stat card."""
+        rows, title_key = self._drilldown_data(key)
+        if rows is None:
+            return
+        dlg = tk.Toplevel(self.root)
+        dlg.title(self.t(title_key) if title_key in _TR_EN else key)
+        dlg.configure(bg=BG)
+        dlg.geometry("780x500")
+        dlg.minsize(500, 300)
+        dlg.transient(self.root)
+
+        # Top: search + filter
+        top = tk.Frame(dlg, bg=BG, padx=8, pady=6)
+        top.pack(fill="x")
+        tk.Label(top, text=self.t("drill_search"), bg=BG, fg=FG,
+                 font=("Segoe UI", 9)).pack(side="left", padx=(0, 4))
+        search_var = tk.StringVar()
+        ent = tk.Entry(top, textvariable=search_var, bg="#222", fg=FG, insertbackground=FG,
+                       font=("Segoe UI", 9), relief="flat", highlightthickness=1,
+                       highlightbackground="#444")
+        ent.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        # Nation filter (only if rows have a nation column)
+        has_nation = any(r[1] for r in rows)
+        filter_var = tk.StringVar(value=self.t("drill_filter_all"))
+        cb = None
+        if has_nation:
+            nations = sorted({(r[1] or "") for r in rows if r[1]})
+            cb = ttk.Combobox(top, textvariable=filter_var,
+                              values=[self.t("drill_filter_all")] + nations,
+                              state="readonly", width=12, font=("Segoe UI", 9))
+            cb.pack(side="left")
+
+        # Treeview with scrollbar
+        body = tk.Frame(dlg, bg=BG)
+        body.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        cols = ("tag", "nation") if has_nation else ("tag",)
+        tree = ttk.Treeview(body, columns=cols, show="headings", height=14)
+        tree.heading("tag", text="Tag")
+        tree.column("tag", width=200, anchor="w")
+        if has_nation:
+            tree.heading("nation", text=self.t("drill_col_nation"))
+            tree.column("nation", width=80, anchor="w")
+        sb = ttk.Scrollbar(body, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=sb.set)
+        sb.pack(side="right", fill="y")
+        tree.pack(side="left", fill="both", expand=True)
+
+        # Populate
+        all_rows = list(rows)
+        def _populate(filtered):
+            tree.delete(*tree.get_children())
+            for r in filtered:
+                tree.insert("", "end", values=r)
+        _populate(all_rows)
+
+        def _apply_filter(*_):
+            q = search_var.get().lower().strip()
+            nat = filter_var.get() if has_nation else self.t("drill_filter_all")
+            out = []
+            for tag, nation in all_rows:
+                if q and q not in tag.lower() and q not in (nation or "").lower():
+                    continue
+                if has_nation and nat != self.t("drill_filter_all") and nation != nat:
+                    continue
+                out.append((tag, nation))
+            _populate(out)
+        search_var.trace_add("write", _apply_filter)
+        if cb is not None:
+            cb.bind("<<ComboboxSelected>>", lambda e: _apply_filter())
+
+        # Status bar
+        status = tk.Label(dlg, text="", bg=BG, fg="#888",
+                          font=("Segoe UI", 8), anchor="w", padx=8)
+        status.pack(fill="x", side="bottom")
+        def _update_status():
+            n = len(tree.get_children())
+            total = len(all_rows)
+            status.config(text=f"{n} / {total}")
+        _update_status()
+        tree.bind("<<TreeviewSelect>>", lambda e: _update_status())
+        search_var.trace_add("write", lambda *_: _update_status())
+        if cb is not None:
+            cb.bind("<<ComboboxSelected>>", lambda e: _update_status())
+
+        # Detail on double-click
+        def _show_detail(_event=None):
+            sel = tree.selection()
+            if not sel:
+                return
+            tag = tree.item(sel[0])["values"][0]
+            self._show_tag_detail(tag, key)
+        tree.bind("<Double-1>", _show_detail)
+        ent.focus_set()
+
+    def _show_tag_detail(self, tag, source_key):
+        """Show a Toplevel with detail JSON for the selected tag."""
+        import json as _json
+        dlg = tk.Toplevel(self.root)
+        dlg.title(f"{tag} — {self.t('drill_detail_title')}")
+        dlg.configure(bg=BG)
+        dlg.geometry("640x420")
+        dlg.minsize(420, 280)
+        dlg.transient(self.root)
+        body = tk.Frame(dlg, bg=BG, padx=8, pady=8)
+        body.pack(fill="both", expand=True)
+        txt = scrolledtext.ScrolledText(body, bg="#111", fg="#ccc", insertbackground="#ccc",
+                                         font=("Consolas", 9), bd=0, wrap="word")
+        txt.pack(fill="both", expand=True)
+
+        data = None
+        if source_key == "tanks_raw":
+            fpath = os.path.join(os.getcwd(), "extracted_data")
+            for nation in os.listdir(fpath) if os.path.isdir(fpath) else []:
+                cand = os.path.join(fpath, nation, f"{tag}.xml")
+                if os.path.isfile(cand):
+                    try:
+                        with open(cand, "r", encoding="utf-8", errors="ignore") as f:
+                            data = {"file": cand, "content": f.read()[:4000]}
+                    except Exception as e:
+                        data = {"file": cand, "error": str(e)}
+                    break
+        elif source_key == "tanks_db":
+            data = (getattr(self, "tank_db", {}) or {}).get(tag)
+        elif source_key == "queue":
+            data = {"tag": tag, "in_queue": True}
+        elif source_key == "tanks_prompts":
+            data = (getattr(self, "prompts", {}) or {}).get(tag)
+        elif source_key == "errors":
+            data = {"tag": tag}
+
+        if data is None:
+            txt.insert("1.0", "(no data)")
+        else:
+            try:
+                txt.insert("1.0", _json.dumps(data, indent=2, ensure_ascii=False))
+            except Exception:
+                txt.insert("1.0", str(data))
 
     def _copy_log_selection(self):
         self._copy_selection(self.log_text)
