@@ -14,10 +14,6 @@ import threading
 import time
 
 SW_MAXIMIZE = 3
-SWP_NOMOVE = 0x0002
-SWP_NOSIZE = 0x0001
-SWP_SHOWWINDOW = 0x0040
-HWND_TOP = 0
 
 
 def _resolve_wot_path(cli_path: str = "") -> str:
@@ -61,17 +57,12 @@ def _find_icon_path() -> str:
 
 
 def _activate_window(hwnd: int) -> None:
-    """Maximize + foreground + show window."""
+    """Maximize + foreground. No SetWindowPos — it breaks maximized state."""
     if not hwnd:
         return
     user32 = ctypes.windll.user32
     try:
         user32.ShowWindow(hwnd, SW_MAXIMIZE)
-    except Exception:
-        pass
-    try:
-        user32.SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
-                            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
     except Exception:
         pass
     try:
