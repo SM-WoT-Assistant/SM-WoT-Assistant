@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="uk">
 <head>
   <meta charset="UTF-8">
@@ -7,145 +7,154 @@
 </head>
 <body>
   <header>
-    <h1>SM WoT <span>Assistant</span> — Admin</h1>
+    <h1>SM WoT <span>Assistant</span> &mdash; Admin</h1>
     <nav>
-      <span id="status">Status: <span id="status-value">—</span></span>
-      <span id="version">v<span id="version-value">—</span></span>
-      <button id="settings-btn" class="icon-btn" title="Settings">⚙</button>
+      <span id="status">Status: <span id="status-value">&mdash;</span></span>
+      <span id="version">v<span id="version-value">&mdash;</span></span>
+      <button id="settings-btn" class="icon-btn" title="Settings">&#x2699;</button>
     </nav>
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="overview">Overview</button>
-    <button class="tab" data-tab="builds">Builds</button>
-    <button class="tab" data-tab="prompts">Prompts</button>
-    <button class="tab" data-tab="errors">Errors</button>
+    <button class="tab active" data-tab="overview" data-i18n="overview">Overview</button>
+    <button class="tab" data-tab="builds" data-i18n="builds">Builds</button>
+    <button class="tab" data-tab="prompts" data-i18n="prompts">Prompts</button>
+    <button class="tab" data-tab="errors" data-i18n="errors">Errors</button>
   </nav>
 
   <main>
     <section class="tab-content active" id="tab-overview">
       <div class="card">
-        <h2>📊 Build status</h2>
+        <h2 data-i18n="build_status">Build status</h2>
         <div class="row">
           <div class="stat" data-detail="tanks-db">
-            <div class="num" id="stat-tanks-db">—</div>
-            <div class="label">Tanks (db)</div>
+            <div class="num" id="stat-tanks-db">&mdash;</div>
+            <div class="label" data-i18n="tanks_db">Tanks (DB)</div>
           </div>
           <div class="stat" data-detail="prompts">
-            <div class="num" id="stat-prompts">—</div>
-            <div class="label">Prompts</div>
+            <div class="num" id="stat-prompts">&mdash;</div>
+            <div class="label" data-i18n="prompts_count">Prompts</div>
           </div>
           <div class="stat" data-detail="builds">
-            <div class="num" id="stat-builds">—</div>
-            <div class="label">Builds</div>
+            <div class="num" id="stat-builds">&mdash;</div>
+            <div class="label" data-i18n="builds_count">Builds</div>
           </div>
           <div class="stat" data-detail="queue">
-            <div class="num" id="stat-queue">—</div>
-            <div class="label">Queue</div>
+            <div class="num" id="stat-queue">&mdash;</div>
+            <div class="label" data-i18n="queue">Queue</div>
           </div>
           <div class="stat" data-detail="errors">
-            <div class="num" id="stat-errors">0</div>
-            <div class="label">Errors</div>
+            <div class="num" id="stat-errors">&mdash;</div>
+            <div class="label" data-i18n="errors_count">Errors</div>
           </div>
         </div>
         <div class="actions">
-          <button id="btn-scan" class="primary">Scan</button>
-          <button id="btn-generate">Generate Queue</button>
-          <button id="btn-generate-popular">Generate Popular</button>
-          <button id="btn-regen-all" class="danger">Regen All</button>
+          <button id="btn-scan" class="primary" data-i18n="scan">Scan</button>
+          <button id="btn-generate" data-i18n="generate_queue">Generate queue</button>
+          <button id="btn-generate-popular" data-i18n="generate_popular">Generate popular</button>
+          <button id="btn-regen-all" class="danger" data-i18n="regen_all">Regenerate all</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>🌐 Community</h2>
+        <h2 data-i18n="community">Community</h2>
         <div class="row">
           <div class="stat" data-detail="community-youtube">
-            <div class="num" id="stat-yt">—</div>
-            <div class="label">YouTube views</div>
+            <div class="num" id="stat-yt">&mdash;</div>
+            <div class="label" data-i18n="youtube_views">YouTube views</div>
           </div>
           <div class="stat" data-detail="community-reddit">
-            <div class="num" id="stat-rd">—</div>
-            <div class="label">Reddit karma</div>
+            <div class="num" id="stat-rd">&mdash;</div>
+            <div class="label" data-i18n="reddit_karma">Reddit karma</div>
           </div>
           <div class="stat" data-detail="community-github">
-            <div class="num" id="stat-gh">—</div>
-            <div class="label">GH downloads</div>
+            <div class="num" id="stat-gh">&mdash;</div>
+            <div class="label" data-i18n="gh_downloads">GH downloads</div>
           </div>
           <div class="stat" data-detail="community-kofi">
-            <div class="num" id="stat-kofi">—</div>
-            <div class="label">Ko-fi</div>
+            <div class="num" id="stat-kofi">&mdash;</div>
+            <div class="label" data-i18n="kofi">Ko-fi</div>
           </div>
           <div class="stat" data-detail="community-patreon">
-            <div class="num" id="stat-patreon">—</div>
-            <div class="label">Patreon</div>
+            <div class="num" id="stat-patreon">&mdash;</div>
+            <div class="label" data-i18n="patreon">Patreon</div>
           </div>
         </div>
         <div class="actions">
-          <button id="btn-refresh-community">Refresh</button>
+          <button id="btn-refresh-community" data-i18n="refresh">Refresh</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>📜 Log (last 100 lines)</h2>
-        <pre id="log-view">—</pre>
+        <h2 data-i18n="log">Log (last 100 lines)</h2>
+        <pre id="log-view">&mdash;</pre>
         <div class="actions">
-          <button id="btn-clear-log">Clear</button>
-          <button id="btn-refresh">Refresh</button>
+          <button id="btn-clear-log" data-i18n="clear">Clear</button>
+          <button id="btn-refresh" data-i18n="refresh">Refresh</button>
         </div>
       </div>
     </section>
 
     <section class="tab-content" id="tab-builds">
       <div class="card">
-        <h2>🔧 Builds</h2>
+        <h2 data-i18n="builds">Builds</h2>
         <div class="filter-bar">
-          <input type="text" id="builds-search" placeholder="Search tag..." />
+          <input type="text" id="builds-search" data-i18n-placeholder="search" placeholder="Search tag..." />
           <select id="builds-filter">
-            <option value="all">All</option>
-            <option value="missing">Missing</option>
-            <option value="incomplete">Incomplete</option>
+            <option value="all" data-i18n="all">All</option>
+            <option value="missing" data-i18n="missing">Missing</option>
+            <option value="complete" data-i18n="complete">Complete</option>
           </select>
         </div>
         <div id="builds-table-wrap">
           <table id="builds-table">
-            <thead><tr><th>Tag</th><th>Status</th><th>Last Updated</th></tr></thead>
+            <thead><tr><th data-i18n="tag">Tag</th><th data-i18n="status">Status</th><th data-i18n="updated">Updated</th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div class="actions">
+          <button id="builds-refresh" data-i18n="refresh">Refresh</button>
         </div>
       </div>
     </section>
 
     <section class="tab-content" id="tab-prompts">
       <div class="card">
-        <h2>📝 Prompts</h2>
+        <h2 data-i18n="prompts">Prompts</h2>
         <div class="filter-bar">
-          <input type="text" id="prompts-search" placeholder="Search prompt..." />
+          <input type="text" id="prompts-search" data-i18n-placeholder="search" placeholder="Search prompt..." />
         </div>
         <div id="prompts-table-wrap">
           <table id="prompts-table">
-            <thead><tr><th>Tag</th><th>Preview</th></tr></thead>
+            <thead><tr><th data-i18n="tag">Tag</th><th data-i18n="preview">Preview</th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div class="actions">
+          <button id="prompts-refresh" data-i18n="refresh">Refresh</button>
         </div>
       </div>
     </section>
 
     <section class="tab-content" id="tab-errors">
       <div class="card">
-        <h2>❌ Recent errors (last 50)</h2>
+        <h2 data-i18n="errors">Errors</h2>
         <div id="errors-table-wrap">
           <table id="errors-table">
-            <thead><tr><th>Type</th><th>Stage</th><th>Text</th><th>Time</th></tr></thead>
+            <thead><tr><th data-i18n="type">Type</th><th data-i18n="stage">Stage</th><th data-i18n="text">Text</th><th data-i18n="time">Time</th></tr></thead>
             <tbody></tbody>
           </table>
+        </div>
+        <div class="actions">
+          <button id="errors-refresh" data-i18n="refresh">Refresh</button>
         </div>
       </div>
     </section>
   </main>
 
   <dialog id="drilldown-modal">
-    <h3 id="drilldown-title">—</h3>
-    <input type="text" id="drilldown-search" placeholder="Search..." />
+    <h3 id="drilldown-title">&mdash;</h3>
+    <input type="text" id="drilldown-search" data-i18n-placeholder="search" placeholder="Search..." />
     <div id="drilldown-table-wrap">
       <table id="drilldown-table">
         <thead></thead>
@@ -153,38 +162,33 @@
       </table>
     </div>
     <div id="drilldown-status">0 / 0</div>
-    <button id="drilldown-close">Close</button>
+    <button id="drilldown-close" data-i18n="close">Close</button>
   </dialog>
 
   <dialog id="settings-modal">
-    <h3>⚙️ Settings</h3>
+    <h3>&#x2699;&#xfe0f; <span data-i18n="settings">Settings</span></h3>
     <form id="settings-form">
-      <label>
-        WoT path:
-        <input type="text" id="set-wot-path" />
-      </label>
+      <label data-i18n="wot_path">WoT path:</label>
+      <input type="text" id="set-wot-path" />
       <label class="check">
         <input type="checkbox" id="set-launch-windows" />
-        Start with Windows (autostart via HKCU\Run registry)
+        <span data-i18n="start_with_windows">Start with Windows</span>
       </label>
-      <label class="check">
-        <input type="checkbox" id="set-sync-schemes" />
-        Sync schemes with battle mode
-      </label>
-      <label>
-        Language:
-        <select id="set-lang">
-          <option value="uk">Українська</option>
-          <option value="en">English</option>
-        </select>
-      </label>
+      <label data-i18n="language">Language:</label>
+      <select id="set-lang">
+        <option value="uk" data-i18n="ukrainian">РЈРєСЂР°С—РЅСЃСЊРєР°</option>
+        <option value="en">English</option>
+      </select>
       <div class="actions">
-        <button type="button" id="settings-cancel">Cancel</button>
-        <button type="submit" class="primary">Save</button>
+        <button type="button" id="settings-cancel" data-i18n="cancel">Cancel</button>
+        <button type="submit" class="primary" data-i18n="save">Save</button>
       </div>
     </form>
   </dialog>
 
+  <div id="toast-container"></div>
+
   <script src="js/app.js"></script>
 </body>
 </html>
+

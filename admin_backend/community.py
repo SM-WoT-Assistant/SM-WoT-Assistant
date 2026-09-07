@@ -106,15 +106,27 @@ def fetch_installations() -> dict:
 
 
 def fetch_all_tiles() -> dict:
-    """Fetch all 5 community tiles in one call (for the overview tab)."""
-    return {
-        "youtube": fetch_youtube(),
-        "reddit": fetch_reddit(),
-        "github": fetch_github(),
-        "kofi": fetch_ko_fi(),
-        "patreon": fetch_patreon(),
-        "installations": fetch_installations(),
+    """Fetch all community tiles in parallel with hard 5s timeout (for dashboard)."""
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+    platforms = {
+        "youtube": fetch_youtube,
+        "reddit": fetch_reddit,
+        "github": fetch_github,
+        "kofi": fetch_ko_fi,
+        "patreon": fetch_patreon,
+        "installations": fetch_installations,
     }
+    result = {}
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        futures = {name: ex.submit(fn) for name, fn in platforms.items()}
+        for name, fut in futures.items():
+            try:
+                result[name] = fut.result(timeout=5)
+            except FuturesTimeout:
+                result[name] = {"ok": False, "error": "timeout"}
+            except Exception as e:
+                result[name] = {"ok": False, "error": str(e) or "error"}
+    return result
 
 
 def _read_community_cache() -> dict:

@@ -6,6 +6,7 @@ without UI thread collisions.
 """
 from __future__ import annotations
 import os
+import sys
 import threading
 from typing import Callable, Optional
 
@@ -24,7 +25,7 @@ class AdminTray:
     def __init__(self, on_open: Callable, on_exit: Callable, icon_path: Optional[str] = None):
         self._on_open = on_open
         self._on_exit = on_exit
-        self._icon_path = icon_path or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "admin_icon.ico")
+        self._icon_path = icon_path or os.path.join(getattr(sys, "_MEIPASS", os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "admin_icon.ico")
         self._icon: Optional["Icon"] = None
         self._thread: Optional[threading.Thread] = None
 

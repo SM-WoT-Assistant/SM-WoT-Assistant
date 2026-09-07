@@ -6,6 +6,7 @@ quirks (Flask 3.x send_static_file needs an active app context, which the
 background-thread Flask runner does not provide on first request).
 """
 from __future__ import annotations
+import json
 import os
 import sys
 import threading
@@ -90,6 +91,24 @@ def _get_mime(path: str) -> str:
 def _make_response(body: bytes, path: str = "") -> "Response":
     return Response(body, mimetype=_get_mime(path))
 
+
+
+
+def _read_internal_json(name, default):
+    """Read JSON file from bundle _internal/ (frozen) or project root (dev)."""
+    bdir = _bundle_dir()
+    candidates = [
+        os.path.join(bdir, """_internal""", name),
+        os.path.join(bdir, name),
+    ]
+    for path in candidates:
+        if os.path.exists(path):
+            try:
+                with open(path, """r""", encoding="""utf-8""") as f:
+                    return json.load(f)
+            except Exception:
+                return default
+    return default
 
 def set_app(app):
     global _APP
@@ -206,6 +225,31 @@ def _create_flask_app():
             return jsonify(fetch_all_tiles())
         except Exception:
             return jsonify({})
+
+    @flask_app.route("/api/tanks")
+    def api_tanks():
+        data = _read_internal_json("tank_db.json", {})
+        if not isinstance(data, dict):
+            return jsonify({"count": 0, "tags": []})
+        tags = list(data.keys())[:100]
+        return jsonify({"count": len(data), "tags": tags})
+
+    @flask_app.route("/api/errors")
+    def api_errors():
+        # Stub: real impl reads RTDB error_reports/ with admin_auth token
+        return jsonify([])
+
+    @flask_app.route("/api/queue")
+    def api_queue():
+        tanks_data = _read_internal_json("tank_db.json", {})
+        prompts = _read_internal_json("prompts_cache.json", {})
+        if not isinstance(tanks_data, dict):
+            return jsonify({"count": 0, "tags": []})
+        tanks_count = len(tanks_data)
+        builds_count = len(prompts) if isinstance(prompts, dict) else 0
+        queue_count = max(0, tanks_count - builds_count)
+        queue_tags = [t for t in list(tanks_data.keys())[:300] if t not in (prompts or {})]
+        return jsonify({"count": queue_count, "tags": queue_tags[:100]})
 
     return flask_app
 

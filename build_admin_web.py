@@ -123,9 +123,8 @@ def main():
         print("[BUILD] canonical dir locked - building into Admin_TMP_BUILD_WEB, then deploying")
         build_admin_web(dist_dir=tmp_build)
         print("[BUILD] Deploying " + tmp_build + " -> " + ADMIN_DIR)
-        if os.path.exists(ADMIN_DIR):
-            _rmtree_tolerant(ADMIN_DIR)
-        os.rename(tmp_build, ADMIN_DIR)
+        shutil.copytree(os.path.join(tmp_build, "SM WoT Assistant Admin"), ADMIN_DIR, dirs_exist_ok=True)
+        shutil.rmtree(tmp_build, ignore_errors=True)
     else:
         build_admin_web()
     print("[BUILD] Admin v" + version + " built!")

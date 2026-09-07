@@ -59,7 +59,6 @@ def main():
 
     wot_path = _resolve_wot_path(args.wot_path)
 
-    # Start backend
     from admin_backend.core import Application
     from admin_backend.api import set_app, run_api_threaded
     app = Application(wot_path=wot_path)
@@ -68,7 +67,6 @@ def main():
     api_thread = run_api_threaded(port=args.port)
     print(f"[ADMIN] API listening on http://127.0.0.1:{args.port}/")
 
-    # Wait for Flask to start listening (avoid race with webview)
     import socket
     for _ in range(50):
         try:
@@ -78,43 +76,62 @@ def main():
             time.sleep(0.1)
     print(f"[ADMIN] Flask API ready on 127.0.0.1:{args.port}")
 
-    # Start webview (create_window + start blocks main thread on GUI event loop)
-    if not args.no_webview:
+    def cleanup():
+        print("[ADMIN] Cleaning up...")
         try:
-            import webview
-            webview.create_window(
-                "SM WoT Assistant Admin",
-                f"http://127.0.0.1:{args.port}/",
-                width=1100, height=700,
-            )
-            print("[ADMIN] Starting webview GUI...")
-            webview.start()  # BLOCKS until window is closed
-            print("[ADMIN] webview closed")
-        except ImportError:
-            print("[ADMIN] pywebview not available, skipping GUI")
+            app.stop()
+        except Exception:
+            pass
 
-    # Start tray
+    import atexit
+    atexit.register(cleanup)
+
+    # Tray BEFORE webview
+    tray = None
     if not args.no_tray:
         try:
             from admin_backend.tray import AdminTray
             def on_open():
                 print("[ADMIN] Open Admin Window clicked")
+                try:
+                    import webview as wv
+                    if wv.windows:
+                        wv.windows[0].show()
+                except Exception:
+                    pass
             def on_exit():
                 print("[ADMIN] Exit clicked")
-                app.stop()
-                sys.exit(0)
+                if tray:
+                    tray.stop()
+                cleanup()
+                os._exit(0)
             tray = AdminTray(on_open=on_open, on_exit=on_exit)
             tray.start()
+            print("[ADMIN] Tray icon started")
         except ImportError:
             print("[ADMIN] pystray not available, skipping tray")
 
-    # Block main thread
-    try:
-        while app.is_running():
-            time.sleep(0.5)
-    except KeyboardInterrupt:
-        print("[ADMIN] KeyboardInterrupt, stopping")
-        app.stop()
+    # Webview blocks main thread
+    if not args.no_webview:
+        try:
+            import webview
+            w = webview.create_window(
+                "SM WoT Assistant Admin",
+                f"http://127.0.0.1:{args.port}/",
+                width=1100, height=700,
+            )
+            print("[ADMIN] Starting webview GUI...")
+            webview.start()
+            print("[ADMIN] webview closed")
+        except ImportError:
+            print("[ADMIN] pywebview not available, skipping GUI")
+
+    # Cleanup after webview closes
+    if tray:
+        tray.stop()
+    cleanup()
+    sys.exit(0)
+
 
 
 if __name__ == "__main__":

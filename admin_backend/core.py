@@ -91,7 +91,6 @@ class Application:
 
     def save_settings(self):
         """Save current settings to admin_settings.json in AppData."""
-        import json
         appdata = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
         path = os.path.join(appdata, "admin_settings.json")
         try:
@@ -105,7 +104,7 @@ class Application:
             return False
 
     def apply_launch_with_windows(self):
-        """Apply 'launch with Windows' setting to HKCU\Run registry."""
+        """Apply 'launch with Windows' setting to HKCU\\Run registry."""
         if not getattr(self, "settings", None):
             return False
         if not getattr(sys, "frozen", False):
