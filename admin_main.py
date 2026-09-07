@@ -1,7 +1,6 @@
-"""Main entry for SM WoT Assistant Admin (replaces admin_app.py).
+"""Main entry for SM WoT Assistant Admin (web).
 
 Architecture:
-  - CustomTkinter shell: skipped (pywebview is the only window now).
   - Backend: admin_backend.Application (Flask + background threads).
   - Frontend: pywebview window showing admin_web/ via http://127.0.0.1:8765/.
   - Tray: pystray (optional, --no-tray to disable).
@@ -13,6 +12,7 @@ Modes:
 """
 from __future__ import annotations
 import argparse
+import ctypes
 import os
 import sys
 import threading
@@ -20,7 +20,6 @@ import time
 
 
 def _resolve_wot_path(cli_path: str = "") -> str:
-    """Resolve WoT path: CLI arg > admin_settings.json > settings.json > common paths."""
     if cli_path and os.path.isdir(cli_path):
         return cli_path
     appdata = os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant")
@@ -46,6 +45,53 @@ def _resolve_wot_path(cli_path: str = "") -> str:
         if os.path.isdir(p):
             return p
     return ""
+
+
+def _find_icon_path() -> str:
+    candidates = []
+    if getattr(sys, "frozen", False):
+        candidates.append(os.path.join(sys._MEIPASS, "admin_icon.ico"))
+    candidates.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "admin_icon.ico"))
+    candidates.append("admin_icon.ico")
+    for p in candidates:
+        if os.path.isfile(p):
+            return p
+    return ""
+
+
+def _set_window_icon(hwnd: int, ico_path: str) -> bool:
+    if not hwnd or not ico_path or not os.path.isfile(ico_path):
+        return False
+    try:
+        user32 = ctypes.windll.user32
+        hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
+        if hicon:
+            user32.SendMessageW(hwnd, 0x0080, 0, hicon)
+            user32.SendMessageW(hwnd, 0x0080, 1, hicon)
+            print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
+            return True
+        print("[ADMIN] LoadImageW failed for icon")
+    except Exception as e:
+        print(f"[ADMIN] Icon set failed: {e}")
+    return False
+
+
+def _get_webview_hwnd() -> int:
+    try:
+        import webview as wv
+        if wv.windows:
+            handle = getattr(wv.windows[0], "native_handle", None)
+            if handle:
+                return int(handle)
+    except Exception:
+        pass
+    try:
+        hwnd = ctypes.windll.user32.FindWindowW(None, "SM WoT Assistant Admin")
+        if hwnd:
+            return hwnd
+    except Exception:
+        pass
+    return 0
 
 
 def main():
@@ -79,6 +125,11 @@ def main():
     def cleanup():
         print("[ADMIN] Cleaning up...")
         try:
+            from admin_backend.browser import close_browser
+            close_browser()
+        except Exception:
+            pass
+        try:
             app.stop()
         except Exception:
             pass
@@ -86,7 +137,6 @@ def main():
     import atexit
     atexit.register(cleanup)
 
-    # Tray BEFORE webview
     tray = None
     if not args.no_tray:
         try:
@@ -111,7 +161,6 @@ def main():
         except ImportError:
             print("[ADMIN] pystray not available, skipping tray")
 
-    # Webview blocks main thread
     if not args.no_webview:
         try:
             import webview
@@ -121,17 +170,27 @@ def main():
                 width=1100, height=700,
             )
             print("[ADMIN] Starting webview GUI...")
+            ico_path = _find_icon_path()
+            def _set_icon_delayed():
+                for _ in range(30):
+                    time.sleep(0.5)
+                    hwnd = _get_webview_hwnd()
+                    if hwnd:
+                        _set_window_icon(hwnd, ico_path)
+                        return
+            if ico_path:
+                threading.Thread(target=_set_icon_delayed, daemon=True).start()
+            else:
+                print("[ADMIN] admin_icon.ico not found")
             webview.start()
             print("[ADMIN] webview closed")
         except ImportError:
             print("[ADMIN] pywebview not available, skipping GUI")
 
-    # Cleanup after webview closes
     if tray:
         tray.stop()
     cleanup()
     sys.exit(0)
-
 
 
 if __name__ == "__main__":

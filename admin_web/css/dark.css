@@ -177,3 +177,10 @@ dialog input[type=text] {
 }
 dialog #drilldown-table-wrap { max-height: 60vh; overflow: auto; }
 #drilldown-status { font-size: 10px; color: var(--muted); margin: 4px 0; }
+#login-status-box {
+  background: var(--bg3);
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin: 8px 0;
+  font-size: 12px;
+}

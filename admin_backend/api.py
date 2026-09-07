@@ -267,6 +267,46 @@ def _create_flask_app():
         queue_tags = [t for t in list(tanks_data.keys())[:300] if t not in (prompts or {})]
         return jsonify({"count": queue_count, "tags": queue_tags[:100]})
 
+    @flask_app.route("/api/community/open-login", methods=["POST"])
+    def api_community_open_login():
+        data = request.get_json(silent=True) or {}
+        platform = data.get("platform", "")
+        if not platform:
+            return jsonify({"ok": False, "error": "platform required"}), 400
+        try:
+            from admin_backend.browser import open_login
+            return jsonify(open_login(platform))
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)[:200]}), 500
+
+    @flask_app.route("/api/community/login-status")
+    def api_community_login_status():
+        platform = request.args.get("platform", "")
+        if not platform:
+            return jsonify({"ok": False, "error": "platform required"}), 400
+        try:
+            from admin_backend.browser import get_login_status
+            return jsonify(get_login_status(platform))
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)[:200]}), 500
+
+    @flask_app.route("/api/community/close-browser", methods=["POST"])
+    def api_community_close_browser():
+        try:
+            from admin_backend.browser import close_browser
+            close_browser()
+            return jsonify({"ok": True})
+        except Exception as e:
+            return jsonify({"ok": False, "error": str(e)[:200]}), 500
+
+    @flask_app.route("/api/community/is-browser-open")
+    def api_community_is_browser_open():
+        try:
+            from admin_backend.browser import is_browser_running
+            return jsonify({"running": is_browser_running()})
+        except Exception:
+            return jsonify({"running": False})
+
     return flask_app
 
 

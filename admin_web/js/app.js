@@ -57,6 +57,14 @@ const I18N = {
     complete: 'Завершені',
     complete_st: 'Завершено',
     no_prompt_st: 'Немає промпту',
+    login_desc: 'Відкриється вікно Chrome для ручного логіну. Після логіну закрийте Chrome та натисніть "Перевірити логін".',
+    open_login: 'Відкрити сторінку логіну',
+    check_login: 'Перевірити логін',
+    close_browser: 'Закрити браузер',
+    login_ok: 'Успішно залогінено!',
+    login_pending: 'Очікування логіну...',
+    login_browser_open: 'Браузер відкритий',
+    login_not_logged_in: 'Ще не залогінено',
     ukrainian: 'Українська'
   },
   en: {
@@ -112,6 +120,14 @@ const I18N = {
     complete: 'Complete',
     complete_st: 'Complete',
     no_prompt_st: 'No prompt',
+    login_desc: 'A Chrome window will open for you to log in manually. After logging in, close Chrome and click "Check Login".',
+    open_login: 'Open Login Page',
+    check_login: 'Check Login',
+    close_browser: 'Close Browser',
+    login_ok: 'Logged in successfully!',
+    login_pending: 'Waiting for login...',
+    login_browser_open: 'Browser open',
+    login_not_logged_in: 'Not logged in yet',
     ukrainian: 'Ukrainian'
   }
 };
@@ -328,12 +344,6 @@ document.getElementById('prompts-refresh').addEventListener('click', refreshProm
 document.getElementById('errors-refresh').addEventListener('click', refreshErrors);
 
 // --- Drilldown ---
-document.querySelectorAll('.stat[data-detail]').forEach(stat => {
-  stat.addEventListener('click', () => {
-    openDrilldown(stat.dataset.detail);
-  });
-});
-
 function openDrilldown(key) {
   const dict = I18N[currentLang] || I18N.uk;
   const titleMap = {
@@ -483,6 +493,123 @@ function setupSearch(inputId, rowSelector) {
       tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
   };
+}
+
+// --- Community Login ---
+let _loginPlatform = null;
+let _loginPollTimer = null;
+
+const LOGIN_PLATFORM_LABELS = {
+  youtube: 'YouTube',
+  reddit: 'Reddit',
+  kofi: 'Ko-fi',
+  patreon: 'Patreon'
+};
+
+document.querySelectorAll('.stat[data-detail]').forEach(stat => {
+  const key = stat.dataset.detail;
+  if (key && key.startsWith('community-')) {
+    stat.style.cursor = 'pointer';
+  }
+  stat.addEventListener('click', () => {
+    if (key && key.startsWith('community-')) {
+      const platform = key.replace('community-', '');
+      if (['youtube', 'reddit', 'kofi', 'patreon'].includes(platform)) {
+        openLoginDialog(platform);
+        return;
+      }
+    }
+    openDrilldown(key);
+  });
+});
+
+function openLoginDialog(platform) {
+  _loginPlatform = platform;
+  const dict = I18N[currentLang] || I18N.uk;
+  const label = LOGIN_PLATFORM_LABELS[platform] || platform;
+  document.getElementById('login-title').textContent = label + ' Login';
+  document.getElementById('login-desc').textContent = dict.login_desc;
+  document.getElementById('login-status-box').style.display = 'none';
+  document.getElementById('login-status-text').textContent = '';
+  document.getElementById('login-modal').showModal();
+  checkBrowserStatus();
+}
+
+async function checkBrowserStatus() {
+  const res = await apiGet('/api/community/is-browser-open');
+  const statusBox = document.getElementById('login-status-box');
+  const statusText = document.getElementById('login-status-text');
+  const dict = I18N[currentLang] || I18N.uk;
+  if (res && res.running) {
+    statusBox.style.display = 'block';
+    statusText.textContent = dict.login_browser_open;
+    statusText.className = 'muted';
+  }
+}
+
+document.getElementById('login-cancel').addEventListener('click', () => {
+  stopLoginPoll();
+  document.getElementById('login-modal').close();
+});
+
+document.getElementById('login-open').addEventListener('click', async () => {
+  if (!_loginPlatform) return;
+  const dict = I18N[currentLang] || I18N.uk;
+  const statusBox = document.getElementById('login-status-box');
+  const statusText = document.getElementById('login-status-text');
+  statusBox.style.display = 'block';
+  statusText.textContent = dict.loading;
+  statusText.className = 'muted';
+  const res = await apiPost('/api/community/open-login', { platform: _loginPlatform });
+  if (res && res.ok) {
+    statusText.textContent = dict.login_pending;
+    startLoginPoll();
+  } else {
+    statusText.textContent = (res && res.error) || 'Error';
+    statusText.className = 'error';
+  }
+});
+
+document.getElementById('login-check').addEventListener('click', async () => {
+  await checkLoginNow();
+});
+
+document.getElementById('login-close').addEventListener('click', async () => {
+  stopLoginPoll();
+  await apiPost('/api/community/close-browser');
+  document.getElementById('login-status-box').style.display = 'none';
+  document.getElementById('login-modal').close();
+});
+
+function startLoginPoll() {
+  stopLoginPoll();
+  _loginPollTimer = setInterval(checkLoginNow, 3000);
+}
+
+function stopLoginPoll() {
+  if (_loginPollTimer) {
+    clearInterval(_loginPollTimer);
+    _loginPollTimer = null;
+  }
+}
+
+async function checkLoginNow() {
+  if (!_loginPlatform) return;
+  const dict = I18N[currentLang] || I18N.uk;
+  const statusText = document.getElementById('login-status-text');
+  const res = await apiGet('/api/community/login-status?platform=' + _loginPlatform);
+  if (res && res.logged_in) {
+    statusText.textContent = dict.login_ok;
+    statusText.className = 'success';
+    stopLoginPoll();
+    refreshCommunity();
+  } else if (res && res.ok === false) {
+    statusText.textContent = res.message || dict.login_not_logged_in;
+    statusText.className = 'muted';
+  } else {
+    statusText.textContent = dict.login_not_logged_in;
+    statusText.className = 'muted';
+  }
 }
 
 // --- Init ---

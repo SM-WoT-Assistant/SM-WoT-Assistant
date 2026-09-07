@@ -176,7 +176,7 @@
       </label>
       <label data-i18n="language">Language:</label>
       <select id="set-lang">
-        <option value="uk" data-i18n="ukrainian">РЈРєСЂР°С—РЅСЃСЊРєР°</option>
+        <option value="uk">Українська</option>
         <option value="en">English</option>
       </select>
       <div class="actions">
@@ -184,6 +184,20 @@
         <button type="submit" class="primary" data-i18n="save">Save</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="login-modal">
+    <h3 id="login-title">Login</h3>
+    <p id="login-desc" data-i18n="login_desc">A Chrome window will open for you to log in manually. After logging in, close Chrome and click "Check Login" below.</p>
+    <div id="login-status-box" style="display:none">
+      <span id="login-status-text">Checking...</span>
+    </div>
+    <div class="actions">
+      <button id="login-cancel" data-i18n="cancel">Cancel</button>
+      <button id="login-open" class="primary" data-i18n="open_login">Open Login Page</button>
+      <button id="login-check" data-i18n="check_login">Check Login</button>
+      <button id="login-close" class="danger" data-i18n="close_browser">Close Browser</button>
+    </div>
   </dialog>
 
   <div id="toast-container"></div>
