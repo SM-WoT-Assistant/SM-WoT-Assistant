@@ -1,0 +1,159 @@
+/* SM WoT Assistant Admin — Web UI */
+:root {
+  --bg: #1a1a1a;
+  --bg2: #222;
+  --bg3: #181818;
+  --fg: #ddd;
+  --muted: #888;
+  --accent: #ffaa00;
+  --accent2: #ff4500;
+  --green: #66cc66;
+  --red: #ff6666;
+  --blue: #6699cc;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+}
+header {
+  background: var(--bg3);
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #333;
+}
+header h1 { margin: 0; font-size: 18px; }
+header h1 span { color: var(--accent); }
+header nav { color: var(--muted); font-size: 12px; display: flex; gap: 16px; }
+header nav #status-value.success { color: var(--green); }
+header nav #status-value.error { color: var(--red); }
+.tabs {
+  background: var(--bg3);
+  display: flex;
+  gap: 0;
+  padding: 0 16px;
+  border-bottom: 1px solid #333;
+}
+.tabs .tab {
+  background: none;
+  border: none;
+  color: var(--muted);
+  padding: 12px 20px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+}
+.tabs .tab:hover { color: var(--fg); }
+.tabs .tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.card {
+  background: var(--bg2);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.card h2 { color: var(--accent); font-size: 14px; margin: 0 0 12px 0; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.stat {
+  background: var(--bg3);
+  border-radius: 6px;
+  padding: 10px 14px;
+  min-width: 100px;
+  text-align: center;
+  flex: 1;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+.stat:hover { background: #252525; }
+.stat .num { font-size: 20px; color: var(--accent2); font-weight: bold; }
+.stat .label { font-size: 10px; color: var(--muted); margin-top: 2px; }
+button {
+  background: #333;
+  color: var(--fg);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+button:hover { background: #444; }
+button.primary { background: #445533; }
+button.primary:hover { background: #556644; }
+button.danger { background: #553333; }
+button.danger:hover { background: #774444; }
+.actions { display: flex; gap: 8px; margin-top: 8px; }
+.filter-bar { display: flex; gap: 8px; margin-bottom: 8px; }
+.filter-bar input, .filter-bar select {
+  background: #181818;
+  color: var(--fg);
+  border: 1px solid #333;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.filter-bar input { flex: 1; }
+table { width: 100%; border-collapse: collapse; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #333; font-size: 12px; }
+th { color: var(--muted); font-weight: normal; background: var(--bg3); }
+tr:hover { background: #252525; }
+#log-view {
+  background: #0c0c0c;
+  color: #ccc;
+  padding: 8px 12px;
+  border-radius: 4px;
+  max-height: 240px;
+  overflow: auto;
+  font-family: 'Consolas', monospace;
+  font-size: 11px;
+  margin: 0;
+  white-space: pre-wrap;
+}
+.error { color: var(--red); }
+.success { color: var(--green); }
+.warn { color: #ffcc66; }
+.muted { color: var(--muted); }
+form label { display: block; margin-bottom: 8px; color: var(--fg); }
+form input[type=text] {
+  background: #181818;
+  color: var(--fg);
+  border: 1px solid #333;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  width: 100%;
+  margin-top: 4px;
+}
+dialog {
+  background: var(--bg2);
+  color: var(--fg);
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 16px;
+  width: 720px;
+  max-width: 90vw;
+  max-height: 80vh;
+}
+dialog::backdrop { background: rgba(0, 0, 0, 0.7); }
+dialog h3 { color: var(--accent); margin: 0 0 8px 0; font-size: 14px; }
+dialog input[type=text] {
+  width: 100%;
+  background: #181818;
+  color: var(--fg);
+  border: 1px solid #333;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  margin-bottom: 8px;
+}
+dialog #drilldown-table-wrap { max-height: 60vh; overflow: auto; }
+#drilldown-status { font-size: 10px; color: var(--muted); margin: 4px 0; }
