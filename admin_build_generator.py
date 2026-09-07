@@ -201,7 +201,13 @@ def _fingerprint_equal(a, b):
         return False
     return a.get("size") == b.get("size") and a.get("crc") == b.get("crc")
 
-def detect_changed_tanks(wot_path, manifest_path=".tank_extract_manifest.json"):
+def _manifest_default_path():
+    return os.path.join(os.environ.get("APPDATA", "."), "SM WoT Assistant",
+                        ".tank_extract_manifest.json")
+
+def detect_changed_tanks(wot_path, manifest_path=None):
+    if manifest_path is None:
+        manifest_path = _manifest_default_path()
     """Return list of tank tags whose vehicle XML changed in scripts.pkg.
 
     Tags with _FAIL_THRESHOLD consecutive generation failures (see
@@ -628,6 +634,17 @@ def _copy_chrome_profile(src, dst):
     """
     if os.path.isdir(dst):
         shutil.rmtree(dst, ignore_errors=True)
+    # Fix WinError 183 (SingletonLock still held by running Chrome): explicitly
+    # remove the lock file from the source profile before copying. The file is
+    # excluded from copy by _PROFILE_SKIP, but Windows still tries to access it
+    # during copytree — removing it eliminates the race.
+    default_src = os.path.join(src, CHROME_PROFILE_DIR)
+    lock_file = os.path.join(default_src, "SingletonLock")
+    if os.path.exists(lock_file):
+        try:
+            os.remove(lock_file)
+        except Exception:
+            pass
     skipped = []
     try:
         shutil.copytree(src, dst, ignore=_PROFILE_SKIP)
@@ -1032,7 +1049,7 @@ def _run_daily_sweep(wot_path=""):
         print("[SWEEP] Daily fill sweep: no incomplete builds")
         return []
     queue = sorted(incomplete.keys())
-    queue = exclude_failed_tags(queue, ".tank_extract_manifest.json", wot_path)
+    queue = exclude_failed_tags(queue, _manifest_default_path(), wot_path)
     if not queue:
         print("[SWEEP] Daily fill sweep: all incomplete builds are in the failure registry")
         return []
@@ -1666,9 +1683,9 @@ def listen_mode(tank_db, wot_path=None):
                 failed = [t for t in (queue or []) if t not in done_tags]
                 try:
                     if failed:
-                        update_manifest_failures(wot_path or "", ".tank_extract_manifest.json", failed)
+                        update_manifest_failures(wot_path or "", _manifest_default_path(), failed)
                     if ok and done_tags:
-                        update_manifest_for_tags(wot_path, ".tank_extract_manifest.json", done_tags)
+                        update_manifest_for_tags(wot_path, _manifest_default_path(), done_tags)
                 except Exception:
                     pass
                 err_msg = reasons.get("summary") or "Generation failed" if reasons else "Generation failed"
