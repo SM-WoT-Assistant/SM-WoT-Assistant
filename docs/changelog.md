@@ -4,6 +4,34 @@
 
 ---
 
+## Admin v1.0.45 + verification Phase 0 fix + UI redesign (04.09.2026)
+
+**Користувач:** «Дуже великі товсті цифри і плитки! stats і adminapp можна звести в один рядок. АИ Білдс взагалі незрозумілі цифри — звідки вони і деякі незрозуміло що вони показують? танк білдс треба поставити у стат за танк промтс і якщо у танк білдс 1010 а в танк промтс 1029 то це означає що 19 промтів повинні бути в черзі на оновлення в ідеалі танк у базі - танк промтс і танк білдс повинні співпадати а в черзі повинно бути 0! Все інше з АИ Білдс можна взагалі прибрати. Для кожної плитки треба зробити вспливаюче вікно з пошуком фільтрами скролом і можливістю подивитись деталізацію а для комюнити сторінку в мережі у вспливаючому вікні програми.»
+
+**8 комітів:**
+
+1. **`fix(admin)`** — manifest path defaults to AppData + remove SingletonLock before profile copy (`9f8af33`). Frozen onefile EXE CWD = `_MEIPASS`; нова `_manifest_default_path()` повертає `%APPDATA%/SM WoT Assistant/.tank_extract_manifest.json`. `_copy_chrome_profile` прибирає SingletonLock перед copytree (WinError 183 race).
+2. **`fix(admin)`** — auto-fit window + scrollable content area for small screens (`8018e22`). `bbox('display')` для auto-height, scrollable Canvas wrap для tall content.
+3. **`data(client v.2.4.0.0)`** — 8 нових промптів (Pl40, Pl44, R233, R234, R236, R239, S37, S41) + A195_Gorilla slots (`092daa5`). Всі з клієнта.
+4. **`fix(website)`** — CHP equality guard + reduced AI Builds to 4 stat-boxes (`a3d1f61`). Видалені 3 version-only stat-boxes (builds-version, prompts-version, popular-version).
+5. **`fix(verification)`** — graceful bundle integrity fallback + exit when frozen (`bb5583d`). Search chain BUNDLE_DIR → CWD → BUNDLE_DIR/.. (parent). `sys.exit(0)` ТІЛЬКИ при `getattr(sys, 'frozen', False)`.
+6. **`feat(admin)`** — compact stat layout + clickable drilldown Toplevel per card (`4f57081`). 18pt → 12pt, 5 плиток clickable (Tanks raw/db, Queue, Tanks prompts, Errors). Кожна відкриває Toplevel з Search Entry + Nation Combobox + Treeview + Scrollbar + Status bar. Double-click → JSON detail.
+7. **`feat(website)`** — compact stat-boxes + clickable drilldown modal (`a312616`). 28px → 18px, modal з Search + Table + Status. Дані з `builds/tanks`, `prompts/tanks`, `installations/`, `error_reports/`.
+8. **Cleanup** — видалені всі untracked сміттєві файли: `proof_final.html`, `tmp_*`, `run_admin_smoke.py`, `magic-context.jsonc.MOVED_READPLEASE`, `RemixIcon_*.zip`, `admin_main.py*`, `build_admin_web.py*`, `admin_backend/`, `admin_web/`, `admin_web_backup_*/`, `img/`.
+
+**Ключові зміни:**
+
+- **Verification Phase 0** (main.py:557-595) — `report_error` + `_show_verification_error` БЕЗ `sys.exit(0)` → half-broken app run. Фікс: search chain `BUNDLE_DIR → CWD → BUNDLE_DIR/..`; `sys.exit(0)` тільки при `frozen=True`. Dev mode продовжує з тим, що має.
+- **Admin app stats layout** (admin_app.py:1286-1304) — `font=("Segoe UI", 18)` → `("Segoe UI", 12)`, padding 3 → 2. Кожна плитка (5 з 8) — `cursor=hand2` + click handler → `_show_stat_drilldown(drill_key)`.
+- **Drilldown Toplevel** (admin_app.py:1356-1485) — `Toplevel` з `Search Entry` (live filter), `Nation Combobox` (тільки якщо `has_nation`), `Treeview` + `Scrollbar`, `Status bar` (`N / total`), `Double-click` → `_show_tag_detail(tag, source_key)` (JSON detail).
+- **Community popup** — вже існує через `_enter_community()` (fullscreen Workspace + embedded Chrome). Кнопка `Community` у top_bar (`admin_app.py:1249`) відкриває його. Без нових змін.
+- **Website stat-boxes** (public/admin.html:22-25) — 28px → 18px, 16px/24px padding → 8px/12px, `cursor=pointer` + `:hover` background.
+- **Website drilldown modal** (public/admin.html JS) — `#drilldownModal` (fixed inset:0, 70% black bg) з Search + Filter Combobox + Table (sticky header, monospace rows). `setupDrilldowns()` навішує обробники на 4 stat-boxes (builds, prompts, queue, installations). Дані з `db.ref('builds/tanks' / 'prompts/tanks' / 'installations' / 'error_reports')`.
+
+**Висновок для користувача:** `tank_db` (= 1029) = джерело істини. `prompts` має дорівнювати `db` (admin app self-healing v1.0.44 автоматично генерує відсутні). `builds` має дорівнювати `db` (admin app self-healing запускає генерацію). `queue = db - builds` — derived в UI, не зберігається. Коли всі три рівні — картки зелені.
+
+---
+
 ## Client v.2.4.0.0 #930 adaptation (02.09.2026) — vehicle XML binary, field_modifications, TTH regression guard
 
 **Клієнт гри оновився до v.2.4.0.0 #930 (02.09.2026). WG змінив формат кількох ключових XML-файлів:**
