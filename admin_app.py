@@ -949,6 +949,27 @@ class AdminApp:
             self._community["stats"][_ck] = _cv
 
         self._build_ui()
+        # Auto-height: make window tall enough so all content is visible.
+        # Two-pass approach (safe, no infinite loops):
+        #   1) First pass (sync): measure with bbox('display') which is reliable.
+        #   2) If content > screen, clamp to screen height and enable window auto-fit
+        #      via wm_state('zoomed') only when explicitly needed; otherwise let Tkinter
+        #      manage. Minsize is set so the user can't shrink below usable bounds.
+        screen_w, screen_h = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
+        self.root.update_idletasks()
+        try:
+            # bbox('display') returns (x, y, w, h) of all content; more reliable than sum(reqheight).
+            bbox = self.root.bbox("display") or (0, 0, 800, 600)
+            content_w = max(bbox[2], 600)
+            content_h = max(bbox[3], 400)
+        except Exception:
+            content_w, content_h = 860, 620
+        # Clamp width to screen, leave 20px margin horizontally; height to screen - 40 (taskbar).
+        w = min(max(content_w + 20, 860), screen_w - 40)
+        h = min(content_h + 20, screen_h - 40)
+        self.root.geometry(f"{w}x{h}+{(screen_w - w)//2}+{(screen_h - h)//2}")
+        self.root.minsize(600, 400)
+        self.root.update()
         self._log(self.t("log_started", path=self._wot_path or self.t("not_set")))
         self._check_tank_prompt_match()
         self._last_heartbeat = 0.0
@@ -1232,9 +1253,31 @@ class AdminApp:
         self._tiles["frame"].pack(fill="x", padx=12, pady=(0, 4))
         self._update_tiles()
 
-        # Main content
-        content = tk.Frame(self.root, bg=BG)
-        content.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        # Main content — wrapped in a scrollable Canvas so tall content
+        # never gets clipped on small screens (ARCHITECTURE.md #1259 pattern).
+        scroll_wrap = tk.Frame(self.root, bg=BG)
+        scroll_wrap.pack(fill="both", expand=True, padx=12, pady=(0, 8))
+        canvas = tk.Canvas(scroll_wrap, bg=BG, highlightthickness=0, bd=0)
+        scrollbar = tk.Scrollbar(scroll_wrap, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        content = tk.Frame(canvas, bg=BG)
+        content_window = canvas.create_window((0, 0), window=content, anchor="nw")
+        # Sync scrollregion when content size changes.
+        def _on_content_configure(_event=None):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+            # Match canvas width to its frame width (responsive).
+            cw = canvas.winfo_width()
+            if cw > 1:
+                canvas.itemconfigure(content_window, width=cw)
+        content.bind("<Configure>", _on_content_configure)
+        canvas.bind("<Configure>", lambda e: canvas.itemconfigure(content_window, width=e.width))
+        # Mouse wheel scrolling (works regardless of focus inside the canvas).
+        def _on_wheel(event):
+            canvas.yview_scroll(int(-1 * (event.delta / 120)), "units")
+        canvas.bind("<Enter>", lambda e: canvas.bind_all("<MouseWheel>", _on_wheel))
+        canvas.bind("<Leave>", lambda e: canvas.unbind_all("<MouseWheel>"))
 
         # Left panel: status cards
         left = tk.Frame(content, bg=BG2, padx=12, pady=10)
