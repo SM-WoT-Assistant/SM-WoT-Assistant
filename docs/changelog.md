@@ -6,8 +6,6 @@
 
 ## Admin v1.0.45 + verification Phase 0 fix + UI redesign (04.09.2026)
 
-**Користувач:** «Дуже великі товсті цифри і плитки! stats і adminapp можна звести в один рядок. АИ Білдс взагалі незрозумілі цифри — звідки вони і деякі незрозуміло що вони показують? танк білдс треба поставити у стат за танк промтс і якщо у танк білдс 1010 а в танк промтс 1029 то це означає що 19 промтів повинні бути в черзі на оновлення в ідеалі танк у базі - танк промтс і танк білдс повинні співпадати а в черзі повинно бути 0! Все інше з АИ Білдс можна взагалі прибрати. Для кожної плитки треба зробити вспливаюче вікно з пошуком фільтрами скролом і можливістю подивитись деталізацію а для комюнити сторінку в мережі у вспливаючому вікні програми.»
-
 **8 комітів:**
 
 1. **`fix(admin)`** — manifest path defaults to AppData + remove SingletonLock before profile copy (`9f8af33`). Frozen onefile EXE CWD = `_MEIPASS`; нова `_manifest_default_path()` повертає `%APPDATA%/SM WoT Assistant/.tank_extract_manifest.json`. `_copy_chrome_profile` прибирає SingletonLock перед copytree (WinError 183 race).
@@ -32,7 +30,7 @@
 
 ---
 
-## Client v.2.4.0.0 #930 adaptation (02.09.2026) — vehicle XML binary, field_modifications, TTH regression guard
+## Admin v1.0.45 + verification Phase 0 fix + UI redesign (04.09.2026)
 
 **Клієнт гри оновився до v.2.4.0.0 #930 (02.09.2026). WG змінив формат кількох ключових XML-файлів:**
 
