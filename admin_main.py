@@ -3,12 +3,7 @@
 Architecture:
   - Backend: admin_backend.Application (Flask + background threads).
   - Frontend: pywebview window showing admin_web/ via http://127.0.0.1:8765/.
-  - Tray: pystray (optional, --no-tray to disable).
-
-Modes:
-  - default:       API + webview + tray
-  - --no-webview:  API + tray (backend-only testing)
-  - --no-tray:     API + webview (no tray icon)
+  - No tray icon — just a maximized browser window.
 """
 from __future__ import annotations
 import argparse
@@ -17,6 +12,12 @@ import os
 import sys
 import threading
 import time
+
+SW_MAXIMIZE = 3
+SWP_NOMOVE = 0x0002
+SWP_NOSIZE = 0x0001
+SWP_SHOWWINDOW = 0x0040
+HWND_TOP = 0
 
 
 def _resolve_wot_path(cli_path: str = "") -> str:
@@ -59,43 +60,44 @@ def _find_icon_path() -> str:
     return ""
 
 
-def _configure_window(hwnd: int, ico_path: str) -> bool:
-    """Set window icon + WS_EX_TOOLWINDOW (no taskbar) + fix focus."""
+def _activate_window(hwnd: int) -> None:
+    """Maximize + foreground + show window."""
     if not hwnd:
-        return False
+        return
     user32 = ctypes.windll.user32
     try:
-        exstyle = user32.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        new_exstyle = (exstyle | WS_EX_TOOLWINDOW) & ~WS_EX_NOACTIVATEAPP & ~WS_EX_APPWINDOW
-        user32.SetWindowLongW(hwnd, GWL_EXSTYLE, new_exstyle)
-        print(f"[ADMIN] WS_EX_TOOLWINDOW set (no taskbar icon)")
-    except Exception as e:
-        print(f"[ADMIN] SetWindowLongW failed: {e}")
-    if ico_path and os.path.isfile(ico_path):
-        try:
-            hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
-            if hicon:
-                user32.SendMessageW(hwnd, 0x0080, 0, hicon)
-                user32.SendMessageW(hwnd, 0x0080, 1, hicon)
-                print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
-        except Exception as e:
-            print(f"[ADMIN] Icon set failed: {e}")
+        user32.ShowWindow(hwnd, SW_MAXIMIZE)
+    except Exception:
+        pass
     try:
         user32.SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0,
                             SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW)
     except Exception:
         pass
-    return True
+    try:
+        user32.SetForegroundWindow(hwnd)
+    except Exception:
+        pass
+    try:
+        user32.BringWindowToTop(hwnd)
+    except Exception:
+        pass
+    print("[ADMIN] Window activated (maximized + foreground)")
 
 
-GWL_EXSTYLE = -20
-WS_EX_TOOLWINDOW = 0x00000080
-WS_EX_NOACTIVATEAPP = 0x08000000
-WS_EX_APPWINDOW = 0x00040000
-HWND_TOP = 0
-SWP_NOMOVE = 0x0002
-SWP_NOSIZE = 0x0001
-SWP_SHOWWINDOW = 0x0040
+def _set_window_icon(hwnd: int, ico_path: str) -> None:
+    """Set window icon via WM_SETICON."""
+    if not hwnd or not ico_path or not os.path.isfile(ico_path):
+        return
+    user32 = ctypes.windll.user32
+    try:
+        hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
+        if hicon:
+            user32.SendMessageW(hwnd, 0x0080, 0, hicon)
+            user32.SendMessageW(hwnd, 0x0080, 1, hicon)
+            print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
+    except Exception as e:
+        print(f"[ADMIN] Icon set failed: {e}")
 
 
 def _get_webview_hwnd() -> int:
@@ -124,8 +126,6 @@ def main():
     parser.add_argument("--wot-path", default="", help="Path to WoT installation")
     parser.add_argument("--port", type=int, default=8765, help="API port (default 8765)")
     parser.add_argument("--no-webview", action="store_true", help="Run API only (no webview window)")
-    parser.add_argument("--no-tray", action="store_true", help="Skip pystray tray icon")
-    parser.add_argument("--tray", dest="tray", action="store_true", default=True)
     args = parser.parse_args()
 
     wot_path = _resolve_wot_path(args.wot_path)
@@ -162,30 +162,6 @@ def main():
     import atexit
     atexit.register(cleanup)
 
-    tray = None
-    if not args.no_tray:
-        try:
-            from admin_backend.tray import AdminTray
-            def on_open():
-                print("[ADMIN] Open Admin Window clicked")
-                try:
-                    import webview as wv
-                    if wv.windows:
-                        wv.windows[0].show()
-                except Exception:
-                    pass
-            def on_exit():
-                print("[ADMIN] Exit clicked")
-                if tray:
-                    tray.stop()
-                cleanup()
-                os._exit(0)
-            tray = AdminTray(on_open=on_open, on_exit=on_exit)
-            tray.start()
-            print("[ADMIN] Tray icon started")
-        except ImportError:
-            print("[ADMIN] pystray not available, skipping tray")
-
     if not args.no_webview:
         try:
             import webview
@@ -193,28 +169,35 @@ def main():
                 "SM WoT Assistant Admin",
                 f"http://127.0.0.1:{args.port}/",
                 width=1100, height=700,
+                maximized=True,
             )
-            print("[ADMIN] Starting webview GUI...")
+            print("[ADMIN] Starting webview GUI (maximized)...")
             ico_path = _find_icon_path()
-            def _configure_window_delayed():
+
+            def _post_start():
+                """Called after webview GUI loop starts — activate and icon."""
                 for _ in range(30):
                     time.sleep(0.5)
                     hwnd = _get_webview_hwnd()
                     if hwnd:
-                        _configure_window(hwnd, ico_path)
+                        _activate_window(hwnd)
+                        if ico_path:
+                            _set_window_icon(hwnd, ico_path)
                         return
                 print("[ADMIN] Could not find webview HWND after 15s")
-            if ico_path:
-                threading.Thread(target=_configure_window_delayed, daemon=True).start()
-            else:
-                print("[ADMIN] admin_icon.ico not found")
-            webview.start()
+
+            webview.start(func=_post_start)
             print("[ADMIN] webview closed")
         except ImportError:
             print("[ADMIN] pywebview not available, skipping GUI")
+            print("[ADMIN] Falling back to default browser...")
+            import webbrowser
+            webbrowser.open(f"http://127.0.0.1:{args.port}/")
+            try:
+                input("Press Enter to exit...")
+            except (KeyboardInterrupt, EOFError):
+                pass
 
-    if tray:
-        tray.stop()
     cleanup()
     sys.exit(0)
 
