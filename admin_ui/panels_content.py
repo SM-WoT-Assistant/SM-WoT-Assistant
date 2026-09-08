@@ -482,24 +482,43 @@ class CommunityPanel(customtkinter.CTkFrame):
 
     def refresh(self) -> None:
         try:
-            from admin_backend.data import get_community_stats
-            stats = get_community_stats()
+            from admin_backend import community as comm
+            results = comm.fetch_all_tiles()
             for key, tile in self._tiles.items():
-                if key == "github":
-                    gh = stats.get("github")
-                    if gh:
-                        tile["val"].configure(text=str(gh.get("total", 0)))
+                res = results.get(key, {})
+                if key == "youtube":
+                    if res.get("ok"):
+                        views = res.get("views", 0)
+                        tile["val"].configure(text=f"{views:,}")
+                        tile["hint"].configure(text=f"{res.get('subscribers', 0):,} subs")
                     else:
                         tile["val"].configure(text="-")
+                        tile["hint"].configure(text=res.get("error", "no data")[:20])
+                elif key == "reddit":
+                    if res.get("ok"):
+                        count = res.get("count", 0)
+                        tile["val"].configure(text=str(count))
+                        tile["hint"].configure(text=f"{count} posts")
+                    else:
+                        tile["val"].configure(text="-")
+                        tile["hint"].configure(text=res.get("error", "no data")[:20])
+                elif key == "github":
+                    if res.get("ok"):
+                        tile["val"].configure(text=str(res.get("downloads", 0)))
+                        tile["hint"].configure(text=f"{res.get('releases', []) and len(res.get('releases', [])) or 0} releases")
+                    else:
+                        tile["val"].configure(text="-")
+                        tile["hint"].configure(text=res.get("error", "no data")[:20])
+                elif key == "kofi":
+                    tile["val"].configure(text="ko-fi.com")
+                    tile["hint"].configure(text="link")
                 elif key == "patreon":
-                    pr = stats.get("patreon")
-                    if pr:
-                        tile["val"].configure(text=str(pr.get("patrons", 0)))
+                    if res.get("ok"):
+                        tile["val"].configure(text=str(res.get("patrons", 0)))
+                        tile["hint"].configure(text=f"${res.get('pledge', 0):.0f}/mo")
                     else:
                         tile["val"].configure(text="-")
-                elif key in ("youtube", "reddit", "kofi"):
-                    tile["val"].configure(text="Chrome")
-                    tile["hint"].configure(text="Manual login")
+                        tile["hint"].configure(text=res.get("error", "no data")[:20])
         except Exception:
             pass
 

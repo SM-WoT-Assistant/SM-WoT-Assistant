@@ -237,10 +237,12 @@ class AdminApp(customtkinter.CTk):
 
     def _report_heartbeat(self) -> None:
         try:
+            from admin_backend.data import read_admin_version
+            ver = read_admin_version()
             import firebase_reporter as fr
             fr._put_json(  # type: ignore[attr-defined]
                 fr._rtdb_url("admin_app/version"),  # type: ignore[attr-defined]
-                {"version": "1.0.46", "last_seen": int(time.time()), "status": "idle"})
+                {"version": ver, "last_seen": int(time.time()), "status": "idle"})
         except Exception:
             pass
 

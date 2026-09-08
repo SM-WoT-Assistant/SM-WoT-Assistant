@@ -45,15 +45,104 @@ def _put_json(path: str, data) -> bool:
         return False
 
 
+_REDDIT_USER = "SM-WoT-Assistant"
+_REDDIT_OAUTH_URL = "https://www.reddit.com/api/v1/access_token"
+_REDDIT_API_BASE = "https://oauth.reddit.com"
+
+
+def _vault_get(service: str, field: str):
+    """Retrieve a decrypted credential from admin_vault."""
+    try:
+        import admin_vault
+        return admin_vault.vault_get(service, field)
+    except Exception:
+        return None
+
+
 # --- Public fetchers ---
 def fetch_youtube() -> dict:
-    """Fetch YouTube channel stats (manual login required via admin_vault)."""
-    return {"ok": False, "error": "manual_login_required"}
+    """Fetch YouTube channel stats via Data API v3 (public API key from vault)."""
+    api_key = _vault_get("youtube", "api_key")
+    if not api_key:
+        return {"ok": False, "error": "no_api_key"}
+    import requests
+    try:
+        url = (
+            "https://www.googleapis.com/youtube/v3/channels"
+            "?part=statistics&forHandle=SMWoTAssistant&key=" + api_key
+        )
+        r = requests.get(url, timeout=10)
+        if r.ok:
+            data = r.json()
+            items = data.get("items", [])
+            if items:
+                stats = items[0].get("statistics", {})
+                return {
+                    "ok": True,
+                    "views": int(stats.get("viewCount", 0)),
+                    "subscribers": int(stats.get("subscriberCount", 0)),
+                    "videos": int(stats.get("videoCount", 0)),
+                }
+            return {"ok": False, "error": "channel_not_found"}
+        return {"ok": False, "error": f"http_{r.status_code}"}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:80]}
 
 
 def fetch_reddit() -> dict:
-    """Fetch Reddit u/SM-WoT-Assistant stats (Content-Type=JSON required)."""
-    return {"ok": False, "error": "manual_login_required"}
+    """Fetch Reddit u/SM-WoT-Assistant posts via OAuth2 Script flow.
+
+    Uses bot account credentials from admin_vault (reddit/client_id,
+    reddit/client_secret, reddit/username, reddit/password).
+    Returns post count + recent posts list.
+    """
+    client_id = _vault_get("reddit", "client_id")
+    client_secret = _vault_get("reddit", "client_secret")
+    username = _vault_get("reddit", "username")
+    password = _vault_get("reddit", "password")
+    if not all([client_id, client_secret, username, password]):
+        return {"ok": False, "error": "no_vault_credentials"}
+    import requests
+    from requests.auth import HTTPBasicAuth
+    try:
+        token_resp = requests.post(
+            _REDDIT_OAUTH_URL,
+            data={"grant_type": "password", "username": username, "password": password},
+            auth=HTTPBasicAuth(str(client_id), str(client_secret)),
+            headers={"User-Agent": "SMWoTAssistant/1.0 (admin bot)"},
+            timeout=10,
+        )
+        if not token_resp.ok:
+            return {"ok": False, "error": f"token_http_{token_resp.status_code}"}
+        access_token = token_resp.json().get("access_token")
+        if not access_token:
+            return {"ok": False, "error": "no_access_token"}
+        posts_resp = requests.get(
+            f"{_REDDIT_API_BASE}/user/{_REDDIT_USER}/submitted",
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "User-Agent": "SMWoTAssistant/1.0 (admin bot)",
+            },
+            params={"limit": 25, "raw_json": 1},
+            timeout=10,
+        )
+        if not posts_resp.ok:
+            return {"ok": False, "error": f"posts_http_{posts_resp.status_code}"}
+        children = posts_resp.json().get("data", {}).get("children", [])
+        posts = []
+        for ch in children:
+            d = ch.get("data", {})
+            posts.append({
+                "title": d.get("title", ""),
+                "date": time.strftime("%Y-%m-%d", time.localtime(d.get("created_utc", 0))),
+                "score": d.get("score", 0),
+                "comments": d.get("num_comments", 0),
+                "url": "https://www.reddit.com" + (d.get("permalink") or ""),
+                "subreddit": d.get("subreddit", ""),
+            })
+        return {"ok": True, "posts": posts, "count": len(posts)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:80]}
 
 
 def fetch_github() -> dict:
