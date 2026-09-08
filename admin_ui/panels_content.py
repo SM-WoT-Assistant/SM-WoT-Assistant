@@ -10,8 +10,21 @@ import time
 from typing import Any, Optional, List
 
 
+_STATUS_COLS = 3
+
+
+def _make_divider(parent, orient="h"):
+    """Create a thin grey divider line."""
+    if orient == "h":
+        return customtkinter.CTkFrame(parent, height=1, fg_color="#2E3240")
+    else:
+        return customtkinter.CTkFrame(parent, width=1, fg_color="#2E3240")
+
+
 class StatusPanel(customtkinter.CTkFrame):
-    """Status cards: admin version, game version, tanks, queue, errors."""
+    """Status tiles in a single horizontal row: Raw, DB, Builds, Queue."""
+
+    _NCOLS = 4
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -21,43 +34,42 @@ class StatusPanel(customtkinter.CTkFrame):
 
     def _build(self) -> None:
         from admin_ui.widgets import card
+
         labels = [
-            ("version", "Admin Version", "-", None),
-            ("wg_version", "Game Version", "-", None),
-            ("game_status", "Game Status", "No WoT", None),
-            ("tanks_raw", "Tanks (raw)", "0", None),
-            ("tanks_db", "Tanks (db)", "0", None),
-            ("queue", "Queue", "0", None),
-            ("last_scan", "Last Scan", "-", None),
-            ("mismatch", "Tanks / Prompts", "-", None),
-            ("errors", "Errors", "0", None),
+            ("tanks_raw", "Raw", "0"),
+            ("tanks_db", "DB", "0"),
+            ("builds", "Builds", "0"),
+            ("queue", "Queue", "0"),
         ]
-        for key, title, value, drilldown_key in labels:
-            c = card(self, title=title, value=value, width=280, height=60,
-                     command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None)
-            c.pack(fill="x", padx=6, pady=3)
+
+        ncols = self._NCOLS
+        grid_cols = ncols * 2 - 1
+
+        for idx, (key, title, value) in enumerate(labels):
+            col = idx % ncols
+            grid_col = col * 2
+
+            drilldown_key = key if key in ("tanks_db", "queue") else None
+            c = card(
+                self, title=title, value=value, width=110, height=36, center=True,
+                command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
+            )
+            c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
             self._cards[key] = c
+
+            if col < ncols - 1:
+                sep = _make_divider(self, "v")
+                sep.grid(row=0, column=grid_col + 1, sticky="ns", padx=0, pady=2)
+
+        for gc in range(grid_cols):
+            if gc % 2 == 0:
+                self.grid_columnconfigure(gc, weight=1)
+            else:
+                self.grid_columnconfigure(gc, weight=0, minsize=1)
 
     def refresh(self) -> None:
         if self.app is None:
             return
-        try:
-            from admin_backend.data import read_admin_version
-            version = read_admin_version()
-            self._cards["version"]._val_lbl.configure(text=version)
-        except Exception as e:
-            self._cards["version"]._val_lbl.configure(text=f"err: {e}")
-
-        try:
-            from admin_backend.data import check_wot_path
-            wot_path = getattr(self.app, '_wot_path', '')
-            exists, ver = check_wot_path(wot_path)
-            self._cards["wg_version"]._val_lbl.configure(text=ver or "-")
-            color = "#66cc66" if exists else "#cc6666"
-            self._cards["game_status"]._val_lbl.configure(
-                text="Connected" if exists else "No WoT", text_color=color)
-        except Exception:
-            pass
 
         try:
             from admin_backend.data import count_raw_tanks
@@ -67,43 +79,40 @@ class StatusPanel(customtkinter.CTkFrame):
             pass
 
         try:
-            from admin_backend.data import check_mismatch
+            from admin_backend.data import count_builds
             tank_db = getattr(self.app, 'tank_db', {})
             prompts = getattr(self.app, 'prompts', {})
-            self._cards["tanks_db"]._val_lbl.configure(text=str(len(tank_db)))
-            q = getattr(self.app, '_queue', [])
-            self._cards["queue"]._val_lbl.configure(text=str(len(q)))
-            self._cards["last_scan"]._val_lbl.configure(
-                text=time.strftime("%H:%M") if getattr(self.app, '_last_scan', 0) > 0 else "-")
-            prompts_only, tanks_only = check_mismatch(tank_db, prompts)
-            mismatch = bool(prompts_only or tanks_only)
-            color = "#cc6666" if mismatch else "#66cc66"
-            self._cards["mismatch"]._val_lbl.configure(
-                text=f"{len(tank_db)} / {len(prompts)}", text_color=color)
-        except Exception:
-            pass
+            db_count = len(tank_db)
+            builds_count = count_builds()
+            queue_count = max(0, db_count - builds_count)
+            self._cards["tanks_db"]._val_lbl.configure(text=str(db_count))
+            self._cards["builds"]._val_lbl.configure(text=str(builds_count))
+            q_color = "#cc6666" if queue_count > 0 else "#66cc66"
+            self._cards["queue"]._val_lbl.configure(text=str(queue_count), text_color=q_color)
 
-        try:
-            from admin_backend.data import get_errors_count
-            errs = get_errors_count()
-            color = "#cc6666" if errs > 0 else "#888888"
-            self._cards["errors"]._val_lbl.configure(text=str(errs), text_color=color)
+            # DB ≠ Prompts mismatch → report error
+            prompts_count = len(prompts)
+            if db_count != prompts_count:
+                try:
+                    import firebase_reporter as fr
+                    fr.report_fallback(
+                        source="admin_ui.status",
+                        context="db_prompts_mismatch",
+                        error_text=f"DB ({db_count}) ≠ Prompts ({prompts_count})",
+                        level="warning",
+                    )
+                except Exception:
+                    pass
         except Exception:
             pass
 
     def _open_drilldown(self, card_key: str) -> None:
-        """Open a detail toptop for a specific card."""
         if card_key == "tanks_db":
             self._drilldown_tanks_db()
         elif card_key == "queue":
             self._drilldown_queue()
-        elif card_key == "errors":
-            self._drilldown_errors()
-        elif card_key == "mismatch":
-            self._drilldown_mismatch()
 
     def _drilldown_tanks_db(self) -> None:
-        import tkinter as tk
         dlg = customtkinter.CTkToplevel(self)
         dlg.title("Tanks Database")
         dlg.geometry("600x500")
@@ -130,6 +139,7 @@ class StatusPanel(customtkinter.CTkFrame):
         tree.configure(yscrollcommand=scroll.set)
         tree.pack(side="left", fill="both", expand=True, padx=(12, 0))
         scroll.pack(side="right", fill="y", padx=(0, 12))
+
         def refresh_tree(q=""):
             for item in tree.get_children():
                 tree.delete(item)
@@ -140,6 +150,7 @@ class StatusPanel(customtkinter.CTkFrame):
                 name = tank_db[tag].get("name", tag)
                 tier = tank_db[tag].get("tier", "?")
                 tree.insert("", "end", values=(tag, name, tier))
+
         refresh_tree()
         search.bind("<KeyRelease>", lambda e: refresh_tree(search.get().strip().lower()))
 
@@ -187,7 +198,7 @@ class StatusPanel(customtkinter.CTkFrame):
         tree.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         try:
             import firebase_reporter as fr
-            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")  # type: ignore[attr-defined]
+            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")
             import requests
             resp = requests.get(url, timeout=10)
             if resp.ok:
@@ -203,40 +214,133 @@ class StatusPanel(customtkinter.CTkFrame):
         except Exception:
             pass
 
-    def _drilldown_mismatch(self) -> None:
+
+
+class InfoPanel(customtkinter.CTkFrame):
+    """Info tiles: version, game version, game status, errors, installs."""
+
+    _NCOLS = 5
+
+    def __init__(self, parent: Any, app: Any = None) -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        self._cards: dict = {}
+        self._build()
+
+    def _build(self) -> None:
+        from admin_ui.widgets import card
+
+        labels = [
+            ("version", "Ver", "-"),
+            ("wg_version", "Game", "-"),
+            ("game_status", "Status", "No WoT"),
+            ("errors", "Errors", "0"),
+            ("installs", "Installs", "0"),
+        ]
+
+        ncols = self._NCOLS
+        grid_cols = ncols * 2 - 1
+
+        for idx, (key, title, value) in enumerate(labels):
+            col = idx % ncols
+            grid_col = col * 2
+
+            drilldown_key = key if key in ("errors",) else None
+            c = card(
+                self, title=title, value=value, width=110, height=36, center=True,
+                command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
+            )
+            c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
+            self._cards[key] = c
+
+            if col < ncols - 1:
+                sep = _make_divider(self, "v")
+                sep.grid(row=0, column=grid_col + 1, sticky="ns", padx=0, pady=2)
+
+        for gc in range(grid_cols):
+            if gc % 2 == 0:
+                self.grid_columnconfigure(gc, weight=1)
+            else:
+                self.grid_columnconfigure(gc, weight=0, minsize=1)
+
+    def refresh(self) -> None:
+        if self.app is None:
+            return
+
+        try:
+            from admin_backend.data import read_admin_version
+            version = read_admin_version()
+            self._cards["version"]._val_lbl.configure(text=version)
+        except Exception as e:
+            self._cards["version"]._val_lbl.configure(text=f"err: {e}")
+
+        try:
+            from admin_backend.data import check_wot_path
+            wot_path = getattr(self.app, '_wot_path', '')
+            exists, ver = check_wot_path(wot_path)
+            self._cards["wg_version"]._val_lbl.configure(text=ver or "-")
+            color = "#66cc66" if exists else "#cc6666"
+            self._cards["game_status"]._val_lbl.configure(
+                text="Connected" if exists else "No WoT", text_color=color)
+        except Exception:
+            pass
+
+        try:
+            from admin_backend.data import get_errors_count
+            errs = get_errors_count()
+            color = "#cc6666" if errs > 0 else "#888888"
+            self._cards["errors"]._val_lbl.configure(text=str(errs), text_color=color)
+        except Exception:
+            pass
+
+        try:
+            from admin_backend.data import get_community_stats
+            stats = get_community_stats()
+            installs = stats.get("installs", 0)
+            self._cards["installs"]._val_lbl.configure(text=str(installs))
+        except Exception:
+            pass
+
+    def _open_drilldown(self, card_key: str) -> None:
+        if card_key == "errors":
+            self._drilldown_errors()
+
+    def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
-        dlg.title("Tanks vs Prompts Mismatch")
-        dlg.geometry("600x400")
+        dlg.title("Errors")
+        dlg.geometry("600x500")
         dlg.transient(self.winfo_toplevel())
         dlg.configure(fg_color="#1A1D28")
-        customtkinter.CTkLabel(dlg, text="Mismatch Analysis",
+        customtkinter.CTkLabel(dlg, text="Error Reports",
                                font=customtkinter.CTkFont(size=14, weight="bold"),
                                text_color="#D4A843").pack(pady=(12, 4))
+        from tkinter import ttk
+        style = ttk.Style()
+        style.configure("ErrDrill.Treeview", background="#12141C", foreground="#DDE0EA",
+                        fieldbackground="#12141C", font=("Segoe UI", 10))
+        tree = ttk.Treeview(dlg, columns=("type", "stage", "text", "time"), show="headings",
+                            style="ErrDrill.Treeview", height=20)
+        tree.heading("type", text="Type")
+        tree.heading("stage", text="Stage")
+        tree.heading("text", text="Error")
+        tree.heading("time", text="Time")
+        tree.column("type", width=100)
+        tree.column("stage", width=100)
+        tree.column("text", width=300)
+        tree.column("time", width=100)
+        scroll = ttk.Scrollbar(dlg, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        tree.pack(fill="both", expand=True, padx=12)
+        scroll.pack(side="right", fill="y")
         try:
-            from admin_backend.data import check_mismatch
-            tank_db = self.app.tank_db if self.app else {}
-            prompts = self.app.prompts if self.app else {}
-            prompts_only, tanks_only = check_mismatch(tank_db, prompts)
-            if prompts_only:
-                customtkinter.CTkLabel(dlg, text=f"Prompts without tank DB ({len(prompts_only)}):",
-                                       text_color="#cc6666",
-                                       font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=12)
-                for t in prompts_only[:20]:
-                    customtkinter.CTkLabel(dlg, text=f"  {t}", text_color="#DDE0EA",
-                                           font=customtkinter.CTkFont(size=10)).pack(anchor="w", padx=20)
-            if tanks_only:
-                customtkinter.CTkLabel(dlg, text=f"Tanks without prompts ({len(tanks_only)}):",
-                                       text_color="#cc6666",
-                                       font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=12, pady=(8, 0))
-                for t in tanks_only[:20]:
-                    customtkinter.CTkLabel(dlg, text=f"  {t}", text_color="#DDE0EA",
-                                           font=customtkinter.CTkFont(size=10)).pack(anchor="w", padx=20)
-            if not prompts_only and not tanks_only:
-                customtkinter.CTkLabel(dlg, text="No mismatch — all OK",
-                                       text_color="#66cc66",
-                                       font=customtkinter.CTkFont(size=12)).pack(pady=20)
-        except Exception as e:
-            customtkinter.CTkLabel(dlg, text=f"Error: {e}", text_color="#cc6666").pack(pady=20)
+            from admin_backend.data import get_error_reports
+            errors = get_error_reports()
+            for e in errors:
+                tree.insert("", "end", values=(
+                    e.get("error_type", "-"), e.get("stage", "-"),
+                    e.get("error_text", "-")[:100], e.get("timestamp", "-")[:16]))
+        except Exception as ex:
+            customtkinter.CTkLabel(dlg, text=f"Error: {ex}", text_color="#cc6666").pack(pady=20)
 
 
 class BuildsPanel(customtkinter.CTkFrame):
@@ -328,7 +432,7 @@ class BuildsPanel(customtkinter.CTkFrame):
 
 
 class CommunityPanel(customtkinter.CTkFrame):
-    """Community monitoring: platform tiles."""
+    """Community monitoring: 6 platform tiles in a horizontal strip with dividers."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -338,51 +442,55 @@ class CommunityPanel(customtkinter.CTkFrame):
 
     def _build(self) -> None:
         platforms = [
-            ("overview", "Builds Ver"),
             ("youtube", "YouTube"),
             ("reddit", "Reddit"),
             ("github", "GitHub"),
             ("kofi", "Ko-fi"),
             ("patreon", "Patreon"),
-            ("installs", "Installs"),
-            ("errors", "Errors"),
         ]
         strip = customtkinter.CTkFrame(self, fg_color="transparent")
         strip.pack(fill="x", padx=6, pady=6)
-        for key, label in platforms:
-            tile = customtkinter.CTkFrame(strip, height=50, fg_color="#14161F", corner_radius=6)
-            tile.pack(side="left", fill="both", expand=True, padx=2)
+        for i, (key, label) in enumerate(platforms):
+            tile = customtkinter.CTkFrame(strip, height=34, fg_color="#14161F",
+                border_width=2, border_color="#2E3240", corner_radius=4)
+            tile.pack_propagate(False)
+            tile.pack(side="left", fill="both", expand=True, padx=0)
+
+            spacer_top = customtkinter.CTkFrame(tile, fg_color="transparent", height=1)
+            spacer_top.pack(fill="x", expand=True)
+
             customtkinter.CTkLabel(
-                tile, text=label, font=customtkinter.CTkFont(size=9),
-                text_color="#6E7284").pack(pady=(6, 0))
+                tile, text=label, font=customtkinter.CTkFont(size=11),
+                text_color="#6E7284").pack(pady=(1, 0))
             val_lbl = customtkinter.CTkLabel(
-                tile, text="-", font=customtkinter.CTkFont(size=13, weight="bold"),
+                tile, text="-", font=customtkinter.CTkFont(size=15, weight="bold"),
                 text_color="#DDE0EA")
             val_lbl.pack()
             hint_lbl = customtkinter.CTkLabel(
-                tile, text="", font=customtkinter.CTkFont(size=8),
+                tile, text="", font=customtkinter.CTkFont(size=10),
                 text_color="#6E7284")
-            hint_lbl.pack()
+            hint_lbl.pack(pady=(0, 1))
+
+            spacer_bottom = customtkinter.CTkFrame(tile, fg_color="transparent", height=1)
+            spacer_bottom.pack(fill="x", expand=True)
+
             self._tiles[key] = {"val": val_lbl, "hint": hint_lbl}
+
+            if i < len(platforms) - 1:
+                sep = _make_divider(strip, "v")
+                sep.pack(side="left", fill="y", padx=0, pady=2)
 
     def refresh(self) -> None:
         try:
             from admin_backend.data import get_community_stats
             stats = get_community_stats()
             for key, tile in self._tiles.items():
-                if key == "overview":
-                    v = stats.get("builds_ver")
-                    tile["val"].configure(text=str(v) if v is not None else "-")
-                elif key == "github":
+                if key == "github":
                     gh = stats.get("github")
                     if gh:
                         tile["val"].configure(text=str(gh.get("total", 0)))
                     else:
                         tile["val"].configure(text="-")
-                elif key == "installs":
-                    tile["val"].configure(text=str(stats.get("installs", 0)))
-                elif key == "errors":
-                    tile["val"].configure(text=str(stats.get("errors", 0)))
                 elif key == "patreon":
                     pr = stats.get("patreon")
                     if pr:
@@ -445,7 +553,7 @@ class ErrorsPanel(customtkinter.CTkFrame):
             self._tree.delete(item)
         try:
             import firebase_reporter as fr
-            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")  # type: ignore[attr-defined]
+            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")
             import requests
             resp = requests.get(url, timeout=10)
             if resp.ok:
@@ -503,6 +611,10 @@ def _controller(title: str, icon_id: str, frame_class, app: Any = None):
 
 def status_controller(app: Any = None):
     return _controller("Status", "status", StatusPanel, app)
+
+
+def info_controller(app: Any = None):
+    return _controller("Info", "info", InfoPanel, app)
 
 
 def builds_controller(app: Any = None):

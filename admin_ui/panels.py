@@ -1,9 +1,9 @@
-"""Admin panels — horizontal pack layout with drag-to-reorder.
+"""Admin panels — vertical stack layout with drag-to-reorder and collapse/expand.
 
-Panels are CTkFrame children packed side='left' inside the main window's
-center area. Guaranteed horizontal layout via pack. Headers support
-drag-to-reorder with a gold indicator line. Order persists in
-admin_panels_layout.json.
+Panels are CTkFrame children packed side='top' inside the main window's
+scrollable center area. Each panel spans the full width (horizontal rows).
+Headers support drag-to-reorder with a gold indicator line and collapse/expand
+toggle (click chevron or header). Order persists in admin_panels_layout.json.
 """
 
 import json
@@ -21,6 +21,8 @@ _LAYOUT_FILE = (
     / "SM WoT Assistant"
     / "admin_panels_layout.json"
 )
+
+_DIVIDER_COLOR = "#2E3240"
 
 
 def _load_order() -> List[str]:
@@ -45,20 +47,35 @@ def _save_order(columns: List[str]) -> None:
         logger.warning("Failed to save panel order", exc_info=True)
 
 
+def divider_h(parent: Any, **kw: Any) -> customtkinter.CTkFrame:
+    """Create a thin horizontal grey divider line."""
+    f = customtkinter.CTkFrame(parent, height=1, fg_color=_DIVIDER_COLOR, **kw)
+    return f
+
+
+def divider_v(parent: Any, **kw: Any) -> customtkinter.CTkFrame:
+    """Create a thin vertical grey divider line."""
+    f = customtkinter.CTkFrame(parent, width=1, fg_color=_DIVIDER_COLOR, **kw)
+    return f
+
+
 class PanelDock:
-    """Manages embedded CTkFrame panels in a horizontal pack layout
-    with drag-to-reorder headers."""
+    """Manages embedded CTkFrame panels in a vertical stack layout
+    with drag-to-reorder headers and collapse/expand."""
 
     def __init__(self, center_widget: Any) -> None:
         self.center = center_widget
         self.panels: Dict[str, Dict[str, Any]] = {}
         self._frames: Dict[str, customtkinter.CTkFrame] = {}
         self._headers: Dict[str, customtkinter.CTkFrame] = {}
+        self._bodies: Dict[str, customtkinter.CTkFrame] = {}
+        self._chevrons: Dict[str, customtkinter.CTkLabel] = {}
+        self._collapsed: Dict[str, bool] = {}
         self._columns: List[str] = []
 
         # Drag state
         self._drag_panel_id: Optional[str] = None
-        self._drag_start_x: int = 0
+        self._drag_start_y: int = 0
         self._drag_indicator: Optional[customtkinter.CTkFrame] = None
 
     def add_panel(
@@ -69,6 +86,7 @@ class PanelDock:
         build: Callable[[Any], Any],
         refresh: Optional[Callable[[Any], None]] = None,
         width: int = 300,
+        collapsed: bool = False,
     ) -> None:
         self.panels[panel_id] = {
             "id": panel_id,
@@ -80,9 +98,10 @@ class PanelDock:
             "width": width,
         }
         self._columns.append(panel_id)
+        self._collapsed[panel_id] = collapsed
 
     def restore(self) -> None:
-        """Load saved order, create all panel frames, pack horizontally."""
+        """Load saved order, create all panel frames, pack vertically."""
         saved = _load_order()
         if saved:
             ordered = [pid for pid in saved if pid in self.panels]
@@ -98,20 +117,37 @@ class PanelDock:
         panel = self.panels[panel_id]
 
         wrapper = customtkinter.CTkFrame(
-            self.center, fg_color="#14161F", corner_radius=6,
+            self.center, fg_color="#14161F", border_width=2, border_color="#2E3240", corner_radius=6,
         )
 
         header = customtkinter.CTkFrame(wrapper, height=30, fg_color="#181B26", corner_radius=6)
         header.pack(fill="x")
         header.pack_propagate(False)
-        customtkinter.CTkLabel(
+
+        title_lbl = customtkinter.CTkLabel(
             header, text=f"  \u2261 {panel['title']}",
             font=customtkinter.CTkFont(size=12, weight="bold"),
             text_color="#D4A843", anchor="w",
-        ).pack(side="left", fill="y", padx=4)
+        )
+        title_lbl.pack(side="left", fill="y", padx=4)
+
+        is_collapsed = self._collapsed.get(panel_id, False)
+        chevron_char = "\u25b8" if is_collapsed else "\u25be"
+        chevron = customtkinter.CTkLabel(
+            header, text=chevron_char,
+            font=customtkinter.CTkFont(size=12),
+            text_color="#6E7284", width=24,
+        )
+        chevron.pack(side="right", padx=4)
+        self._chevrons[panel_id] = chevron
 
         body_container = customtkinter.CTkFrame(wrapper, fg_color="transparent")
-        body_container.pack(fill="both", expand=True, padx=2, pady=(2, 4))
+        self._bodies[panel_id] = body_container
+
+        if is_collapsed:
+            pass
+        else:
+            body_container.pack(fill="both", expand=True, padx=2, pady=(2, 4))
 
         content = panel["build"](body_container)
         content.pack(fill="both", expand=True)
@@ -120,14 +156,32 @@ class PanelDock:
         self._frames[panel_id] = wrapper
         self._headers[panel_id] = header
 
-        for widget in (header,):
+        for widget in (header, title_lbl):
             widget.bind("<Button-1>", lambda e, pid=panel_id: self._drag_start(e, pid))
             widget.bind("<B1-Motion>", self._drag_move)
             widget.bind("<ButtonRelease-1>", self._drag_end)
             widget.configure(cursor="fleur")
 
+        chevron.bind("<Button-1>", lambda e, pid=panel_id: self._toggle_collapse(pid))
+        chevron.configure(cursor="hand2")
+
+    def _toggle_collapse(self, panel_id: str) -> None:
+        collapsed = self._collapsed.get(panel_id, False)
+        new_state = not collapsed
+        self._collapsed[panel_id] = new_state
+
+        chevron = self._chevrons.get(panel_id)
+        body = self._bodies.get(panel_id)
+        if chevron:
+            chevron.configure(text="\u25b8" if new_state else "\u25be")
+        if body:
+            if new_state:
+                body.pack_forget()
+            else:
+                body.pack(fill="both", expand=True, padx=2, pady=(2, 4))
+
     def _repack_all(self) -> None:
-        """Unpack all wrappers, then pack in current _columns order (left to right)."""
+        """Unpack all wrappers, then pack in current _columns order (top to bottom)."""
         for wrapper in self._frames.values():
             try:
                 wrapper.pack_forget()
@@ -137,76 +191,78 @@ class PanelDock:
         for panel_id in self._columns:
             if panel_id in self._frames:
                 self._frames[panel_id].pack(
-                    side="left", fill="both", expand=True, padx=3, pady=3,
+                    side="top", fill="x", padx=3, pady=3,
                 )
 
     def _drag_start(self, event, panel_id: str) -> None:
         self._drag_panel_id = panel_id
-        self._drag_start_x = event.x_root
+        self._drag_start_y = event.y_root
 
     def _drag_move(self, event) -> None:
         if self._drag_panel_id is None:
             return
-        target_col = self._resolve_target_col(event.x_root)
-        self._show_indicator(target_col)
+        target_idx = self._resolve_target_idx(event.y_root)
+        self._show_indicator(target_idx)
 
     def _drag_end(self, event) -> None:
         if self._drag_panel_id is None:
             return
 
-        target_col = self._resolve_target_col(event.x_root)
+        target_idx = self._resolve_target_idx(event.y_root)
         self._hide_indicator()
 
-        src_col = self._columns.index(self._drag_panel_id)
-        if target_col != src_col:
+        src_idx = self._columns.index(self._drag_panel_id)
+        if target_idx != src_idx:
             pid = self._drag_panel_id
             self._columns.remove(pid)
-            self._columns.insert(target_col, pid)
+            self._columns.insert(target_idx, pid)
             self._repack_all()
             _save_order(self._columns)
+        else:
+            self._toggle_collapse(self._drag_panel_id)
 
         self._drag_panel_id = None
 
-    def _resolve_target_col(self, root_x: int) -> int:
-        """Determine insertion index from mouse x_root coordinate."""
+    def _resolve_target_idx(self, root_y: int) -> int:
+        """Determine insertion index from mouse y_root coordinate."""
         for i, pid in enumerate(self._columns):
             if pid not in self._frames:
                 continue
             wrapper = self._frames[pid]
-            x0 = wrapper.winfo_rootx()
-            x1 = x0 + wrapper.winfo_width()
-            mid = (x0 + x1) // 2
-            if root_x < mid:
+            y0 = wrapper.winfo_rooty()
+            y1 = y0 + wrapper.winfo_height()
+            mid = (y0 + y1) // 2
+            if root_y < mid:
                 return i
         return len(self._columns)
 
-    def _show_indicator(self, col_idx: int) -> None:
-        """Show a gold vertical line at the target drop position."""
+    def _show_indicator(self, target_idx: int) -> None:
+        """Show a gold horizontal line at the target drop position."""
         self._hide_indicator()
         try:
-            if 0 <= col_idx < len(self._columns):
-                pid = self._columns[col_idx]
+            if 0 <= target_idx < len(self._columns):
+                pid = self._columns[target_idx]
                 if pid in self._frames:
                     wrapper = self._frames[pid]
-                    x = wrapper.winfo_rootx() - self.center.winfo_rootx() - 2
+                    y = wrapper.winfo_rooty() - self.center.winfo_rooty() - 2
                 else:
                     return
-            elif col_idx >= len(self._columns) and self._columns:
+            elif target_idx >= len(self._columns) and self._columns:
                 last_pid = self._columns[-1]
                 if last_pid in self._frames:
                     wrapper = self._frames[last_pid]
-                    x = (wrapper.winfo_rootx() - self.center.winfo_rootx()
-                         + wrapper.winfo_width() + 2)
+                    y = (wrapper.winfo_rooty() - self.center.winfo_rooty()
+                         + wrapper.winfo_height() + 2)
                 else:
                     return
             else:
                 return
 
-            h = max(100, self.center.winfo_height() - 10)
+            w = max(100, self.center.winfo_width() - 10)
             indicator = customtkinter.CTkFrame(
-                self.center, width=3, height=h, fg_color="#D4A843",
+                self.center, width=w, height=3, fg_color="#D4A843",
             )
-            indicator.place(x=max(0, x), y=5)
+            indicator.place(x=5, y=max(0, y))
             self._drag_indicator = indicator
         except Exception:
             pass
@@ -238,5 +294,7 @@ class PanelDock:
                 pass
         self._frames.clear()
         self._headers.clear()
+        self._bodies.clear()
+        self._chevrons.clear()
         for panel in self.panels.values():
             panel["body"] = None

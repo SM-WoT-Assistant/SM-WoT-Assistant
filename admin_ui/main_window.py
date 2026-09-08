@@ -23,6 +23,7 @@ if str(_project_root) not in sys.path:
 from admin_ui.panels import PanelDock
 from admin_ui.panels_content import (
     status_controller,
+    info_controller,
     builds_controller,
     community_controller,
     errors_controller,
@@ -69,11 +70,22 @@ class AdminApp(customtkinter.CTk):
         self.default_width = 1200
         self.default_height = 700
         self.title("SM WoT Assistant \u2014 Admin")
-        self.geometry(f"{self.default_width}x{self.default_height}")
         self.minsize(900, 500)
         self.configure(fg_color="#0E0E13")
 
         self._settings = _load_settings()
+
+        # Restore saved window geometry or use defaults
+        gw = self._settings.get("window_w")
+        gh = self._settings.get("window_h")
+        gx = self._settings.get("window_x")
+        gy = self._settings.get("window_y")
+        if gw and gh:
+            self.geometry(f"{gw}x{gh}")
+            if gx is not None and gy is not None:
+                self.geometry(f"+{gx}+{gy}")
+        else:
+            self.geometry(f"{self.default_width}x{self.default_height}")
         self._log_lines: list = []
 
         self.tank_db: dict = {}
@@ -93,6 +105,7 @@ class AdminApp(customtkinter.CTk):
         self._build_layout()
         self._register_panels()
         self._setup_close()
+        self.after(100, self._validate_position)
         self.after(500, self._load_data)
         self.after(500, self._start_background)
         self.after(1000, self._start_tray)
@@ -142,6 +155,15 @@ class AdminApp(customtkinter.CTk):
 
         self._center = customtkinter.CTkFrame(self, fg_color="#0E0E13")
         self._center.grid(row=1, column=0, sticky="nsew")
+        self._center.grid_propagate(False)
+
+        self._scroll = customtkinter.CTkScrollableFrame(
+            self._center, fg_color="#0E0E13",
+            scrollbar_fg_color="#0E0E13",
+            scrollbar_button_color="#2E3240",
+            scrollbar_button_hover_color="#3E4250",
+        )
+        self._scroll.pack(fill="both", expand=True)
 
         self._statusbar = customtkinter.CTkFrame(self, height=26, fg_color="#14161F")
         self._statusbar.grid(row=2, column=0, sticky="ew")
@@ -153,7 +175,7 @@ class AdminApp(customtkinter.CTk):
         )
         self._status_lbl.pack(side="left", padx=12)
 
-        self.panel_dock = PanelDock(self._center)
+        self.panel_dock = PanelDock(self._scroll)
 
     def _register_panels(self) -> None:
         self.panel_dock.add_panel(
@@ -163,28 +185,34 @@ class AdminApp(customtkinter.CTk):
             width=320,
         )
         self.panel_dock.add_panel(
+            "info", "Info", "info",
+            build=info_controller(self)["build"],
+            refresh=info_controller(self)["refresh"],
+            width=320,
+        )
+        self.panel_dock.add_panel(
             "builds", "Builds", "builds",
             build=builds_controller(self)["build"],
             refresh=builds_controller(self)["refresh"],
-            width=400,
+            width=400, collapsed=True,
         )
         self.panel_dock.add_panel(
             "community", "Community", "community",
             build=community_controller(self)["build"],
             refresh=community_controller(self)["refresh"],
-            width=300,
+            width=350,
         )
         self.panel_dock.add_panel(
             "errors", "Errors", "errors",
             build=errors_controller(self)["build"],
             refresh=errors_controller(self)["refresh"],
-            width=350,
+            width=350, collapsed=True,
         )
         self.panel_dock.add_panel(
             "log", "Log", "log",
             build=log_controller(self)["build"],
             refresh=log_controller(self)["refresh"],
-            width=350,
+            width=350, collapsed=True,
         )
         self.panel_dock.restore()
 
@@ -201,12 +229,7 @@ class AdminApp(customtkinter.CTk):
                         self._report_heartbeat()
                     if now - self._last_errors_poll > 86400:
                         self._last_errors_poll = now
-                        try:
-                            from admin_backend.data import get_errors_count
-                            self._errors_count = get_errors_count()
-                            self.after(0, self.panel_dock.refresh)
-                        except Exception:
-                            pass
+                        self.after(0, self._load_data)
                 except Exception as e:
                     self.after(0, lambda e=e: self.log(f"BG error: {e}"))
                 time.sleep(10)
@@ -385,8 +408,32 @@ class AdminApp(customtkinter.CTk):
     def _setup_close(self) -> None:
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+    def _validate_position(self) -> None:
+        """Reset to center if saved position is off-screen."""
+        try:
+            self.update_idletasks()
+            geo = self.geometry() or ""  # WxH+X+Y
+            parts = geo.replace("x", "+").split("+")
+            x, y, w, h = int(parts[2]), int(parts[3]), int(parts[0]), int(parts[1])
+            sx, sy = self.winfo_screenwidth(), self.winfo_screenheight()
+            if x > sx or y > sy or x + w < 0 or y + h < 0:
+                self.geometry("")  # center on screen
+        except Exception:
+            pass
+
     def _on_close(self) -> None:
         self._running = False
+        # Save window geometry
+        try:
+            geo = self.geometry() or ""  # WxH+X+Y
+            parts = geo.replace("x", "+").split("+")
+            self._settings["window_w"] = int(parts[0])
+            self._settings["window_h"] = int(parts[1])
+            self._settings["window_x"] = int(parts[2])
+            self._settings["window_y"] = int(parts[3])
+            _save_settings(self._settings)
+        except Exception:
+            pass
         self.tray.stop()
         self.panel_dock.close_all()
         self.destroy()

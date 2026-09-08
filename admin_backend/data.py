@@ -45,7 +45,7 @@ def load_prompts_merged() -> Dict[str, str]:
     local = load_prompts()
     try:
         import firebase_reporter as fr
-        url = fr._rtdb_url("prompts/tanks.json")
+        url = fr._rtdb_url("prompts/tanks")
         import requests
         resp = requests.get(url, timeout=10)
         if resp.ok and resp.json():
@@ -120,6 +120,21 @@ def check_mismatch(tank_db: dict, prompts: dict) -> Tuple[List[str], List[str]]:
         return [], []
 
 
+def count_builds() -> int:
+    """Count builds in RTDB builds/tanks."""
+    try:
+        import firebase_reporter as fr
+        url = fr._rtdb_url("builds/tanks")
+        import requests
+        resp = requests.get(url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            return len(data.keys()) if isinstance(data, dict) else 0
+    except Exception:
+        pass
+    return 0
+
+
 def get_errors_count() -> int:
     """Count error_reports from RTDB."""
     try:
@@ -135,18 +150,36 @@ def get_errors_count() -> int:
     return 0
 
 
+def get_error_reports() -> list:
+    """Fetch error_reports from RTDB."""
+    try:
+        import firebase_reporter as fr
+        url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=100")
+        import requests
+        resp = requests.get(url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            if data:
+                if isinstance(data, dict):
+                    return list(data.values())
+                return data
+    except Exception:
+        pass
+    return []
+
+
 def get_community_stats() -> Dict[str, Any]:
     """Aggregate community stats from RTDB + public APIs."""
     stats: Dict[str, Any] = {}
     try:
         import firebase_reporter as fr
-        builds_ver = fr._get_json(fr._rtdb_url("builds/version.json"))  # type: ignore[attr-defined]
+        builds_ver = fr._get_json(fr._rtdb_url("builds/version"))  # type: ignore[attr-defined]
         stats["builds_ver"] = builds_ver
     except Exception:
         stats["builds_ver"] = None
     try:
         import firebase_reporter as fr
-        installs = fr._get_json(fr._rtdb_url("installations.json"))  # type: ignore[attr-defined]
+        installs = fr._get_json(fr._rtdb_url("installations"))  # type: ignore[attr-defined]
         stats["installs"] = len(installs) if installs else 0
     except Exception:
         stats["installs"] = 0

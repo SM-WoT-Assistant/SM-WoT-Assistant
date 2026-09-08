@@ -158,7 +158,7 @@ class StatusPill(customtkinter.CTkFrame):
         super().__init__(parent, fg_color="transparent", **kw)
         color = STATUS_COLORS.get(status, TEXT_MUTED[_mode()])
         self._dot = customtkinter.CTkLabel(
-            self, text="\u25cf", text_color=color, font=customtkinter.CTkFont(size=10),
+            self, text="\u25cf", text_color=color, font=customtkinter.CTkFont(size=11),
             width=12,
         )
         self._dot.pack(side="left", padx=(0, 4))
@@ -186,27 +186,44 @@ def card(
     width: int = 200,
     height: int = 80,
     command: Any = None,
+    center: bool = False,
     **kw: Any,
 ) -> customtkinter.CTkFrame:
-    frame = customtkinter.CTkFrame(parent, width=width, height=height, **kw)
+    frame = customtkinter.CTkFrame(parent, width=width, height=height,
+        border_width=2, border_color="#2E3240", corner_radius=4, **kw)
     frame.pack_propagate(False)
+
+    anchor = "center" if center else "w"
+    px = 4 if center else 10
+    title_pady = (2, 0) if center else (6, 0)
+    sub_pady = (0, 2) if center else (0, 4)
+
+    if center:
+        spacer_top = customtkinter.CTkFrame(frame, fg_color="transparent", height=1)
+        spacer_top.pack(fill="x", expand=True)
+
     title_lbl = customtkinter.CTkLabel(
         frame, text=title, font=customtkinter.CTkFont(size=11),
-        text_color=_token(TEXT_MUTED), anchor="w",
+        text_color=_token(TEXT_MUTED), anchor=anchor, justify=anchor,
     )
-    title_lbl.pack(fill="x", padx=10, pady=(8, 0))
+    title_lbl.pack(fill="x", padx=px, pady=title_pady)
     val_lbl = customtkinter.CTkLabel(
-        frame, text=value, font=customtkinter.CTkFont(size=18, weight="bold"),
-        text_color=_token(TEXT), anchor="w",
+        frame, text=value, font=customtkinter.CTkFont(size=15, weight="bold"),
+        text_color=_token(TEXT), anchor=anchor, justify=anchor,
     )
-    val_lbl.pack(fill="x", padx=10)
+    val_lbl.pack(fill="x", padx=px)
     sub_lbl = None
     if subtitle:
         sub_lbl = customtkinter.CTkLabel(
             frame, text=subtitle, font=customtkinter.CTkFont(size=10),
-            text_color=_token(TEXT_MUTED), anchor="w",
+            text_color=_token(TEXT_MUTED), anchor=anchor, justify=anchor,
         )
-        sub_lbl.pack(fill="x", padx=10, pady=(0, 6))
+        sub_lbl.pack(fill="x", padx=px, pady=sub_pady)
+
+    if center:
+        spacer_bottom = customtkinter.CTkFrame(frame, fg_color="transparent", height=1)
+        spacer_bottom.pack(fill="x", expand=True)
+
     frame._val_lbl = val_lbl  # type: ignore[attr-defined]
     frame._sub_lbl = sub_lbl  # type: ignore[attr-defined]
     if command:
