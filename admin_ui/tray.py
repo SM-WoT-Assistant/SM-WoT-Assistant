@@ -1,7 +1,8 @@
 """Admin tray icon — pure Win32 ctypes (Shell_NotifyIconW).
 
-Pattern taken from the main app's tray_icon.py and old admin_app.py.
-Single-instance mutex via CreateMutexW + get_last_error()==183.
+Follows the same pattern as the main app's tray_icon.py:
+message-only window, WNDPROC sets a flag, main thread polls.
+Left click = open/restore. Right click = exit.
 """
 
 import ctypes
@@ -9,70 +10,45 @@ import ctypes.wintypes as wintypes
 import logging
 import os
 import sys
-import threading
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-SHELL32 = ctypes.WinDLL("shell32", use_last_error=True)
-USER32 = ctypes.WinDLL("user32", use_last_error=True)
+SHELL32 = ctypes.windll.shell32
+USER32 = ctypes.windll.user32
+KERNEL32 = ctypes.windll.kernel32
 
-NIM_ADD = 0x00000000
-NIM_MODIFY = 0x00000001
-NIM_DELETE = 0x00000002
-NIF_MESSAGE = 0x00000001
-NIF_ICON = 0x00000002
-NIF_TIP = 0x00000004
-NIF_INFO = 0x00000010
-WM_USER = 0x0400
+USER32.DefWindowProcW.argtypes = [
+    wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+]
+USER32.DefWindowProcW.restype = wintypes.LPARAM
+
+WM_APP = 0x8000
+NIM_ADD = 0
+NIM_MODIFY = 1
+NIM_DELETE = 2
+NIF_MESSAGE = 1
+NIF_ICON = 2
+NIF_TIP = 4
+NIF_INFO = 0x10
+WM_LBUTTONUP = 0x0202
+WM_RBUTTONUP = 0x0205
+IMAGE_ICON = 1
+LR_LOADFROMFILE = 0x0010
+LR_DEFAULTSIZE = 0x0040
 
 ICON_PATH = Path(__file__).parent.parent / "admin_icon.ico"
 
-WNDPROC = ctypes.WINFUNCTYPE(
-    ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
-)
 
-USER32.DefWindowProcW.argtypes = (
-    wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
-)
-USER32.DefWindowProcW.restype = ctypes.c_long
-
-
-class _GUID(ctypes.Structure):
-    _fields_ = [
-        ("Data1", wintypes.DWORD),
-        ("Data2", wintypes.WORD),
-        ("Data3", wintypes.WORD),
-        ("Data4", ctypes.c_byte * 8),
-    ]
-
-
-class _WNDCLASSEXW(ctypes.Structure):
-    _fields_ = [
-        ("cbSize", wintypes.UINT),
-        ("style", wintypes.UINT),
-        ("lpfnWndProc", WNDPROC),
-        ("cbClsExtra", ctypes.c_int),
-        ("cbWndExtra", ctypes.c_int),
-        ("hInstance", wintypes.HINSTANCE),
-        ("hIcon", wintypes.HICON),
-        ("hCursor", getattr(wintypes, 'HCURSOR', ctypes.c_void_p)),
-        ("hbrBackground", wintypes.HBRUSH),
-        ("lpszMenuName", wintypes.LPCWSTR),
-        ("lpszClassName", wintypes.LPCWSTR),
-        ("hIconSm", wintypes.HICON),
-    ]
-
-
-class _NOTIFYICONDATAW(ctypes.Structure):
+class NOTIFYICONDATAW(ctypes.Structure):
     _fields_ = [
         ("cbSize", wintypes.DWORD),
         ("hWnd", wintypes.HWND),
         ("uID", wintypes.UINT),
         ("uFlags", wintypes.UINT),
         ("uCallbackMessage", wintypes.UINT),
-        ("hIcon", wintypes.HICON),
+        ("hIcon", wintypes.HANDLE),
         ("szTip", wintypes.WCHAR * 128),
         ("dwState", wintypes.DWORD),
         ("dwStateMask", wintypes.DWORD),
@@ -80,142 +56,201 @@ class _NOTIFYICONDATAW(ctypes.Structure):
         ("uVersion", wintypes.UINT),
         ("szInfoTitle", wintypes.WCHAR * 64),
         ("dwInfoFlags", wintypes.DWORD),
-        ("guidItem", _GUID),
-        ("hBalloonIcon", wintypes.HICON),
+        ("guidItem", ctypes.c_byte * 16),
+        ("hBalloonIcon", wintypes.HANDLE),
     ]
 
 
-def _load_icon(path: Optional[str] = None) -> int:
-    p = path or str(ICON_PATH)
-    if not os.path.exists(p):
-        p = str(Path(sys.executable).parent / "admin_icon.ico") if getattr(sys, 'frozen', False) else p
-    try:
-        hicon = ctypes.windll.user32.LoadImageW(
-            0, p, 1, 0, 0, 0x00000010)
-        if hicon:
-            return hicon
-    except Exception:
-        pass
-    return 0
+class WNDCLASSW(ctypes.Structure):
+    _fields_ = [
+        ("style", wintypes.UINT),
+        ("lpfnWndProc", ctypes.c_void_p),
+        ("cbClsExtra", ctypes.c_int),
+        ("cbWndExtra", ctypes.c_int),
+        ("hInstance", wintypes.HINSTANCE),
+        ("hIcon", wintypes.HANDLE),
+        ("hCursor", wintypes.HANDLE),
+        ("hbrBackground", wintypes.HANDLE),
+        ("lpszMenuName", wintypes.LPCWSTR),
+        ("lpszClassName", wintypes.LPCWSTR),
+    ]
+
+
+WNDPROC = ctypes.WINFUNCTYPE(
+    wintypes.LPARAM, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+)
+
+_active_tray: Optional["AdminTray"] = None
+_class_registered = False
+_global_wndproc = None
+
+
+def _global_wndproc_func(hwnd, msg, wparam, lparam):
+    if msg == WM_APP and lparam in (WM_LBUTTONUP, WM_RBUTTONUP):
+        if _active_tray is not None:
+            _active_tray._on_click(lparam)
+    return USER32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+
+_wndproc_instance = WNDPROC(_global_wndproc_func)
+
+
+def _ensure_class_registered() -> None:
+    global _class_registered, _global_wndproc
+    if _class_registered:
+        return
+    hinstance = KERNEL32.GetModuleHandleW(None)
+    _global_wndproc = ctypes.cast(_wndproc_instance, ctypes.c_void_p).value
+    wc = WNDCLASSW()
+    wc.lpfnWndProc = _global_wndproc
+    wc.hInstance = hinstance
+    wc.lpszClassName = "SMAdminTray"
+    atom = USER32.RegisterClassW(ctypes.byref(wc))
+    if atom:
+        _class_registered = True
 
 
 class AdminTray:
-    """System tray icon for the admin application."""
+    """System tray icon for the admin application.
 
-    def __init__(self, on_open: Optional[Callable] = None, on_exit: Optional[Callable] = None) -> None:
+    Left click = open/restore window.
+    Right click = exit application.
+    Polling pattern — WNDPROC sets flags, main thread handles actions.
+    """
+
+    def __init__(
+        self,
+        on_open: Optional[Callable] = None,
+        on_exit: Optional[Callable] = None,
+    ) -> None:
         self.on_open = on_open
         self.on_exit = on_exit
-        self._hwnd: Optional[int] = None
-        self._icon = 0
-        self._running = False
-        self._thread: Optional[threading.Thread] = None
-        self._wndproc_ref = None
+        self._click_left = False
+        self._click_right = False
+        self._destroyed = False
+        self._msg_hwnd = 0
+        self._nid: Optional[NOTIFYICONDATAW] = None
+        self._hicon = 0
+        self._root: Any = None
+        self._poll_id: Any = None
 
-    def start(self) -> None:
-        if self._running:
+    def start(self, root: Any = None) -> None:
+        if self._destroyed:
             return
-        self._running = True
-        self._thread = threading.Thread(target=self._run, daemon=True)
-        self._thread.start()
+        self._root = root
+        _ensure_class_registered()
+
+        self._hicon = self._load_icon()
+
+        hinstance = KERNEL32.GetModuleHandleW(None)
+        self._msg_hwnd = USER32.CreateWindowExW(
+            0, "SMAdminTray", "",
+            0, 0, 0, 0, 0,
+            None, None, hinstance, None,
+        )
+        if not self._msg_hwnd:
+            print("[TRAY] Failed to create message window")
+            return
+
+        self._nid = NOTIFYICONDATAW()
+        self._nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+        self._nid.hWnd = self._msg_hwnd
+        self._nid.uID = 1
+        self._nid.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP
+        self._nid.uCallbackMessage = WM_APP
+        self._nid.hIcon = self._hicon
+        self._nid.szTip = "SM WoT Assistant Admin"
+
+        if SHELL32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(self._nid)):
+            self._start_poll()
+        else:
+            print("[TRAY] Shell_NotifyIconW NIM_ADD failed")
+
+    def _start_poll(self) -> None:
+        if self._root is not None:
+            self._poll_id = self._root.after(250, self._poll)
+
+    def _poll(self) -> None:
+        if self._destroyed:
+            return
+        if self._click_left:
+            self._click_left = False
+            if self.on_open:
+                try:
+                    self._root.after_idle(self.on_open)
+                except Exception:
+                    pass
+        if self._click_right:
+            self._click_right = False
+            if self.on_exit:
+                try:
+                    self._root.after_idle(self.on_exit)
+                except Exception:
+                    pass
+        if not self._destroyed:
+            self._poll_id = self._root.after(250, self._poll)
+
+    def _on_click(self, lparam: int) -> None:
+        """Called from WNDPROC — just set flags, no Tk calls."""
+        if lparam == WM_LBUTTONUP:
+            self._click_left = True
+        elif lparam == WM_RBUTTONUP:
+            self._click_right = True
+
+    def _load_icon(self) -> int:
+        p = str(ICON_PATH)
+        if not os.path.exists(p):
+            if getattr(sys, 'frozen', False):
+                p = str(Path(sys.executable).parent / "admin_icon.ico")
+        if not os.path.exists(p):
+            return 0
+        try:
+            hicon = USER32.LoadImageW(0, p, IMAGE_ICON, 0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE)
+            return hicon if hicon else 0
+        except Exception:
+            return 0
 
     def stop(self) -> None:
-        self._running = False
-        if self._hwnd:
+        self._destroyed = True
+        if self._nid:
             try:
-                SHELL32.Shell_NotifyIconW(NIM_DELETE, self._nid(self._hwnd))
+                SHELL32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(self._nid))
             except Exception:
                 pass
+            self._nid = None
+        if self._msg_hwnd:
             try:
-                USER32.DestroyWindow(self._hwnd)
+                USER32.DestroyWindow(self._msg_hwnd)
             except Exception:
                 pass
+            self._msg_hwnd = 0
+        if self._poll_id and self._root:
+            try:
+                self._root.after_cancel(self._poll_id)
+            except Exception:
+                pass
+            self._poll_id = None
+        if self._hicon:
+            try:
+                USER32.DestroyIcon(self._hicon)
+            except Exception:
+                pass
+            self._hicon = 0
 
     def show_notification(self, title: str, message: str) -> None:
-        if not self._hwnd:
+        if not self._nid:
             return
         try:
-            nid = self._nid(self._hwnd)
-            nid.uFlags |= NIF_INFO
+            nid = NOTIFYICONDATAW()
+            nid.cbSize = ctypes.sizeof(NOTIFYICONDATAW)
+            nid.hWnd = self._msg_hwnd
+            nid.uID = 1
+            nid.uFlags = NIF_INFO
             nid.szInfoTitle = title[:64]
             nid.szInfo = message[:256]
             SHELL32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
         except Exception:
-            logger.warning("Failed to show notification", exc_info=True)
+            logger.warning("Notification failed", exc_info=True)
 
-    def _run(self) -> None:
-        h_instance = ctypes.windll.kernel32.GetModuleHandleW(None)
-
-        self._wndproc_ref = WNDPROC(self._wndproc)
-        wc = _WNDCLASSEXW()
-        wc.cbSize = ctypes.sizeof(_WNDCLASSEXW)
-        wc.lpfnWndProc = self._wndproc_ref
-        wc.hInstance = h_instance
-        wc.lpszClassName = "SMAdminTray"
-        wc.hCursor = ctypes.windll.user32.LoadCursorW(0, 32512)
-        USER32.RegisterClassExW(ctypes.byref(wc))
-
-        self._hwnd = int(ctypes.windll.user32.CreateWindowExW(
-            0, "SMAdminTray", "SMAdminTray", 0, 0, 0, 0, 0,
-            0, 0, h_instance, None))
-
-        self._icon = _load_icon()
-        nid = self._nid(self._hwnd)
-        SHELL32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
-
-        msg = wintypes.MSG()
-        while self._running and ctypes.windll.user32.GetMessageW(ctypes.byref(msg), 0, 0, 0):
-            ctypes.windll.user32.TranslateMessage(ctypes.byref(msg))
-            ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
-
-    def _wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
-        try:
-            if msg == 0x0400:  # WM_USER (callback)
-                if lparam == 0x0205:  # WM_RBUTTONUP
-                    self._show_menu(hwnd)
-                elif lparam == 0x0202:  # WM_LBUTTONUP
-                    if self.on_open:
-                        try:
-                            self.on_open()
-                        except Exception:
-                            pass
-            elif msg == 0x0002:  # WM_DESTROY
-                self._running = False
-                ctypes.windll.user32.PostQuitMessage(0)
-        except Exception:
-            pass
-        return int(ctypes.windll.user32.DefWindowProcW(
-            hwnd, msg, wintypes.WPARAM(wparam), wintypes.LPARAM(lparam)))
-
-    def _show_menu(self, hwnd: int) -> None:
-        hmenu = ctypes.windll.user32.CreatePopupMenu()
-        ctypes.windll.user32.AppendMenuW(hmenu, 0x0000, 1, "Open Admin")
-        ctypes.windll.user32.AppendMenuW(hmenu, 0x0000, 2, "Exit")
-        pt = wintypes.POINT()
-        ctypes.windll.user32.GetCursorPos(ctypes.byref(pt))
-        ctypes.windll.user32.SetForegroundWindow(hwnd)
-        cmd = ctypes.windll.user32.TrackPopupMenu(
-            hmenu, 0x0100, pt.x, pt.y, 0, hwnd, None)
-        ctypes.windll.user32.DestroyMenu(hmenu)
-        if cmd == 1:
-            if self.on_open:
-                try:
-                    self.on_open()
-                except Exception:
-                    pass
-        elif cmd == 2:
-            if self.on_exit:
-                try:
-                    self.on_exit()
-                except Exception:
-                    pass
-
-    def _nid(self, hwnd: int) -> _NOTIFYICONDATAW:
-        nid = _NOTIFYICONDATAW()
-        nid.cbSize = ctypes.sizeof(_NOTIFYICONDATAW)
-        nid.hWnd = hwnd
-        nid.uID = 1
-        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
-        nid.uCallbackMessage = 0x0400
-        nid.hIcon = self._icon
-        nid.szTip = "SM WoT Assistant Admin"
-        return nid
+    def __del__(self) -> None:
+        self.stop()

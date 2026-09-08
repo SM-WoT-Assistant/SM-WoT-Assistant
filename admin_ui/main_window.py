@@ -1,7 +1,7 @@
-"""Admin main window — CustomTkinter + PanelDock.
+"""Admin main window — CustomTkinter with embedded grid panels.
 
-Entry point for the new admin application. Creates the main CTk window,
-registers all panels, and starts the mainloop.
+Entry point for the new admin application. Panels are CTkFrames
+inside the main window, arranged horizontally via grid.
 """
 
 import json
@@ -15,13 +15,12 @@ from typing import Any, Optional
 
 import customtkinter
 
-# Ensure project root is on sys.path for package imports
 _this_dir = Path(__file__).resolve().parent
 _project_root = _this_dir.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from admin_ui.panels import PanelDock, STATE_DOCKED_LEFT, STATE_DOCKED_RIGHT
+from admin_ui.panels import PanelDock
 from admin_ui.panels_content import (
     status_controller,
     builds_controller,
@@ -55,7 +54,7 @@ def _save_settings(settings: dict) -> None:
 
 
 class AdminApp(customtkinter.CTk):
-    """Admin desktop application with dockable panels."""
+    """Admin desktop application with embedded horizontal panels."""
 
     def __init__(self) -> None:
         theme_path = Path(__file__).parent / "theme.json"
@@ -68,8 +67,8 @@ class AdminApp(customtkinter.CTk):
         super().__init__()
 
         self.default_width = 1200
-        self.default_height = 800
-        self.title("SM WoT Assistant — Admin")
+        self.default_height = 700
+        self.title("SM WoT Assistant \u2014 Admin")
         self.geometry(f"{self.default_width}x{self.default_height}")
         self.minsize(900, 500)
         self.configure(fg_color="#0E0E13")
@@ -77,33 +76,31 @@ class AdminApp(customtkinter.CTk):
         self._settings = _load_settings()
         self._log_lines: list = []
 
-        self.tank_db = {}
-        self.prompts = {}
+        self.tank_db: dict = {}
+        self.prompts: dict = {}
         self._queue: list = []
         self._last_scan: float = 0
-        self._wot_path = self._settings.get("wot_path", "")
+        self._wot_path: str = self._settings.get("wot_path", "")
         self._scanning = False
         self._generating = False
         self._running = True
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
-        self._last_wg_check: float = 0
-        self._last_wg_ts = 0
-        self._wg_ver = ""
         self._errors_count = 0
 
         self.tray = AdminTray(on_open=self._tray_open, on_exit=self._tray_exit)
 
         self._build_layout()
-        self._build_menu()
         self._register_panels()
+        self._setup_close()
         self.after(500, self._load_data)
         self.after(500, self._start_background)
         self.after(1000, self._start_tray)
-        self.after(200, self._post_startup)
 
     def _build_layout(self) -> None:
+        self.grid_rowconfigure(0, weight=0)
         self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
         self.grid_columnconfigure(0, weight=1)
 
         self._topbar = customtkinter.CTkFrame(self, height=44, fg_color="#14161F")
@@ -145,6 +142,8 @@ class AdminApp(customtkinter.CTk):
 
         self._center = customtkinter.CTkFrame(self, fg_color="#0E0E13")
         self._center.grid(row=1, column=0, sticky="nsew")
+        self._center.grid_columnconfigure(0, weight=1)
+        self._center.grid_rowconfigure(0, weight=1)
 
         self._statusbar = customtkinter.CTkFrame(self, height=26, fg_color="#14161F")
         self._statusbar.grid(row=2, column=0, sticky="ew")
@@ -156,46 +155,43 @@ class AdminApp(customtkinter.CTk):
         )
         self._status_lbl.pack(side="left", padx=12)
 
-        self.panel_dock = PanelDock(self)
-
-    def _build_menu(self) -> None:
-        pass
+        self.panel_dock = PanelDock(self._center)
 
     def _register_panels(self) -> None:
         self.panel_dock.add_panel(
             "status", "Status", "status",
             build=status_controller(self)["build"],
             refresh=status_controller(self)["refresh"],
-            default_dock=STATE_DOCKED_LEFT, width=320,
+            width=320,
         )
         self.panel_dock.add_panel(
             "builds", "Builds", "builds",
             build=builds_controller(self)["build"],
             refresh=builds_controller(self)["refresh"],
-            default_dock=STATE_DOCKED_RIGHT, width=400,
+            width=400,
         )
         self.panel_dock.add_panel(
             "community", "Community", "community",
             build=community_controller(self)["build"],
             refresh=community_controller(self)["refresh"],
-            default_dock=STATE_DOCKED_RIGHT, width=400,
+            width=300,
         )
         self.panel_dock.add_panel(
             "errors", "Errors", "errors",
             build=errors_controller(self)["build"],
             refresh=errors_controller(self)["refresh"],
-            default_dock=STATE_DOCKED_RIGHT, width=400,
+            width=350,
         )
         self.panel_dock.add_panel(
             "log", "Log", "log",
             build=log_controller(self)["build"],
             refresh=log_controller(self)["refresh"],
-            default_dock=STATE_DOCKED_RIGHT, width=400,
+            width=350,
         )
         self.panel_dock.restore()
 
     def _start_tray(self) -> None:
-        self.tray.start()
+        self.tray.start(root=self)
 
     def _start_background(self) -> None:
         def _loop():
@@ -276,21 +272,12 @@ class AdminApp(customtkinter.CTk):
 
     def _gen_queue(self) -> None:
         if not self._queue:
-            self.log("Queue is empty — run Scan first")
+            self.log("Queue is empty \u2014 run Scan first")
             return
         self.log(f"Generation queued for {len(self._queue)} tanks")
 
     def _gen_all(self) -> None:
         self.log(f"Regen all: {len(self.tank_db)} tanks")
-
-    def _post_startup(self) -> None:
-        for _ in range(12):
-            if self.winfo_ismapped():
-                break
-            self.update_idletasks()
-            self.after(100, lambda: None)
-        self.panel_dock.raise_all()
-        self.panel_dock._sync_docked_heights()
 
     def _toggle_lang(self) -> None:
         current = self._settings.get("language", "en")
@@ -313,14 +300,12 @@ class AdminApp(customtkinter.CTk):
             text_color="#D4A843",
         ).pack(pady=(16, 12))
 
-        # WoT Path
         customtkinter.CTkLabel(dlg, text="WoT Path:", text_color="#DDE0EA",
                                font=customtkinter.CTkFont(size=12)).pack(anchor="w", padx=20)
         path_entry = customtkinter.CTkEntry(dlg, width=400)
         path_entry.insert(0, self._wot_path)
         path_entry.pack(padx=20, pady=(0, 8))
 
-        # Autostart
         autostart_var = customtkinter.BooleanVar(value=self._settings.get("launch_on_game_start", False))
         customtkinter.CTkCheckBox(
             dlg, text="Start with Windows (via tray watcher)",
@@ -328,7 +313,6 @@ class AdminApp(customtkinter.CTk):
             font=customtkinter.CTkFont(size=12),
         ).pack(anchor="w", padx=20, pady=4)
 
-        # Language display
         customtkinter.CTkLabel(dlg, text=f"Current language: {self._settings.get('language', 'en').upper()}",
                                text_color="#6E7284",
                                font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=20, pady=4)
@@ -368,11 +352,11 @@ class AdminApp(customtkinter.CTk):
                 0, winreg.KEY_SET_VALUE,
             )
             if enabled:
-                import sys
-                if getattr(sys, 'frozen', False):
-                    exe = sys.executable
+                import sys as _sys
+                if getattr(_sys, 'frozen', False):
+                    exe = _sys.executable
                 else:
-                    exe = f'"{sys.executable}"'
+                    exe = f'"{_sys.executable}"'
                 winreg.SetValueEx(key, "SM_WoT_Assistant_Admin", 0, winreg.REG_SZ, str(exe))
             else:
                 try:
@@ -384,7 +368,6 @@ class AdminApp(customtkinter.CTk):
             self.log(f"Autostart registry error: {e}")
 
     def notify(self, title: str, message: str) -> None:
-        """Show Windows balloon notification via tray."""
         self.tray.show_notification(title, message)
 
     def log(self, text: str) -> None:
@@ -401,7 +384,7 @@ class AdminApp(customtkinter.CTk):
         self._status_lbl.configure(text=text)
         self._status_pill.configure(text=f"\u25cf {text}", text_color=color)
 
-    def _setup_close(self):
+    def _setup_close(self) -> None:
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _on_close(self) -> None:
@@ -411,9 +394,8 @@ class AdminApp(customtkinter.CTk):
         self.destroy()
 
 
-def run():
+def run() -> None:
     app = AdminApp()
-    app._setup_close()
     app.mainloop()
 
 
