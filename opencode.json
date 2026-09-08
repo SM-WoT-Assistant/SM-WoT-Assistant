@@ -8,5 +8,9 @@
     "auto": false,
     "prune": false,
     "snapshots": false
+  },
+  "permissions": {
+    "edit": [{"pattern": "*", "action": "allow"}],
+    "write": [{"pattern": "*", "action": "allow"}]
   }
 }
