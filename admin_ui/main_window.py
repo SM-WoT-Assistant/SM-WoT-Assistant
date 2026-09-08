@@ -15,6 +15,12 @@ from typing import Any, Optional
 
 import customtkinter
 
+# Ensure project root is on sys.path for package imports
+_this_dir = Path(__file__).resolve().parent
+_project_root = _this_dir.parent
+if str(_project_root) not in sys.path:
+    sys.path.insert(0, str(_project_root))
+
 from admin_ui.panels import PanelDock, STATE_DOCKED_LEFT, STATE_DOCKED_RIGHT
 from admin_ui.panels_content import (
     status_controller,
