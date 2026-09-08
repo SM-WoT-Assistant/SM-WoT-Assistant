@@ -22,18 +22,19 @@ class StatusPanel(customtkinter.CTkFrame):
     def _build(self) -> None:
         from admin_ui.widgets import card
         labels = [
-            ("version", "Admin Version", "-"),
-            ("wg_version", "Game Version", "-"),
-            ("game_status", "Game Status", "No WoT"),
-            ("tanks_raw", "Tanks (raw)", "0"),
-            ("tanks_db", "Tanks (db)", "0"),
-            ("queue", "Queue", "0"),
-            ("last_scan", "Last Scan", "-"),
-            ("mismatch", "Tanks / Prompts", "-"),
-            ("errors", "Errors", "0"),
+            ("version", "Admin Version", "-", None),
+            ("wg_version", "Game Version", "-", None),
+            ("game_status", "Game Status", "No WoT", None),
+            ("tanks_raw", "Tanks (raw)", "0", None),
+            ("tanks_db", "Tanks (db)", "0", None),
+            ("queue", "Queue", "0", None),
+            ("last_scan", "Last Scan", "-", None),
+            ("mismatch", "Tanks / Prompts", "-", None),
+            ("errors", "Errors", "0", None),
         ]
-        for key, title, value in labels:
-            c = card(self, title=title, value=value, width=280, height=60)
+        for key, title, value, drilldown_key in labels:
+            c = card(self, title=title, value=value, width=280, height=60,
+                     command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None)
             c.pack(fill="x", padx=6, pady=3)
             self._cards[key] = c
 
@@ -89,6 +90,153 @@ class StatusPanel(customtkinter.CTkFrame):
             self._cards["errors"]._val_lbl.configure(text=str(errs), text_color=color)
         except Exception:
             pass
+
+    def _open_drilldown(self, card_key: str) -> None:
+        """Open a detail toptop for a specific card."""
+        if card_key == "tanks_db":
+            self._drilldown_tanks_db()
+        elif card_key == "queue":
+            self._drilldown_queue()
+        elif card_key == "errors":
+            self._drilldown_errors()
+        elif card_key == "mismatch":
+            self._drilldown_mismatch()
+
+    def _drilldown_tanks_db(self) -> None:
+        import tkinter as tk
+        dlg = customtkinter.CTkToplevel(self)
+        dlg.title("Tanks Database")
+        dlg.geometry("600x500")
+        dlg.transient(self.winfo_toplevel())
+        dlg.configure(fg_color="#1A1D28")
+        customtkinter.CTkLabel(dlg, text="Tanks Database",
+                               font=customtkinter.CTkFont(size=14, weight="bold"),
+                               text_color="#D4A843").pack(pady=(12, 4))
+        search = customtkinter.CTkEntry(dlg, placeholder_text="Search tanks...")
+        search.pack(fill="x", padx=12, pady=(0, 4))
+        from tkinter import ttk
+        style = ttk.Style()
+        style.configure("Drill.Treeview", background="#12141C", foreground="#DDE0EA",
+                        fieldbackground="#12141C", font=("Segoe UI", 10))
+        tree = ttk.Treeview(dlg, columns=("tag", "name", "tier"), show="headings",
+                            style="Drill.Treeview", height=20)
+        tree.heading("tag", text="Tag")
+        tree.heading("name", text="Name")
+        tree.heading("tier", text="Tier")
+        tree.column("tag", width=150)
+        tree.column("name", width=250)
+        tree.column("tier", width=60)
+        scroll = customtkinter.CTkScrollbar(dlg, command=tree.yview)
+        tree.configure(yscrollcommand=scroll.set)
+        tree.pack(side="left", fill="both", expand=True, padx=(12, 0))
+        scroll.pack(side="right", fill="y", padx=(0, 12))
+        def refresh_tree(q=""):
+            for item in tree.get_children():
+                tree.delete(item)
+            tank_db = self.app.tank_db if self.app else {}
+            for tag in sorted(tank_db.keys()):
+                if q and q not in tag.lower():
+                    continue
+                name = tank_db[tag].get("name", tag)
+                tier = tank_db[tag].get("tier", "?")
+                tree.insert("", "end", values=(tag, name, tier))
+        refresh_tree()
+        search.bind("<KeyRelease>", lambda e: refresh_tree(search.get().strip().lower()))
+
+    def _drilldown_queue(self) -> None:
+        dlg = customtkinter.CTkToplevel(self)
+        dlg.title("Queue (Changed Tanks)")
+        dlg.geometry("500x400")
+        dlg.transient(self.winfo_toplevel())
+        dlg.configure(fg_color="#1A1D28")
+        customtkinter.CTkLabel(dlg, text="Changed Tanks",
+                               font=customtkinter.CTkFont(size=14, weight="bold"),
+                               text_color="#D4A843").pack(pady=(12, 4))
+        from tkinter import ttk
+        tree = ttk.Treeview(dlg, columns=("tag", "name"), show="headings", height=18)
+        tree.heading("tag", text="Tag")
+        tree.heading("name", text="Name")
+        tree.column("tag", width=200)
+        tree.column("name", width=250)
+        tree.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        queue = self.app._queue if self.app else []
+        tank_db = self.app.tank_db if self.app else {}
+        for tag in queue:
+            name = tank_db.get(tag, {}).get("name", tag)
+            tree.insert("", "end", values=(tag, name))
+
+    def _drilldown_errors(self) -> None:
+        dlg = customtkinter.CTkToplevel(self)
+        dlg.title("Error Reports")
+        dlg.geometry("700x500")
+        dlg.transient(self.winfo_toplevel())
+        dlg.configure(fg_color="#1A1D28")
+        customtkinter.CTkLabel(dlg, text="Recent Errors",
+                               font=customtkinter.CTkFont(size=14, weight="bold"),
+                               text_color="#D4A843").pack(pady=(12, 4))
+        from tkinter import ttk
+        tree = ttk.Treeview(dlg, columns=("time", "type", "stage", "text"), show="headings", height=18)
+        tree.heading("time", text="Time")
+        tree.heading("type", text="Type")
+        tree.heading("stage", text="Stage")
+        tree.heading("text", text="Text")
+        tree.column("time", width=120)
+        tree.column("type", width=80)
+        tree.column("stage", width=100)
+        tree.column("text", width=350)
+        tree.pack(fill="both", expand=True, padx=12, pady=(0, 12))
+        try:
+            import firebase_reporter as fr
+            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")  # type: ignore[attr-defined]
+            import requests
+            resp = requests.get(url, timeout=10)
+            if resp.ok:
+                data = resp.json()
+                if data:
+                    for key, val in sorted(data.items(), key=lambda x: x[1].get("timestamp", 0), reverse=True)[:50]:
+                        ts = val.get("timestamp", "")
+                        if isinstance(ts, (int, float)):
+                            ts = time.strftime("%m-%d %H:%M", time.localtime(ts))
+                        tree.insert("", "end", values=(
+                            ts, val.get("error_type", "-"), val.get("stage", "-"),
+                            str(val.get("error_text", "-"))[:100]))
+        except Exception:
+            pass
+
+    def _drilldown_mismatch(self) -> None:
+        dlg = customtkinter.CTkToplevel(self)
+        dlg.title("Tanks vs Prompts Mismatch")
+        dlg.geometry("600x400")
+        dlg.transient(self.winfo_toplevel())
+        dlg.configure(fg_color="#1A1D28")
+        customtkinter.CTkLabel(dlg, text="Mismatch Analysis",
+                               font=customtkinter.CTkFont(size=14, weight="bold"),
+                               text_color="#D4A843").pack(pady=(12, 4))
+        try:
+            from admin_backend.data import check_mismatch
+            tank_db = self.app.tank_db if self.app else {}
+            prompts = self.app.prompts if self.app else {}
+            prompts_only, tanks_only = check_mismatch(tank_db, prompts)
+            if prompts_only:
+                customtkinter.CTkLabel(dlg, text=f"Prompts without tank DB ({len(prompts_only)}):",
+                                       text_color="#cc6666",
+                                       font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=12)
+                for t in prompts_only[:20]:
+                    customtkinter.CTkLabel(dlg, text=f"  {t}", text_color="#DDE0EA",
+                                           font=customtkinter.CTkFont(size=10)).pack(anchor="w", padx=20)
+            if tanks_only:
+                customtkinter.CTkLabel(dlg, text=f"Tanks without prompts ({len(tanks_only)}):",
+                                       text_color="#cc6666",
+                                       font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=12, pady=(8, 0))
+                for t in tanks_only[:20]:
+                    customtkinter.CTkLabel(dlg, text=f"  {t}", text_color="#DDE0EA",
+                                           font=customtkinter.CTkFont(size=10)).pack(anchor="w", padx=20)
+            if not prompts_only and not tanks_only:
+                customtkinter.CTkLabel(dlg, text="No mismatch — all OK",
+                                       text_color="#66cc66",
+                                       font=customtkinter.CTkFont(size=12)).pack(pady=20)
+        except Exception as e:
+            customtkinter.CTkLabel(dlg, text=f"Error: {e}", text_color="#cc6666").pack(pady=20)
 
 
 class BuildsPanel(customtkinter.CTkFrame):

@@ -185,6 +185,7 @@ def card(
     subtitle: str = "",
     width: int = 200,
     height: int = 80,
+    command: Any = None,
     **kw: Any,
 ) -> customtkinter.CTkFrame:
     frame = customtkinter.CTkFrame(parent, width=width, height=height, **kw)
@@ -208,6 +209,10 @@ def card(
         sub_lbl.pack(fill="x", padx=10, pady=(0, 6))
     frame._val_lbl = val_lbl  # type: ignore[attr-defined]
     frame._sub_lbl = sub_lbl  # type: ignore[attr-defined]
+    if command:
+        for widget in (frame, title_lbl, val_lbl):
+            widget.bind("<Button-1>", lambda e, cmd=command: cmd())
+        frame.configure(cursor="hand2")
     return frame
 
 

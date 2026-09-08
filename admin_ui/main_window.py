@@ -129,6 +129,14 @@ class AdminApp(customtkinter.CTk):
         )
         self._lang_btn.pack(side="right", padx=4)
 
+        self._settings_btn = customtkinter.CTkButton(
+            self._topbar, text="\u2699", width=36, height=28,
+            fg_color="transparent", hover_color="#1A1D28",
+            text_color="#6E7284", font=customtkinter.CTkFont(size=18),
+            command=self._open_settings,
+        )
+        self._settings_btn.pack(side="right", padx=4)
+
         self._center = customtkinter.CTkFrame(self, fg_color="#0E0E13")
         self._center.grid(row=1, column=0, sticky="nsew")
 
@@ -188,10 +196,10 @@ class AdminApp(customtkinter.CTk):
             while self._running:
                 try:
                     now = time.time()
-                    if now - self._last_heartbeat > 60:
+                    if now - self._last_heartbeat > 86400:
                         self._last_heartbeat = now
                         self._report_heartbeat()
-                    if now - self._last_errors_poll > 30:
+                    if now - self._last_errors_poll > 86400:
                         self._last_errors_poll = now
                         try:
                             from admin_backend.data import get_errors_count
@@ -284,6 +292,94 @@ class AdminApp(customtkinter.CTk):
         self._settings["language"] = new_lang
         _save_settings(self._settings)
         self._lang_btn.configure(text=new_lang.upper())
+
+    def _open_settings(self) -> None:
+        dlg = customtkinter.CTkToplevel(self)
+        dlg.title("Settings")
+        dlg.geometry("440x340")
+        dlg.transient(self)
+        dlg.grab_set()
+        dlg.configure(fg_color="#1A1D28")
+
+        customtkinter.CTkLabel(
+            dlg, text="Settings",
+            font=customtkinter.CTkFont(size=16, weight="bold"),
+            text_color="#D4A843",
+        ).pack(pady=(16, 12))
+
+        # WoT Path
+        customtkinter.CTkLabel(dlg, text="WoT Path:", text_color="#DDE0EA",
+                               font=customtkinter.CTkFont(size=12)).pack(anchor="w", padx=20)
+        path_entry = customtkinter.CTkEntry(dlg, width=400)
+        path_entry.insert(0, self._wot_path)
+        path_entry.pack(padx=20, pady=(0, 8))
+
+        # Autostart
+        autostart_var = customtkinter.BooleanVar(value=self._settings.get("launch_on_game_start", False))
+        customtkinter.CTkCheckBox(
+            dlg, text="Start with Windows (via tray watcher)",
+            variable=autostart_var, text_color="#DDE0EA",
+            font=customtkinter.CTkFont(size=12),
+        ).pack(anchor="w", padx=20, pady=4)
+
+        # Language display
+        customtkinter.CTkLabel(dlg, text=f"Current language: {self._settings.get('language', 'en').upper()}",
+                               text_color="#6E7284",
+                               font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=20, pady=4)
+
+        def _save():
+            self._wot_path = path_entry.get().strip()
+            self._settings["wot_path"] = self._wot_path
+            self._settings["launch_on_game_start"] = autostart_var.get()
+            _save_settings(self._settings)
+            self._apply_autostart(autostart_var.get())
+            self.log(f"Settings saved: wot_path={self._wot_path}")
+            dlg.destroy()
+
+        def _cancel():
+            dlg.destroy()
+
+        btn_frame = customtkinter.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=(16, 12))
+        customtkinter.CTkButton(
+            btn_frame, text="Save", width=100,
+            fg_color="#D4A843", hover_color="#B8922E", text_color="#12141C",
+            command=_save,
+        ).pack(side="right", padx=4)
+        customtkinter.CTkButton(
+            btn_frame, text="Cancel", width=100,
+            fg_color="transparent", hover_color="#2E3240", text_color="#6E7284",
+            border_width=1, border_color="#2E3240",
+            command=_cancel,
+        ).pack(side="right", padx=4)
+
+    def _apply_autostart(self, enabled: bool) -> None:
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0, winreg.KEY_SET_VALUE,
+            )
+            if enabled:
+                import sys
+                if getattr(sys, 'frozen', False):
+                    exe = sys.executable
+                else:
+                    exe = f'"{sys.executable}"'
+                winreg.SetValueEx(key, "SM_WoT_Assistant_Admin", 0, winreg.REG_SZ, str(exe))
+            else:
+                try:
+                    winreg.DeleteValue(key, "SM_WoT_Assistant_Admin")
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception as e:
+            self.log(f"Autostart registry error: {e}")
+
+    def notify(self, title: str, message: str) -> None:
+        """Show Windows balloon notification via tray."""
+        self.tray.show_notification(title, message)
 
     def log(self, text: str) -> None:
         ts = time.strftime("%H:%M:%S")
