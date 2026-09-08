@@ -2,18 +2,151 @@
 
 Architecture:
   - Backend: admin_backend.Application (Flask + background threads).
-  - Frontend: pywebview window showing admin_web/ via http://127.0.0.1:8765/.
-  - No tray icon — just a maximized browser window.
+  - Frontend: default browser via webbrowser.open().
+  - Tray: pure Win32 Shell_NotifyIconW (no pystray/pywebview dependency).
 """
 from __future__ import annotations
 import argparse
 import ctypes
+import ctypes.wintypes
 import os
 import sys
-import threading
 import time
+import webbrowser
 
-SW_MAXIMIZE = 3
+
+# ── Win32 constants ──
+WM_APP = 0x8000
+WM_TRAY_CALLBACK = WM_APP + 1
+NIF_ICON = 0x00000001
+NIF_MESSAGE = 0x00000002
+NIF_TIP = 0x00000004
+NIF_INFO = 0x00000010
+NIM_ADD = 0x00000000
+NIM_MODIFY = 0x00000001
+NIM_DELETE = 0x00000002
+WM_LBUTTONUP = 0x0202
+WM_LBUTTONDBLCLK = 0x0203
+SW_RESTORE = 9
+
+
+MUTEX_NAME = "SM_WoT_Assistant_Admin_SingleInstance"
+
+
+class NOTIFYICONDATAW(ctypes.Structure):
+    _fields_ = [
+        ("cbSize", ctypes.c_uint),
+        ("hWnd", ctypes.wintypes.HWND),
+        ("uID", ctypes.c_uint),
+        ("uFlags", ctypes.c_uint),
+        ("uCallbackMessage", ctypes.c_uint),
+        ("hIcon", ctypes.wintypes.HICON),
+        ("szTip", ctypes.c_wchar * 128),
+        ("dwState", ctypes.c_uint),
+        ("dwStateMask", ctypes.c_uint),
+        ("szInfo", ctypes.c_wchar * 256),
+        ("uTimeoutOrVersion", ctypes.c_uint),
+        ("szInfoTitle", ctypes.c_wchar * 64),
+        ("dwInfoFlags", ctypes.c_uint),
+        ("guidItem", ctypes.c_wchar * 39),
+        ("hBalloonIcon", ctypes.wintypes.HICON),
+    ]
+
+
+class _Win32Tray:
+    """Pure Win32 system tray icon — no pystray/tkinter dependency."""
+
+    def __init__(self, app_name: str, icon_path: str, on_activate, on_exit):
+        self._app_name = app_name
+        self._icon_path = icon_path
+        self._on_activate = on_activate
+        self._on_exit = on_exit
+        self._hwnd = None
+        self._hicon = 0
+        self._registered = False
+
+    def start(self):
+        user32 = ctypes.windll.user32
+        user32.DefWindowProcW.argtypes = [
+            ctypes.wintypes.HWND, ctypes.wintypes.UINT,
+            ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM,
+        ]
+        user32.DefWindowProcW.restype = ctypes.wintypes.LPARAM
+        hinst = ctypes.windll.kernel32.GetModuleHandleW(None)
+
+        WNDCLASSEXW = type("WNDCLASSEXW", (ctypes.Structure,), {"_fields_": [
+            ("cbSize", ctypes.c_uint), ("style", ctypes.c_uint),
+            ("lpfnWndProc", ctypes.c_void_p), ("cbClsExtra", ctypes.c_int),
+            ("cbWndExtra", ctypes.c_int), ("hInstance", ctypes.wintypes.HINSTANCE),
+            ("hIcon", ctypes.wintypes.HICON), ("hCursor", ctypes.c_void_p),
+            ("hbrBackground", ctypes.c_void_p), ("lpszMenuName", ctypes.c_wchar_p),
+            ("lpszClassName", ctypes.c_wchar_p), ("hIconSm", ctypes.wintypes.HICON),
+        ]})
+
+        def wndproc(hwnd, msg, wparam, lparam):
+            try:
+                if msg == WM_TRAY_CALLBACK and (lparam & 0xFFFF) in (WM_LBUTTONUP, WM_LBUTTONDBLCLK):
+                    self._on_activate()
+            except Exception:
+                pass
+            return user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+
+        self._wndproc = ctypes.WINFUNCTYPE(
+            ctypes.wintypes.LPARAM, ctypes.wintypes.HWND, ctypes.wintypes.UINT,
+            ctypes.wintypes.WPARAM, ctypes.wintypes.LPARAM
+        )(wndproc)
+
+        cls = WNDCLASSEXW()
+        cls.cbSize = ctypes.sizeof(cls)
+        cls.lpfnWndProc = ctypes.cast(self._wndproc, ctypes.c_void_p)
+        cls.hInstance = hinst
+        cls.lpszClassName = "AdminTrayClass"
+        user32.RegisterClassExW(ctypes.byref(cls))
+
+        self._hwnd = user32.CreateWindowExW(
+            0, "AdminTrayClass", "", 0, 0, 0, 0, 0, 0, 0, hinst, None
+        )
+
+        if os.path.isfile(self._icon_path):
+            self._hicon = user32.LoadImageW(0, self._icon_path, 1, 0, 0, 0x0010)
+        if not self._hicon:
+            self._hicon = user32.LoadIconW(0, 32512)
+
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(nid)
+        nid.hWnd = self._hwnd
+        nid.uID = 1
+        nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP
+        nid.uCallbackMessage = WM_TRAY_CALLBACK
+        nid.hIcon = self._hicon
+        nid.szTip = self._app_name
+        ctypes.windll.shell32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(nid))
+        self._registered = True
+
+    def notify(self, title: str, message: str):
+        if not self._registered:
+            return
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(nid)
+        nid.hWnd = self._hwnd
+        nid.uID = 1
+        nid.uFlags = NIF_INFO
+        nid.szInfoTitle = title[:64]
+        nid.szInfo = message[:256]
+        ctypes.windll.shell32.Shell_NotifyIconW(NIM_MODIFY, ctypes.byref(nid))
+
+    def remove(self):
+        if not self._registered:
+            return
+        nid = NOTIFYICONDATAW()
+        nid.cbSize = ctypes.sizeof(nid)
+        nid.hWnd = self._hwnd
+        nid.uID = 1
+        ctypes.windll.shell32.Shell_NotifyIconW(NIM_DELETE, ctypes.byref(nid))
+        self._registered = False
+        if self._hwnd:
+            ctypes.windll.user32.DestroyWindow(self._hwnd)
+            self._hwnd = None
 
 
 def _resolve_wot_path(cli_path: str = "") -> str:
@@ -33,12 +166,8 @@ def _resolve_wot_path(cli_path: str = "") -> str:
                 return wp
         except Exception:
             pass
-    common_paths = [
-        r"C:\Games\World_of_Tanks_EU",
-        r"D:\Games\World_of_Tanks_EU",
-        r"C:\Program Files (x86)\World_of_Tanks_EU",
-    ]
-    for p in common_paths:
+    for p in (r"C:\Games\World_of_Tanks_EU", r"D:\Games\World_of_Tanks_EU",
+              r"C:\Program Files (x86)\World_of_Tanks_EU"):
         if os.path.isdir(p):
             return p
     return ""
@@ -56,67 +185,19 @@ def _find_icon_path() -> str:
     return ""
 
 
-def _activate_window(hwnd: int) -> None:
-    """Maximize + foreground. No SetWindowPos — it breaks maximized state."""
-    if not hwnd:
-        return
-    user32 = ctypes.windll.user32
-    try:
-        user32.ShowWindow(hwnd, SW_MAXIMIZE)
-    except Exception:
-        pass
-    try:
-        user32.SetForegroundWindow(hwnd)
-    except Exception:
-        pass
-    try:
-        user32.BringWindowToTop(hwnd)
-    except Exception:
-        pass
-    print("[ADMIN] Window activated (maximized + foreground)")
-
-
-def _set_window_icon(hwnd: int, ico_path: str) -> None:
-    """Set window icon via WM_SETICON."""
-    if not hwnd or not ico_path or not os.path.isfile(ico_path):
-        return
-    user32 = ctypes.windll.user32
-    try:
-        hicon = user32.LoadImageW(0, ico_path, 1, 0, 0, 0x0010)
-        if hicon:
-            user32.SendMessageW(hwnd, 0x0080, 0, hicon)
-            user32.SendMessageW(hwnd, 0x0080, 1, hicon)
-            print(f"[ADMIN] Window icon set from {os.path.basename(ico_path)}")
-    except Exception as e:
-        print(f"[ADMIN] Icon set failed: {e}")
-
-
-def _get_webview_hwnd() -> int:
-    try:
-        import webview as wv
-        if wv.windows:
-            w = wv.windows[0]
-            native = getattr(w, "native", None)
-            if native is not None:
-                handle = getattr(native, "Handle", None)
-                if handle is not None:
-                    return int(handle.ToInt32())
-    except Exception:
-        pass
-    try:
-        hwnd = ctypes.windll.user32.FindWindowW(None, "SM WoT Assistant Admin")
-        if hwnd:
-            return hwnd
-    except Exception:
-        pass
-    return 0
-
-
 def main():
+    k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    k32.CreateMutexW.argtypes = (ctypes.c_void_p, ctypes.c_bool, ctypes.c_wchar_p)
+    k32.CreateMutexW.restype = ctypes.c_void_p
+    mutex = k32.CreateMutexW(None, False, MUTEX_NAME)
+    if ctypes.get_last_error() == 183:
+        print("[ADMIN] Another instance is running")
+        sys.exit(0)
+
     parser = argparse.ArgumentParser(description="SM WoT Assistant Admin (web)")
     parser.add_argument("--wot-path", default="", help="Path to WoT installation")
     parser.add_argument("--port", type=int, default=8765, help="API port (default 8765)")
-    parser.add_argument("--no-webview", action="store_true", help="Run API only (no webview window)")
+    parser.add_argument("--no-browser", action="store_true", help="Don't open browser automatically")
     args = parser.parse_args()
 
     wot_path = _resolve_wot_path(args.wot_path)
@@ -138,6 +219,8 @@ def main():
             time.sleep(0.1)
     print(f"[ADMIN] Flask API ready on 127.0.0.1:{args.port}")
 
+    url = f"http://127.0.0.1:{args.port}/"
+
     def cleanup():
         print("[ADMIN] Cleaning up...")
         try:
@@ -149,45 +232,42 @@ def main():
             app.stop()
         except Exception:
             pass
+        if tray:
+            tray.remove()
+        if mutex:
+            try:
+                k32.CloseHandle(mutex)
+            except Exception:
+                pass
 
     import atexit
     atexit.register(cleanup)
 
-    if not args.no_webview:
-        try:
-            import webview
-            w = webview.create_window(
-                "SM WoT Assistant Admin",
-                f"http://127.0.0.1:{args.port}/",
-                width=1100, height=700,
-                maximized=True,
-            )
-            print("[ADMIN] Starting webview GUI (maximized)...")
-            ico_path = _find_icon_path()
+    tray = None
+    icon_path = _find_icon_path()
 
-            def _post_start():
-                """Called after webview GUI loop starts — activate and icon."""
-                for _ in range(30):
-                    time.sleep(0.5)
-                    hwnd = _get_webview_hwnd()
-                    if hwnd:
-                        _activate_window(hwnd)
-                        if ico_path:
-                            _set_window_icon(hwnd, ico_path)
-                        return
-                print("[ADMIN] Could not find webview HWND after 15s")
+    def on_tray_activate():
+        webbrowser.open(url)
 
-            webview.start(func=_post_start)
-            print("[ADMIN] webview closed")
-        except ImportError:
-            print("[ADMIN] pywebview not available, skipping GUI")
-            print("[ADMIN] Falling back to default browser...")
-            import webbrowser
-            webbrowser.open(f"http://127.0.0.1:{args.port}/")
-            try:
-                input("Press Enter to exit...")
-            except (KeyboardInterrupt, EOFError):
-                pass
+    def on_tray_exit():
+        cleanup()
+        os._exit(0)
+
+    tray = _Win32Tray("SM WoT Assistant Admin", icon_path, on_tray_activate, on_tray_exit)
+    tray.start()
+    print("[ADMIN] Tray icon started")
+
+    if not args.no_browser:
+        webbrowser.open(url)
+        print(f"[ADMIN] Opened {url}")
+
+    tray.notify("SM WoT Assistant Admin", f"Running on {url}")
+
+    try:
+        while True:
+            time.sleep(60)
+    except (KeyboardInterrupt, EOFError):
+        pass
 
     cleanup()
     sys.exit(0)

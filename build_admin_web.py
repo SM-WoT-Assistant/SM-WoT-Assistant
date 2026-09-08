@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Build SM WoT Assistant Admin (CustomTkinter + pywebview hybrid) as
-standalone onedir EXE.
+"""Build SM WoT Assistant Admin (Flask + webbrowser) as standalone onedir EXE.
 
 Output: dist/SM WoT Assistant Admin/SM WoT Assistant Admin.exe
-        + _internal/ (admin_backend, admin_web, pywebview, customtkinter, ...)
+        + _internal/ (admin_backend, admin_web, flask, selenium, ...)
 """
 from __future__ import annotations
 import os, shutil, subprocess, sys
@@ -39,7 +38,7 @@ def _rmtree_tolerant(path):
 
 
 def build_admin_web(dist_dir=None):
-    """Build admin_main.py as --onedir EXE with pywebview + customtkinter."""
+    """Build admin_main.py as --onedir EXE with webbrowser + Flask API."""
     if dist_dir is None:
         dist_dir = DIST_DIR
     admin_exe_dir = os.path.join(dist_dir, "SM WoT Assistant Admin")
@@ -52,7 +51,7 @@ def build_admin_web(dist_dir=None):
     add_data_args = []
     for d in datas:
         add_data_args.extend(["--add-data", os.path.join(d) + SEP + "."])
-    hidden = ["customtkinter", "pywebview", "pystray", "PIL", "flask", "flask_cors", "werkzeug", "selenium", "selenium.webdriver.chrome.webdriver"]
+    hidden = ["PIL", "flask", "flask_cors", "werkzeug", "selenium", "selenium.webdriver.chrome.webdriver"]
     for h in hidden:
         add_data_args.extend(["--hidden-import", h])
     cmd = [PYTHON_EXE, "-m", "PyInstaller",
