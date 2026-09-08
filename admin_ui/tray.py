@@ -29,6 +29,15 @@ WM_USER = 0x0400
 
 ICON_PATH = Path(__file__).parent.parent / "admin_icon.ico"
 
+WNDPROC = ctypes.WINFUNCTYPE(
+    ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+)
+
+USER32.DefWindowProcW.argtypes = (
+    wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
+)
+USER32.DefWindowProcW.restype = ctypes.c_long
+
 
 class _GUID(ctypes.Structure):
     _fields_ = [
@@ -43,7 +52,7 @@ class _WNDCLASSEXW(ctypes.Structure):
     _fields_ = [
         ("cbSize", wintypes.UINT),
         ("style", wintypes.UINT),
-        ("lpfnWndProc", ctypes.c_void_p),
+        ("lpfnWndProc", WNDPROC),
         ("cbClsExtra", ctypes.c_int),
         ("cbWndExtra", ctypes.c_int),
         ("hInstance", wintypes.HINSTANCE),
@@ -74,11 +83,6 @@ class _NOTIFYICONDATAW(ctypes.Structure):
         ("guidItem", _GUID),
         ("hBalloonIcon", wintypes.HICON),
     ]
-
-
-WNDPROC = ctypes.WINFUNCTYPE(
-    ctypes.c_long, wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM
-)
 
 
 def _load_icon(path: Optional[str] = None) -> int:
@@ -164,19 +168,23 @@ class AdminTray:
             ctypes.windll.user32.DispatchMessageW(ctypes.byref(msg))
 
     def _wndproc(self, hwnd: int, msg: int, wparam: int, lparam: int) -> int:
-        if msg == 0x0400:  # WM_USER (callback)
-            if lparam == 0x0205:  # WM_RBUTTONUP
-                self._show_menu(hwnd)
-            elif lparam == 0x0202:  # WM_LBUTTONUP
-                if self.on_open:
-                    try:
-                        self.on_open()
-                    except Exception:
-                        pass
-        elif msg == 0x0002:  # WM_DESTROY
-            self._running = False
-            ctypes.windll.user32.PostQuitMessage(0)
-        return ctypes.windll.user32.DefWindowProcW(hwnd, msg, wparam, lparam)
+        try:
+            if msg == 0x0400:  # WM_USER (callback)
+                if lparam == 0x0205:  # WM_RBUTTONUP
+                    self._show_menu(hwnd)
+                elif lparam == 0x0202:  # WM_LBUTTONUP
+                    if self.on_open:
+                        try:
+                            self.on_open()
+                        except Exception:
+                            pass
+            elif msg == 0x0002:  # WM_DESTROY
+                self._running = False
+                ctypes.windll.user32.PostQuitMessage(0)
+        except Exception:
+            pass
+        return int(ctypes.windll.user32.DefWindowProcW(
+            hwnd, msg, wintypes.WPARAM(wparam), wintypes.LPARAM(lparam)))
 
     def _show_menu(self, hwnd: int) -> None:
         hmenu = ctypes.windll.user32.CreatePopupMenu()
