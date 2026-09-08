@@ -142,8 +142,6 @@ class AdminApp(customtkinter.CTk):
 
         self._center = customtkinter.CTkFrame(self, fg_color="#0E0E13")
         self._center.grid(row=1, column=0, sticky="nsew")
-        self._center.grid_columnconfigure(0, weight=1)
-        self._center.grid_rowconfigure(0, weight=1)
 
         self._statusbar = customtkinter.CTkFrame(self, height=26, fg_color="#14161F")
         self._statusbar.grid(row=2, column=0, sticky="ew")
