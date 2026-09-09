@@ -1023,6 +1023,97 @@ def _publish_tank_data(base_dir, user_data_dir=None):
         print(f"[ADMIN] tank_data: no files published")
 
 
+def _extract_full_pipeline(wot_path):
+    """Run the full client-side extraction pipeline from the admin.
+
+    Sequence:
+      1. TankExtractor.extract_metadata() → extracted_data/
+      2. TankExtractor.build_database()    → tank_db.json
+      3. build_crew_builds.main()          → crew_builds.json
+      4. extract_loadouts()                → equipment_loadouts.json
+      5. GameEntitiesExtractor.run_step1() → game_entities.json
+
+    Each step depends on the previous. Steps that fail are logged and skipped
+    (pipeline continues with remaining steps).
+    """
+    scripts_pkg = os.path.join(wot_path, "res", "packages", "scripts.pkg")
+    if not os.path.exists(scripts_pkg):
+        print(f"[ADMIN] pipeline: scripts.pkg not found at {scripts_pkg}")
+        return False
+
+    print(f"[ADMIN] pipeline: starting full extraction from {wot_path}")
+
+    # ── Step 1: Extract + decode all vehicle XMLs ──────
+    print("[ADMIN] pipeline [1/5]: extract_metadata...")
+    try:
+        from tank_extractor import TankExtractor
+        te = TankExtractor(wot_path)
+        ok = te.extract_metadata()
+        if not ok:
+            print("[ADMIN] pipeline [1/5]: extract_metadata FAILED")
+        else:
+            print("[ADMIN] pipeline [1/5]: extract_metadata OK")
+    except Exception as e:
+        print(f"[ADMIN] pipeline [1/5]: extract_metadata ERROR: {e}")
+        traceback.print_exc()
+        te = None
+
+    # ── Step 2: Build tank_db.json ─────────────────────
+    print("[ADMIN] pipeline [2/5]: build_database...")
+    try:
+        if te is None:
+            from tank_extractor import TankExtractor
+            te = TankExtractor(wot_path)
+        ok = te.build_database()
+        if ok:
+            print("[ADMIN] pipeline [2/5]: build_database OK")
+        else:
+            print("[ADMIN] pipeline [2/5]: build_database FAILED")
+    except Exception as e:
+        print(f"[ADMIN] pipeline [2/5]: build_database ERROR: {e}")
+        traceback.print_exc()
+
+    # ── Step 3: Build crew_builds.json ─────────────────
+    print("[ADMIN] pipeline [3/5]: build_crew_builds...")
+    try:
+        import build_crew_builds
+        build_crew_builds.main()
+        print("[ADMIN] pipeline [3/5]: build_crew_builds OK")
+    except Exception as e:
+        print(f"[ADMIN] pipeline [3/5]: build_crew_builds ERROR: {e}")
+        traceback.print_exc()
+
+    # ── Step 4: Extract equipment loadouts ─────────────
+    print("[ADMIN] pipeline [4/5]: extract_equipment_loadouts...")
+    try:
+        from extract_equipment_loadouts import extract_loadouts
+        import config as _cfg
+        out_path = os.path.join(_cfg.BASE_DIR, "equipment_loadouts.json")
+        ok = extract_loadouts(scripts_pkg, out_path)
+        if ok:
+            print("[ADMIN] pipeline [4/5]: extract_equipment_loadouts OK")
+        else:
+            print("[ADMIN] pipeline [4/5]: extract_equipment_loadouts FAILED")
+    except Exception as e:
+        print(f"[ADMIN] pipeline [4/5]: extract_equipment_loadouts ERROR: {e}")
+        traceback.print_exc()
+
+    # ── Step 5: Extract game entities ──────────────────
+    print("[ADMIN] pipeline [5/5]: game_entities...")
+    try:
+        from parse_game_entities import GameEntitiesExtractor
+        ge = GameEntitiesExtractor()
+        ge.run_step1()
+        ge.save_to_json()
+        print("[ADMIN] pipeline [5/5]: game_entities OK")
+    except Exception as e:
+        print(f"[ADMIN] pipeline [5/5]: game_entities ERROR: {e}")
+        traceback.print_exc()
+
+    print("[ADMIN] pipeline: extraction complete")
+    return True
+
+
 # ── Daily fill sweep for incomplete builds ──────────
 def _normalize_crew_role(role):
     """Normalize a crew role name to the canonical base role(s) used by client data.
@@ -1643,40 +1734,40 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
 def listen_mode(tank_db, wot_path=None):
     """Poll pending_updates and auto-generate. Periodically scan for game changes."""
     print(f"\n=== Listen Mode {'(WoT: ' + wot_path + ')' if wot_path else '(no WoT path)'} ===\n")
-    _last_scan = -3600  # trigger initial scan immediately
+    _last_scan = -86400  # trigger initial scan immediately (24h interval)
     _last_wg = -21600  # trigger initial WG check immediately
     _last_sweep = -86400  # trigger initial fill sweep immediately
-    _last_tank_data_publish = -86400  # trigger initial tank_data publish immediately
 
-    # Initial tank_data publish on startup
+    # Initial extraction pipeline on startup
     if wot_path:
         try:
+            _extract_full_pipeline(wot_path)
             import config as _cfg
             _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
         except Exception as e:
-            print(f"[LISTEN] Initial tank_data publish error: {e}")
+            print(f"[LISTEN] Initial pipeline + publish error: {e}")
 
     while True:
         now = time.time()
 
-        # ── Periodic scripts.pkg scan (every 60 min) ─────
-        if wot_path and now - _last_scan > 3600:
+        # ── Periodic scripts.pkg scan (every 24 hours) ─────
+        if wot_path and now - _last_scan > 86400:
             _last_scan = now
             changed = detect_changed_tanks(wot_path)
             if changed:
-                print(f"[LISTEN] {len(changed)} changed - writing pending_updates")
+                print(f"[LISTEN] {len(changed)} changed - running pipeline + pending_updates")
+                try:
+                    _extract_full_pipeline(wot_path)
+                    import config as _cfg
+                    _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
+                except Exception as e:
+                    print(f"[LISTEN] pipeline after change error: {e}")
                 _put_json(_rtdb_url("pending_updates/builds"), {
                     "status": "generating",
                     "queue": changed,
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                     "message": f"{len(changed)} tanks changed in scripts.pkg"
                 })
-                # Publish tank data to Firebase when scripts.pkg changes
-                try:
-                    import config as _cfg
-                    _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
-                except Exception as e:
-                    print(f"[LISTEN] tank_data publish error: {e}")
 
         # ── WG API check (every 6 hours) ─────────────────
         if now - _last_wg > 21600:
@@ -1764,16 +1855,29 @@ def listen_mode(tank_db, wot_path=None):
 # ── Main ────────────────────────────────────────────
 def main():
     import argparse
-    parser = argparse.ArgumentParser(description="AI Tank Build Generator")
+    parser = argparse.ArgumentParser(description="SM WoT Assistant — Admin Pipeline")
+    parser.add_argument("--extract", action="store_true",
+                        help="Run full extraction pipeline (tank_db, crew, equipment, entities) and publish to Firebase")
     parser.add_argument("--popular", action="store_true", help="Regenerate popular tanks")
     parser.add_argument("--builds", nargs="?", const=True, default=False, help="Regenerate builds (optional: specific tag)")
     parser.add_argument("--listen", action="store_true", help="Watch pending_updates and auto-run")
-    parser.add_argument("--wot-path", type=str, default=None, help="Path to WoT installation for change detection")
+    parser.add_argument("--wot-path", type=str, default=None, help="Path to WoT installation")
     args = parser.parse_args()
 
     print("="*60)
-    print("SM WoT Assistant — AI Build Generator")
+    print("SM WoT Assistant — Admin Pipeline")
     print("="*60)
+
+    if args.extract:
+        if not args.wot_path:
+            print("[ERROR] --extract requires --wot-path")
+            return
+        print(f"[EXTRACT] Full pipeline from {args.wot_path}")
+        _extract_full_pipeline(args.wot_path)
+        import config as _cfg
+        _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
+        print("\nDone.")
+        return
 
     tank_db = load_tank_db()
     print(f"[DB] {len(tank_db)} tanks")
@@ -1793,9 +1897,6 @@ def main():
             print(f"[PROMPTS] {len(prompts)} cached")
             generate_builds(driver, tank_db, prompts, single_tag=single_tag, wot_path=args.wot_path)
         else:
-            # Default: publish tank_data to Firebase
-            import config as _cfg
-            _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
             parser.print_help()
     finally:
         driver.quit()
