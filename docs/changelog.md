@@ -4,25 +4,31 @@
 
 ---
 
-## v1.0.73 — Admin Pipeline Migration (09.09.2026)
+## v1.0.73 — Admin Pipeline Integration + New UI (09.09.2026)
 
-**Ключова зміна:** Перенесення збирання танкових даних з клієнта в адмін-програму.
+**Ключова зміна:** Інтеграція extraction pipeline в новий CustomTkinter UI адмін-програми.
 
-### Відключено в клієнті (map_manager.py):
+### admin_ui/main_window.py — повна інтеграція з pipeline:
 
-| Блок | Що робить | Статус |
-|------|-----------|--------|
-| `_ADMIN_MIGRATION = True` | Керує відключенням через flag | НОВИЙ |
-| pending_updates/builds signal (141-162) | Сигнал Firebase про зміну гри | DISABLED — admin detect independently |
-| TTH validation (163-246) | Перевірка покриття TTH | DISABLED — client downloads from Firebase |
-| need_tank_rebuild / should_refresh_data (237-248) | Вирішує чи запускати pipeline | DISABLED — always False |
-| TankExtractor (286-346) | extract_metadata, build_database, update_tth, compact_descr, extract_icons | DISABLED — admin handles |
-| build_crew_builds.main() (349-355) | Crew builds з scripts.pkg | DISABLED — admin handles |
-| extract_equipment_loadouts (357-365) | Equipment з scripts.pkg | DISABLED — admin handles |
-| GameEntitiesExtractor (367-376) | Entities з scripts.pkg | DISABLED — admin handles |
-| reload_tank_data trigger (384-385) | Перезавантаження після pipeline | DISABLED — triggered by Firebase sync |
-| Version check + maps extraction | MapExtractor, has_changed(), ext.extract() | ЗАЛИШЕНО |
-| Icon extraction | tex.extract_icons() | ЗАЛИШЕНО (через TankExtractor в іншому місці) |
+| Метод | Що робить |
+|-------|-----------|
+| `_do_scan()` | Викликає `admin_build_generator.detect_changed_tanks()` |
+| `_gen_queue()` | Викликає `generate_builds(queue=...)` в thread |
+| `_gen_all()` | Викликає `generate_builds(force=True)` в thread |
+| `_extract_now()` | `_extract_full_pipeline()` + `_publish_tank_data()` в thread |
+| `_listen_toggle()` | 24h auto-extract daemon loop |
+
+### BuildsPanel (panels_content.py):
+
+- Кнопки: Scan, Generate Queue, Regen All, **Extract**, **Listen**
+- Extract: запускає повний pipeline (game client → extraction → Firebase)
+- Listen: toggle auto-extract кожні 24h
+
+### build_admin.py:
+
+- Entry point змінено з `admin_app.py` → `admin_ui/main_window.py`
+- Додано hidden imports: admin_ui, admin_backend, extraction pipeline, customtkinter
+- Admin version: 1.0.45 → 1.0.46
 
 ### Додано в клієнті (stats_ai.py + main.py):
 
