@@ -360,6 +360,12 @@ class BuildsPanel(customtkinter.CTkFrame):
         primary_button(btn_frame, "Generate Queue", width=110, command=self._on_gen_queue).pack(side="left", padx=2)
         ghost_button(btn_frame, "Regen All", width=80, command=self._on_regen_all).pack(side="left", padx=2)
 
+        btn_frame2 = customtkinter.CTkFrame(self, fg_color="transparent")
+        btn_frame2.pack(fill="x", padx=6, pady=(0, 4))
+        primary_button(btn_frame2, "Extract", width=80, command=self._on_extract).pack(side="left", padx=2)
+        self._listen_btn = ghost_button(btn_frame2, "Listen: OFF", width=100, command=self._on_listen)
+        self._listen_btn.pack(side="left", padx=2)
+
         self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
         self._search.pack(fill="x", padx=6, pady=(0, 4))
         self._search.bind("<KeyRelease>", self._on_search)
@@ -378,6 +384,16 @@ class BuildsPanel(customtkinter.CTkFrame):
     def _on_regen_all(self) -> None:
         if self.app and hasattr(self.app, '_gen_all'):
             self.app._gen_all()
+
+    def _on_extract(self) -> None:
+        if self.app and hasattr(self.app, '_extract_now'):
+            self.app._extract_now()
+
+    def _on_listen(self) -> None:
+        if self.app and hasattr(self.app, '_listen_toggle'):
+            self.app._listen_toggle()
+            active = getattr(self.app, '_listen_active', False)
+            self._listen_btn.configure(text=f"Listen: {'ON' if active else 'OFF'}")
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()

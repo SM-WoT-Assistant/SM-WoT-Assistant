@@ -16,7 +16,7 @@ def read_version():
 
 
 def build_admin_exe(version, dist_dir=None):
-    """Build admin_app.py as --onedir EXE.
+    """Build admin_ui/main_window.py as --onedir EXE.
     dist_dir: override output dir (used when the canonical ADMIN_DIR is
     locked by the invisible handle incident #1546 — WinError 32 on the
     folder itself while writing inside still works)."""
@@ -24,10 +24,17 @@ def build_admin_exe(version, dist_dir=None):
         dist_dir = DIST_DIR
     admin_exe_dir = os.path.join(dist_dir, "SM WoT Assistant Admin")
     print(f"[BUILD] Building Admin v{version}...")
-    admin_py = os.path.join(BASE_DIR, "admin_app.py")
-    if not os.path.exists(admin_py):
-        print("[BUILD] FATAL: admin_app.py not found")
+    entry_py = os.path.join(BASE_DIR, "admin_ui", "main_window.py")
+    if not os.path.exists(entry_py):
+        print("[BUILD] FATAL: admin_ui/main_window.py not found")
         sys.exit(1)
+
+    def _add(rel_path):
+        src = os.path.join(BASE_DIR, rel_path)
+        if os.path.exists(src):
+            return ["--add-data", f"{src}{os.pathsep}."]
+        print(f"[BUILD] WARN: {rel_path} not found, skipping")
+        return []
 
     result = subprocess.run([
         PYTHON_EXE, "-m", "PyInstaller",
@@ -39,32 +46,61 @@ def build_admin_exe(version, dist_dir=None):
         "--specpath", os.path.join(BASE_DIR, "build"),
         "--clean",
         "--noconfirm",
-        "--add-data", f"{os.path.join(BASE_DIR, 'admin_icon.ico')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'admin_version.txt')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, '_fill_all_builds.py')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'generate_prompt_v2.py')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'stats_data.py')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'tank_db.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'tank_tth.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'tank_slots_full.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'translations.py')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'game_entities_english.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'crew_builds.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'prompts_cache.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'game_entities.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'admin_uk_seed.json')}{os.pathsep}.",
-        "--add-data", f"{os.path.join(BASE_DIR, 'temp_scripts', 'decoded', 'tiers_devices_decoded.xml')}{os.pathsep}temp_scripts/decoded/",
+        # Admin UI package
+        "--collect-submodules", "admin_ui",
+        "--collect-submodules", "admin_backend",
+        # Pipeline dependencies
+        "--hidden-import", "admin_build_generator",
+        "--hidden-import", "admin_auth",
+        "--hidden-import", "tank_extractor",
+        "--hidden-import", "build_crew_builds",
+        "--hidden-import", "extract_equipment_loadouts",
+        "--hidden-import", "parse_game_entities",
+        "--hidden-import", "name_localizer",
+        "--hidden-import", "decode_xml",
+        "--hidden-import", "wot_decoder",
+        "--hidden-import", "language_module",
+        "--hidden-import", "tth_updater",
+        "--hidden-import", "config",
+        "--hidden-import", "firebase_reporter",
+        "--hidden-import", "firebase_identity",
+        "--hidden-import", "firebase_groups",
+        "--hidden-import", "firebase_drawings",
+        "--hidden-import", "stats_data",
+        "--hidden-import", "stats_ai",
+        "--hidden-import", "generate_prompt_v2",
+        "--hidden-import", "_fill_all_builds",
+        # UI framework
+        "--hidden-import", "customtkinter",
         "--hidden-import", "PIL",
         "--hidden-import", "PIL._tkinter_finder",
         "--hidden-import", "requests",
         "--hidden-import", "deep_translator",
+        # Selenium (for build generation)
         "--hidden-import", "selenium.webdriver.chrome.webdriver",
         "--hidden-import", "selenium.webdriver.chrome.service",
         "--hidden-import", "selenium.webdriver.chrome.options",
         "--hidden-import", "selenium.webdriver.common.service",
         "--hidden-import", "selenium.webdriver.common.selenium_manager",
         "--hidden-import", "selenium.webdriver.common.driver_finder",
-        admin_py,
+        # Data files
+        *_add("admin_icon.ico"),
+        *_add("admin_version.txt"),
+        *_add("_fill_all_builds.py"),
+        *_add("generate_prompt_v2.py"),
+        *_add("stats_data.py"),
+        *_add("tank_db.json"),
+        *_add("tank_tth.json"),
+        *_add("tank_slots_full.json"),
+        *_add("translations.py"),
+        *_add("game_entities_english.json"),
+        *_add("crew_builds.json"),
+        *_add("prompts_cache.json"),
+        *_add("game_entities.json"),
+        *_add("admin_uk_seed.json"),
+        *_add("equipment_loadouts.json"),
+        *_add("temp_scripts/decoded/tiers_devices_decoded.xml"),
+        entry_py,
     ], cwd=BASE_DIR)
 
     if result.returncode != 0:

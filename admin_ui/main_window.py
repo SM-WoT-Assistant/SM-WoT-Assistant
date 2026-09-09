@@ -277,8 +277,8 @@ class AdminApp(customtkinter.CTk):
         self._scanning = True
         self.log("Scanning for changes...")
         try:
-            from admin_backend.data import get_queue
-            changed = get_queue(self.tank_db, self.prompts, self._wot_path)
+            from admin_build_generator import detect_changed_tanks, _manifest_default_path
+            changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
             self._last_scan = time.time()
             self._queue = changed
             if changed:
@@ -297,10 +297,104 @@ class AdminApp(customtkinter.CTk):
         if not self._queue:
             self.log("Queue is empty \u2014 run Scan first")
             return
-        self.log(f"Generation queued for {len(self._queue)} tanks")
+        self.log(f"Generating builds for {len(self._queue)} queued tanks...")
+        threading.Thread(target=self._do_gen_queue, daemon=True).start()
+
+    def _do_gen_queue(self) -> None:
+        self._generating = True
+        self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
+        try:
+            from admin_build_generator import generate_builds, load_tank_db, load_prompts
+            tank_db = load_tank_db()
+            prompts = load_prompts()
+            ok, done_tags, reasons = generate_builds(
+                None, tank_db, prompts,
+                queue=self._queue, wot_path=self._wot_path,
+            )
+            if ok:
+                self.log(f"Generation complete: {len(done_tags)} tanks built")
+                self._queue = [t for t in self._queue if t not in done_tags]
+            else:
+                summary = reasons.get("summary", "unknown") if reasons else "failed"
+                self.log(f"Generation failed: {summary}")
+            self.after(0, self.panel_dock.refresh)
+        except Exception as e:
+            self.log(f"Generate error: {e}")
+        finally:
+            self._generating = False
+            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
 
     def _gen_all(self) -> None:
-        self.log(f"Regen all: {len(self.tank_db)} tanks")
+        self.log(f"Regenerating ALL {len(self.tank_db)} tanks...")
+        threading.Thread(target=self._do_gen_all, daemon=True).start()
+
+    def _do_gen_all(self) -> None:
+        self._generating = True
+        self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
+        try:
+            from admin_build_generator import generate_builds, load_tank_db, load_prompts
+            tank_db = load_tank_db()
+            prompts = load_prompts()
+            ok, done_tags, reasons = generate_builds(
+                None, tank_db, prompts, force=True, wot_path=self._wot_path,
+            )
+            if ok:
+                self.log(f"Full regeneration complete: {len(done_tags)} tanks")
+            else:
+                summary = reasons.get("summary", "unknown") if reasons else "failed"
+                self.log(f"Full regeneration failed: {summary}")
+            self.after(0, self.panel_dock.refresh)
+        except Exception as e:
+            self.log(f"Regen all error: {e}")
+        finally:
+            self._generating = False
+            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+
+    def _extract_now(self) -> None:
+        if not self._wot_path:
+            self.log("ERROR: WoT path not set \u2014 open Settings")
+            return
+        if self._scanning:
+            self.log("Pipeline already running")
+            return
+        self.log("Starting extraction pipeline...")
+        threading.Thread(target=self._do_extract, daemon=True).start()
+
+    def _do_extract(self) -> None:
+        self._scanning = True
+        self.after(0, lambda: self.set_status("Extracting...", "#ffaa00"))
+        try:
+            from admin_build_generator import _extract_full_pipeline, _publish_tank_data
+            import config as _cfg
+            _extract_full_pipeline(self._wot_path)
+            self.log("Extraction done \u2014 publishing to Firebase...")
+            _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
+            self.log("Pipeline complete \u2014 Firebase updated")
+            self.after(0, self._load_data)
+        except Exception as e:
+            self.log(f"Pipeline error: {e}")
+        finally:
+            self._scanning = False
+            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+
+    def _listen_toggle(self) -> None:
+        if getattr(self, "_listen_active", False):
+            self._listen_active = False
+            self.log("Listen mode OFF")
+        else:
+            self._listen_active = True
+            self.log("Listen mode ON \u2014 auto-extract every 24h")
+            threading.Thread(target=self._listen_loop, daemon=True).start()
+
+    def _listen_loop(self) -> None:
+        import time as _time
+        last_extract = -86400
+        while getattr(self, "_listen_active", False):
+            now = _time.time()
+            if now - last_extract > 86400:
+                last_extract = now
+                self.after(0, self._extract_now)
+            _time.sleep(60)
 
     def _toggle_lang(self) -> None:
         current = self._settings.get("language", "en")
