@@ -90,7 +90,7 @@ def check_wot_path(wot_path: str) -> Tuple[bool, Optional[str]]:
     try:
         import xml.etree.ElementTree as ET
         tree = ET.parse(str(vxml))
-        ver = tree.getroot().get("version", "")
+        ver = tree.getroot().findtext("version", "")
         return True, ver
     except Exception:
         return True, None
