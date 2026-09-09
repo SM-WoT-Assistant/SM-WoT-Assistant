@@ -300,37 +300,51 @@ class AdminApp(customtkinter.CTk):
         except Exception as e:
             self.log(f"Data load error: {e}")
 
+    def _scan_now(self) -> None:
+        if self._generating or self._scanning:
+            self.log("Operation already running")
+            return
+        def _scan():
+            self._generating = True
+            self.after(0, lambda: self.set_status("Scanning...", "#ffaa00"))
+            try:
+                from admin_build_generator import detect_changed_tanks, _manifest_default_path
+                changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
+                self._queue = changed
+                if changed:
+                    self.log(f"Found {len(changed)} tanks needing builds")
+                else:
+                    self.log("No tanks need builds")
+                self.after(0, self.panel_dock.refresh)
+            except Exception as e:
+                self.log(f"Scan error: {e}")
+            finally:
+                self._generating = False
+                self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+        threading.Thread(target=_scan, daemon=True).start()
+
     def _generate_now(self) -> None:
         if self._generating:
             self.log("Generation already running")
             return
-        def _scan_and_gen():
+        queue = list(self._queue)
+        if not queue:
+            self.log("Queue empty — run Scan first or wait for auto-detect")
+            return
+        def _gen_queue():
             self._generating = True
-            self.after(0, lambda: self.set_status("Scanning...", "#ffaa00"))
+            self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
             driver = None
             try:
-                from admin_build_generator import detect_changed_tanks, _manifest_default_path, generate_builds, load_tank_db, load_prompts, _create_driver
-                changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
-                self._queue = changed
-                self.log(f"Creating Chrome driver...")
+                from admin_build_generator import generate_builds, load_tank_db, load_prompts, _create_driver
+                self.log(f"Generating {len(queue)} builds from queue...")
                 driver = _create_driver()
-                if not changed:
-                    self.log("No changed tanks — generating all")
-                    self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
-                    tank_db = load_tank_db()
-                    prompts = load_prompts()
-                    ok, done_tags, reasons = generate_builds(
-                        driver, tank_db, prompts, force=True, wot_path=self._wot_path,
-                    )
-                else:
-                    self.log(f"Found {len(changed)} changed tanks — generating queue")
-                    self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
-                    tank_db = load_tank_db()
-                    prompts = load_prompts()
-                    ok, done_tags, reasons = generate_builds(
-                        driver, tank_db, prompts,
-                        queue=self._queue, wot_path=self._wot_path,
-                    )
+                tank_db = load_tank_db()
+                prompts = load_prompts()
+                ok, done_tags, reasons = generate_builds(
+                    driver, tank_db, prompts,
+                    queue=queue, wot_path=self._wot_path,
+                )
                 if ok:
                     count = len(done_tags)
                     self.log(f"Generation complete: {count} tanks built")
@@ -349,7 +363,7 @@ class AdminApp(customtkinter.CTk):
                         pass
                 self._generating = False
                 self.after(0, lambda: self.set_status("Idle", "#66cc66"))
-        threading.Thread(target=_scan_and_gen, daemon=True).start()
+        threading.Thread(target=_gen_queue, daemon=True).start()
 
     def _auto_generate_toggle(self) -> None:
         self._auto_generate = not getattr(self, "_auto_generate", False)
@@ -405,6 +419,40 @@ class AdminApp(customtkinter.CTk):
         finally:
             self._scanning = False
             self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+
+    def _regen_all_builds(self) -> None:
+        if self._generating:
+            self.log("Generation already running")
+            return
+        def _force_gen():
+            self._generating = True
+            self.after(0, lambda: self.set_status("Force generating all...", "#ffaa00"))
+            driver = None
+            try:
+                from admin_build_generator import generate_builds, load_tank_db, load_prompts, _create_driver
+                driver = _create_driver()
+                tank_db = load_tank_db()
+                prompts = load_prompts()
+                ok, done_tags, reasons = generate_builds(
+                    driver, tank_db, prompts, force=True, wot_path=self._wot_path,
+                )
+                if ok:
+                    self.log(f"Force generation complete: {len(done_tags)} tanks built")
+                else:
+                    summary = reasons.get("summary", "unknown") if reasons else "failed"
+                    self.log(f"Force generation failed: {summary}")
+                self.after(0, self.panel_dock.refresh)
+            except Exception as e:
+                self.log(f"Force gen error: {e}")
+            finally:
+                if driver:
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
+                self._generating = False
+                self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+        threading.Thread(target=_force_gen, daemon=True).start()
 
     def _toggle_lang(self) -> None:
         current = self._settings.get("language", "en")
@@ -509,6 +557,36 @@ class AdminApp(customtkinter.CTk):
             dlg, text="Regen All DB", width=200, fg_color="#cc6666",
             hover_color="#993333", text_color="white",
             command=_confirm_regen,
+        ).pack(padx=20, pady=2)
+
+        def _confirm_regen_builds():
+            win = customtkinter.CTkToplevel(dlg)
+            win.title("Confirm Regen All Builds")
+            win.geometry("400x160")
+            win.transient(dlg)
+            win.grab_set()
+            win.configure(fg_color="#1A1D28")
+            customtkinter.CTkLabel(
+                win, text="Regenerate ALL tank builds?\nThis re-runs AI for every tank — very slow!",
+                text_color="#DDE0EA", font=customtkinter.CTkFont(size=12),
+                wraplength=360,
+            ).pack(pady=(16, 12))
+            bf = customtkinter.CTkFrame(win, fg_color="transparent")
+            bf.pack(fill="x", padx=20, pady=(0, 12))
+            def _do():
+                win.destroy()
+                dlg.destroy()
+                self._regen_all_builds()
+            customtkinter.CTkButton(bf, text="Regen Builds", width=100, fg_color="#cc6666",
+                                    hover_color="#993333", text_color="white", command=_do).pack(side="right", padx=4)
+            customtkinter.CTkButton(bf, text="Cancel", width=80, fg_color="transparent",
+                                    text_color="#6E7284", border_width=1, border_color="#2E3240",
+                                    command=win.destroy).pack(side="right", padx=4)
+
+        customtkinter.CTkButton(
+            dlg, text="Regen All Builds", width=200, fg_color="#cc6666",
+            hover_color="#993333", text_color="white",
+            command=_confirm_regen_builds,
         ).pack(padx=20, pady=2)
 
         def _save():

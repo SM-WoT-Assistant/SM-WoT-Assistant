@@ -151,7 +151,7 @@ def get_errors_count() -> int:
     """Count error_reports from RTDB."""
     try:
         import firebase_reporter as fr
-        url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=100")
+        url = fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=100")
         import requests
         resp = requests.get(url, timeout=10)
         if resp.ok:
@@ -166,7 +166,7 @@ def get_error_reports() -> list:
     """Fetch error_reports from RTDB."""
     try:
         import firebase_reporter as fr
-        url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=100")
+        url = fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=100")
         import requests
         resp = requests.get(url, timeout=10)
         if resp.ok:
@@ -197,7 +197,7 @@ def get_community_stats() -> Dict[str, Any]:
         stats["installs"] = 0
     try:
         import firebase_reporter as fr
-        errors = fr._get_json(fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=100"))  # type: ignore[attr-defined]
+        errors = fr._get_json(fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=100"))  # type: ignore[attr-defined]
         stats["errors"] = len(errors) if errors else 0
     except Exception:
         stats["errors"] = 0

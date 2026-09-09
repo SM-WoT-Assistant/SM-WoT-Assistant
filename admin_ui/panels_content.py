@@ -250,7 +250,7 @@ class StatusPanel(customtkinter.CTkFrame):
         tree.pack(fill="both", expand=True, padx=12, pady=(0, 12))
         try:
             import firebase_reporter as fr
-            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")
+            url = fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=50")
             import requests
             resp = requests.get(url, timeout=10)
             if resp.ok:
@@ -397,12 +397,13 @@ class InfoPanel(customtkinter.CTkFrame):
 
 
 class BuildsPanel(customtkinter.CTkFrame):
-    """Build controls: Generate + Auto-generate toggle + tank treeview."""
+    """Build controls: Scan + Generate (queue) + Auto toggle + queue badge + tank treeview."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self._tree = None
+        self._queue_label = None
         self._build()
 
     def _build(self) -> None:
@@ -410,8 +411,13 @@ class BuildsPanel(customtkinter.CTkFrame):
         btn_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=6, pady=6)
         primary_button(btn_frame, "Generate", width=90, command=self._on_generate).pack(side="left", padx=2)
+        ghost_button(btn_frame, "Scan", width=60, command=self._on_scan).pack(side="left", padx=2)
         self._auto_btn = ghost_button(btn_frame, "Auto: OFF", width=80, command=self._on_toggle_auto)
         self._auto_btn.pack(side="left", padx=2)
+        self._queue_label = customtkinter.CTkLabel(
+            btn_frame, text="", text_color="#6E7284",
+            font=customtkinter.CTkFont(size=11))
+        self._queue_label.pack(side="left", padx=(8, 0))
 
         self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
         self._search.pack(fill="x", padx=6, pady=(0, 4))
@@ -419,6 +425,10 @@ class BuildsPanel(customtkinter.CTkFrame):
 
         self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
         self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
+
+    def _on_scan(self) -> None:
+        if self.app and hasattr(self.app, '_scan_now'):
+            self.app._scan_now()
 
     def _on_generate(self) -> None:
         if self.app and hasattr(self.app, '_generate_now'):
@@ -429,13 +439,6 @@ class BuildsPanel(customtkinter.CTkFrame):
             self.app._auto_generate_toggle()
             active = getattr(self.app, '_auto_generate', False)
             self._auto_btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
-
-        self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
-        self._search.pack(fill="x", padx=6, pady=(0, 4))
-        self._search.bind("<KeyRelease>", self._on_search)
-
-        self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
-        self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
@@ -454,6 +457,12 @@ class BuildsPanel(customtkinter.CTkFrame):
             self._tree.insert("", "end", values=(tag, name, status))
 
     def refresh(self) -> None:
+        queue = getattr(self.app, '_queue', [])
+        if self._queue_label:
+            if queue:
+                self._queue_label.configure(text=f"{len(queue)} in queue", text_color="#ffaa00")
+            else:
+                self._queue_label.configure(text="queue empty", text_color="#6E7284")
         if self._tree is None:
             try:
                 from tkinter import ttk
@@ -638,7 +647,7 @@ class ErrorsPanel(customtkinter.CTkFrame):
             self._tree.delete(item)
         try:
             import firebase_reporter as fr
-            url = fr._rtdb_url("error_reports.json?orderBy=%22timestamp%22&limitToLast=50")
+            url = fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=50")
             import requests
             resp = requests.get(url, timeout=10)
             if resp.ok:
