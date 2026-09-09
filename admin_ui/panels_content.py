@@ -339,18 +339,6 @@ class StatusPanel(customtkinter.CTkFrame):
             var.set(active)
             btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
 
-    def _toggle_chrome_visible(self) -> None:
-        current = getattr(self.app, '_chrome_visible', False)
-        if self.app:
-            self.app._chrome_visible = not current
-        new_val = not current
-        self._chrome_vis_var.set(new_val)
-        self._chrome_vis_btn.configure(
-            text=f"Chrome: {'Visible' if new_val else 'Hidden'}",
-            fg_color="#D4A843" if new_val else "transparent",
-            text_color="#12141C" if new_val else "#6E7284",
-        )
-
     def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
         dlg.title("Error Reports")
@@ -565,6 +553,18 @@ class BuildsPanel(customtkinter.CTkFrame):
     def _open_queue(self) -> None:
         if self.app:
             self.app._open_queue()
+
+    def _toggle_chrome_visible(self) -> None:
+        current = getattr(self.app, '_chrome_visible', False)
+        if self.app:
+            self.app._chrome_visible = not current
+        new_val = not current
+        self._chrome_vis_var.set(new_val)
+        self._chrome_vis_btn.configure(
+            text=f"Chrome: {'Visible' if new_val else 'Hidden'}",
+            fg_color="#D4A843" if new_val else "transparent",
+            text_color="#12141C" if new_val else "#6E7284",
+        )
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
