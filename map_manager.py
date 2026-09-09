@@ -3,6 +3,13 @@ import json
 import threading
 import config
 
+# --- Admin migration flag (v1.0.73) ---
+# When True, tank extraction pipeline is DISABLED in the client.
+# Admin program handles: detect_changed_tanks, generate_prompt, generate_builds, publish to Firebase.
+# Client downloads tank_db, crew_builds, equipment_loadouts, game_entities, tank_tth from Firebase.
+# Delete after v1.0.74 when tested. See docs/changelog.md.
+_ADMIN_MIGRATION = True
+
 try:
     import map_extractor
 except ImportError:
@@ -138,7 +145,8 @@ class MapManager:
                     except Exception as e:
                         print(f"[MAP_MGR] has_changed error: {e}")
 
-                if version_changed:
+                if version_changed and not _ADMIN_MIGRATION:
+                    # DISABLED v1.0.73 — admin detects game changes independently via scripts.pkg fingerprint
                     try:
                         import firebase_reporter
                         ts = __import__('time').strftime("%Y-%m-%dT%H:%M:%S")
@@ -160,92 +168,103 @@ class MapManager:
                                 "Failed to signal Firebase about game version change")
                         except Exception:
                             pass
-                required_tth_schema = 2
-                current_tth_schema = int(self.app.settings.get("tth_schema_version", 0) or 0)
-                tth_has_data = False
-                tth_count = 0
-                tth_json = {}
-                if os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json")):
-                    try:
-                        with open(os.path.join(config.BASE_DIR, "tank_tth.json"), "r", encoding="utf-8") as f:
-                            tth_json = json.load(f)
-                        tth_has_data = isinstance(tth_json, dict) and bool(tth_json)
-                        if isinstance(tth_json, dict):
-                            tth_count = len(tth_json)
-                    except Exception:
-                        tth_has_data = False
-
-                tank_db_count = 0
-                if os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")):
-                    try:
-                        with open(os.path.join(config.BASE_DIR, "tank_db.json"), "r", encoding="utf-8") as f:
-                            tank_db_json = json.load(f)
-                        if isinstance(tank_db_json, dict):
-                            tank_db_count = len(tank_db_json)
-                    except Exception:
-                        tank_db_count = 0
-
-                tank_db_has_data = tank_db_count > 0
-
-                # Перевіряємо, чи присутні критичні папки іконок для СТАТ AI (збірки).
-                loadout_base = os.path.join(config.BASE_DIR, "extracted_icons", "loadout")
-                loadout_dirs = [
-                    os.path.join(loadout_base, "artefacts"),
-                    os.path.join(loadout_base, "ammo"),
-                    os.path.join(loadout_base, "crew_skills"),
-                ]
-                loadout_counts = []
-                for d in loadout_dirs:
-                    if os.path.isdir(d):
+                # --- DISABLED v1.0.73: admin handles tank data extraction via Firebase ---
+                if _ADMIN_MIGRATION:
+                    tank_db_has_data = True
+                    tth_has_data = True
+                    need_tank_rebuild = False
+                    should_refresh_data = False
+                    should_force_refresh = False
+                    need_ui_icon_refresh = False
+                    required_tth_schema = 0
+                    current_tth_schema = 0
+                else:
+                    required_tth_schema = 2
+                    current_tth_schema = int(self.app.settings.get("tth_schema_version", 0) or 0)
+                    tth_has_data = False
+                    tth_count = 0
+                    tth_json = {}
+                    if os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json")):
                         try:
-                            loadout_counts.append(len([n for n in os.listdir(d) if n.lower().endswith('.png')]))
+                            with open(os.path.join(config.BASE_DIR, "tank_tth.json"), "r", encoding="utf-8") as f:
+                                tth_json = json.load(f)
+                            tth_has_data = isinstance(tth_json, dict) and bool(tth_json)
+                            if isinstance(tth_json, dict):
+                                tth_count = len(tth_json)
                         except Exception:
+                            tth_has_data = False
+
+                    tank_db_count = 0
+                    if os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json")):
+                        try:
+                            with open(os.path.join(config.BASE_DIR, "tank_db.json"), "r", encoding="utf-8") as f:
+                                tank_db_json = json.load(f)
+                            if isinstance(tank_db_json, dict):
+                                tank_db_count = len(tank_db_json)
+                        except Exception:
+                            tank_db_count = 0
+
+                    tank_db_has_data = tank_db_count > 0
+
+                    # Перевіряємо, чи присутні критичні папки іконок для СТАТ AI (збірки).
+                    loadout_base = os.path.join(config.BASE_DIR, "extracted_icons", "loadout")
+                    loadout_dirs = [
+                        os.path.join(loadout_base, "artefacts"),
+                        os.path.join(loadout_base, "ammo"),
+                        os.path.join(loadout_base, "crew_skills"),
+                    ]
+                    loadout_counts = []
+                    for d in loadout_dirs:
+                        if os.path.isdir(d):
+                            try:
+                                loadout_counts.append(len([n for n in os.listdir(d) if n.lower().endswith('.png')]))
+                            except Exception:
+                                loadout_counts.append(0)
+                        else:
                             loadout_counts.append(0)
-                    else:
-                        loadout_counts.append(0)
-                need_ui_icon_refresh = any(c <= 0 for c in loadout_counts)
+                    need_ui_icon_refresh = any(c <= 0 for c in loadout_counts)
 
-                # Якщо ТТХ значно менше, ніж танків у базі, вважаємо файл неповним і перебудовуємо.
-                tth_coverage_bad = tank_db_count > 0 and tth_count < max(200, int(tank_db_count * 0.6))
-                popular_missing_tth = False
-                popular_missing_core_tth = False
-                if isinstance(tth_json, dict) and hasattr(self.app, "popular_tanks"):
-                    tth_norm = {str(k).lower().replace('-', '_') for k in tth_json.keys()}
-                    for p_tag in self.app.popular_tanks:
-                        p_norm = str(p_tag).lower().replace('-', '_')
-                        if p_tag in self.app.tank_db and p_norm not in tth_norm:
-                            popular_missing_tth = True
-                            break
-
-                    # Якісна перевірка: якщо у популярних танків немає ключових ТТХ, потрібен rebuild.
-                    for p_tag in self.app.popular_tanks:
-                        p_norm = str(p_tag).lower().replace('-', '_')
-                        if p_tag not in self.app.tank_db:
-                            continue
-                        rec = tth_json.get(p_tag)
-                        if rec is None:
-                            for k, v in tth_json.items():
-                                if str(k).lower().replace('-', '_') == p_norm:
-                                    rec = v
-                                    break
-                        if isinstance(rec, dict):
-                            has_core = ('reload' in rec) or ('turret_armor' in rec) or ('view_range' in rec)
-                            if not has_core:
-                                popular_missing_core_tth = True
+                    # Якщо ТТХ значно менше, ніж танків у базі, вважаємо файл неповним і перебудовуємо.
+                    tth_coverage_bad = tank_db_count > 0 and tth_count < max(200, int(tank_db_count * 0.6))
+                    popular_missing_tth = False
+                    popular_missing_core_tth = False
+                    if isinstance(tth_json, dict) and hasattr(self.app, "popular_tanks"):
+                        tth_norm = {str(k).lower().replace('-', '_') for k in tth_json.keys()}
+                        for p_tag in self.app.popular_tanks:
+                            p_norm = str(p_tag).lower().replace('-', '_')
+                            if p_tag in self.app.tank_db and p_norm not in tth_norm:
+                                popular_missing_tth = True
                                 break
 
-                need_tank_rebuild = tank_extractor and (
-                    not os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json"))
-                    or not os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json"))
-                    or not tank_db_has_data
-                    or not tth_has_data
-                    or tth_coverage_bad
-                    or popular_missing_tth
-                    or popular_missing_core_tth
-                    or current_tth_schema < required_tth_schema
-                )
-                should_force_refresh = force_update_on_startup
-                should_refresh_data = version_changed or need_tank_rebuild or should_force_refresh or need_ui_icon_refresh
+                        # Якісна перевірка: якщо у популярних танків немає ключових ТТХ, потрібен rebuild.
+                        for p_tag in self.app.popular_tanks:
+                            p_norm = str(p_tag).lower().replace('-', '_')
+                            if p_tag not in self.app.tank_db:
+                                continue
+                            rec = tth_json.get(p_tag)
+                            if rec is None:
+                                for k, v in tth_json.items():
+                                    if str(k).lower().replace('-', '_') == p_norm:
+                                        rec = v
+                                        break
+                            if isinstance(rec, dict):
+                                has_core = ('reload' in rec) or ('turret_armor' in rec) or ('view_range' in rec)
+                                if not has_core:
+                                    popular_missing_core_tth = True
+                                    break
+
+                    need_tank_rebuild = tank_extractor and (
+                        not os.path.exists(os.path.join(config.BASE_DIR, "tank_db.json"))
+                        or not os.path.exists(os.path.join(config.BASE_DIR, "tank_tth.json"))
+                        or not tank_db_has_data
+                        or not tth_has_data
+                        or tth_coverage_bad
+                        or popular_missing_tth
+                        or popular_missing_core_tth
+                        or current_tth_schema < required_tth_schema
+                    )
+                    should_force_refresh = force_update_on_startup
+                    should_refresh_data = version_changed or need_tank_rebuild or should_force_refresh or need_ui_icon_refresh
 
                 if version_changed:
                     emit(25, "version_changed_detected", version=current_v)
@@ -283,7 +302,10 @@ class MapManager:
                 tanks_ok = True
                 tank_pipeline_ran = False
                 tth_pipeline_ran = False
-                if tank_extractor and should_refresh_data:
+                if _ADMIN_MIGRATION:
+                    # DISABLED v1.0.73 — admin handles tank extraction, crew, loadouts, entities
+                    emit(85, "stats_ai_up_to_date_full")
+                elif tank_extractor and should_refresh_data:
                     stability_mode = bool(getattr(self.app, "settings", {}).get("pause_tank_auto_rebuild", True))
                     if stability_mode:
                         emit(62, "stats_ai_stability_mode", "orange")
@@ -346,7 +368,8 @@ class MapManager:
                     emit(85, "stats_ai_up_to_date_full")
 
                 # Auto-update crew and equipment ONLY when game client version changed
-                if version_changed:
+                if version_changed and not _ADMIN_MIGRATION:
+                    # DISABLED v1.0.73 — admin handles crew builds, equipment loadouts, game entities
                     try:
                         import build_crew_builds
                         build_crew_builds.main()
@@ -378,10 +401,10 @@ class MapManager:
                 if maps_ok and tanks_ok:
                     if version_changed:
                         self.app.settings["game_version"] = current_v
-                    if tank_pipeline_ran or tth_pipeline_ran or current_tth_schema < required_tth_schema:
+                    if not _ADMIN_MIGRATION and (tank_pipeline_ran or tth_pipeline_ran or current_tth_schema < required_tth_schema):
                         self.app.settings["tth_schema_version"] = required_tth_schema
                     self.app.safe_execute(self.app.save_settings)
-                    if (tank_pipeline_ran or tth_pipeline_ran) and hasattr(self.app, "reload_tank_data"):
+                    if not _ADMIN_MIGRATION and (tank_pipeline_ran or tth_pipeline_ran) and hasattr(self.app, "reload_tank_data"):
                         self.app.safe_execute(self.app.reload_tank_data)
                     if should_refresh_data:
                         emit(100, "update_complete_ai", "lime")

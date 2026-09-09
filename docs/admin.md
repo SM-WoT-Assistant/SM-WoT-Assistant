@@ -4,6 +4,63 @@
 
 ---
 
+## Admin Build Pipeline — перенесення з клієнта (v1.0.73, 09.09.2026)
+
+### Архітектура "Client ← Firebase ← Admin"
+
+```
+Клієнт (main.py)                    Firebase RTDB                  Адмін (admin_build_generator.py)
+─────────────────                    ─────────────                  ──────────────────────────────
+On startup:                          tank_data/version              On scripts.pkg change:
+  _sync_tank_data() ──────────────→  tank_data/tank_db      ←────  _publish_tank_data()
+  _sync_popular_tanks() ──────────→  tank_data/crew_builds  ←────  (reads local JSONs)
+  _sync_builds() ─────────────────→  tank_data/equip_load   ←────
+                                     tank_data/game_entities ←────
+  reload_tank_data()                 tank_data/tank_tth      ←────
+                                     tank_data/tank_slots    ←────
+                                     builds/version
+                                     builds/tanks/{tag}
+                                     popular_tanks/version
+                                     popular_tanks/data
+```
+
+### Адмін-пайплайн (що він робить):
+
+1. **detect_changed_tanks()** — сканує scripts.pkg через manifest fingerprint (size+CRC)
+2. **_tank_record_from_client()** — читає list.xml з extracted_data/{nation}/
+3. **_slots_and_crew_from_client()** — читає vehicle XML, _normalize_crew_role()
+4. **generate_prompt_v2.generate_prompt()** — локальний Python (без AI, без Chrome)
+5. **_upload_prompt()** — публікує промпт в Firebase prompts/tanks/{tag}
+6. **generate_builds()** — Chrome + Gemini AI Mode → генерує JSON builds
+7. **_upload_build()** — публікує build в Firebase builds/tanks/{tag}
+8. **_publish_tank_data()** — (НОВИЙ) публікує локальні JSON в Firebase tank_data/
+
+### Що НЕ потрібно в адміні:
+
+- Екстракція іконок (extracted_icons/) — клієнт робить самостійно
+- ТТХ дані — клієнт робить самостійно
+- Мапи (MapExtractor) — клієнт робить самостійно
+- Localization (.mo parsing) — клієнт робить самостійно
+
+### Що НЕ потрібно в клієнті (вимкнено через _ADMIN_MIGRATION):
+
+- TankExtractor повний пайплайн (extract_metadata, build_database, update_tth, compact_descr)
+- build_crew_builds.main()
+- extract_equipment_loadouts.extract_loadouts()
+- GameEntitiesExtractor.run_step1()
+- pending_updates/builds signal в Firebase
+- TTH validation chain
+- reload_tank_data trigger після локального pipeline
+
+### Файли:
+
+- `map_manager.py:_ADMIN_MIGRATION = True` — flag відключення
+- `stats_ai.py:_sync_tank_data()` — завантаження з Firebase
+- `admin_build_generator.py:_publish_tank_data()` — публікація в Firebase
+- `main.py:_run_firebase_sync()` — оновлено: tank_data → popular_tanks → builds
+
+---
+
 ## Patreon у Community Workspace + скрізь (21.08.2026, адмінка v1.0.34)
 
 **Джерело:** публічний legacy-API `https://www.patreon.com/api/campaigns/16413892` (campaign id з og:image teaser patreon.com/cw/SMWoTAssistant) — **без auth, без Chrome, без vault** (як GitHub): `patron_count`, `paid_member_count`, `campaign_pledge_sum`, `creation_count` (пости), `created_at`. Якщо API зламається — статус http_*/error, tile "—".

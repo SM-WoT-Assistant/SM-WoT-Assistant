@@ -4,6 +4,48 @@
 
 ---
 
+## v1.0.73 — Admin Pipeline Migration (09.09.2026)
+
+**Ключова зміна:** Перенесення збирання танкових даних з клієнта в адмін-програму.
+
+### Відключено в клієнті (map_manager.py):
+
+| Блок | Що робить | Статус |
+|------|-----------|--------|
+| `_ADMIN_MIGRATION = True` | Керує відключенням через flag | НОВИЙ |
+| pending_updates/builds signal (141-162) | Сигнал Firebase про зміну гри | DISABLED — admin detect independently |
+| TTH validation (163-246) | Перевірка покриття TTH | DISABLED — client downloads from Firebase |
+| need_tank_rebuild / should_refresh_data (237-248) | Вирішує чи запускати pipeline | DISABLED — always False |
+| TankExtractor (286-346) | extract_metadata, build_database, update_tth, compact_descr, extract_icons | DISABLED — admin handles |
+| build_crew_builds.main() (349-355) | Crew builds з scripts.pkg | DISABLED — admin handles |
+| extract_equipment_loadouts (357-365) | Equipment з scripts.pkg | DISABLED — admin handles |
+| GameEntitiesExtractor (367-376) | Entities з scripts.pkg | DISABLED — admin handles |
+| reload_tank_data trigger (384-385) | Перезавантаження після pipeline | DISABLED — triggered by Firebase sync |
+| Version check + maps extraction | MapExtractor, has_changed(), ext.extract() | ЗАЛИШЕНО |
+| Icon extraction | tex.extract_icons() | ЗАЛИШЕНО (через TankExtractor в іншому місці) |
+
+### Додано в клієнті (stats_ai.py + main.py):
+
+- `_sync_tank_data()` — завантаження tank_db, crew_builds, equipment_loadouts, game_entities, tank_tth, tank_slots_full з Firebase RTDB `tank_data/` node
+- Версійний контроль через `tank_data/version` — завантажується тільки при зміні версії
+- Збереження в обидві директорії (USER_DATA_DIR + BASE_DIR)
+- `_run_firebase_sync()` розширено: tank_data → popular_tanks → builds → reload_tank_data
+
+### Додано в адміні (admin_build_generator.py):
+
+- `_publish_tank_data(base_dir, user_data_dir)` — публікація локальних JSON файлів в Firebase RTDB `tank_data/` node
+- Викликається в `listen_mode()` при старті та після scripts.pkg зміни
+- Версійний контроль через `tank_data/version` (auto-increment)
+
+### Видалення після тестування:
+
+Видалити після v1.0.74 якщо працює стабільно:
+1. `map_manager.py` — `if not _ADMIN_MIGRATION:` блоки та `_ADMIN_MIGRATION` flag
+2. Відновити прямі виклики якщо буде потрібно повернення
+3. Видалити `tank_extractor` import якщо повністю не використовується
+
+---
+
 ## Admin v1.0.45 + verification Phase 0 fix + UI redesign (04.09.2026)
 
 **8 комітів:**

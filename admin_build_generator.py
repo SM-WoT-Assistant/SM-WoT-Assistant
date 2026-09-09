@@ -976,6 +976,53 @@ def _update_pending_status(path, status, message="", progress=None):
         data["progress"] = progress
     _put_json(_rtdb_url(f"pending_updates/{path}"), data)
 
+
+def _publish_tank_data(base_dir, user_data_dir=None):
+    """Publish tank data files to Firebase RTDB tank_data/ node.
+    Called after detect_changed_tanks / build_database / crew builds / equipment / entities.
+    Reads local JSON files from base_dir (or user_data_dir) and uploads to Firebase.
+    Bumps tank_data/version on success.
+
+    Disabled client-side: client downloads from Firebase instead of extracting locally.
+    """
+    import config
+    FILES = {
+        "tank_db.json": "tank_db",
+        "crew_builds.json": "crew_builds",
+        "equipment_loadouts.json": "equipment_loadouts",
+        "game_entities_english.json": "game_entities_english",
+        "tank_tth.json": "tank_tth",
+        "tank_slots_full.json": "tank_slots_full",
+    }
+    published = 0
+    for filename, rt_key in FILES.items():
+        # Try base_dir first, then user_data_dir
+        src = os.path.join(base_dir, filename)
+        if not os.path.exists(src) and user_data_dir:
+            src = os.path.join(user_data_dir, filename)
+        if not os.path.exists(src):
+            print(f"[ADMIN] tank_data: {filename} not found, skipping")
+            continue
+        try:
+            with open(src, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not data:
+                continue
+            if _put_json(_rtdb_url(f"tank_data/{rt_key}"), data):
+                published += 1
+            else:
+                print(f"[ADMIN] tank_data: failed to publish {rt_key}")
+        except Exception as e:
+            print(f"[ADMIN] tank_data: error publishing {rt_key}: {e}")
+    if published > 0:
+        cur = _get_json(_rtdb_url("tank_data/version")) or 0
+        new_ver = int(cur) + 1
+        _put_json(_rtdb_url("tank_data/version"), new_ver)
+        print(f"[ADMIN] tank_data published: {published}/{len(FILES)} files, version {new_ver}")
+    else:
+        print(f"[ADMIN] tank_data: no files published")
+
+
 # ── Daily fill sweep for incomplete builds ──────────
 def _normalize_crew_role(role):
     """Normalize a crew role name to the canonical base role(s) used by client data.
@@ -1599,6 +1646,15 @@ def listen_mode(tank_db, wot_path=None):
     _last_scan = -3600  # trigger initial scan immediately
     _last_wg = -21600  # trigger initial WG check immediately
     _last_sweep = -86400  # trigger initial fill sweep immediately
+    _last_tank_data_publish = -86400  # trigger initial tank_data publish immediately
+
+    # Initial tank_data publish on startup
+    if wot_path:
+        try:
+            import config as _cfg
+            _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
+        except Exception as e:
+            print(f"[LISTEN] Initial tank_data publish error: {e}")
 
     while True:
         now = time.time()
@@ -1615,6 +1671,12 @@ def listen_mode(tank_db, wot_path=None):
                     "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
                     "message": f"{len(changed)} tanks changed in scripts.pkg"
                 })
+                # Publish tank data to Firebase when scripts.pkg changes
+                try:
+                    import config as _cfg
+                    _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
+                except Exception as e:
+                    print(f"[LISTEN] tank_data publish error: {e}")
 
         # ── WG API check (every 6 hours) ─────────────────
         if now - _last_wg > 21600:
@@ -1731,6 +1793,9 @@ def main():
             print(f"[PROMPTS] {len(prompts)} cached")
             generate_builds(driver, tank_db, prompts, single_tag=single_tag, wot_path=args.wot_path)
         else:
+            # Default: publish tank_data to Firebase
+            import config as _cfg
+            _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
             parser.print_help()
     finally:
         driver.quit()

@@ -2001,6 +2001,10 @@ class WotAssistantHQ:
 
     def _run_firebase_sync(self):
         try:
+            self.stats_ai_module._sync_tank_data()
+        except Exception as e:
+            print(f"[Firebase] Tank data sync error: {e}")
+        try:
             self.stats_ai_module._sync_popular_tanks()
         except Exception as e:
             print(f"[Firebase] Popular tanks sync error: {e}")
@@ -2008,6 +2012,12 @@ class WotAssistantHQ:
             self.stats_ai_module._sync_builds()
         except Exception as e:
             print(f"[Firebase] Builds sync error: {e}")
+        # After tank_data sync, reload if data changed
+        if hasattr(self, "reload_tank_data"):
+            try:
+                self.safe_execute(self.reload_tank_data)
+            except Exception as e:
+                print(f"[Firebase] Reload tank data error: {e}")
 
     def _check_pending_tactic_maps(self):
         """HEAD-перевірка pending мап на сайті. Chrome не використовується."""

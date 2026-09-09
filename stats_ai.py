@@ -3030,3 +3030,57 @@ class StatsAI:
             print(f"[Firebase] Builds check: no changes (v{remote_version})")
         self._builds_cache_version = remote_version
         self._builds_scripts_fingerprint = remote_fp
+
+    def _sync_tank_data(self):
+        """Fetch tank data files from Firebase and save to USER_DATA_DIR.
+        Admin publishes tank_db, crew_builds, equipment_loadouts, game_entities,
+        tank_tth, tank_slots_full under tank_data/ RTDB node.
+        Only downloads when remote version > local version."""
+        import config
+        url_version = self._rtdb_url("tank_data/version")
+        remote_version = self._get_remote_json(url_version)
+        if not remote_version:
+            return
+        local_version = 0
+        try:
+            local_version_file = os.path.join(config.USER_DATA_DIR, "tank_data_version.json")
+            if os.path.exists(local_version_file):
+                with open(local_version_file, "r") as f:
+                    local_version = json.load(f).get("version", 0)
+        except Exception:
+            local_version = 0
+        if remote_version <= local_version:
+            return
+        print(f"[Firebase] Tank data version changed: {local_version} → {remote_version}, downloading...")
+        FILES = {
+            "tank_db": "tank_db.json",
+            "crew_builds": "crew_builds.json",
+            "equipment_loadouts": "equipment_loadouts.json",
+            "game_entities_english": "game_entities_english.json",
+            "tank_tth": "tank_tth.json",
+            "tank_slots_full": "tank_slots_full.json",
+        }
+        downloaded = 0
+        for rt_key, local_name in FILES.items():
+            url = self._rtdb_url(f"tank_data/{rt_key}")
+            data = self._get_remote_json(url, timeout=30)
+            if data is None:
+                continue
+            # Save to USER_DATA_DIR (writable)
+            dst_user = os.path.join(config.USER_DATA_DIR, local_name)
+            # Save to BASE_DIR (bundle copy)
+            dst_bundle = os.path.join(config.BASE_DIR, local_name)
+            for dst in (dst_user, dst_bundle):
+                try:
+                    with open(dst, "w", encoding="utf-8") as f:
+                        json.dump(data, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"[Firebase] Failed to save {dst}: {e}")
+            downloaded += 1
+        # Save version marker
+        try:
+            with open(os.path.join(config.USER_DATA_DIR, "tank_data_version.json"), "w") as f:
+                json.dump({"version": remote_version}, f)
+        except Exception:
+            pass
+        print(f"[Firebase] Tank data updated: {downloaded}/{len(FILES)} files (v{remote_version})")
