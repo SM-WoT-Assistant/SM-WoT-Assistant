@@ -10,6 +10,7 @@ import os
 import sys
 import threading
 import time
+import tkinter as tk
 from pathlib import Path
 from typing import Any, Optional
 
@@ -108,9 +109,14 @@ class AdminApp(customtkinter.CTk):
             "running": False, "queue": [], "current_tag": None,
             "results": {}, "progress": (0, 0),
         }
-        self._queue_popup = None
-        self._splash_overlay = None
         self._bg_reload_data = False
+
+        # Splash state
+        self.splash: Optional[tk.Toplevel] = None
+        self._splash_shown_at: float = 0.0
+        self._startup_target_percent: int = 0
+        self._startup_display_percent: int = 0
+        self._startup_ready: bool = False
 
         self.tray = AdminTray(on_open=self._tray_open, on_exit=self._tray_exit)
 
@@ -119,7 +125,7 @@ class AdminApp(customtkinter.CTk):
         self._show_splash()
         self._setup_close()
         self.after(100, self._validate_position)
-        self.after(200, self._do_load_data)
+        self.after(200, self._load_data)
         self.after(500, self._start_background)
         self.after(1000, self._start_tray)
 
@@ -191,91 +197,134 @@ class AdminApp(customtkinter.CTk):
         self.panel_dock = PanelDock(self._scroll)
 
     def _show_splash(self) -> None:
-        """Show a loading overlay with logo + progress bar on top of _center."""
-        self._splash_overlay = customtkinter.CTkFrame(self._center, fg_color="#0E0E13")
-        self._splash_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        """Show a separate Toplevel splash window with logo + progress bar."""
+        self.withdraw()
 
-        inner = customtkinter.CTkFrame(self._splash_overlay, fg_color="transparent")
-        inner.place(relx=0.5, rely=0.4, anchor="center")
+        sw, sh = 400, 300
+        sx = self.winfo_screenwidth()
+        sy = self.winfo_screenheight()
+        x = (sx - sw) // 2
+        y = (sy - sh) // 2
 
+        self.splash = tk.Toplevel(self)
+        self.splash.overrideredirect(True)
+        self.splash.attributes("-topmost", True)
+        self.splash.configure(bg="black")
+        self.splash.geometry(f"{sw}x{sh}+{x}+{y}")
+
+        self._splash_shown_at = time.time()
+        self._startup_target_percent = 0
+        self._startup_display_percent = 0
+        self._startup_ready = False
+
+        self._splash_canvas = tk.Canvas(
+            self.splash, width=sw, height=sh, bg="black", highlightthickness=0)
+        self._splash_canvas.pack()
+
+        # Logo
         logo_path = _project_root / "logo.png"
+        self._splash_logo_img = None
         if logo_path.exists():
             try:
-                from PIL import Image
+                from PIL import Image, ImageTk
                 img = Image.open(str(logo_path))
-                img = img.resize((80, 80), Image.Resampling.LANCZOS)
-                self._splash_img = customtkinter.CTkImage(light_image=img, dark_image=img, size=(80, 80))
-                customtkinter.CTkLabel(
-                    inner, image=self._splash_img, text=""
-                ).pack(pady=(0, 12))
+                img = img.resize((64, 64), Image.Resampling.LANCZOS)
+                self._splash_logo_img = ImageTk.PhotoImage(img)
+                self._splash_canvas.create_image(sw // 2, sh // 2 - 40, image=self._splash_logo_img)
             except Exception:
                 pass
 
-        customtkinter.CTkLabel(
-            inner, text="SM WoT Assistant",
-            font=customtkinter.CTkFont(size=18, weight="bold"),
-            text_color="#D4A843",
-        ).pack(pady=(0, 4))
-        customtkinter.CTkLabel(
-            inner, text="Admin",
-            font=customtkinter.CTkFont(size=14),
-            text_color="#6E7284",
-        ).pack(pady=(0, 16))
+        # Title
+        self._splash_canvas.create_text(
+            sw // 2, sh // 2 + 10, text="SM WoT Assistant",
+            fill="#D4A843", font=("Segoe UI", 16, "bold"))
+        self._splash_canvas.create_text(
+            sw // 2, sh // 2 + 35, text="Admin",
+            fill="#6E7284", font=("Segoe UI", 12))
 
-        self._splash_bar = customtkinter.CTkProgressBar(
-            inner, width=240, height=6,
-            progress_color="#D4A843", fg_color="#2E3240",
-        )
-        self._splash_bar.pack(pady=(0, 8))
-        self._splash_bar.set(0)
+        # Status text
+        self._splash_status_text = self._splash_canvas.create_text(
+            sw // 2, sh - 50, text="Loading data...",
+            fill="#bbbbbb", font=("Segoe UI", 9))
 
-        self._splash_status = customtkinter.CTkLabel(
-            inner, text="Loading data...",
-            font=customtkinter.CTkFont(size=11),
-            text_color="#6E7284",
-        )
-        self._splash_status.pack()
+        # Percent text
+        self._splash_percent_text = self._splash_canvas.create_text(
+            sw - 34, sh - 20, text="0%",
+            fill="#dddddd", font=("Segoe UI", 9))
 
-        self.after(300, lambda: self._splash_bar.set(0.3))
+        # Progress bar
+        self._splash_pbar = self._splash_canvas.create_rectangle(
+            0, sh - 10, 0, sh, fill="#D4A843", outline="")
 
-    def _dismiss_splash(self) -> None:
-        if self._splash_overlay:
-            self._splash_overlay.destroy()
-            self._splash_overlay = None
+        self._splash_canvas.itemconfigure(self._splash_status_text, text="Loading data...")
+        self._animate_startup_progress()
+        self.splash.deiconify()
+        self.splash.lift()
+        self.splash.update_idletasks()
 
-    def _load_cached_stats(self) -> None:
-        """Read cached stats from admin_settings.json for instant display."""
+    def _update_splash_progress(self, percent: int, text: str = None) -> None:
+        """Update splash progress bar and status text."""
+        if not self.splash or not self.splash.winfo_exists():
+            return
         try:
-            settings_path = (
-                Path(os.environ.get("APPDATA", "."))
-                / "SM WoT Assistant"
-                / "admin_settings.json"
-            )
-            if settings_path.exists():
-                data = json.loads(settings_path.read_text(encoding="utf-8"))
-                cached = data.get("_cached_stats", {})
-                if cached:
-                    for panel_id, panel in self.panel_dock.panels.items():
-                        if panel_id == "status" and panel["body"] is not None:
-                            body = panel["body"]
-                            if hasattr(body, "apply_cache"):
-                                body.apply_cache(cached)
+            percent = max(0, min(100, int(percent)))
+            self._startup_target_percent = percent
+            self._startup_display_percent = percent
+            if text:
+                self._splash_canvas.itemconfigure(self._splash_status_text, text=text)
+            self._splash_canvas.itemconfigure(
+                self._splash_percent_text, text=f"{percent}%")
+            sw = int(self._splash_canvas["width"])
+            sh = int(self._splash_canvas["height"])
+            x2 = int((sw * percent) / 100)
+            self._splash_canvas.coords(self._splash_pbar, 0, sh - 8, x2, sh)
+            self.splash.update_idletasks()
         except Exception:
             pass
 
-    def _save_cached_stats(self, stats: dict) -> None:
-        """Persist stats to admin_settings.json."""
+    def _animate_startup_progress(self) -> None:
+        """Smoothly animate progress bar toward target."""
+        if not self.splash or not self.splash.winfo_exists():
+            return
         try:
-            settings_path = (
-                Path(os.environ.get("APPDATA", "."))
-                / "SM WoT Assistant"
-                / "admin_settings.json"
-            )
-            data = {}
-            if settings_path.exists():
-                data = json.loads(settings_path.read_text(encoding="utf-8"))
-            data["_cached_stats"] = stats
-            settings_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            sw = int(self._splash_canvas["width"])
+            sh = int(self._splash_canvas["height"])
+            target = int(self._startup_target_percent)
+            current = int(self._startup_display_percent)
+            if current < target:
+                step = 2 if (target - current) > 8 else 1
+                current = min(target, current + step)
+                self._startup_display_percent = current
+                x2 = int((sw * current) / 100)
+                self._splash_canvas.coords(self._splash_pbar, 0, sh - 8, x2, sh)
+                self._splash_canvas.itemconfigure(
+                    self._splash_percent_text, text=f"{current}%")
+            self.after(45, self._animate_startup_progress)
+        except Exception:
+            pass
+
+    def _finish_startup_splash(self) -> None:
+        """Destroy splash and show main window."""
+        if not self._startup_ready:
+            return
+        shown_at = self._splash_shown_at
+        elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
+        min_visible_ms = 2000
+        if elapsed_ms < min_visible_ms:
+            self.after(min_visible_ms - elapsed_ms, self._finish_startup_splash)
+            return
+        try:
+            if self.splash and self.splash.winfo_exists():
+                self.splash.destroy()
+        except Exception:
+            pass
+        finally:
+            self.splash = None
+
+        try:
+            self.deiconify()
+            self.lift()
+            self.focus_force()
         except Exception:
             pass
 
@@ -341,7 +390,7 @@ class AdminApp(customtkinter.CTk):
                 return
             if getattr(self, "_bg_reload_data", False):
                 self._bg_reload_data = False
-                self._do_load_data()
+                self._do_reload_data()
             self.after(1000, _bg_poll)
 
         threading.Thread(target=_loop, daemon=True).start()
@@ -370,7 +419,7 @@ class AdminApp(customtkinter.CTk):
         self.after(0, self._on_close)
 
     def _resolve_wot_path(self, cli_wot_path: str) -> str:
-        """Resolve WoT path: admin settings → main app settings → common paths."""
+        """Resolve WoT path: admin settings -> main app settings -> common paths."""
         import os
         candidates = []
         if cli_wot_path:
@@ -397,41 +446,33 @@ class AdminApp(customtkinter.CTk):
                 return p
         return ""
 
-    def _do_load_data(self) -> None:
+    def _load_data(self) -> None:
+        """Initial data load with splash progress updates."""
+        self._update_splash_progress(10, "Loading tank database...")
+        try:
+            from admin_backend.data import load_tank_db, load_prompts_merged
+            self.tank_db = load_tank_db()
+            self._update_splash_progress(40, "Loading prompts...")
+            self.prompts = load_prompts_merged()
+            self._update_splash_progress(70, "Loading builds info...")
+            self.log(f"Loaded {len(self.tank_db)} tanks, {len(self.prompts)} prompts")
+        except Exception as e:
+            self.log(f"Data load error: {e}")
+        self._update_splash_progress(90, "Finalizing...")
+        self._startup_ready = True
+        self.after(200, self._finish_startup_splash)
+        self.panel_dock.refresh()
+
+    def _do_reload_data(self) -> None:
+        """Background data reload (no splash)."""
         try:
             from admin_backend.data import load_tank_db, load_prompts_merged
             self.tank_db = load_tank_db()
             self.prompts = load_prompts_merged()
-            self.log(f"Loaded {len(self.tank_db)} tanks, {len(self.prompts)} prompts")
-            self.after(0, self._on_data_loaded)
+            self.log(f"Reloaded {len(self.tank_db)} tanks, {len(self.prompts)} prompts")
+            self.after(0, self.panel_dock.refresh)
         except Exception as e:
-            self.log(f"Data load error: {e}")
-            self.after(0, self._on_data_loaded)
-
-    def _on_data_loaded(self) -> None:
-        """Called after data load completes — refresh panels, save cache, dismiss splash."""
-        self.panel_dock.refresh()
-        try:
-            from admin_backend.data import count_builds
-            self._save_cached_stats({
-                "db_count": len(self.tank_db),
-                "builds_count": count_builds(),
-            })
-        except Exception:
-            pass
-        self._dismiss_splash()
-
-    def _open_queue_popup(self) -> None:
-        """Open the queue popup (singleton)."""
-        from admin_ui.queue_popup import QueuePopup
-        if self._queue_popup is not None:
-            try:
-                self._queue_popup.lift()
-                self._queue_popup.focus_force()
-                return
-            except Exception:
-                self._queue_popup = None
-        self._queue_popup = QueuePopup(self, self)
+            self.log(f"Data reload error: {e}")
 
     def _scan_now(self) -> None:
         if self._generating or self._scanning:
@@ -462,7 +503,7 @@ class AdminApp(customtkinter.CTk):
             return
         queue = list(self._queue)
         if not queue:
-            self.log("Queue empty — run Scan first or wait for auto-detect")
+            self.log("Queue empty \u2014 run Scan first or wait for auto-detect")
             return
         def _gen_queue():
             self._generating = True
@@ -717,7 +758,7 @@ class AdminApp(customtkinter.CTk):
             win.grab_set()
             win.configure(fg_color="#1A1D28")
             customtkinter.CTkLabel(
-                win, text="Regenerate ALL tank builds?\nThis re-runs AI for every tank — very slow!",
+                win, text="Regenerate ALL tank builds?\nThis re-runs AI for every tank \u2014 very slow!",
                 text_color="#DDE0EA", font=customtkinter.CTkFont(size=12),
                 wraplength=360,
             ).pack(pady=(16, 12))

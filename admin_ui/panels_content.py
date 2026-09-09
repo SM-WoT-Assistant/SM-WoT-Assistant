@@ -63,13 +63,10 @@ class StatusPanel(customtkinter.CTkFrame):
             grid_col = col * 2
 
             drilldown_key = key if key in ("tanks_db",) else None
-            queue_cmd = None
-            if key == "queue":
-                queue_cmd = lambda: self.app._open_queue_popup() if self.app and hasattr(self.app, "_open_queue_popup") else None
             c = card(
                 self, title=title, value=value, width=110, height=30, center=True,
                 fg_color="#14161F",
-                command=queue_cmd if queue_cmd else (lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None),
+                command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
             )
             c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
             self._cards[key] = c
@@ -157,8 +154,7 @@ class StatusPanel(customtkinter.CTkFrame):
         if card_key == "tanks_db":
             self._drilldown_tanks_db()
         elif card_key == "queue":
-            if self.app and hasattr(self.app, "_open_queue_popup"):
-                self.app._open_queue_popup()
+            self._drilldown_queue()
 
     def _drilldown_tanks_db(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
@@ -204,44 +200,144 @@ class StatusPanel(customtkinter.CTkFrame):
 
     def _drilldown_queue(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
-        dlg.title("Queue — Builds Validation")
-        dlg.geometry("550x500")
+        dlg.title("Queue \u2014 Builds Validation")
+        dlg.geometry("560x550")
         dlg.transient(self.winfo_toplevel())
         dlg.configure(fg_color="#1A1D28")
         from tkinter import ttk
 
-        missing = getattr(self, '_missing_builds', [])
-        extra = getattr(self, '_extra_builds', [])
+        missing = list(getattr(self, '_missing_builds', []))
+        extra = list(getattr(self, '_extra_builds', []))
+        tank_db = self.app.tank_db if self.app else {}
 
+        # --- Controls ---
+        ctrl_frame = customtkinter.CTkFrame(dlg, fg_color="transparent")
+        ctrl_frame.pack(fill="x", padx=12, pady=(10, 4))
+
+        gen_btn = customtkinter.CTkButton(
+            ctrl_frame, text="Generate", width=90, height=28,
+            fg_color="#D4A843", hover_color="#B8922E", text_color="#12141C",
+            command=lambda: self.app._generate_now() if self.app else None,
+        )
+        gen_btn.pack(side="left", padx=2)
+
+        auto_var = customtkinter.BooleanVar(value=getattr(self.app, '_auto_generate', False) if self.app else False)
+        auto_btn = customtkinter.CTkButton(
+            ctrl_frame, text=f"Auto: {'ON' if auto_var.get() else 'OFF'}", width=80, height=28,
+            fg_color="transparent", text_color="#6E7284", border_width=1, border_color="#2E3240",
+            command=lambda: self._toggle_auto_in_queue(auto_var, auto_btn),
+        )
+        auto_btn.pack(side="left", padx=2)
+
+        status_lbl = customtkinter.CTkLabel(
+            ctrl_frame, text="", text_color="#6E7284",
+            font=customtkinter.CTkFont(size=11))
+        status_lbl.pack(side="left", padx=(8, 0))
+
+        # --- Progress bar ---
+        pbar = customtkinter.CTkProgressBar(dlg, width=520, height=6,
+            progress_color="#D4A843", fg_color="#2E3240")
+        pbar.pack(fill="x", padx=12, pady=(0, 6))
+        pbar.set(0)
+
+        # --- Missing builds treeview ---
         customtkinter.CTkLabel(dlg, text=f"Tanks Without Builds ({len(missing)})",
                                font=customtkinter.CTkFont(size=14, weight="bold"),
-                               text_color="#D4A843").pack(pady=(12, 4))
+                               text_color="#D4A843").pack(pady=(0, 4), anchor="w", padx=12)
 
-        tree = ttk.Treeview(dlg, columns=("tag", "name", "tier"), show="headings", height=14)
+        style = ttk.Style()
+        style.configure("Queue.Treeview", background="#12141C", foreground="#DDE0EA",
+                        fieldbackground="#12141C", borderwidth=0, font=("Segoe UI", 10))
+        style.configure("Queue.Treeview.Heading", background="#181B26", foreground="#D4A843",
+                        borderwidth=0, font=("Segoe UI", 10, "bold"))
+
+        tree = ttk.Treeview(dlg, columns=("tag", "name", "tier", "status"), show="headings",
+                            style="Queue.Treeview", height=14)
         tree.heading("tag", text="Tag")
         tree.heading("name", text="Name")
         tree.heading("tier", text="Tier")
-        tree.column("tag", width=200)
-        tree.column("name", width=220)
-        tree.column("tier", width=50)
+        tree.heading("status", text="\u25cf")
+        tree.column("tag", width=170)
+        tree.column("name", width=200)
+        tree.column("tier", width=40)
+        tree.column("status", width=30)
+        tree.tag_configure("generating", background="#3d3a00")
+        tree.tag_configure("ok", background="#0a2e0a")
+        tree.tag_configure("fail", background="#2e0a0a")
         tree.pack(fill="x", padx=12, pady=(0, 4))
-        tank_db = self.app.tank_db if self.app else {}
+
         for tag in missing:
             name = tank_db.get(tag, {}).get("name", tag)
             tier = tank_db.get(tag, {}).get("tier", "?")
-            tree.insert("", "end", values=(tag, name, tier))
+            tree.insert("", "end", values=(tag, name, tier, ""), tags=(), iid=f"m_{tag}")
 
+        # --- Extra builds ---
         if extra:
             customtkinter.CTkLabel(
-                dlg, text=f"Extra Builds in RTDB ({len(extra)}) — not in DB",
+                dlg, text=f"Extra Builds in RTDB ({len(extra)}) \u2014 not in DB",
                 font=customtkinter.CTkFont(size=12, weight="bold"),
-                text_color="#cc6666").pack(pady=(8, 2))
-            extra_tree = ttk.Treeview(dlg, columns=("tag",), show="headings", height=6)
+                text_color="#cc6666").pack(pady=(8, 2), anchor="w", padx=12)
+            extra_tree = ttk.Treeview(dlg, columns=("tag",), show="headings",
+                                      style="Queue.Treeview", height=6)
             extra_tree.heading("tag", text="Tag")
-            extra_tree.column("tag", width=400)
-            extra_tree.pack(fill="x", padx=12, pady=(0, 12))
+            extra_tree.column("tag", width=500)
+            extra_tree.pack(fill="x", padx=12, pady=(0, 8))
             for tag in extra:
                 extra_tree.insert("", "end", values=(tag,))
+
+        # --- Live progress polling ---
+        def _poll():
+            if not dlg.winfo_exists():
+                return
+            gp = getattr(self.app, '_gen_progress', {}) if self.app else {}
+            running = gp.get("running", False)
+            current_tag = gp.get("current_tag")
+            results = gp.get("results", {})
+            progress = gp.get("progress", (0, 0))
+
+            if running:
+                gen_btn.configure(state="disabled")
+                auto_btn.configure(state="disabled")
+                cur, total = progress
+                pct = cur / total if total > 0 else 0
+                pbar.set(pct)
+                status_lbl.configure(text=f"{cur}/{total}", text_color="#ffaa00")
+
+                for iid in tree.get_children():
+                    vals = tree.item(iid, "values")
+                    tag = vals[0]
+                    name_val = vals[1]
+                    tier_val = vals[2]
+                    if tag == current_tag:
+                        tree.item(iid, values=(tag, name_val, tier_val, "\u25cf"),
+                                  tags=("generating",))
+                    elif tag in results:
+                        st = results[tag]
+                        sym = "\u2714" if st == "ok" else "\u2716"
+                        tree.item(iid, values=(tag, name_val, tier_val, sym),
+                                  tags=(st,))
+            else:
+                gen_btn.configure(state="normal")
+                auto_btn.configure(state="normal")
+                if results:
+                    ok = sum(1 for v in results.values() if v == "ok")
+                    fail = sum(1 for v in results.values() if v == "fail")
+                    status_lbl.configure(text=f"Done: {ok} ok, {fail} fail",
+                                         text_color="#66cc66" if fail == 0 else "#ffaa00")
+                    pbar.set(1.0)
+                elif not missing:
+                    status_lbl.configure(text="All builds complete", text_color="#66cc66")
+
+            dlg.after(500, _poll)
+
+        dlg.after(500, _poll)
+
+    def _toggle_auto_in_queue(self, var, btn):
+        if self.app and hasattr(self.app, '_auto_generate_toggle'):
+            self.app._auto_generate_toggle()
+            active = getattr(self.app, '_auto_generate', False)
+            var.set(active)
+            btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
 
     def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
@@ -412,12 +508,13 @@ class InfoPanel(customtkinter.CTkFrame):
 
 
 class BuildsPanel(customtkinter.CTkFrame):
-    """Builds summary: queue link + tank treeview (controls moved to QueuePopup)."""
+    """Builds summary: clickable queue count + tank treeview."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self._tree = None
+        self._queue_label = None
         self._build()
 
     def _build(self) -> None:
@@ -425,8 +522,9 @@ class BuildsPanel(customtkinter.CTkFrame):
         summary.pack(fill="x", padx=6, pady=(6, 2))
 
         self._queue_btn = customtkinter.CTkButton(
-            summary, text="Open Queue", width=90, height=28,
-            fg_color="#D4A843", hover_color="#B8922E", text_color="#12141C",
+            summary, text="Queue:", width=50, height=28,
+            fg_color="transparent", text_color="#6E7284",
+            border_width=1, border_color="#2E3240",
             command=self._open_queue,
         )
         self._queue_btn.pack(side="left", padx=2)
@@ -434,7 +532,7 @@ class BuildsPanel(customtkinter.CTkFrame):
         self._queue_label = customtkinter.CTkLabel(
             summary, text="", text_color="#6E7284",
             font=customtkinter.CTkFont(size=11))
-        self._queue_label.pack(side="left", padx=(8, 0))
+        self._queue_label.pack(side="left", padx=(4, 0))
 
         self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
         self._search.pack(fill="x", padx=6, pady=(0, 4))
@@ -444,8 +542,17 @@ class BuildsPanel(customtkinter.CTkFrame):
         self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
     def _open_queue(self) -> None:
-        if self.app and hasattr(self.app, "_open_queue_popup"):
-            self.app._open_queue_popup()
+        if self.app:
+            for panel_id, panel in self.app.panel_dock.panels.items():
+                if panel_id == "status" and panel["body"] is not None:
+                    body = panel["body"]
+                    if hasattr(body, '_drilldown_queue'):
+                        body._drilldown_queue()
+                        return
+            # Fallback: call directly on status panel
+            status_body = self.app.panel_dock.panels.get("status", {}).get("body")
+            if status_body and hasattr(status_body, '_drilldown_queue'):
+                status_body._drilldown_queue()
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
