@@ -51,7 +51,8 @@ class StatusPanel(customtkinter.CTkFrame):
 
             drilldown_key = key if key in ("tanks_db", "queue") else None
             c = card(
-                self, title=title, value=value, width=110, height=36, center=True,
+                self, title=title, value=value, width=110, height=30, center=True,
+                fg_color="#14161F",
                 command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
             )
             c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
@@ -247,7 +248,8 @@ class InfoPanel(customtkinter.CTkFrame):
 
             drilldown_key = key if key in ("errors",) else None
             c = card(
-                self, title=title, value=value, width=110, height=36, center=True,
+                self, title=title, value=value, width=110, height=30, center=True,
+                fg_color="#14161F",
                 command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
             )
             c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
@@ -344,7 +346,7 @@ class InfoPanel(customtkinter.CTkFrame):
 
 
 class BuildsPanel(customtkinter.CTkFrame):
-    """Build controls: Scan, Generate, Regen All + tank treeview."""
+    """Build controls: Generate + Auto-generate toggle + tank treeview."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
@@ -356,15 +358,9 @@ class BuildsPanel(customtkinter.CTkFrame):
         from admin_ui.widgets import primary_button, ghost_button
         btn_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         btn_frame.pack(fill="x", padx=6, pady=6)
-        primary_button(btn_frame, "Scan", width=80, command=self._on_scan).pack(side="left", padx=2)
-        primary_button(btn_frame, "Generate Queue", width=110, command=self._on_gen_queue).pack(side="left", padx=2)
-        ghost_button(btn_frame, "Regen All", width=80, command=self._on_regen_all).pack(side="left", padx=2)
-
-        btn_frame2 = customtkinter.CTkFrame(self, fg_color="transparent")
-        btn_frame2.pack(fill="x", padx=6, pady=(0, 4))
-        primary_button(btn_frame2, "Extract", width=80, command=self._on_extract).pack(side="left", padx=2)
-        self._listen_btn = ghost_button(btn_frame2, "Listen: OFF", width=100, command=self._on_listen)
-        self._listen_btn.pack(side="left", padx=2)
+        primary_button(btn_frame, "Generate", width=90, command=self._on_generate).pack(side="left", padx=2)
+        self._auto_btn = ghost_button(btn_frame, "Auto: OFF", width=80, command=self._on_toggle_auto)
+        self._auto_btn.pack(side="left", padx=2)
 
         self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
         self._search.pack(fill="x", padx=6, pady=(0, 4))
@@ -373,27 +369,22 @@ class BuildsPanel(customtkinter.CTkFrame):
         self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
         self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
-    def _on_scan(self) -> None:
-        if self.app and hasattr(self.app, '_scan_now'):
-            self.app._scan_now()
+    def _on_generate(self) -> None:
+        if self.app and hasattr(self.app, '_generate_now'):
+            self.app._generate_now()
 
-    def _on_gen_queue(self) -> None:
-        if self.app and hasattr(self.app, '_gen_queue'):
-            self.app._gen_queue()
+    def _on_toggle_auto(self) -> None:
+        if self.app and hasattr(self.app, '_auto_generate_toggle'):
+            self.app._auto_generate_toggle()
+            active = getattr(self.app, '_auto_generate', False)
+            self._auto_btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
 
-    def _on_regen_all(self) -> None:
-        if self.app and hasattr(self.app, '_gen_all'):
-            self.app._gen_all()
+        self._search = customtkinter.CTkEntry(self, placeholder_text="Search tanks...")
+        self._search.pack(fill="x", padx=6, pady=(0, 4))
+        self._search.bind("<KeyRelease>", self._on_search)
 
-    def _on_extract(self) -> None:
-        if self.app and hasattr(self.app, '_extract_now'):
-            self.app._extract_now()
-
-    def _on_listen(self) -> None:
-        if self.app and hasattr(self.app, '_listen_toggle'):
-            self.app._listen_toggle()
-            active = getattr(self.app, '_listen_active', False)
-            self._listen_btn.configure(text=f"Listen: {'ON' if active else 'OFF'}")
+        self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
+        self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
@@ -457,38 +448,46 @@ class CommunityPanel(customtkinter.CTkFrame):
         self._build()
 
     def _build(self) -> None:
+        import webbrowser
         platforms = [
-            ("youtube", "YouTube"),
-            ("reddit", "Reddit"),
-            ("github", "GitHub"),
-            ("kofi", "Ko-fi"),
-            ("patreon", "Patreon"),
+            ("youtube", "YouTube", "https://youtube.com/@SMWoTAssistant"),
+            ("reddit", "Reddit", "https://reddit.com/user/SM-WoT-Assistant"),
+            ("github", "GitHub", "https://github.com/SM-WoT-Assistant"),
+            ("kofi", "Ko-fi", "https://ko-fi.com/smwotassistant"),
+            ("patreon", "Patreon", "https://patreon.com/cw/SMWoTAssistant"),
         ]
         strip = customtkinter.CTkFrame(self, fg_color="transparent")
         strip.pack(fill="x", padx=6, pady=6)
-        for i, (key, label) in enumerate(platforms):
-            tile = customtkinter.CTkFrame(strip, height=34, fg_color="#14161F",
+        for i, (key, label, url) in enumerate(platforms):
+            tile = customtkinter.CTkFrame(strip, height=30, fg_color="#14161F",
                 border_width=2, border_color="#2E3240", corner_radius=4)
             tile.pack_propagate(False)
             tile.pack(side="left", fill="both", expand=True, padx=0)
+            tile.configure(cursor="hand2")
 
             spacer_top = customtkinter.CTkFrame(tile, fg_color="transparent", height=1)
             spacer_top.pack(fill="x", expand=True)
 
             customtkinter.CTkLabel(
-                tile, text=label, font=customtkinter.CTkFont(size=11),
+                tile, text=label, font=customtkinter.CTkFont(size=12),
                 text_color="#6E7284").pack(pady=(1, 0))
             val_lbl = customtkinter.CTkLabel(
-                tile, text="-", font=customtkinter.CTkFont(size=15, weight="bold"),
+                tile, text="-", font=customtkinter.CTkFont(size=16, weight="bold"),
                 text_color="#DDE0EA")
             val_lbl.pack()
             hint_lbl = customtkinter.CTkLabel(
-                tile, text="", font=customtkinter.CTkFont(size=10),
+                tile, text="", font=customtkinter.CTkFont(size=12),
                 text_color="#6E7284")
             hint_lbl.pack(pady=(0, 1))
 
             spacer_bottom = customtkinter.CTkFrame(tile, fg_color="transparent", height=1)
             spacer_bottom.pack(fill="x", expand=True)
+
+            for w in (tile, spacer_top, spacer_top.winfo_children()[0] if spacer_top.winfo_children() else spacer_top):
+                pass
+            tile.bind("<Button-1>", lambda e, u=url: webbrowser.open(u))
+            for child in tile.winfo_children():
+                child.bind("<Button-1>", lambda e, u=url: webbrowser.open(u))
 
             self._tiles[key] = {"val": val_lbl, "hint": hint_lbl}
 

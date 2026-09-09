@@ -187,10 +187,15 @@ def card(
     height: int = 80,
     command: Any = None,
     center: bool = False,
+    fg_color: Optional[str] = None,
     **kw: Any,
 ) -> customtkinter.CTkFrame:
-    frame = customtkinter.CTkFrame(parent, width=width, height=height,
-        border_width=2, border_color="#2E3240", corner_radius=4, **kw)
+    frame_kw: Dict[str, Any] = dict(width=width, height=height,
+        border_width=2, border_color="#2E3240", corner_radius=4)
+    if fg_color is not None:
+        frame_kw["fg_color"] = fg_color
+    frame_kw.update(kw)
+    frame = customtkinter.CTkFrame(parent, **frame_kw)
     frame.pack_propagate(False)
 
     anchor = "center" if center else "w"
@@ -203,19 +208,19 @@ def card(
         spacer_top.pack(fill="x", expand=True)
 
     title_lbl = customtkinter.CTkLabel(
-        frame, text=title, font=customtkinter.CTkFont(size=11),
+        frame, text=title, font=customtkinter.CTkFont(size=12),
         text_color=_token(TEXT_MUTED), anchor=anchor, justify=anchor,
     )
     title_lbl.pack(fill="x", padx=px, pady=title_pady)
     val_lbl = customtkinter.CTkLabel(
-        frame, text=value, font=customtkinter.CTkFont(size=15, weight="bold"),
+        frame, text=value, font=customtkinter.CTkFont(size=16, weight="bold"),
         text_color=_token(TEXT), anchor=anchor, justify=anchor,
     )
     val_lbl.pack(fill="x", padx=px)
     sub_lbl = None
     if subtitle:
         sub_lbl = customtkinter.CTkLabel(
-            frame, text=subtitle, font=customtkinter.CTkFont(size=10),
+            frame, text=subtitle, font=customtkinter.CTkFont(size=12),
             text_color=_token(TEXT_MUTED), anchor=anchor, justify=anchor,
         )
         sub_lbl.pack(fill="x", padx=px, pady=sub_pady)

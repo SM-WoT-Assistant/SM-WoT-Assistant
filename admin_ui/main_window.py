@@ -91,10 +91,10 @@ class AdminApp(customtkinter.CTk):
         self.tank_db: dict = {}
         self.prompts: dict = {}
         self._queue: list = []
-        self._last_scan: float = 0
         self._wot_path: str = self._settings.get("wot_path", "")
         self._scanning = False
         self._generating = False
+        self._auto_generate = False
         self._running = True
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
@@ -267,88 +267,52 @@ class AdminApp(customtkinter.CTk):
         except Exception as e:
             self.log(f"Data load error: {e}")
 
-    def _scan_now(self) -> None:
-        if self._scanning:
-            self.log("Scan already running")
+    def _generate_now(self) -> None:
+        if self._generating:
+            self.log("Generation already running")
             return
-        threading.Thread(target=self._do_scan, daemon=True).start()
+        def _scan_and_gen():
+            self._generating = True
+            self.after(0, lambda: self.set_status("Scanning...", "#ffaa00"))
+            try:
+                from admin_build_generator import detect_changed_tanks, _manifest_default_path, generate_builds, load_tank_db, load_prompts
+                changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
+                self._queue = changed
+                if not changed:
+                    self.log("No changed tanks \u2014 generating all")
+                    self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
+                    tank_db = load_tank_db()
+                    prompts = load_prompts()
+                    ok, done_tags, reasons = generate_builds(
+                        None, tank_db, prompts, force=True, wot_path=self._wot_path,
+                    )
+                else:
+                    self.log(f"Found {len(changed)} changed tanks \u2014 generating queue")
+                    self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
+                    tank_db = load_tank_db()
+                    prompts = load_prompts()
+                    ok, done_tags, reasons = generate_builds(
+                        None, tank_db, prompts,
+                        queue=self._queue, wot_path=self._wot_path,
+                    )
+                if ok:
+                    count = len(done_tags)
+                    self.log(f"Generation complete: {count} tanks built")
+                    self._queue = [t for t in self._queue if t not in done_tags]
+                else:
+                    summary = reasons.get("summary", "unknown") if reasons else "failed"
+                    self.log(f"Generation failed: {summary}")
+                self.after(0, self.panel_dock.refresh)
+            except Exception as e:
+                self.log(f"Generate error: {e}")
+            finally:
+                self._generating = False
+                self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+        threading.Thread(target=_scan_and_gen, daemon=True).start()
 
-    def _do_scan(self) -> None:
-        self._scanning = True
-        self.log("Scanning for changes...")
-        try:
-            from admin_build_generator import detect_changed_tanks, _manifest_default_path
-            changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
-            self._last_scan = time.time()
-            self._queue = changed
-            if changed:
-                self.log(f"Found {len(changed)} changed tanks")
-                for t in changed[:10]:
-                    self.log(f"  {t}")
-            else:
-                self.log("No changes detected")
-            self.after(0, self.panel_dock.refresh)
-        except Exception as e:
-            self.log(f"Scan error: {e}")
-        finally:
-            self._scanning = False
-
-    def _gen_queue(self) -> None:
-        if not self._queue:
-            self.log("Queue is empty \u2014 run Scan first")
-            return
-        self.log(f"Generating builds for {len(self._queue)} queued tanks...")
-        threading.Thread(target=self._do_gen_queue, daemon=True).start()
-
-    def _do_gen_queue(self) -> None:
-        self._generating = True
-        self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
-        try:
-            from admin_build_generator import generate_builds, load_tank_db, load_prompts
-            tank_db = load_tank_db()
-            prompts = load_prompts()
-            ok, done_tags, reasons = generate_builds(
-                None, tank_db, prompts,
-                queue=self._queue, wot_path=self._wot_path,
-            )
-            if ok:
-                self.log(f"Generation complete: {len(done_tags)} tanks built")
-                self._queue = [t for t in self._queue if t not in done_tags]
-            else:
-                summary = reasons.get("summary", "unknown") if reasons else "failed"
-                self.log(f"Generation failed: {summary}")
-            self.after(0, self.panel_dock.refresh)
-        except Exception as e:
-            self.log(f"Generate error: {e}")
-        finally:
-            self._generating = False
-            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
-
-    def _gen_all(self) -> None:
-        self.log(f"Regenerating ALL {len(self.tank_db)} tanks...")
-        threading.Thread(target=self._do_gen_all, daemon=True).start()
-
-    def _do_gen_all(self) -> None:
-        self._generating = True
-        self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
-        try:
-            from admin_build_generator import generate_builds, load_tank_db, load_prompts
-            tank_db = load_tank_db()
-            prompts = load_prompts()
-            ok, done_tags, reasons = generate_builds(
-                None, tank_db, prompts, force=True, wot_path=self._wot_path,
-            )
-            if ok:
-                self.log(f"Full regeneration complete: {len(done_tags)} tanks")
-            else:
-                summary = reasons.get("summary", "unknown") if reasons else "failed"
-                self.log(f"Full regeneration failed: {summary}")
-            self.after(0, self.panel_dock.refresh)
-        except Exception as e:
-            self.log(f"Regen all error: {e}")
-        finally:
-            self._generating = False
-            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
+    def _auto_generate_toggle(self) -> None:
+        self._auto_generate = not getattr(self, "_auto_generate", False)
+        self.log(f"Auto-generate: {'ON' if self._auto_generate else 'OFF'}")
 
     def _extract_now(self) -> None:
         if not self._wot_path:
@@ -377,24 +341,29 @@ class AdminApp(customtkinter.CTk):
             self._scanning = False
             self.after(0, lambda: self.set_status("Idle", "#66cc66"))
 
-    def _listen_toggle(self) -> None:
-        if getattr(self, "_listen_active", False):
-            self._listen_active = False
-            self.log("Listen mode OFF")
-        else:
-            self._listen_active = True
-            self.log("Listen mode ON \u2014 auto-extract every 24h")
-            threading.Thread(target=self._listen_loop, daemon=True).start()
+    def _regen_all_db(self) -> None:
+        if not self._wot_path:
+            self.log("ERROR: WoT path not set \u2014 open Settings")
+            return
+        if self._scanning:
+            self.log("Pipeline already running")
+            return
+        self.log("Regenerating ALL database...")
+        threading.Thread(target=self._do_regen_all, daemon=True).start()
 
-    def _listen_loop(self) -> None:
-        import time as _time
-        last_extract = -86400
-        while getattr(self, "_listen_active", False):
-            now = _time.time()
-            if now - last_extract > 86400:
-                last_extract = now
-                self.after(0, self._extract_now)
-            _time.sleep(60)
+    def _do_regen_all(self) -> None:
+        self._scanning = True
+        self.after(0, lambda: self.set_status("Regenerating DB...", "#ffaa00"))
+        try:
+            from admin_build_generator import _extract_full_pipeline
+            _extract_full_pipeline(self._wot_path)
+            self.log("Full DB regeneration complete")
+            self.after(0, self._load_data)
+        except Exception as e:
+            self.log(f"Regen error: {e}")
+        finally:
+            self._scanning = False
+            self.after(0, lambda: self.set_status("Idle", "#66cc66"))
 
     def _toggle_lang(self) -> None:
         current = self._settings.get("language", "en")
@@ -406,7 +375,7 @@ class AdminApp(customtkinter.CTk):
     def _open_settings(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
         dlg.title("Settings")
-        dlg.geometry("440x340")
+        dlg.geometry("440x460")
         dlg.transient(self)
         dlg.grab_set()
         dlg.configure(fg_color="#1A1D28")
@@ -433,6 +402,73 @@ class AdminApp(customtkinter.CTk):
         customtkinter.CTkLabel(dlg, text=f"Current language: {self._settings.get('language', 'en').upper()}",
                                text_color="#6E7284",
                                font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=20, pady=4)
+
+        sep = customtkinter.CTkFrame(dlg, height=1, fg_color="#2E3240")
+        sep.pack(fill="x", padx=20, pady=8)
+
+        customtkinter.CTkLabel(dlg, text="Dangerous Operations",
+                               font=customtkinter.CTkFont(size=12, weight="bold"),
+                               text_color="#cc6666").pack(anchor="w", padx=20, pady=(0, 4))
+
+        def _confirm_extract():
+            win = customtkinter.CTkToplevel(dlg)
+            win.title("Confirm Extract")
+            win.geometry("380x160")
+            win.transient(dlg)
+            win.grab_set()
+            win.configure(fg_color="#1A1D28")
+            customtkinter.CTkLabel(
+                win, text="Run full extraction pipeline?\nThis reads from the game client and uploads to Firebase.",
+                text_color="#DDE0EA", font=customtkinter.CTkFont(size=12),
+                wraplength=340,
+            ).pack(pady=(16, 12))
+            bf = customtkinter.CTkFrame(win, fg_color="transparent")
+            bf.pack(fill="x", padx=20, pady=(0, 12))
+            def _do():
+                win.destroy()
+                dlg.destroy()
+                self._extract_now()
+            customtkinter.CTkButton(bf, text="Extract", width=80, fg_color="#cc6666",
+                                    hover_color="#993333", text_color="white", command=_do).pack(side="right", padx=4)
+            customtkinter.CTkButton(bf, text="Cancel", width=80, fg_color="transparent",
+                                    text_color="#6E7284", border_width=1, border_color="#2E3240",
+                                    command=win.destroy).pack(side="right", padx=4)
+
+        customtkinter.CTkButton(
+            dlg, text="Extract Pipeline", width=200, fg_color="#cc6666",
+            hover_color="#993333", text_color="white",
+            command=_confirm_extract,
+        ).pack(padx=20, pady=2)
+
+        def _confirm_regen():
+            win = customtkinter.CTkToplevel(dlg)
+            win.title("Confirm Regen All")
+            win.geometry("380x160")
+            win.transient(dlg)
+            win.grab_set()
+            win.configure(fg_color="#1A1D28")
+            customtkinter.CTkLabel(
+                win, text="Regenerate ENTIRE database?\nThis takes a very long time!",
+                text_color="#DDE0EA", font=customtkinter.CTkFont(size=12),
+                wraplength=340,
+            ).pack(pady=(16, 12))
+            bf = customtkinter.CTkFrame(win, fg_color="transparent")
+            bf.pack(fill="x", padx=20, pady=(0, 12))
+            def _do():
+                win.destroy()
+                dlg.destroy()
+                self._regen_all_db()
+            customtkinter.CTkButton(bf, text="Regen All", width=80, fg_color="#cc6666",
+                                    hover_color="#993333", text_color="white", command=_do).pack(side="right", padx=4)
+            customtkinter.CTkButton(bf, text="Cancel", width=80, fg_color="transparent",
+                                    text_color="#6E7284", border_width=1, border_color="#2E3240",
+                                    command=win.destroy).pack(side="right", padx=4)
+
+        customtkinter.CTkButton(
+            dlg, text="Regen All DB", width=200, fg_color="#cc6666",
+            hover_color="#993333", text_color="white",
+            command=_confirm_regen,
+        ).pack(padx=20, pady=2)
 
         def _save():
             self._wot_path = path_entry.get().strip()
