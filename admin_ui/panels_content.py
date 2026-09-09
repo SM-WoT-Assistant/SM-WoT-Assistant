@@ -13,6 +13,19 @@ from typing import Any, Optional, List
 _STATUS_COLS = 3
 
 
+def _err_ts_sort(val):
+    """Sort key for error timestamp: handle both ISO strings and epoch ms."""
+    ts = val.get("timestamp", "")
+    if isinstance(ts, (int, float)):
+        return str(ts)
+    return str(ts or "")
+
+
+def _err_text(val):
+    """Get error text from RTDB record: handle both firebase_reporter and admin_backend schemas."""
+    return val.get("error") or val.get("error_text") or val.get("message") or ""
+
+
 def _make_divider(parent, orient="h"):
     """Create a thin grey divider line."""
     if orient == "h":
@@ -243,13 +256,13 @@ class StatusPanel(customtkinter.CTkFrame):
             if resp.ok:
                 data = resp.json()
                 if data:
-                    for key, val in sorted(data.items(), key=lambda x: x[1].get("timestamp", 0), reverse=True)[:50]:
+                    for key, val in sorted(data.items(), key=lambda x: _err_ts_sort(x[1]), reverse=True)[:50]:
                         ts = val.get("timestamp", "")
                         if isinstance(ts, (int, float)):
-                            ts = time.strftime("%m-%d %H:%M", time.localtime(ts))
+                            ts = time.strftime("%m-%d %H:%M", time.localtime(ts / 1000 if ts > 1e12 else ts))
                         tree.insert("", "end", values=(
-                            ts, val.get("error_type", "-"), val.get("stage", "-"),
-                            str(val.get("error_text", "-"))[:100]))
+                            str(ts)[:16], val.get("type", "-"), val.get("stage", "-"),
+                            _err_text(val)[:100]))
         except Exception:
             pass
 
@@ -377,8 +390,8 @@ class InfoPanel(customtkinter.CTkFrame):
             errors = get_error_reports()
             for e in errors:
                 tree.insert("", "end", values=(
-                    e.get("error_type", "-"), e.get("stage", "-"),
-                    e.get("error_text", "-")[:100], e.get("timestamp", "-")[:16]))
+                    e.get("type", "-"), e.get("stage", "-"),
+                    _err_text(e)[:100], str(e.get("timestamp", "-"))[:16]))
         except Exception as ex:
             customtkinter.CTkLabel(dlg, text=f"Error: {ex}", text_color="#cc6666").pack(pady=20)
 
@@ -631,13 +644,13 @@ class ErrorsPanel(customtkinter.CTkFrame):
             if resp.ok:
                 data = resp.json()
                 if data:
-                    for key, val in sorted(data.items(), key=lambda x: x[1].get("timestamp", 0), reverse=True)[:50]:
+                    for key, val in sorted(data.items(), key=lambda x: _err_ts_sort(x[1]), reverse=True)[:50]:
                         ts = val.get("timestamp", "")
                         if isinstance(ts, (int, float)):
-                            ts = time.strftime("%m-%d %H:%M", time.localtime(ts))
+                            ts = time.strftime("%m-%d %H:%M", time.localtime(ts / 1000 if ts > 1e12 else ts))
                         self._tree.insert("", "end", values=(
-                            ts, val.get("error_type", "-"), val.get("stage", "-"),
-                            str(val.get("error_text", "-"))[:100]))
+                            str(ts)[:16], val.get("type", "-"), val.get("stage", "-"),
+                            str(val.get("error") or val.get("error_text") or "-")[:100]))
         except Exception:
             pass
 
