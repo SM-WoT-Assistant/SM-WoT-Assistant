@@ -92,6 +92,11 @@ class AdminApp(customtkinter.CTk):
         self.prompts: dict = {}
         self._queue: list = []
         self._wot_path: str = self._settings.get("wot_path", "")
+        if not self._wot_path:
+            self._wot_path = self._resolve_wot_path("")
+            if self._wot_path:
+                self._settings["wot_path"] = self._wot_path
+                _save_settings(self._settings)
         self._scanning = False
         self._generating = False
         self._auto_generate = False
@@ -257,6 +262,34 @@ class AdminApp(customtkinter.CTk):
     def _tray_exit(self) -> None:
         self.after(0, self._on_close)
 
+    def _resolve_wot_path(self, cli_wot_path: str) -> str:
+        """Resolve WoT path: admin settings → main app settings → common paths."""
+        import os
+        candidates = []
+        if cli_wot_path:
+            candidates.append(cli_wot_path)
+        if self._settings.get("wot_path"):
+            candidates.append(self._settings["wot_path"])
+        try:
+            main_settings_path = os.path.join(
+                os.environ.get("APPDATA", "."), "SM WoT Assistant", "settings.json")
+            with open(main_settings_path, "r", encoding="utf-8") as f:
+                main_settings = json.load(f)
+                if main_settings.get("wot_path"):
+                    candidates.append(main_settings["wot_path"])
+        except Exception:
+            pass
+        candidates.extend([
+            "C:/Games/World_of_Tanks_EU", "D:/Games/World_of_Tanks_EU",
+            "E:/Games/World_of_Tanks_EU", "C:/Games/World_of_Tanks",
+            "D:/Games/World_of_Tanks", "E:/Games/World_of_Tanks",
+        ])
+        for p in candidates:
+            p = (p or "").strip()
+            if p and os.path.exists(os.path.join(p, "version.xml")):
+                return p
+        return ""
+
     def _load_data(self) -> None:
         try:
             from admin_backend.data import load_tank_db, load_prompts_merged
@@ -274,25 +307,28 @@ class AdminApp(customtkinter.CTk):
         def _scan_and_gen():
             self._generating = True
             self.after(0, lambda: self.set_status("Scanning...", "#ffaa00"))
+            driver = None
             try:
-                from admin_build_generator import detect_changed_tanks, _manifest_default_path, generate_builds, load_tank_db, load_prompts
+                from admin_build_generator import detect_changed_tanks, _manifest_default_path, generate_builds, load_tank_db, load_prompts, _create_driver
                 changed = detect_changed_tanks(self._wot_path, _manifest_default_path())
                 self._queue = changed
+                self.log(f"Creating Chrome driver...")
+                driver = _create_driver()
                 if not changed:
-                    self.log("No changed tanks \u2014 generating all")
+                    self.log("No changed tanks — generating all")
                     self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
                     tank_db = load_tank_db()
                     prompts = load_prompts()
                     ok, done_tags, reasons = generate_builds(
-                        None, tank_db, prompts, force=True, wot_path=self._wot_path,
+                        driver, tank_db, prompts, force=True, wot_path=self._wot_path,
                     )
                 else:
-                    self.log(f"Found {len(changed)} changed tanks \u2014 generating queue")
+                    self.log(f"Found {len(changed)} changed tanks — generating queue")
                     self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
                     tank_db = load_tank_db()
                     prompts = load_prompts()
                     ok, done_tags, reasons = generate_builds(
-                        None, tank_db, prompts,
+                        driver, tank_db, prompts,
                         queue=self._queue, wot_path=self._wot_path,
                     )
                 if ok:
@@ -306,6 +342,11 @@ class AdminApp(customtkinter.CTk):
             except Exception as e:
                 self.log(f"Generate error: {e}")
             finally:
+                if driver:
+                    try:
+                        driver.quit()
+                    except Exception:
+                        pass
                 self._generating = False
                 self.after(0, lambda: self.set_status("Idle", "#66cc66"))
         threading.Thread(target=_scan_and_gen, daemon=True).start()

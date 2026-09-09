@@ -71,17 +71,13 @@ def read_admin_version() -> str:
 
 
 def count_raw_tanks() -> int:
-    """Count .xml files in extracted_data/."""
-    count = 0
-    extracted = Path(config.BASE_DIR) / "extracted_data"
-    if not extracted.exists():
+    """Count all tanks in tank_db.json (before bad-tag filtering)."""
+    try:
+        path = Path(config.BASE_DIR) / "tank_db.json"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return len(data)
+    except Exception:
         return 0
-    for nation_dir in extracted.iterdir():
-        if nation_dir.is_dir():
-            for f in nation_dir.iterdir():
-                if f.suffix == ".xml":
-                    count += 1
-    return count
 
 
 def check_wot_path(wot_path: str) -> Tuple[bool, Optional[str]]:
@@ -133,6 +129,22 @@ def count_builds() -> int:
     except Exception:
         pass
     return 0
+
+
+def get_build_tags() -> set:
+    """Return set of tank tags that have builds in RTDB."""
+    try:
+        import firebase_reporter as fr
+        url = fr._rtdb_url("builds/tanks")
+        import requests
+        resp = requests.get(url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            if isinstance(data, dict):
+                return set(data.keys())
+    except Exception:
+        pass
+    return set()
 
 
 def get_errors_count() -> int:

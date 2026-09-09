@@ -157,25 +157,33 @@ class StatusPanel(customtkinter.CTkFrame):
 
     def _drilldown_queue(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
-        dlg.title("Queue (Changed Tanks)")
+        dlg.title("Queue (Tanks Without Builds)")
         dlg.geometry("500x400")
         dlg.transient(self.winfo_toplevel())
         dlg.configure(fg_color="#1A1D28")
-        customtkinter.CTkLabel(dlg, text="Changed Tanks",
+        customtkinter.CTkLabel(dlg, text="Tanks Without Builds",
                                font=customtkinter.CTkFont(size=14, weight="bold"),
                                text_color="#D4A843").pack(pady=(12, 4))
         from tkinter import ttk
-        tree = ttk.Treeview(dlg, columns=("tag", "name"), show="headings", height=18)
+        tree = ttk.Treeview(dlg, columns=("tag", "name", "tier"), show="headings", height=18)
         tree.heading("tag", text="Tag")
         tree.heading("name", text="Name")
+        tree.heading("tier", text="Tier")
         tree.column("tag", width=200)
-        tree.column("name", width=250)
+        tree.column("name", width=200)
+        tree.column("tier", width=50)
         tree.pack(fill="both", expand=True, padx=12, pady=(0, 12))
-        queue = self.app._queue if self.app else []
         tank_db = self.app.tank_db if self.app else {}
-        for tag in queue:
-            name = tank_db.get(tag, {}).get("name", tag)
-            tree.insert("", "end", values=(tag, name))
+        try:
+            from admin_backend.data import get_build_tags
+            build_tags = get_build_tags()
+        except Exception:
+            build_tags = set()
+        missing = sorted(t for t in tank_db if t not in build_tags)
+        for tag in missing:
+            name = tank_db[tag].get("name", tag)
+            tier = tank_db[tag].get("tier", "?")
+            tree.insert("", "end", values=(tag, name, tier))
 
     def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
