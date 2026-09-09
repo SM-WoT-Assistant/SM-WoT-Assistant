@@ -64,6 +64,11 @@
       ".read": "auth != null",
       ".write": "auth != null"
     },
+    "tank_data": {
+      ".read": true,
+      ".write": "auth != null && auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'",
+      ".indexOn": ["version"]
+    },
     "drawings": {
       ".read": true,
       ".write": false
