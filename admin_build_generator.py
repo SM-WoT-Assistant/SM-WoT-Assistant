@@ -44,7 +44,7 @@ PROMPTS_FILE = "prompts_cache.json"
 # 995 танків vs 996 промптів — промпти для відфільтрованих клонів рахувались, танки ні).
 _BAD_TAG_MARKERS = [
     "_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test", "_training",
-    "tutorial", "observer", "r05_kv", "r70_t_50_2", "sherman_crab", "g00_",
+    "mapstraining", "tutorial", "observer", "r05_kv", "r70_t_50_2", "sherman_crab", "g00_",
     "_cfe", "auto_s", "auto_test", "_shxxi", "_bomber", "pillbox", "env_artillery",
     "a08_t23", "a26_t18", "a15_t57", "_newonboarding", "_storymode",
 ]
@@ -658,7 +658,7 @@ def _copy_chrome_profile(src, dst):
     return dst
 
 
-def _create_driver():
+def _create_driver(visible=False):
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options
     from selenium.webdriver.chrome.service import Service
@@ -688,9 +688,10 @@ def _create_driver():
     opts.add_argument("--disable-blink-features=AutomationControlled")
     opts.add_argument("--no-first-run")
     opts.add_argument("--no-default-browser-check")
-    # Off-screen window: the AI Mode session runs fully hidden (no visible
-    # Chrome window above other apps). Position far outside the screen bounds.
-    opts.add_argument("--window-position=-32000,-32000")
+    if visible:
+        opts.add_argument("--start-maximized")
+    else:
+        opts.add_argument("--window-position=-32000,-32000")
     opts.add_argument("--window-size=1400,900")
     opts.add_experimental_option("excludeSwitches", ["enable-automation"])
     opts.add_experimental_option("useAutomationExtension", False)

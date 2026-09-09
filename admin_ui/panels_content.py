@@ -339,6 +339,18 @@ class StatusPanel(customtkinter.CTkFrame):
             var.set(active)
             btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
 
+    def _toggle_chrome_visible(self) -> None:
+        current = getattr(self.app, '_chrome_visible', False)
+        if self.app:
+            self.app._chrome_visible = not current
+        new_val = not current
+        self._chrome_vis_var.set(new_val)
+        self._chrome_vis_btn.configure(
+            text=f"Chrome: {'Visible' if new_val else 'Hidden'}",
+            fg_color="#D4A843" if new_val else "transparent",
+            text_color="#12141C" if new_val else "#6E7284",
+        )
+
     def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
         dlg.title("Error Reports")
@@ -528,6 +540,15 @@ class BuildsPanel(customtkinter.CTkFrame):
             command=self._open_queue,
         )
         self._queue_btn.pack(side="left", padx=2)
+
+        self._chrome_vis_var = customtkinter.BooleanVar(value=False)
+        self._chrome_vis_btn = customtkinter.CTkButton(
+            summary, text="Chrome: Hidden", width=110, height=28,
+            fg_color="transparent", text_color="#6E7284",
+            border_width=1, border_color="#2E3240",
+            command=self._toggle_chrome_visible,
+        )
+        self._chrome_vis_btn.pack(side="left", padx=2)
 
         self._queue_label = customtkinter.CTkLabel(
             summary, text="", text_color="#6E7284",

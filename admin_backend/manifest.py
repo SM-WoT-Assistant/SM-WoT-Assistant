@@ -15,7 +15,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 _BAD_TAG_MARKERS = (
     "_7x7", "_fallout", "_fl", "_sh", "_bootcamp", "_igr", "_test", "_training",
-    "tutorial", "observer", "r05_kv", "r70_t_50_2", "sherman_crab", "g00_",
+    "mapstraining", "tutorial", "observer", "r05_kv", "r70_t_50_2", "sherman_crab", "g00_",
     "_cfe", "auto_s", "auto_test", "_shxxi", "_bomber", "pillbox", "env_artillery",
     "a08_t23", "a26_t18", "a15_t57", "_newonboarding", "_storymode",
 )

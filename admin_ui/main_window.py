@@ -101,6 +101,7 @@ class AdminApp(customtkinter.CTk):
         self._scanning = False
         self._generating = False
         self._auto_generate = False
+        self._chrome_visible = False
         self._running = True
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
@@ -517,7 +518,7 @@ class AdminApp(customtkinter.CTk):
             try:
                 from admin_build_generator import generate_builds, load_tank_db, load_prompts, _create_driver
                 self.log(f"Generating {len(queue)} builds from queue...")
-                driver = _create_driver()
+                driver = _create_driver(visible=self._chrome_visible)
                 tank_db = load_tank_db()
                 prompts = load_prompts()
 
@@ -629,7 +630,7 @@ class AdminApp(customtkinter.CTk):
             driver = None
             try:
                 from admin_build_generator import generate_builds, load_tank_db, load_prompts, _create_driver
-                driver = _create_driver()
+                driver = _create_driver(visible=self._chrome_visible)
                 tank_db = load_tank_db()
                 prompts = load_prompts()
                 ok, done_tags, reasons = generate_builds(
