@@ -104,14 +104,22 @@ class AdminApp(customtkinter.CTk):
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
         self._errors_count = 0
+        self._gen_progress: dict = {
+            "running": False, "queue": [], "current_tag": None,
+            "results": {}, "progress": (0, 0),
+        }
+        self._queue_popup = None
+        self._splash_overlay = None
+        self._bg_reload_data = False
 
         self.tray = AdminTray(on_open=self._tray_open, on_exit=self._tray_exit)
 
         self._build_layout()
         self._register_panels()
+        self._show_splash()
         self._setup_close()
         self.after(100, self._validate_position)
-        self.after(500, self._load_data)
+        self.after(200, self._do_load_data)
         self.after(500, self._start_background)
         self.after(1000, self._start_tray)
 
@@ -182,6 +190,95 @@ class AdminApp(customtkinter.CTk):
 
         self.panel_dock = PanelDock(self._scroll)
 
+    def _show_splash(self) -> None:
+        """Show a loading overlay with logo + progress bar on top of _center."""
+        self._splash_overlay = customtkinter.CTkFrame(self._center, fg_color="#0E0E13")
+        self._splash_overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+
+        inner = customtkinter.CTkFrame(self._splash_overlay, fg_color="transparent")
+        inner.place(relx=0.5, rely=0.4, anchor="center")
+
+        logo_path = _project_root / "logo.png"
+        if logo_path.exists():
+            try:
+                from PIL import Image
+                img = Image.open(str(logo_path))
+                img = img.resize((80, 80), Image.Resampling.LANCZOS)
+                self._splash_img = customtkinter.CTkImage(light_image=img, dark_image=img, size=(80, 80))
+                customtkinter.CTkLabel(
+                    inner, image=self._splash_img, text=""
+                ).pack(pady=(0, 12))
+            except Exception:
+                pass
+
+        customtkinter.CTkLabel(
+            inner, text="SM WoT Assistant",
+            font=customtkinter.CTkFont(size=18, weight="bold"),
+            text_color="#D4A843",
+        ).pack(pady=(0, 4))
+        customtkinter.CTkLabel(
+            inner, text="Admin",
+            font=customtkinter.CTkFont(size=14),
+            text_color="#6E7284",
+        ).pack(pady=(0, 16))
+
+        self._splash_bar = customtkinter.CTkProgressBar(
+            inner, width=240, height=6,
+            progress_color="#D4A843", fg_color="#2E3240",
+        )
+        self._splash_bar.pack(pady=(0, 8))
+        self._splash_bar.set(0)
+
+        self._splash_status = customtkinter.CTkLabel(
+            inner, text="Loading data...",
+            font=customtkinter.CTkFont(size=11),
+            text_color="#6E7284",
+        )
+        self._splash_status.pack()
+
+        self.after(300, lambda: self._splash_bar.set(0.3))
+
+    def _dismiss_splash(self) -> None:
+        if self._splash_overlay:
+            self._splash_overlay.destroy()
+            self._splash_overlay = None
+
+    def _load_cached_stats(self) -> None:
+        """Read cached stats from admin_settings.json for instant display."""
+        try:
+            settings_path = (
+                Path(os.environ.get("APPDATA", "."))
+                / "SM WoT Assistant"
+                / "admin_settings.json"
+            )
+            if settings_path.exists():
+                data = json.loads(settings_path.read_text(encoding="utf-8"))
+                cached = data.get("_cached_stats", {})
+                if cached:
+                    for panel_id, panel in self.panel_dock.panels.items():
+                        if panel_id == "status" and panel["body"] is not None:
+                            body = panel["body"]
+                            if hasattr(body, "apply_cache"):
+                                body.apply_cache(cached)
+        except Exception:
+            pass
+
+    def _save_cached_stats(self, stats: dict) -> None:
+        """Persist stats to admin_settings.json."""
+        try:
+            settings_path = (
+                Path(os.environ.get("APPDATA", "."))
+                / "SM WoT Assistant"
+                / "admin_settings.json"
+            )
+            data = {}
+            if settings_path.exists():
+                data = json.loads(settings_path.read_text(encoding="utf-8"))
+            data["_cached_stats"] = stats
+            settings_path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+
     def _register_panels(self) -> None:
         self.panel_dock.add_panel(
             "status", "Status", "status",
@@ -234,11 +331,21 @@ class AdminApp(customtkinter.CTk):
                         self._report_heartbeat()
                     if now - self._last_errors_poll > 86400:
                         self._last_errors_poll = now
-                        self.after(0, self._load_data)
-                except Exception as e:
-                    self.after(0, lambda e=e: self.log(f"BG error: {e}"))
+                        self._bg_reload_data = True
+                except Exception:
+                    pass
                 time.sleep(10)
+
+        def _bg_poll():
+            if not self._running:
+                return
+            if getattr(self, "_bg_reload_data", False):
+                self._bg_reload_data = False
+                self._do_load_data()
+            self.after(1000, _bg_poll)
+
         threading.Thread(target=_loop, daemon=True).start()
+        self.after(1000, _bg_poll)
 
     def _report_heartbeat(self) -> None:
         try:
@@ -290,15 +397,41 @@ class AdminApp(customtkinter.CTk):
                 return p
         return ""
 
-    def _load_data(self) -> None:
+    def _do_load_data(self) -> None:
         try:
             from admin_backend.data import load_tank_db, load_prompts_merged
             self.tank_db = load_tank_db()
             self.prompts = load_prompts_merged()
             self.log(f"Loaded {len(self.tank_db)} tanks, {len(self.prompts)} prompts")
-            self.panel_dock.refresh()
+            self.after(0, self._on_data_loaded)
         except Exception as e:
             self.log(f"Data load error: {e}")
+            self.after(0, self._on_data_loaded)
+
+    def _on_data_loaded(self) -> None:
+        """Called after data load completes — refresh panels, save cache, dismiss splash."""
+        self.panel_dock.refresh()
+        try:
+            from admin_backend.data import count_builds
+            self._save_cached_stats({
+                "db_count": len(self.tank_db),
+                "builds_count": count_builds(),
+            })
+        except Exception:
+            pass
+        self._dismiss_splash()
+
+    def _open_queue_popup(self) -> None:
+        """Open the queue popup (singleton)."""
+        from admin_ui.queue_popup import QueuePopup
+        if self._queue_popup is not None:
+            try:
+                self._queue_popup.lift()
+                self._queue_popup.focus_force()
+                return
+            except Exception:
+                self._queue_popup = None
+        self._queue_popup = QueuePopup(self, self)
 
     def _scan_now(self) -> None:
         if self._generating or self._scanning:
@@ -333,6 +466,10 @@ class AdminApp(customtkinter.CTk):
             return
         def _gen_queue():
             self._generating = True
+            self._gen_progress.update({
+                "running": True, "queue": list(queue),
+                "current_tag": None, "results": {}, "progress": (0, len(queue)),
+            })
             self.after(0, lambda: self.set_status("Generating...", "#ffaa00"))
             driver = None
             try:
@@ -341,9 +478,20 @@ class AdminApp(customtkinter.CTk):
                 driver = _create_driver()
                 tank_db = load_tank_db()
                 prompts = load_prompts()
+
+                def _progress_cb(tag, status, current, total):
+                    self._gen_progress["progress"] = (current, total)
+                    if status == "generating":
+                        self._gen_progress["current_tag"] = tag
+                    elif status in ("ok", "fail"):
+                        self._gen_progress["results"][tag] = status
+                        if tag in self._gen_progress["queue"]:
+                            self._gen_progress["queue"].remove(tag)
+
                 ok, done_tags, reasons = generate_builds(
                     driver, tank_db, prompts,
                     queue=queue, wot_path=self._wot_path,
+                    progress_callback=_progress_cb,
                 )
                 if ok:
                     count = len(done_tags)
@@ -362,6 +510,8 @@ class AdminApp(customtkinter.CTk):
                     except Exception:
                         pass
                 self._generating = False
+                self._gen_progress["running"] = False
+                self._gen_progress["current_tag"] = None
                 self.after(0, lambda: self.set_status("Idle", "#66cc66"))
         threading.Thread(target=_gen_queue, daemon=True).start()
 
@@ -389,7 +539,7 @@ class AdminApp(customtkinter.CTk):
             self.log("Extraction done \u2014 publishing to Firebase...")
             _publish_tank_data(_cfg.BASE_DIR, _cfg.USER_DATA_DIR)
             self.log("Pipeline complete \u2014 Firebase updated")
-            self.after(0, self._load_data)
+            self._bg_reload_data = True
         except Exception as e:
             self.log(f"Pipeline error: {e}")
         finally:
@@ -413,7 +563,7 @@ class AdminApp(customtkinter.CTk):
             from admin_build_generator import _extract_full_pipeline
             _extract_full_pipeline(self._wot_path)
             self.log("Full DB regeneration complete")
-            self.after(0, self._load_data)
+            self._bg_reload_data = True
         except Exception as e:
             self.log(f"Regen error: {e}")
         finally:

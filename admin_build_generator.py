@@ -1507,8 +1507,12 @@ def _persist_client_tank_data(tag, db_rec, slots_rec, crew_rec):
             print(f"[WARN] crew_builds.json persist failed: {e}")
 
 
-def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queue=None, wot_path=None):
+def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queue=None, wot_path=None, progress_callback=None):
     """Generate builds for specified tanks.
+
+    Args:
+        progress_callback: Optional callable(tag, status, current, total) called
+            for each tank: status is "generating", "ok", or "fail".
 
     Returns (ok, done_tags, reasons): ok=True when at least one build was
     uploaded, done_tags is the list of tags actually uploaded to RTDB,
@@ -1608,6 +1612,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         data = tank_db[tag]
         tank_name = data.get("name", tag)
         print(f"  [{actual_idx+1}/{total}] Tier {data.get('tier',0)} — {tank_name} [{tag}]", flush=True)
+        if progress_callback:
+            try:
+                progress_callback(tag, "generating", actual_idx+1, total)
+            except Exception:
+                pass
 
         # Get prompt
         prompt = prompts.get(tag)
@@ -1619,6 +1628,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             reasons[tag] = "no_prompt: generate_prompt returned nothing usable"
             print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
+            if progress_callback:
+                try:
+                    progress_callback(tag, "fail", actual_idx+1, total)
+                except Exception:
+                    pass
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
@@ -1657,6 +1671,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             reasons[tag] = "ai_no_response" + (f": {submit_err[:150]}" if submit_err else "")
             print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
+            if progress_callback:
+                try:
+                    progress_callback(tag, "fail", actual_idx+1, total)
+                except Exception:
+                    pass
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
@@ -1668,6 +1687,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             reasons[tag] = "ai_parse_fail: no build or incomplete parse from AI response"
             print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
+            if progress_callback:
+                try:
+                    progress_callback(tag, "fail", actual_idx+1, total)
+                except Exception:
+                    pass
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
@@ -1679,6 +1703,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         ok = _upload_build(tag, build_data)
         if ok:
             print(f"    [OK] uploaded")
+            if progress_callback:
+                try:
+                    progress_callback(tag, "ok", actual_idx+1, total)
+                except Exception:
+                    pass
             # Event-driven sync (02.09.2026 #1692): always upload prompt to RTDB,
             # not just on prompt_new=True. Old behavior: tanks with already-valid
             # local prompts never re-uploaded, so RTDB prompts/tanks lagged
@@ -1695,6 +1724,11 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             reasons[tag] = "upload_fail: RTDB write rejected"
             print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
+            if progress_callback:
+                try:
+                    progress_callback(tag, "fail", actual_idx+1, total)
+                except Exception:
+                    pass
             retry_tags = [tag] + to_process[idx+1:]
             save_progress(prog["pass"], actual_idx+1, retry_tags, ok_count, fail_count)
 

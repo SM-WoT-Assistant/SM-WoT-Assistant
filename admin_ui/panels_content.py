@@ -62,11 +62,14 @@ class StatusPanel(customtkinter.CTkFrame):
             col = idx % ncols
             grid_col = col * 2
 
-            drilldown_key = key if key in ("tanks_db", "queue") else None
+            drilldown_key = key if key in ("tanks_db",) else None
+            queue_cmd = None
+            if key == "queue":
+                queue_cmd = lambda: self.app._open_queue_popup() if self.app and hasattr(self.app, "_open_queue_popup") else None
             c = card(
                 self, title=title, value=value, width=110, height=30, center=True,
                 fg_color="#14161F",
-                command=lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None,
+                command=queue_cmd if queue_cmd else (lambda dk=drilldown_key: self._open_drilldown(dk) if dk else None),
             )
             c.grid(row=0, column=grid_col, sticky="nsew", padx=2, pady=2)
             self._cards[key] = c
@@ -80,6 +83,17 @@ class StatusPanel(customtkinter.CTkFrame):
                 self.grid_columnconfigure(gc, weight=1)
             else:
                 self.grid_columnconfigure(gc, weight=0, minsize=1)
+
+    def apply_cache(self, cached: dict) -> None:
+        """Apply cached stats for instant display at startup."""
+        if "db_count" in cached:
+            self._cards["tanks_db"]._val_lbl.configure(text=str(cached["db_count"]))
+        if "builds_count" in cached:
+            self._cards["builds"]._val_lbl.configure(text=str(cached["builds_count"]))
+        if "db_count" in cached and "builds_count" in cached:
+            q = max(0, cached["db_count"] - cached["builds_count"])
+            q_color = "#cc6666" if q > 0 else "#66cc66"
+            self._cards["queue"]._val_lbl.configure(text=str(q), text_color=q_color)
 
     def refresh(self) -> None:
         if self.app is None:
@@ -143,7 +157,8 @@ class StatusPanel(customtkinter.CTkFrame):
         if card_key == "tanks_db":
             self._drilldown_tanks_db()
         elif card_key == "queue":
-            self._drilldown_queue()
+            if self.app and hasattr(self.app, "_open_queue_popup"):
+                self.app._open_queue_popup()
 
     def _drilldown_tanks_db(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
@@ -397,25 +412,27 @@ class InfoPanel(customtkinter.CTkFrame):
 
 
 class BuildsPanel(customtkinter.CTkFrame):
-    """Build controls: Scan + Generate (queue) + Auto toggle + queue badge + tank treeview."""
+    """Builds summary: queue link + tank treeview (controls moved to QueuePopup)."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self._tree = None
-        self._queue_label = None
         self._build()
 
     def _build(self) -> None:
-        from admin_ui.widgets import primary_button, ghost_button
-        btn_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        btn_frame.pack(fill="x", padx=6, pady=6)
-        primary_button(btn_frame, "Generate", width=90, command=self._on_generate).pack(side="left", padx=2)
-        ghost_button(btn_frame, "Scan", width=60, command=self._on_scan).pack(side="left", padx=2)
-        self._auto_btn = ghost_button(btn_frame, "Auto: OFF", width=80, command=self._on_toggle_auto)
-        self._auto_btn.pack(side="left", padx=2)
+        summary = customtkinter.CTkFrame(self, fg_color="transparent")
+        summary.pack(fill="x", padx=6, pady=(6, 2))
+
+        self._queue_btn = customtkinter.CTkButton(
+            summary, text="Open Queue", width=90, height=28,
+            fg_color="#D4A843", hover_color="#B8922E", text_color="#12141C",
+            command=self._open_queue,
+        )
+        self._queue_btn.pack(side="left", padx=2)
+
         self._queue_label = customtkinter.CTkLabel(
-            btn_frame, text="", text_color="#6E7284",
+            summary, text="", text_color="#6E7284",
             font=customtkinter.CTkFont(size=11))
         self._queue_label.pack(side="left", padx=(8, 0))
 
@@ -426,19 +443,9 @@ class BuildsPanel(customtkinter.CTkFrame):
         self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
         self._tree_frame.pack(fill="both", expand=True, padx=6, pady=(0, 6))
 
-    def _on_scan(self) -> None:
-        if self.app and hasattr(self.app, '_scan_now'):
-            self.app._scan_now()
-
-    def _on_generate(self) -> None:
-        if self.app and hasattr(self.app, '_generate_now'):
-            self.app._generate_now()
-
-    def _on_toggle_auto(self) -> None:
-        if self.app and hasattr(self.app, '_auto_generate_toggle'):
-            self.app._auto_generate_toggle()
-            active = getattr(self.app, '_auto_generate', False)
-            self._auto_btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
+    def _open_queue(self) -> None:
+        if self.app and hasattr(self.app, "_open_queue_popup"):
+            self.app._open_queue_popup()
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
@@ -458,11 +465,10 @@ class BuildsPanel(customtkinter.CTkFrame):
 
     def refresh(self) -> None:
         queue = getattr(self.app, '_queue', [])
-        if self._queue_label:
-            if queue:
-                self._queue_label.configure(text=f"{len(queue)} in queue", text_color="#ffaa00")
-            else:
-                self._queue_label.configure(text="queue empty", text_color="#6E7284")
+        if queue:
+            self._queue_label.configure(text=f"{len(queue)} in queue", text_color="#ffaa00")
+        else:
+            self._queue_label.configure(text="queue empty", text_color="#6E7284")
         if self._tree is None:
             try:
                 from tkinter import ttk
