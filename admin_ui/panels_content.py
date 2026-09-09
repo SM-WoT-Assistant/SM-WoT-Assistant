@@ -62,7 +62,7 @@ class StatusPanel(customtkinter.CTkFrame):
             col = idx % ncols
             grid_col = col * 2
 
-            drilldown_key = key if key in ("tanks_db",) else None
+            drilldown_key = key if key in ("tanks_db", "queue") else None
             c = card(
                 self, title=title, value=value, width=110, height=30, center=True,
                 fg_color="#14161F",
@@ -217,7 +217,7 @@ class StatusPanel(customtkinter.CTkFrame):
         gen_btn = customtkinter.CTkButton(
             ctrl_frame, text="Generate", width=90, height=28,
             fg_color="#D4A843", hover_color="#B8922E", text_color="#12141C",
-            command=lambda: self.app._generate_now() if self.app else None,
+            command=lambda: self.app._generate_now(queue=list(missing)) if self.app and missing else None,
         )
         gen_btn.pack(side="left", padx=2)
 
@@ -543,16 +543,7 @@ class BuildsPanel(customtkinter.CTkFrame):
 
     def _open_queue(self) -> None:
         if self.app:
-            for panel_id, panel in self.app.panel_dock.panels.items():
-                if panel_id == "status" and panel["body"] is not None:
-                    body = panel["body"]
-                    if hasattr(body, '_drilldown_queue'):
-                        body._drilldown_queue()
-                        return
-            # Fallback: call directly on status panel
-            status_body = self.app.panel_dock.panels.get("status", {}).get("body")
-            if status_body and hasattr(status_body, '_drilldown_queue'):
-                status_body._drilldown_queue()
+            self.app._open_queue()
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()

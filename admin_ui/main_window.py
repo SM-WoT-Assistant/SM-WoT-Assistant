@@ -497,11 +497,12 @@ class AdminApp(customtkinter.CTk):
                 self.after(0, lambda: self.set_status("Idle", "#66cc66"))
         threading.Thread(target=_scan, daemon=True).start()
 
-    def _generate_now(self) -> None:
+    def _generate_now(self, queue=None) -> None:
         if self._generating:
             self.log("Generation already running")
             return
-        queue = list(self._queue)
+        if queue is None:
+            queue = list(self._queue)
         if not queue:
             self.log("Queue empty \u2014 run Scan first or wait for auto-detect")
             return
@@ -559,6 +560,13 @@ class AdminApp(customtkinter.CTk):
     def _auto_generate_toggle(self) -> None:
         self._auto_generate = not getattr(self, "_auto_generate", False)
         self.log(f"Auto-generate: {'ON' if self._auto_generate else 'OFF'}")
+
+    def _open_queue(self) -> None:
+        """Open the queue popup from StatusPanel."""
+        panel = self.panel_dock.panels.get("status", {})
+        body = panel.get("body") if isinstance(panel, dict) else None
+        if body and hasattr(body, '_drilldown_queue'):
+            body._drilldown_queue()
 
     def _extract_now(self) -> None:
         if not self._wot_path:
