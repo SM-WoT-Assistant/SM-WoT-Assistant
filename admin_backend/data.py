@@ -180,25 +180,42 @@ def get_error_reports() -> list:
     return []
 
 
+def _rtdb_get(path: str, timeout: int = 10, use_admin_token: bool = False) -> Any:
+    """GET from RTDB. First tries API key; if 401 and use_admin_token, retries with admin ID token."""
+    import requests
+    import firebase_reporter as fr
+    url = fr._rtdb_url(path)
+    resp = requests.get(url, timeout=timeout)
+    if resp.ok:
+        return resp.json()
+    if resp.status_code == 401 and use_admin_token:
+        try:
+            from admin_auth import _rtdb_url_with_token
+            auth_url = _rtdb_url_with_token(path)
+            if auth_url:
+                resp2 = requests.get(auth_url, timeout=timeout)
+                if resp2.ok:
+                    return resp2.json()
+        except Exception:
+            pass
+    return None
+
+
 def get_community_stats() -> Dict[str, Any]:
     """Aggregate community stats from RTDB + public APIs."""
     stats: Dict[str, Any] = {}
     try:
-        import firebase_reporter as fr
-        builds_ver = fr._get_json(fr._rtdb_url("builds/version"))  # type: ignore[attr-defined]
-        stats["builds_ver"] = builds_ver
+        stats["builds_ver"] = _rtdb_get("builds/version")
     except Exception:
         stats["builds_ver"] = None
     try:
-        import firebase_reporter as fr
-        installs = fr._get_json(fr._rtdb_url("installations"))  # type: ignore[attr-defined]
-        stats["installs"] = len(installs) if installs else 0
+        installs = _rtdb_get("installations", use_admin_token=True)
+        stats["installs"] = len(installs) if isinstance(installs, dict) else 0
     except Exception:
         stats["installs"] = 0
     try:
-        import firebase_reporter as fr
-        errors = fr._get_json(fr._rtdb_url("error_reports?orderBy=%22timestamp%22&limitToLast=100"))  # type: ignore[attr-defined]
-        stats["errors"] = len(errors) if errors else 0
+        errors = _rtdb_get("error_reports?orderBy=%22timestamp%22&limitToLast=100")
+        stats["errors"] = len(errors) if isinstance(errors, (dict, list)) else 0
     except Exception:
         stats["errors"] = 0
     try:

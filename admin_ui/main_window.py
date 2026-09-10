@@ -417,7 +417,7 @@ class AdminApp(customtkinter.CTk):
         self.focus_force()
 
     def _tray_exit(self) -> None:
-        self.after(0, self._on_close)
+        self.after(0, self._real_exit)
 
     def _resolve_wot_path(self, cli_wot_path: str) -> str:
         """Resolve WoT path: admin settings -> main app settings -> common paths."""
@@ -873,10 +873,24 @@ class AdminApp(customtkinter.CTk):
             pass
 
     def _on_close(self) -> None:
-        self._running = False
-        # Save window geometry
+        """Minimize to tray instead of exiting. Real exit via tray menu."""
         try:
             geo = self.geometry() or ""  # WxH+X+Y
+            parts = geo.replace("x", "+").split("+")
+            self._settings["window_w"] = int(parts[0])
+            self._settings["window_h"] = int(parts[1])
+            self._settings["window_x"] = int(parts[2])
+            self._settings["window_y"] = int(parts[3])
+            _save_settings(self._settings)
+        except Exception:
+            pass
+        self.withdraw()
+
+    def _real_exit(self) -> None:
+        """Actual exit: save geometry, stop tray, destroy window."""
+        self._running = False
+        try:
+            geo = self.geometry() or ""
             parts = geo.replace("x", "+").split("+")
             self._settings["window_w"] = int(parts[0])
             self._settings["window_h"] = int(parts[1])

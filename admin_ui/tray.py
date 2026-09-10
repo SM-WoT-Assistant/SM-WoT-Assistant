@@ -2,7 +2,7 @@
 
 Follows the same pattern as the main app's tray_icon.py:
 message-only window, WNDPROC sets a flag, main thread polls.
-Left click = open/restore. Right click = exit.
+Left click = open/restore window. Right click = context menu (Restore / Exit).
 """
 
 import ctypes
@@ -34,9 +34,17 @@ NIF_TIP = 4
 NIF_INFO = 0x10
 WM_LBUTTONUP = 0x0202
 WM_RBUTTONUP = 0x0205
+WM_COMMAND = 0x0111
 IMAGE_ICON = 1
 LR_LOADFROMFILE = 0x0010
 LR_DEFAULTSIZE = 0x0040
+
+IDM_RESTORE = 1001
+IDM_EXIT = 1002
+
+TPM_RIGHTBUTTON = 0x0002
+TPM_NONOTIFY = 0x0080
+TPM_RETURNCMD = 0x0100
 
 ICON_PATH = Path(__file__).parent.parent / "admin_icon.ico"
 
@@ -86,9 +94,12 @@ _global_wndproc = None
 
 
 def _global_wndproc_func(hwnd, msg, wparam, lparam):
-    if msg == WM_APP and lparam in (WM_LBUTTONUP, WM_RBUTTONUP):
+    if msg == WM_APP and lparam == WM_LBUTTONUP:
         if _active_tray is not None:
-            _active_tray._on_click(lparam)
+            _active_tray._on_click_left()
+    elif msg == WM_APP and lparam == WM_RBUTTONUP:
+        if _active_tray is not None:
+            _active_tray._show_menu_flag = True
     return USER32.DefWindowProcW(hwnd, msg, wparam, lparam)
 
 
@@ -114,7 +125,7 @@ class AdminTray:
     """System tray icon for the admin application.
 
     Left click = open/restore window.
-    Right click = exit application.
+    Right click = context menu (Restore / Exit).
     Polling pattern — WNDPROC sets flags, main thread handles actions.
     """
 
@@ -126,7 +137,7 @@ class AdminTray:
         self.on_open = on_open
         self.on_exit = on_exit
         self._click_left = False
-        self._click_right = False
+        self._show_menu_flag = False
         self._destroyed = False
         self._msg_hwnd = 0
         self._nid: Optional[NOTIFYICONDATAW] = None
@@ -180,22 +191,54 @@ class AdminTray:
                     self._root.after_idle(self.on_open)
                 except Exception:
                     pass
-        if self._click_right:
-            self._click_right = False
-            if self.on_exit:
-                try:
-                    self._root.after_idle(self.on_exit)
-                except Exception:
-                    pass
+        if self._show_menu_flag:
+            self._show_menu_flag = False
+            self._show_context_menu()
         if not self._destroyed:
             self._poll_id = self._root.after(250, self._poll)
 
-    def _on_click(self, lparam: int) -> None:
-        """Called from WNDPROC — just set flags, no Tk calls."""
-        if lparam == WM_LBUTTONUP:
-            self._click_left = True
-        elif lparam == WM_RBUTTONUP:
-            self._click_right = True
+    def _on_click_left(self) -> None:
+        """Called from WNDPROC — just set flag, no Tk calls."""
+        self._click_left = True
+
+    def _show_context_menu(self) -> None:
+        """Show right-click context menu on the main thread."""
+        if self._destroyed or not self._msg_hwnd:
+            return
+        try:
+            pt = wintypes.POINT()
+            USER32.GetCursorPos(ctypes.byref(pt))
+            USER32.SetForegroundWindow(self._msg_hwnd)
+
+            h_menu = USER32.CreatePopupMenu()
+            if not h_menu:
+                return
+            USER32.AppendMenuW(h_menu, 0, IDM_RESTORE, "Restore")
+            USER32.AppendMenuW(h_menu, 0x0800, 0, None)  # MF_SEPARATOR
+            USER32.AppendMenuW(h_menu, 0, IDM_EXIT, "Exit")
+
+            cmd = USER32.TrackPopupMenu(
+                h_menu,
+                TPM_RIGHTBUTTON | TPM_NONOTIFY | TPM_RETURNCMD,
+                pt.x, pt.y, 0, self._msg_hwnd, None,
+            )
+            USER32.DestroyMenu(h_menu)
+            USER32.PostMessageW(self._msg_hwnd, WM_APP, 0, 0)
+
+            if cmd == IDM_RESTORE:
+                if self.on_open:
+                    try:
+                        self._root.after_idle(self.on_open)
+                    except Exception:
+                        pass
+            elif cmd == IDM_EXIT:
+                if self.on_exit:
+                    try:
+                        self._root.after_idle(self.on_exit)
+                    except Exception:
+                        pass
+        except Exception:
+            logger.warning("Context menu failed", exc_info=True)
 
     def _load_icon(self) -> int:
         p = str(ICON_PATH)
