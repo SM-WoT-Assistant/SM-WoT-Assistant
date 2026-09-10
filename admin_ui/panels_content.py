@@ -5,6 +5,7 @@ PanelDock uses build(parent) -> content and refresh(content) callbacks.
 """
 
 import customtkinter
+import tkinter as tk
 import threading
 import time
 from typing import Any, Optional, List
@@ -32,6 +33,93 @@ def _make_divider(parent, orient="h"):
         return customtkinter.CTkFrame(parent, height=1, fg_color="#2E3240")
     else:
         return customtkinter.CTkFrame(parent, width=1, fg_color="#2E3240")
+
+
+def _bind_copy(dlg):
+    """Bind Ctrl+C / right-click Copy on all widgets in a popup dialog.
+
+    - Treeview: Ctrl+C copies selected rows; right-click copies focused row
+    - CTkLabel: right-click → Copy menu
+    - CTkTextbox: already supports Ctrl+C natively
+    """
+    from tkinter import ttk
+
+    def _copy_text(widget, text):
+        widget.clipboard_clear()
+        widget.clipboard_append(text)
+
+    def _copy_treeview(tree, event=None):
+        sel = tree.selection()
+        if not sel:
+            return
+        rows = []
+        for iid in sel:
+            vals = tree.item(iid, "values")
+            rows.append("\t".join(str(v) for v in vals))
+        _copy_text(tree, "\n".join(rows))
+
+    def _tree_context_menu(tree, event):
+        menu = tk.Menu(tree, tearoff=0, bg="#1A1D28", fg="#DDE0EA",
+                       activebackground="#D4A843", activeforeground="#12141C")
+        menu.add_command(label="Copy",
+                         command=lambda: _copy_treeview(tree))
+        menu.add_command(label="Copy All",
+                         command=lambda: _copy_text(
+                             tree,
+                             "\n".join(
+                                 "\t".join(str(v) for v in tree.item(iid, "values"))
+                                 for iid in tree.get_children()
+                             )))
+        menu.add_separator()
+        menu.add_command(label="Select All",
+                         command=lambda: tree.selection_set(tree.get_children()))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _label_context_menu(lbl, event):
+        text = lbl.cget("text")
+        if not text:
+            return
+        menu = tk.Menu(lbl, tearoff=0, bg="#1A1D28", fg="#DDE0EA",
+                       activebackground="#D4A843", activeforeground="#12141C")
+        menu.add_command(label="Copy",
+                         command=lambda: _copy_text(lbl, text))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    for widget in dlg.winfo_children():
+        if isinstance(widget, ttk.Treeview):
+            widget.bind("<Control-c>", lambda e, t=widget: _copy_treeview(t, e))
+            widget.bind("<Control-C>", lambda e, t=widget: _copy_treeview(t, e))
+            widget.bind("<Control-a>",
+                        lambda e, t=widget: t.selection_set(t.get_children()))
+            widget.bind("<Control-A>",
+                        lambda e, t=widget: t.selection_set(t.get_children()))
+            widget.bind("<Button-3>",
+                        lambda e, t=widget: _tree_context_menu(t, e))
+        elif isinstance(widget, customtkinter.CTkLabel):
+            widget.bind("<Button-3>",
+                        lambda e, l=widget: _label_context_menu(l, e))
+        elif isinstance(widget, customtkinter.CTkFrame):
+            for child in widget.winfo_children():
+                if isinstance(child, ttk.Treeview):
+                    child.bind("<Control-c>",
+                               lambda e, t=child: _copy_treeview(t, e))
+                    child.bind("<Control-C>",
+                               lambda e, t=child: _copy_treeview(t, e))
+                    child.bind("<Control-a>",
+                               lambda e, t=child: t.selection_set(t.get_children()))
+                    child.bind("<Control-A>",
+                               lambda e, t=child: t.selection_set(t.get_children()))
+                    child.bind("<Button-3>",
+                               lambda e, t=child: _tree_context_menu(t, e))
+                elif isinstance(child, customtkinter.CTkLabel):
+                    child.bind("<Button-3>",
+                               lambda e, l=child: _label_context_menu(l, e))
 
 
 class StatusPanel(customtkinter.CTkFrame):
@@ -229,6 +317,16 @@ class StatusPanel(customtkinter.CTkFrame):
         )
         auto_btn.pack(side="left", padx=2)
 
+        chrome_vis = getattr(self.app, '_chrome_visible', False) if self.app else False
+        chrome_btn = customtkinter.CTkButton(
+            ctrl_frame, text=f"Chrome: {'Visible' if chrome_vis else 'Hidden'}", width=110, height=28,
+            fg_color="#D4A843" if chrome_vis else "transparent",
+            text_color="#12141C" if chrome_vis else "#6E7284",
+            border_width=1, border_color="#D4A843" if chrome_vis else "#2E3240",
+            command=lambda: self._toggle_chrome_in_queue(chrome_btn),
+        )
+        chrome_btn.pack(side="left", padx=2)
+
         status_lbl = customtkinter.CTkLabel(
             ctrl_frame, text="", text_color="#6E7284",
             font=customtkinter.CTkFont(size=11))
@@ -331,6 +429,7 @@ class StatusPanel(customtkinter.CTkFrame):
             dlg.after(500, _poll)
 
         dlg.after(500, _poll)
+        _bind_copy(dlg)
 
     def _toggle_auto_in_queue(self, var, btn):
         if self.app and hasattr(self.app, '_auto_generate_toggle'):
@@ -338,6 +437,18 @@ class StatusPanel(customtkinter.CTkFrame):
             active = getattr(self.app, '_auto_generate', False)
             var.set(active)
             btn.configure(text=f"Auto: {'ON' if active else 'OFF'}")
+
+    def _toggle_chrome_in_queue(self, btn) -> None:
+        current = getattr(self.app, '_chrome_visible', False) if self.app else False
+        new_val = not current
+        if self.app:
+            self.app._chrome_visible = new_val
+        btn.configure(
+            text=f"Chrome: {'Visible' if new_val else 'Hidden'}",
+            fg_color="#D4A843" if new_val else "transparent",
+            text_color="#12141C" if new_val else "#6E7284",
+            border_color="#D4A843" if new_val else "#2E3240",
+        )
 
     def _drilldown_errors(self) -> None:
         dlg = customtkinter.CTkToplevel(self)
@@ -376,6 +487,7 @@ class StatusPanel(customtkinter.CTkFrame):
                             _err_text(val)[:100]))
         except Exception:
             pass
+        _bind_copy(dlg)
 
 
 
@@ -499,12 +611,14 @@ class InfoPanel(customtkinter.CTkFrame):
         try:
             from admin_backend.data import get_error_reports
             errors = get_error_reports()
+            errors.reverse()
             for e in errors:
                 tree.insert("", "end", values=(
                     e.get("type", "-"), e.get("stage", "-"),
                     _err_text(e)[:100], str(e.get("timestamp", "-"))[:16]))
         except Exception as ex:
             customtkinter.CTkLabel(dlg, text=f"Error: {ex}", text_color="#cc6666").pack(pady=20)
+        _bind_copy(dlg)
 
 
 class BuildsPanel(customtkinter.CTkFrame):
@@ -529,15 +643,6 @@ class BuildsPanel(customtkinter.CTkFrame):
         )
         self._queue_btn.pack(side="left", padx=2)
 
-        self._chrome_vis_var = customtkinter.BooleanVar(value=False)
-        self._chrome_vis_btn = customtkinter.CTkButton(
-            summary, text="Chrome: Hidden", width=110, height=28,
-            fg_color="transparent", text_color="#6E7284",
-            border_width=1, border_color="#2E3240",
-            command=self._toggle_chrome_visible,
-        )
-        self._chrome_vis_btn.pack(side="left", padx=2)
-
         self._queue_label = customtkinter.CTkLabel(
             summary, text="", text_color="#6E7284",
             font=customtkinter.CTkFont(size=11))
@@ -553,18 +658,6 @@ class BuildsPanel(customtkinter.CTkFrame):
     def _open_queue(self) -> None:
         if self.app:
             self.app._open_queue()
-
-    def _toggle_chrome_visible(self) -> None:
-        current = getattr(self.app, '_chrome_visible', False)
-        if self.app:
-            self.app._chrome_visible = not current
-        new_val = not current
-        self._chrome_vis_var.set(new_val)
-        self._chrome_vis_btn.configure(
-            text=f"Chrome: {'Visible' if new_val else 'Hidden'}",
-            fg_color="#D4A843" if new_val else "transparent",
-            text_color="#12141C" if new_val else "#6E7284",
-        )
 
     def _on_search(self, event=None) -> None:
         query = self._search.get().strip().lower()
