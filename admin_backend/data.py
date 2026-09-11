@@ -71,13 +71,77 @@ def read_admin_version() -> str:
 
 
 def count_raw_tanks() -> int:
-    """Count all tanks in tank_db.json (before bad-tag filtering)."""
+    """Count all tanks in tank_db.json (before bad-tag filtering).
+
+    Prefers USER_DATA_DIR (updated by extraction pipeline) over BASE_DIR
+    (bundled at build time, may be stale).
+    """
+    for d in (config.USER_DATA_DIR, config.BASE_DIR):
+        path = Path(d) / "tank_db.json"
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                return len(data)
+            except Exception:
+                pass
+    return 0
+
+
+_WG_VEHICLES_URL = "https://api.worldoftanks.eu/wot/encyclopedia/vehicles/"
+_WG_APP_ID = "0cc3f254142cf2e40511006d6cd18761"
+
+
+def fetch_wg_tank_tags() -> set:
+    """Fetch all tank tags from WG API (paginated, tags-only for speed).
+
+    WG API uses numeric IDs as dict keys; the actual tag is in the 'tag' field.
+    """
+    import requests
+    tags = set()
     try:
-        path = Path(config.BASE_DIR) / "tank_db.json"
-        data = json.loads(path.read_text(encoding="utf-8"))
-        return len(data)
+        page = 1
+        while True:
+            r = requests.get(_WG_VEHICLES_URL, params={
+                "application_id": _WG_APP_ID, "language": "en",
+                "limit": 100, "page": page, "fields": "tag"
+            }, timeout=10)
+            if r.status_code != 200:
+                break
+            data = r.json()
+            if data.get("status") != "ok":
+                break
+            items = data.get("data", {})
+            if not items:
+                break
+            for _id, info in items.items():
+                t = info.get("tag")
+                if t:
+                    tags.add(t)
+            meta = data.get("meta", {})
+            if page >= meta.get("page_total", 1):
+                break
+            page += 1
     except Exception:
-        return 0
+        pass
+    return tags
+
+
+def cross_validate_wg() -> Dict[str, Any]:
+    """Compare local tank_db with WG API. Returns summary dict."""
+    local = load_tank_db()
+    wg_tags = fetch_wg_tank_tags()
+    if not wg_tags:
+        return {"status": "wg_fetch_failed", "local_count": len(local), "wg_count": 0}
+    local_tags = set(local.keys())
+    new_in_wg = sorted(wg_tags - local_tags)
+    missing_from_wg = sorted(local_tags - wg_tags)
+    return {
+        "status": "ok",
+        "local_count": len(local),
+        "wg_count": len(wg_tags),
+        "new_in_wg": new_in_wg,
+        "missing_from_wg": missing_from_wg,
+    }
 
 
 def check_wot_path(wot_path: str) -> Tuple[bool, Optional[str]]:

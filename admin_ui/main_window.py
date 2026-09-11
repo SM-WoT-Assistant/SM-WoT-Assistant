@@ -468,6 +468,23 @@ class AdminApp(customtkinter.CTk):
             self.log(f"Loaded {len(self.tank_db)} tanks, {len(self.prompts)} prompts")
         except Exception as e:
             self.log(f"Data load error: {e}")
+        self._update_splash_progress(80, "WG API cross-validation...")
+        try:
+            from admin_backend.data import cross_validate_wg
+            wg = cross_validate_wg()
+            if wg["status"] == "ok":
+                self.log(f"WG API: {wg['wg_count']} tanks | local: {wg['local_count']}")
+                if wg["new_in_wg"]:
+                    self.log(f"  NEW in WG ({len(wg['new_in_wg'])}): {', '.join(wg['new_in_wg'][:5])}")
+                if wg["missing_from_wg"]:
+                    self.log(f"  Not in WG ({len(wg['missing_from_wg'])}): removed/event/collector")
+                self._wg_validation = wg
+            else:
+                self.log(f"WG API fetch failed — using local data only")
+                self._wg_validation = None
+        except Exception as e:
+            self.log(f"WG validation error: {e}")
+            self._wg_validation = None
         self._update_splash_progress(90, "Finalizing...")
         self._startup_ready = True
         self.after(200, self._finish_startup_splash)
