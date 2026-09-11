@@ -191,7 +191,7 @@ def _rtdb_get(path: str, timeout: int = 10, use_admin_token: bool = False) -> An
     if resp.status_code == 401 and use_admin_token:
         try:
             from admin_auth import _rtdb_url_with_token
-            auth_url = _rtdb_url_with_token(path)
+            auth_url = _rtdb_url_with_token(url)
             if auth_url:
                 resp2 = requests.get(auth_url, timeout=timeout)
                 if resp2.ok:
