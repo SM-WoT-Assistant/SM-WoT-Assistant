@@ -4,6 +4,7 @@ Entry point for the new admin application. Panels are CTkFrames
 inside the main window, arranged horizontally via grid.
 """
 
+import atexit
 import json
 import logging
 import os
@@ -370,6 +371,14 @@ class AdminApp(customtkinter.CTk):
 
     def _start_tray(self) -> None:
         self.tray.start(root=self)
+        atexit.register(self._cleanup_tray)
+
+    def _cleanup_tray(self) -> None:
+        """Safety-net: remove tray icon on any exit path."""
+        try:
+            self.tray.stop()
+        except Exception:
+            pass
 
     def _start_background(self) -> None:
         def _loop():

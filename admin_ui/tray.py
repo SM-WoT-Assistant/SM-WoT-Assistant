@@ -146,6 +146,7 @@ class AdminTray:
         self._poll_id: Any = None
 
     def start(self, root: Any = None) -> None:
+        global _active_tray
         if self._destroyed:
             return
         self._root = root
@@ -173,6 +174,7 @@ class AdminTray:
         self._nid.szTip = "SM WoT Assistant Admin"
 
         if SHELL32.Shell_NotifyIconW(NIM_ADD, ctypes.byref(self._nid)):
+            _active_tray = self
             self._start_poll()
         else:
             print("[TRAY] Shell_NotifyIconW NIM_ADD failed")
@@ -254,6 +256,9 @@ class AdminTray:
             return 0
 
     def stop(self) -> None:
+        global _active_tray
+        if _active_tray is self:
+            _active_tray = None
         self._destroyed = True
         if self._nid:
             try:
