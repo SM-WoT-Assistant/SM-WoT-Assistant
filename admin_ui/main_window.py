@@ -122,14 +122,23 @@ class AdminApp(customtkinter.CTk):
 
         self.tray = AdminTray(on_open=self._tray_open, on_exit=self._tray_exit)
 
+        self._start_minimized = self._settings.get("start_minimized", False)
+
         self._build_layout()
         self._register_panels()
-        self._show_splash()
         self._setup_close()
         self.after(100, self._validate_position)
-        self.after(200, self._load_data)
-        self.after(500, self._start_background)
-        self.after(1000, self._start_tray)
+
+        if self._start_minimized:
+            self.withdraw()
+            self.after(100, self._start_tray)
+            self.after(200, self._load_data)
+            self.after(500, self._start_background)
+        else:
+            self._show_splash()
+            self.after(200, self._load_data)
+            self.after(500, self._start_background)
+            self.after(1000, self._start_tray)
 
     def _build_layout(self) -> None:
         self.grid_rowconfigure(0, weight=0)
@@ -306,8 +315,17 @@ class AdminApp(customtkinter.CTk):
             pass
 
     def _finish_startup_splash(self) -> None:
-        """Destroy splash and show main window."""
+        """Destroy splash and show main window (or stay hidden if start_minimized)."""
         if not self._startup_ready:
+            return
+        if self._start_minimized:
+            try:
+                if self.splash and self.splash.winfo_exists():
+                    self.splash.destroy()
+            except Exception:
+                pass
+            finally:
+                self.splash = None
             return
         shown_at = self._splash_shown_at
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
@@ -714,6 +732,13 @@ class AdminApp(customtkinter.CTk):
             font=customtkinter.CTkFont(size=12),
         ).pack(anchor="w", padx=20, pady=4)
 
+        minimized_var = customtkinter.BooleanVar(value=self._settings.get("start_minimized", False))
+        customtkinter.CTkCheckBox(
+            dlg, text="Start minimized to tray (no splash)",
+            variable=minimized_var, text_color="#DDE0EA",
+            font=customtkinter.CTkFont(size=12),
+        ).pack(anchor="w", padx=20, pady=4)
+
         customtkinter.CTkLabel(dlg, text=f"Current language: {self._settings.get('language', 'en').upper()}",
                                text_color="#6E7284",
                                font=customtkinter.CTkFont(size=11)).pack(anchor="w", padx=20, pady=4)
@@ -819,9 +844,10 @@ class AdminApp(customtkinter.CTk):
             self._wot_path = path_entry.get().strip()
             self._settings["wot_path"] = self._wot_path
             self._settings["launch_on_game_start"] = autostart_var.get()
+            self._settings["start_minimized"] = minimized_var.get()
             _save_settings(self._settings)
             self._apply_autostart(autostart_var.get())
-            self.log(f"Settings saved: wot_path={self._wot_path}")
+            self.log(f"Settings saved: wot_path={self._wot_path}, start_minimized={minimized_var.get()}")
             dlg.destroy()
 
         def _cancel():
