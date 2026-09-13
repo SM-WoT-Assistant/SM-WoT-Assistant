@@ -95,6 +95,8 @@ TRANSLATIONS = {
             "version_same": "Version {version} unchanged",
             "extracting_tank_data": "Loading tank data ({count} tanks)...",
             "version_saved": "Version {version} saved",
+            "log_error_title": "Log file error",
+            "log_error_hint": "Auto-detect battle functions may not work.\nContact the developer.",
             "stage_2_extract_ui": "Loading interface assets...",
             "stage_2_skip_icons": "Icons up to date",
             "stage_2_update_tank_db": "Updating tank database...",

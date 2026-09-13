@@ -61,7 +61,7 @@
       ".write": true
     },
     "admin_app": {
-      ".read": "auth != null",
+      ".read": true,
       ".write": "auth != null"
     },
     "tank_data": {

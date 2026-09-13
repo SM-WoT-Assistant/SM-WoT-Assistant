@@ -211,6 +211,92 @@ def get_build_tags() -> set:
     return set()
 
 
+def count_prompts() -> int:
+    """Count prompts in RTDB prompts/tanks."""
+    try:
+        import firebase_reporter as fr
+        url = fr._rtdb_url("prompts/tanks")
+        import requests
+        resp = requests.get(url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            return len(data.keys()) if isinstance(data, dict) else 0
+    except Exception:
+        pass
+    return 0
+
+
+def get_pending_status(path: str = "builds") -> dict:
+    """Read pending_updates/{path} from RTDB. Returns {status, message, progress, queue}."""
+    try:
+        import firebase_reporter as fr
+        url = fr._rtdb_url(f"pending_updates/{path}")
+        import requests
+        resp = requests.get(url, timeout=10)
+        if resp.ok:
+            data = resp.json()
+            if isinstance(data, dict):
+                return data
+    except Exception:
+        pass
+    return {}
+
+
+def _rtdb_put(path: str, data) -> bool:
+    """Write JSON to Firebase RTDB using API key auth."""
+    try:
+        import firebase_reporter as fr
+        import requests as _req
+        url = fr._rtdb_url(path)  # type: ignore[attr-defined]
+        resp = _req.put(url, json=data, timeout=15)
+        return resp.ok
+    except Exception:
+        return False
+
+
+def write_pending_queue(tanks: list, updated_at: str = None) -> None:
+    """Write full queue list to pending_updates/queue in RTDB for website sync.
+    tanks: [{"tag": "...", "name": "...", "tier": "10", "status": "waiting"}, ...]
+    status: "waiting" | "generating" | "ok" | "fail"
+    """
+    import time as _time
+    if updated_at is None:
+        updated_at = _time.strftime("%Y-%m-%dT%H:%M:%S")
+    _rtdb_put("pending_updates/queue", {"tanks": tanks, "updated_at": updated_at})
+
+
+def update_queue_tank_status(tag: str, status: str) -> None:
+    """Update a single tank's status in pending_updates/queue in RTDB."""
+    try:
+        import firebase_reporter as fr
+        import requests as _req
+        import time as _time
+        url = fr._rtdb_url("pending_updates/queue")  # type: ignore[attr-defined]
+        resp = _req.get(url, timeout=10)
+        if resp.ok and resp.json():
+            data = resp.json()
+            tanks = data.get("tanks", [])
+            for t in tanks:
+                if t.get("tag") == tag:
+                    t["status"] = status
+                    break
+            data["updated_at"] = _time.strftime("%Y-%m-%dT%H:%M:%S")
+            _req.put(url, json=data, timeout=15)
+    except Exception:
+        pass
+
+
+def write_pending_status(status: str, message: str = "") -> None:
+    """Write final generation status (done/error) to pending_updates/builds in RTDB."""
+    import time as _time
+    data = {
+        "status": status,
+        "updated_at": _time.strftime("%Y-%m-%dT%H:%M:%S"),
+        "message": message,
+    }
+    _rtdb_put("pending_updates/builds", data)
+
+
 def get_errors_count() -> int:
     """Count error_reports from RTDB."""
     try:

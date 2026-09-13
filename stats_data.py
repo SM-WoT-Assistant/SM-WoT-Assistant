@@ -139,21 +139,49 @@ def generate_mo_maps(lm, lang="en"):
 
 
 def load_from_cache(lang="en"):
-    """Load maps from disk cache. Returns True if loaded successfully."""
+    """Load maps from disk cache. Returns True if loaded successfully.
+
+    If the requested language cache is empty or missing, tries any other
+    available mo_maps_*.json in USER_DATA_DIR as fallback.
+    """
     global EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP, _CACHED_LANG
-    path = _mo_cache_path(lang)
-    if not os.path.exists(path):
-        return False
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        EQUIP_MAP = data.get("equip_map", {})
-        CONS_MAP = data.get("cons_map", {})
-        CREW_SKILL_MAP = data.get("crew_skill_map", {})
+
+    def _try_load(lg):
+        path = _mo_cache_path(lg)
+        if not os.path.exists(path):
+            return False
+        try:
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            em = data.get("equip_map", {})
+            cm = data.get("cons_map", {})
+            crm = data.get("crew_skill_map", {})
+            if em or cm or crm:
+                EQUIP_MAP.clear()
+                CONS_MAP.clear()
+                CREW_SKILL_MAP.clear()
+                EQUIP_MAP.update(em)
+                CONS_MAP.update(cm)
+                CREW_SKILL_MAP.update(crm)
+                return True
+            return False
+        except Exception:
+            return False
+
+    if _try_load(lang):
         _CACHED_LANG = lang
         return True
+    # Fallback: scan USER_DATA_DIR for any available mo_maps_*.json
+    try:
+        for fn in os.listdir(config.USER_DATA_DIR):
+            if fn.startswith("mo_maps_") and fn.endswith(".json"):
+                fallback_lang = fn.replace("mo_maps_", "").replace(".json", "")
+                if fallback_lang != lang and _try_load(fallback_lang):
+                    _CACHED_LANG = fallback_lang
+                    return True
     except Exception:
-        return False
+        pass
+    return False
 
 
 def _save_cache(equip_map, cons_map, crew_map, lang):

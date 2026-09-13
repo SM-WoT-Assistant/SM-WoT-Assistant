@@ -11,8 +11,18 @@ import threading
 import sys
 from datetime import datetime, timezone, date
 from stats_data import EQUIP_MAP, CONS_MAP, CREW_SKILL_MAP
+from generate_prompt_v2 import PERK_NAME_MAP
 import config
 import language_module
+
+EN_CREW_TO_ICON = {}
+for _icon, _eng in PERK_NAME_MAP.items():
+    _k = _eng.strip().lower()
+    if _k and _k not in EN_CREW_TO_ICON:
+        EN_CREW_TO_ICON[_k] = _icon
+    _ks = _k.replace(' ', '').replace('-', '')
+    if _ks and _ks not in EN_CREW_TO_ICON:
+        EN_CREW_TO_ICON[_ks] = _icon
 
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
@@ -1499,6 +1509,16 @@ class StatsAI:
         except:
             return None
 
+    @staticmethod
+    def resolve_crew_perk_icon_name(name):
+        """Resolve a crew perk name (possibly AI-internal like 'brothersinarms')
+        to the correct icon filename. Returns the resolved name or the original."""
+        nl = name.lower().strip()
+        icon = EN_CREW_TO_ICON.get(nl)
+        if icon:
+            return icon
+        return name
+
     def _get_section_icon(self, section, size=(18, 18)):
         """Іконка секції з fallback на tth, якщо loadout-іконок немає."""
         candidates = {
@@ -2297,7 +2317,10 @@ class StatsAI:
         for sk_list in build_data.get('crew', []):
             if isinstance(sk_list, tuple) and len(sk_list) == 2:
                 for sk in sk_list[1]:
-                    if sk: self.get_loadout_icon('artefacts', sk, (24, 24))
+                    if sk:
+                        rsk = self.resolve_crew_perk_icon_name(sk)
+                        self.get_loadout_icon('artefacts', rsk, (24, 24))
+                        self.get_loadout_icon('crew_perks', rsk, (24, 24))
         for a in build_data.get('ammo', []):
             n = a[0] if isinstance(a, tuple) else a
             if n: self.get_loadout_icon('ammo', n, (48, 48))
@@ -2617,8 +2640,11 @@ class StatsAI:
                 sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                 sk_box.pack(side="left", padx=(0, 3))
                 sk_box.pack_propagate(False)
-                self._bind_item_tooltip(sk_box, sk, "crew_perks")
-                sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                resolved_sk = self.resolve_crew_perk_icon_name(sk)
+                self._bind_item_tooltip(sk_box, resolved_sk, "crew_perks")
+                sk_photo = self.get_loadout_icon("artefacts", resolved_sk, (24, 24))
+                if not sk_photo:
+                    sk_photo = self.get_loadout_icon("crew_perks", resolved_sk, (24, 24))
                 sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
                 if sk_photo:
                     sk_lbl.config(image=sk_photo)
@@ -2632,8 +2658,11 @@ class StatsAI:
                     sk_box = tk.Frame(row, bg="#2a1a1a", bd=1, relief="flat", width=40, height=40)
                     sk_box.pack(side="left", padx=(0, 3))
                     sk_box.pack_propagate(False)
-                    self._bind_item_tooltip(sk_box, sk, "crew_perks")
-                    sk_photo = self.get_loadout_icon("artefacts", sk, (24, 24))
+                    resolved_sk = self.resolve_crew_perk_icon_name(sk)
+                    self._bind_item_tooltip(sk_box, resolved_sk, "crew_perks")
+                    sk_photo = self.get_loadout_icon("artefacts", resolved_sk, (24, 24))
+                    if not sk_photo:
+                        sk_photo = self.get_loadout_icon("crew_perks", resolved_sk, (24, 24))
                     sk_lbl = tk.Label(sk_box, bg="#2a1a1a")
                     if sk_photo:
                         sk_lbl.config(image=sk_photo)

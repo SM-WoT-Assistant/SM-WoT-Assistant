@@ -9,8 +9,8 @@
     "prune": false,
     "snapshots": false
   },
-  "permissions": {
-    "edit": [{"pattern": "*", "action": "allow"}],
-    "write": [{"pattern": "*", "action": "allow"}]
-  }
+  "permission": {
+  "edit": "allow",
+  "write": "allow"
+}
 }

@@ -18,8 +18,24 @@ def print(*args, **kwargs):
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from generate_prompt_v2 import generate_prompt
+from generate_prompt_v2 import generate_prompt, PERK_NAME_MAP
 from stats_ai import _save_ai_build_cache, _load_ai_build_cache
+
+# Ensure EQUIP_MAP / CONS_MAP / CREW_SKILL_MAP are populated from .mo cache
+import stats_data
+if not stats_data.load_from_cache("en"):
+    print("[INIT] WARNING: mo_maps cache not found — crew perk mapping may be incomplete")
+
+# Reverse PERK_NAME_MAP: English name -> icon filename (language-independent)
+# Includes both original ("brothers in arms") and stripped ("brothersinarms") keys
+_EN_CREW_TO_ICON = {}
+for _icon, _eng in PERK_NAME_MAP.items():
+    _k = _eng.strip().lower()
+    if _k and _k not in _EN_CREW_TO_ICON:
+        _EN_CREW_TO_ICON[_k] = _icon
+    _ks = _k.replace(' ', '').replace('-', '')
+    if _ks and _ks not in _EN_CREW_TO_ICON:
+        _EN_CREW_TO_ICON[_ks] = _icon
 
 _PROGRESS = "_fill_progress.json"
 
@@ -157,17 +173,38 @@ def parse_build(text):
                 skills = [s.strip() for s in st.split(',') if s.strip()]
                 mapped = []
                 for s in skills:
-                    sl = s.lower()
+                    sl = s.lower().strip()
+                    # 1. Direct English->icon reverse map from PERK_NAME_MAP (language-independent)
+                    icon = _EN_CREW_TO_ICON.get(sl)
+                    if icon:
+                        mapped.append(icon)
+                        continue
+                    # 2. CREW_SKILL_MAP (may be localized — Ukrainian keys etc.)
                     found = False
                     for sk, sv in CREW_SKILL_MAP.items():
-                        if sl == sk.lower(): mapped.append(sv); found = True; break
+                        if sl == sk.lower():
+                            mapped.append(sv); found = True; break
                     if found: continue
+                    # 3. Fuzzy match against CREW_SKILL_MAP
                     best_val, best_len = None, 0
                     for sk, sv in CREW_SKILL_MAP.items():
                         skl = sk.lower()
                         if skl in sl or sl in skl:
                             if len(sk) > best_len: best_val, best_len = sv, len(sk)
-                    mapped.append(best_val if best_val else sl.replace(' ','').replace('-',''))
+                    if best_val:
+                        mapped.append(best_val)
+                        continue
+                    # 4. Fuzzy match against PERK_NAME_MAP values (English display names)
+                    best_val, best_len = None, 0
+                    for _icon_id, _eng_name in PERK_NAME_MAP.items():
+                        _el = _eng_name.lower()
+                        if _el in sl or sl in _el:
+                            if len(_eng_name) > best_len: best_val, best_len = _icon_id, len(_eng_name)
+                    if best_val:
+                        mapped.append(best_val)
+                        continue
+                    # 5. Last resort: cleaned raw name (will likely not match icon file)
+                    mapped.append(sl.replace(' ','').replace('-',''))
                 crew.append((role, mapped[:6]))
         elif section == 'fm':
             if 'level' in ll:

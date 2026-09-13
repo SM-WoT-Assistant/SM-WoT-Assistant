@@ -24,6 +24,11 @@ from stats_ai import _save_ai_build_cache, _load_ai_build_cache, _save_ai_build_
 _is_build_complete = StatsAI._is_build_complete
 from _fill_all_builds import parse_build as _parse_build_response
 
+# Ensure EQUIP_MAP / CONS_MAP / CREW_SKILL_MAP are populated from .mo cache
+import stats_data
+if not stats_data.load_from_cache("en"):
+    print("[INIT] WARNING: mo_maps cache not found — crew perk mapping may be incomplete")
+
 # ── Config ──────────────────────────────────────────
 FIREBASE_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
 API_KEY = "AIzaSyBbZTPygDttChnbxbRB1xfHOACiHN2YStE"
@@ -905,14 +910,25 @@ def _parse_popular_response(text, tank_db):
 
 # ── Firebase uploads ────────────────────────────────
 def _upload_build(tag, build_data):
+    """Returns (ok: bool, reason: str). reason is '' on success."""
     if not build_data or not _is_build_complete(build_data):
-        return False
+        return False, "incomplete_build"
+    is_valid, issues = validate_build_integrity(tag, build_data)
+    if not is_valid:
+        bad_perks = [i for i in issues if i.startswith("crew_bad_perk:")]
+        if bad_perks:
+            reason = f"integrity_fail: {len(bad_perks)} bad crew perk names"
+            print(f"    [INTEGRITY] {tag}: {len(bad_perks)} bad crew perk names — skipping upload")
+        else:
+            reason = f"integrity_fail: {', '.join(issues[:3])}"
+            print(f"    [INTEGRITY] {tag}: {', '.join(issues[:3])} — skipping upload")
+        return False, reason
     ts = time.strftime("%Y-%m-%dT%H:%M:%S")
     url = _rtdb_url(f"builds/tanks/{tag}")
     ok = _put_json(url, {"data": build_data, "updated": ts})
     if ok:
         _save_ai_build_cache(tag, build_data, fail_count=0)
-    return ok
+    return ok, ""
 
 def _upload_prompt(tag, prompt):
     if not prompt:
@@ -1163,6 +1179,56 @@ def strict_build_incomplete(tag, build_data):
             missing.append("crew:" + r)
     return missing
 
+def validate_build_integrity(tag, build_data):
+    """Full integrity check: structure, completeness, and crew perk name validity.
+    Returns (is_valid: bool, issues: list[str])."""
+    if not build_data or not isinstance(build_data, dict):
+        return False, ["empty_build"]
+    issues = []
+    tier = 0
+    try:
+        _db = load_tank_db()
+        tier = _db.get(tag, {}).get("tier", 0)
+    except Exception:
+        pass
+    for k in ("equipment_1", "consumables_1", "consumables_2"):
+        if not build_data.get(k):
+            issues.append(k)
+    if tier >= 6:
+        if not build_data.get("equipment_2"):
+            issues.append("equipment_2")
+        if not build_data.get("field_mods"):
+            issues.append("field_mods")
+    if not build_data.get("ammo"):
+        issues.append("ammo")
+    crew = build_data.get("crew")
+    if not crew or not isinstance(crew, list):
+        issues.append("crew_missing")
+    else:
+        valid_icons = set()
+        icon_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                "extracted_icons", "loadout")
+        for subdir in ("artefacts", "crew_perks"):
+            dp = os.path.join(icon_dir, subdir)
+            if os.path.isdir(dp):
+                for fn in os.listdir(dp):
+                    if fn.lower().endswith(".png"):
+                        valid_icons.add(fn[:-4].lower())
+        from _fill_all_builds import _EN_CREW_TO_ICON
+        from stats_data import CREW_SKILL_MAP
+        valid_icons.update(v.lower() for v in _EN_CREW_TO_ICON.values())
+        valid_icons.update(v.lower() for v in CREW_SKILL_MAP.values())
+        for item in crew:
+            if not isinstance(item, (list, tuple)) or len(item) < 2:
+                issues.append("crew_bad_format")
+                continue
+            _, skills = item[0], item[1]
+            for sk in (skills or []):
+                sk_lower = sk.lower().replace(' ', '').replace('-', '')
+                if sk_lower not in valid_icons:
+                    issues.append(f"crew_bad_perk:{sk}")
+    return len(issues) == 0, issues
+
 def scan_incomplete_builds():
     """Fetch all RTDB builds and return {tag: [missing sections]} for strictly incomplete ones.
 
@@ -1179,6 +1245,50 @@ def scan_incomplete_builds():
         if missing:
             incomplete[tag] = missing
     return incomplete
+
+def scan_and_queue_bad_builds(wot_path=""):
+    """Scan local cache for builds with bad crew perk names or other integrity issues.
+    Delete bad builds from RTDB, queue them for regeneration, and return a report dict.
+    This is the one-shot cleanup for legacy bad builds."""
+    cache_data, _, _ = _load_ai_build_cache()
+    if not cache_data:
+        print("[INTEGRITY] No builds in cache to scan")
+        return {"scanned": 0, "bad": 0, "queued": 0}
+    report = {"scanned": 0, "bad": 0, "queued": 0, "by_reason": {}}
+    bad_tags = []
+    for tag, data in cache_data.items():
+        if _is_bad_tag(tag):
+            continue
+        report["scanned"] += 1
+        is_valid, issues = validate_build_integrity(tag, data)
+        if not is_valid:
+            report["bad"] += 1
+            bad_tags.append((tag, issues))
+            for issue in issues:
+                reason = issue.split(":")[0] if ":" in issue else issue
+                report["by_reason"][reason] = report["by_reason"].get(reason, 0) + 1
+    if not bad_tags:
+        print(f"[INTEGRITY] All {report['scanned']} builds are valid")
+        return report
+    print(f"[INTEGRITY] Found {report['bad']} / {report['scanned']} invalid builds:")
+    for reason, count in sorted(report["by_reason"].items(), key=lambda x: -x[1]):
+        print(f"  {reason}: {count}")
+    queue_tags = []
+    for tag, issues in bad_tags:
+        url = _rtdb_url(f"builds/tanks/{tag}")
+        _put_json(url, None)
+        queue_tags.append(tag)
+        print(f"  [DEL] {tag}: {', '.join(issues[:3])}")
+    report["queued"] = len(queue_tags)
+    if queue_tags:
+        _put_json(_rtdb_url("pending_updates/builds"), {
+            "status": "generating",
+            "queue": queue_tags,
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+            "message": f"Integrity cleanup: {len(queue_tags)} invalid builds",
+        })
+        print(f"[INTEGRITY] Queued {len(queue_tags)} builds for regeneration")
+    return report
 
 def _run_daily_sweep(wot_path=""):
     """Queue all strictly incomplete builds for regeneration via pending_updates/builds.
@@ -1701,7 +1811,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
         # Upload
         if not single_tag:
             _update_pending_status("builds", "generating", progress={"done": actual_idx+1, "total": total, "current": tank_name})
-        ok = _upload_build(tag, build_data)
+        ok, upload_reason = _upload_build(tag, build_data)
         if ok:
             print(f"    [OK] uploaded")
             if progress_callback:
@@ -1709,11 +1819,6 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
                     progress_callback(tag, "ok", actual_idx+1, total)
                 except Exception:
                     pass
-            # Event-driven sync (02.09.2026 #1692): always upload prompt to RTDB,
-            # not just on prompt_new=True. Old behavior: tanks with already-valid
-            # local prompts never re-uploaded, so RTDB prompts/tanks lagged
-            # behind builds/tanks. Now: each build success publishes its prompt,
-            # website listener on prompts/version triggers loadBuildsData().
             if _upload_prompt(tag, prompt):
                 _update_prompts_version()
                 if prompt_new:
@@ -1722,7 +1827,7 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
             done_tags.append(tag)
             save_progress(prog["pass"], actual_idx+1, to_process[idx+1:], ok_count, fail_count)
         else:
-            reasons[tag] = "upload_fail: RTDB write rejected"
+            reasons[tag] = upload_reason or "upload_fail: RTDB write rejected"
             print(f"    [FAIL] {reasons[tag]}")
             fail_count += 1
             if progress_callback:
@@ -1896,6 +2001,8 @@ def main():
     parser.add_argument("--popular", action="store_true", help="Regenerate popular tanks")
     parser.add_argument("--builds", nargs="?", const=True, default=False, help="Regenerate builds (optional: specific tag)")
     parser.add_argument("--listen", action="store_true", help="Watch pending_updates and auto-run")
+    parser.add_argument("--integrity", action="store_true",
+                        help="Scan cache for bad builds, delete from RTDB, queue for regeneration")
     parser.add_argument("--wot-path", type=str, default=None, help="Path to WoT installation")
     args = parser.parse_args()
 
@@ -1916,6 +2023,14 @@ def main():
 
     tank_db = load_tank_db()
     print(f"[DB] {len(tank_db)} tanks")
+
+    if args.integrity:
+        report = scan_and_queue_bad_builds(wot_path=args.wot_path)
+        print(f"\n[INTEGRITY] Report: scanned={report['scanned']}, bad={report['bad']}, queued={report['queued']}")
+        if report.get("by_reason"):
+            for reason, count in sorted(report["by_reason"].items(), key=lambda x: -x[1]):
+                print(f"  {reason}: {count}")
+        return
 
     if args.listen:
         listen_mode(tank_db, wot_path=args.wot_path)

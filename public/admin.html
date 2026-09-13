@@ -156,7 +156,7 @@
                 <div style="font-size:12px;color:#666;margin-top:4px;">
                     Build generation runs via desktop admin_app.py — <a href="#" onclick="loadBuildsData();return false">refresh stats</a>
                 </div>
-
+            </div>
         </div>
 
         <div class="card">
@@ -832,23 +832,13 @@ function renderAdminReleases() {
 window.render_releases = renderAdminReleases;
 // ═══ AI Builds management ═══
 let _buildsPollTimer = null;
-let _lastBuildsVersion = localStorage.getItem("admin_last_builds_ver") || "0";
-
-function _checkBuildsNew(ver) {
-    if (ver && ver !== _lastBuildsVersion) {
-        localStorage.setItem("admin_last_builds_ver", ver);
-        _lastBuildsVersion = ver;
-        return true;
-    }
-    return false;
-}
 
 function setupDrilldowns() {
     // AI Builds stat-boxes: clickable -> drilldown modal
     const map = [
         { sel: '.stat-box:has(#builds-count)', key: 'builds', title: 'Tanks (builds) — RTDB builds/tanks' },
         { sel: '.stat-box:has(#prompts-count)', key: 'prompts', title: 'Tanks (prompts) — RTDB prompts/tanks' },
-        { sel: '.stat-box:has(#queue-count)', key: 'prompts', title: 'Queue (not yet generated)' },
+        { sel: '.stat-box:has(#queue-count)', key: 'queue', title: 'Queue — Missing Builds' },
         { sel: '.stat-box:has(#admin-version)', key: 'installations', title: 'Admin App installations' },
     ];
     map.forEach(({ sel, key, title }) => {
@@ -860,66 +850,57 @@ function setupDrilldowns() {
 }
 
 function loadBuildsData() {
-    // Builds version
-    db.ref("builds/version").once("value").then(s => {
-        const ver = s.val();
-        document.getElementById("builds-version").textContent = ver || '—';
-        if (_checkBuildsNew(String(ver || '0'))) {
-            const hdr = document.querySelector('#dashboard .card:last-child .section-header');
-            if (hdr) { hdr.classList.add('has-new'); expandSection(hdr); }
-        }
-    }).catch(() => {});
+    const _pending = [];
     // Builds count
-    db.ref("builds/tanks").once("value").then(s => {
+    _pending.push(db.ref("builds/tanks").once("value").then(s => {
         const data = s.val();
         const count = data ? Object.keys(data).length : 0;
         document.getElementById("builds-count").textContent = count || '—';
-    }).catch(() => {});
-    // Prompts count (02.09.2026 #1692 — show prompts/tanks size)
-    db.ref("prompts/tanks").once("value").then(s => {
+    }).catch(() => {}));
+    // Prompts count
+    _pending.push(db.ref("prompts/tanks").once("value").then(s => {
         const data = s.val();
         const count = data ? Object.keys(data).length : 0;
         document.getElementById("prompts-count").textContent = count || '—';
-    }).catch(() => {});
-    // Prompts version
-    db.ref("prompts/version").once("value").then(s => {
-        document.getElementById("prompts-version").textContent = s.val() || '—';
-    }).catch(() => {});
-    // Queue count (02.09.2026 #1692): pending_updates/builds.queue
-    db.ref("pending_updates/builds").once("value").then(s => {
-        const data = s.val();
-        let q = 0;
-        if (data && data.queue && Array.isArray(data.queue)) {
-            q = data.queue.length;
-        } else if (data && data.progress && data.progress.total) {
-            q = data.progress.total - (data.progress.done || 0);
+    }).catch(() => {}));
+    // Queue count — from pending_updates/queue (desktop provides correctly filtered list)
+    _pending.push(db.ref("pending_updates/queue").once("value").then(snap => {
+        const data = snap.val();
+        if (data && data.tanks && Array.isArray(data.tanks) && data.tanks.length > 0) {
+            document.getElementById("queue-count").textContent = data.tanks.length;
+        } else {
+            document.getElementById("queue-count").textContent = '—';
         }
-        document.getElementById("queue-count").textContent = q || '—';
-    }).catch(() => {});
+    }).catch(() => {}));
     // Fingerprint
-    db.ref("builds/scripts_fingerprint").once("value").then(s => {
+    _pending.push(db.ref("builds/scripts_fingerprint").once("value").then(s => {
         const fp = s.val() || '';
         document.getElementById("builds-fingerprint").textContent = fp ? fp.slice(0,12)+'...' : '—';
-    }).catch(() => {});
-    // Popular version
-    db.ref("popular_tanks/version").once("value").then(s => {
-        document.getElementById("popular-version").textContent = s.val() || '—';
-    }).catch(() => {});
-    // Equality guard (user spec: tanks count == prompts count; any mismatch = error)
-    const buildsVal = document.getElementById("builds-count").textContent;
-    const promptsVal = document.getElementById("prompts-count").textContent;
-    if (buildsVal !== '—' && promptsVal !== '—' && buildsVal !== promptsVal) {
-        document.getElementById("pending-status").innerHTML =
-            '<div style="padding:8px 12px;border-radius:6px;margin-bottom:8px;font-size:13px;background:#442222;color:#cc6666;border:1px solid #884444;">❌ <b>ERROR (CHP):</b> Tank/Prompt mismatch — builds=' + buildsVal + ', prompts=' + promptsVal + '. Check Errors for missing tag.</div>';
-    }
+    }).catch(() => {}));
+    // Equality guard: runs AFTER all async fetches complete
+    Promise.allSettled(_pending).then(() => {
+        const buildsVal = document.getElementById("builds-count").textContent;
+        const promptsVal = document.getElementById("prompts-count").textContent;
+        if (buildsVal !== '—' && promptsVal !== '—' && buildsVal !== promptsVal) {
+            document.getElementById("pending-status").innerHTML =
+                '<div style="padding:8px 12px;border-radius:6px;margin-bottom:8px;font-size:13px;background:#442222;color:#cc6666;border:1px solid #884444;">❌ <b>ERROR (CHP):</b> Tank/Prompt mismatch — builds=' + buildsVal + ', prompts=' + promptsVal + '. Check Errors for missing tag.</div>';
+        } else {
+            document.getElementById("pending-status").innerHTML = '';
+        }
+    });
 }
 
-// Event-driven sync (02.09.2026 #1692): re-fetch on prompts/version or
-// builds/version change (no polling, instant refresh when admin publishes).
-db.ref("prompts/version").on("value", () => loadBuildsData());
-db.ref("builds/version").on("value", () => loadBuildsData());
 // pending_updates/builds change: admin writes here on start/end/error.
 db.ref("pending_updates/builds").on("value", () => loadBuildsData());
+// pending_updates/queue change: desktop writes queue list on every status refresh.
+db.ref("pending_updates/queue").on("value", (snap) => {
+    const data = snap.val();
+    if (data && data.tanks && Array.isArray(data.tanks) && data.tanks.length > 0) {
+        document.getElementById("queue-count").textContent = data.tanks.length;
+    } else {
+        document.getElementById("queue-count").textContent = '—';
+    }
+});
 // error_reports changes: admin auto-cleanup / auto-fill / mismatch events.
 db.ref("error_reports").on("value", () => { loadErrorsData(); loadErrors(); });
 
@@ -983,7 +964,13 @@ function loadAdminAppData() {
         const lg = d.last_generation;
         document.getElementById("admin-last-gen").textContent =
             (lg && lg.at) ? ((lg.count || 0) + ' tanks · ' + fmtDateTime(lg.at)) : '—';
-    }).catch(() => {});
+    }).catch(() => {
+        document.getElementById("admin-version").textContent = '—';
+        document.getElementById("admin-status").textContent = 'Unknown';
+        document.getElementById("admin-status").style.color = '#888';
+        document.getElementById("admin-activity").textContent = '—';
+        document.getElementById("admin-last-gen").textContent = '—';
+    });
     db.ref("builds/last_generated_at").once("value").then(s =>
         document.getElementById("builds-updated").textContent = fmtDateTime(s.val())).catch(() => {});
     db.ref("prompts/last_generated_at").once("value").then(s =>
@@ -1065,6 +1052,12 @@ function pollPendingUpdates() {
 // Drilldown modal: stat-box click -> show modal with search + table
 const _drilldownState = { key: null, allRows: [] };
 
+let _drilldownLiveRef = null;
+
+function _queueDrilldownLiveCallback() {
+    if (_drilldownState.key === 'queue') _loadDrilldownData();
+}
+
 function openDrilldown(key, title) {
     const modal = document.getElementById('drilldownModal');
     document.getElementById('drilldownTitle').textContent = title;
@@ -1074,10 +1067,18 @@ function openDrilldown(key, title) {
     _drilldownState.allRows = [];
     modal.classList.add('open');
     _loadDrilldownData();
+    if (key === 'queue') {
+        db.ref('pending_updates/queue').on('value', _queueDrilldownLiveCallback);
+        _drilldownLiveRef = true;
+    }
 }
 
 function closeDrilldown() {
     document.getElementById('drilldownModal').classList.remove('open');
+    if (_drilldownLiveRef) {
+        db.ref('pending_updates/queue').off('value', _queueDrilldownLiveCallback);
+        _drilldownLiveRef = null;
+    }
 }
 
 function _loadDrilldownData() {
@@ -1122,6 +1123,20 @@ function _loadDrilldownData() {
             _drilldownState.allRows = rows;
             _renderDrilldown();
         });
+    } else if (key === 'queue') {
+        filterEl.style.display = 'none';
+        db.ref('pending_updates/queue').once('value').then(snap => {
+            const data = snap.val();
+            const rows = [];
+            if (data && data.tanks && Array.isArray(data.tanks)) {
+                data.tanks.forEach(t => {
+                    const statusSym = t.status === 'ok' ? '✔' : t.status === 'fail' ? '✖' : t.status === 'generating' ? '●' : '';
+                    rows.push({ tag: t.tag || '—', name: t.name || '—', tier: t.tier || '—', status: statusSym, _status: t.status || 'waiting' });
+                });
+            }
+            _drilldownState.allRows = rows;
+            _renderDrilldown();
+        });
     } else {
         _drilldownState.allRows = [];
         _renderDrilldown();
@@ -1141,13 +1156,17 @@ function _renderDrilldown() {
     let headers, cols;
     if (key === 'installations') { headers = ['UID', 'Version', 'Last seen']; cols = ['tag', 'version', 'last']; }
     else if (key === 'errors') { headers = ['Key', 'Type', 'Level', 'Text']; cols = ['tag', 'type', 'level', 'text']; }
+    else if (key === 'queue') { headers = ['Tag', 'Name', 'Tier', 'Status']; cols = ['tag', 'name', 'tier', 'status']; }
     else { headers = ['Tag']; cols = ['tag']; }
     const wrap = document.getElementById('drilldownTableWrap');
     let html = '<table id="drilldownTable"><thead><tr>';
     headers.forEach(h => html += `<th>${h}</th>`);
     html += '</tr></thead><tbody>';
     rows.forEach(r => {
-        html += '<tr>';
+        const statusClass = (key === 'queue' && r._status === 'generating') ? ' style="background:#3d3a00"'
+            : (key === 'queue' && r._status === 'ok') ? ' style="background:#0a2e0a"'
+            : (key === 'queue' && r._status === 'fail') ? ' style="background:#2e0a0a"' : '';
+        html += `<tr${statusClass}>`;
         cols.forEach(c => html += `<td>${_esc(r[c] || '')}</td>`);
         html += '</tr>';
     });

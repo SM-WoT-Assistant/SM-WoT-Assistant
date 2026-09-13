@@ -249,6 +249,7 @@ class WotAssistantHQ:
             self.on_vehicle_detected,
         )
         self.log_watcher.start()
+        self.log_watcher.on_log_error = self._on_log_error
 
         self.ui_mgr = ui_manager.UIManager(self)
 
@@ -1073,6 +1074,8 @@ class WotAssistantHQ:
         self._restore_from_tray()
         if self.mode != "edit":
             self.toggle_editor()
+        else:
+            pass
 
     def _on_tray_click(self):
         """Колбек при кліку на іконку в треї"""
@@ -1379,7 +1382,6 @@ class WotAssistantHQ:
         self.root.after(0, apply_class_filter)
 
     def on_battle_countdown_started(self, map_id, arena_type):
-        print(f"[BATTLE] countdown_started: map={map_id}, arena_type={arena_type}, auto_battle={self.auto_battle_var.get()}, mode={self.mode}, hidden={self._hidden_by_f10}, unhide_on_battle={self._unhide_on_battle_var.get()}")
         if not self.auto_battle_var.get():
             return
         # Fallback: якщо arena-виявлення не встигло показати вікно з трею
@@ -1390,6 +1392,8 @@ class WotAssistantHQ:
             self.root.after(0, self._restore_from_tray)
         if self.mode != "norm":
             self.root.after(100, self.toggle_editor)
+        else:
+            pass
 
     def _on_battle_mode_changed(self):
         self.map_mgr.load_map_list()
@@ -1407,7 +1411,6 @@ class WotAssistantHQ:
         self.last_battle_map = map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
-        print(f"[BATTLE] on_battle_detected: map={map_id}, mode={mode}, auto_sync={self.auto_sync_var.get()}, auto_battle={self.auto_battle_var.get()}, unhide_on_battle={self._unhide_on_battle_var.get()}, hidden={self._hidden_by_f10}, mode={self.mode}")
 
         # Новий бій скасовує відкладене повернення в edit після попереднього бою
         if self._battle_edit_return is not None:
@@ -1420,7 +1423,7 @@ class WotAssistantHQ:
         if self._unhide_on_battle_var.get() and self._hidden_by_f10:
             self._restored_by_battle = True
             self.root.after(0, self._battle_restore_from_tray)
-        
+
         if not self.auto_sync_var.get():
             return
         
@@ -1436,7 +1439,6 @@ class WotAssistantHQ:
 
     def on_battle_ended(self):
         self.save_settings()
-        print(f"[BATTLE] battle_ended: last_map={self.last_battle_map}, auto_battle={self.auto_battle_var.get()}, restored_by_battle={self._restored_by_battle}, mode={self.mode}, hidden={self._hidden_by_f10}")
         
         if self._restored_by_battle:
             self._restored_by_battle = False
@@ -1468,10 +1470,26 @@ class WotAssistantHQ:
         ui_mode = mode_map.get(mode, "Standard")
         self.safe_battle_sync(map_id, ui_mode)
 
+    def _on_log_error(self, msg):
+        try:
+            firebase_reporter.report_fallback(
+                source="log_reader",
+                context="game_log",
+                error_text=msg,
+                level="critical",
+            )
+        except Exception:
+            pass
+        user_msg = (
+            f"{msg}\n\n"
+            + self.t("ui", "log_error_hint")
+        )
+        self.root.after(100, lambda m=user_msg: dialog_utils.dark_messagebox(
+            self.root, self.t("ui", "log_error_title"), m, is_error=True
+        ))
+
     def safe_battle_sync(self, map_id, ui_mode):
-        print(f"[BATTLE] safe_battle_sync: map={map_id}, ui_mode={ui_mode}, log_path={self.settings.get('log_path','')}")
         if not self.settings.get("log_path", ""):
-            print(f"[BATTLE] EARLY EXIT: log_path empty")
             return
 
         if self.active_view != "maps" or self.map_mode != 2:
@@ -1943,35 +1961,48 @@ class WotAssistantHQ:
         except: self.logo_splash = self.logo_image_object = None
 
     def _auto_detect_log_path(self):
-        """Автоматичне визначення шляху до логу."""
+        """Автоматичне визначення шляху до логу. WoT 2.4+ пише в game.log замість python.log."""
         detected = None
-        common_logs = [
-            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks", "logs", "python.log"),
-            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks EU", "logs", "python.log"),
-            os.path.join(os.path.expanduser("~"), "AppData", "Local", "Wargaming.net", "World of Tanks", "logs", "python.log"),
-            os.path.join("C:\\", "Games", "World_of_Tanks", "logs", "python.log"),
-            os.path.join("D:\\", "Games", "World_of_Tanks", "logs", "python.log"),
-            os.path.join("C:\\", "Games", "World_of_Tanks_EU", "python.log"),
-            os.path.join("C:\\", "Games", "World_of_Tanks_EU", "logs", "python.log"),
-            os.path.join("D:\\", "Games", "World_of_Tanks_EU", "python.log"),
-            os.path.join("D:\\", "Games", "World_of_Tanks_EU", "logs", "python.log"),
-            os.path.join(os.getcwd(), "logs", "python.log"),
+        is_stale = False
+        common_dirs = [
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Roaming", "Wargaming.net", "World of Tanks EU"),
+            os.path.join(os.path.expanduser("~"), "AppData", "Local", "Wargaming.net", "World of Tanks"),
+            os.path.join("C:\\", "Games", "World_of_Tanks"),
+            os.path.join("C:\\", "Games", "World_of_Tanks_EU"),
+            os.path.join("D:\\", "Games", "World_of_Tanks"),
+            os.path.join("D:\\", "Games", "World_of_Tanks_EU"),
         ]
-        # Також спробуємо вивести з wot_path
         wot_path = self.settings.get("wot_path", "")
         if wot_path:
-            for suffix in ["python.log", os.path.join("logs", "python.log")]:
-                p = os.path.normpath(os.path.join(wot_path, suffix))
-                if p not in common_logs:
-                    common_logs.append(p)
-        for p in common_logs:
-            if os.path.exists(p):
-                detected = p
+            common_dirs.insert(0, wot_path)
+
+        for d in common_dirs:
+            gl = os.path.join(d, "game.log")
+            pl = os.path.join(d, "python.log")
+            pl_logs = os.path.join(d, "logs", "python.log")
+            gl_logs = os.path.join(d, "logs", "game.log")
+            for candidate in [gl, pl, pl_logs, gl_logs]:
+                if os.path.exists(candidate):
+                    detected = candidate
+                    if candidate.endswith("python.log"):
+                        age_hours = (time.time() - os.path.getmtime(candidate)) / 3600.0
+                        if age_hours > 24:
+                            is_stale = True
+                            alt = gl if candidate == pl else os.path.join(d, "game.log")
+                            if os.path.exists(alt):
+                                detected = alt
+                                is_stale = False
+                    break
+            if detected:
                 break
         if detected:
             self.settings["log_path"] = detected
             self.save_settings()
-            print(f"[INIT] Автоматично визначено log_path: {detected}")
+            if is_stale:
+                print(f"[INIT] Auto-detected log (python.log stale): {detected}")
+            else:
+                print(f"[INIT] Auto-detected log_path: {detected}")
 
     def _on_startup_progress(self, percent, text):
         self.update_startup_progress(percent, text)

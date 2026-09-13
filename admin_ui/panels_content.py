@@ -123,14 +123,17 @@ def _bind_copy(dlg):
 
 
 class StatusPanel(customtkinter.CTkFrame):
-    """Status tiles in a single horizontal row: Raw, DB, Builds, Queue."""
+    """Status tiles in a single horizontal row: Raw, DB, Builds, Prompts, Queue."""
 
-    _NCOLS = 4
+    _NCOLS = 5
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
         self.app = app
         self._cards: dict = {}
+        self._pending_lbl: Optional[customtkinter.CTkLabel] = None
+        self._pending_bar: Optional[customtkinter.CTkProgressBar] = None
+        self._pending_poll_id: Optional[str] = None
         self._build()
 
     def _build(self) -> None:
@@ -140,6 +143,7 @@ class StatusPanel(customtkinter.CTkFrame):
             ("tanks_raw", "Raw", "0"),
             ("tanks_db", "DB", "0"),
             ("builds", "Builds", "0"),
+            ("prompts", "Prompts", "0"),
             ("queue", "Queue", "0"),
         ]
 
@@ -169,6 +173,19 @@ class StatusPanel(customtkinter.CTkFrame):
             else:
                 self.grid_columnconfigure(gc, weight=0, minsize=1)
 
+        # Pending progress row (below tiles)
+        pending_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        pending_frame.grid(row=1, column=0, columnspan=grid_cols, sticky="ew", padx=4, pady=(4, 0))
+        self._pending_lbl = customtkinter.CTkLabel(
+            pending_frame, text="", text_color="#6E7284",
+            font=customtkinter.CTkFont(size=11))
+        self._pending_lbl.pack(side="left", padx=(0, 8))
+        self._pending_bar = customtkinter.CTkProgressBar(
+            pending_frame, width=200, height=6,
+            progress_color="#D4A843", fg_color="#2E3240")
+        self._pending_bar.pack(side="left", padx=(0, 4))
+        self._pending_bar.set(0)
+
     def apply_cache(self, cached: dict) -> None:
         """Apply cached stats for instant display at startup."""
         if "db_count" in cached:
@@ -192,13 +209,26 @@ class StatusPanel(customtkinter.CTkFrame):
             pass
 
         try:
-            from admin_backend.data import count_builds, get_build_tags
+            from admin_backend.data import count_builds, count_prompts, get_build_tags, get_pending_status, write_pending_queue
             tank_db = getattr(self.app, 'tank_db', {})
             prompts = getattr(self.app, 'prompts', {})
             db_count = len(tank_db)
             builds_count = count_builds()
+            prompts_count = count_prompts()
             self._cards["tanks_db"]._val_lbl.configure(text=str(db_count))
             self._cards["builds"]._val_lbl.configure(text=str(builds_count))
+            self._cards["prompts"]._val_lbl.configure(text=str(prompts_count))
+
+            # Build/Prompt guard: color builds tile if mismatch
+            if builds_count > 0 and prompts_count > 0 and builds_count != prompts_count:
+                self._cards["builds"]._val_lbl.configure(text_color="#cc6666")
+                self._cards["prompts"]._val_lbl.configure(text_color="#cc6666")
+            elif builds_count > 0:
+                self._cards["builds"]._val_lbl.configure(text_color="#66cc66")
+                self._cards["prompts"]._val_lbl.configure(text_color="#66cc66" if prompts_count == builds_count else "#888888")
+            else:
+                self._cards["builds"]._val_lbl.configure(text_color="#888888")
+                self._cards["prompts"]._val_lbl.configure(text_color="#888888")
 
             db_tags = set(tank_db.keys())
             build_tags = get_build_tags()
@@ -208,6 +238,18 @@ class StatusPanel(customtkinter.CTkFrame):
 
             q_color = "#cc6666" if queue_count > 0 else "#66cc66"
             self._cards["queue"]._val_lbl.configure(text=str(queue_count), text_color=q_color)
+
+            # Publish queue to RTDB with full tank info for website synchronization
+            tanks_list = []
+            for tag in self._missing_builds:
+                td = tank_db.get(tag, {})
+                tanks_list.append({
+                    "tag": tag,
+                    "name": td.get("name", tag),
+                    "tier": str(td.get("tier", "?")),
+                    "status": "waiting",
+                })
+            write_pending_queue(tanks_list)
 
             arith_queue = max(0, db_count - builds_count)
             if queue_count != arith_queue:
@@ -223,18 +265,58 @@ class StatusPanel(customtkinter.CTkFrame):
                 except Exception:
                     pass
 
-            prompts_count = len(prompts)
-            if db_count != prompts_count:
+            # Report builds vs prompts mismatch
+            if builds_count > 0 and prompts_count > 0 and builds_count != prompts_count:
                 try:
                     import firebase_reporter as fr
                     fr.report_fallback(
                         source="admin_ui.status",
-                        context="db_prompts_mismatch",
-                        error_text=f"DB ({db_count}) ≠ Prompts ({prompts_count})",
+                        context="builds_prompts_mismatch",
+                        error_text=f"Builds ({builds_count}) ≠ Prompts ({prompts_count})",
                         level="warning",
                     )
                 except Exception:
                     pass
+        except Exception:
+            pass
+
+        # Pending updates polling
+        self._poll_pending()
+
+    def _poll_pending(self) -> None:
+        """Read pending_updates/builds from RTDB and update progress bar."""
+        if self.app is None:
+            return
+        try:
+            from admin_backend.data import get_pending_status
+            data = get_pending_status("builds")
+            status = data.get("status")
+            if not status or status == "idle":
+                self._pending_lbl.configure(text="", text_color="#6E7284")
+                self._pending_bar.set(0)
+                return
+
+            progress = data.get("progress", {})
+            msg = data.get("message", "")
+            done = progress.get("done", 0)
+            total = progress.get("total", 0)
+
+            if status == "generating":
+                pct = done / total if total > 0 else 0
+                self._pending_bar.set(pct)
+                self._pending_lbl.configure(
+                    text=f"Generating: {done}/{total} {'— ' + msg if msg else ''}",
+                    text_color="#ffaa00")
+            elif status == "done":
+                self._pending_bar.set(1.0)
+                self._pending_lbl.configure(
+                    text=f"Done: {msg or 'generation complete'}",
+                    text_color="#66cc66")
+            elif status == "error":
+                self._pending_bar.set(0)
+                self._pending_lbl.configure(
+                    text=f"Error: {msg or 'unknown'}",
+                    text_color="#cc6666")
         except Exception:
             pass
 

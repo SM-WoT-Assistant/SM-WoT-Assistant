@@ -428,10 +428,11 @@ class AdminApp(customtkinter.CTk):
         try:
             from admin_backend.data import read_admin_version
             ver = read_admin_version()
+            status = "generating" if self._generating else "idle"
             import firebase_reporter as fr
             fr._put_json(  # type: ignore[attr-defined]
                 fr._rtdb_url("admin_app/version"),  # type: ignore[attr-defined]
-                {"version": ver, "last_seen": int(time.time()), "status": "idle"})
+                {"version": ver, "last_seen": int(time.time()), "status": status})
         except Exception:
             pass
 
@@ -570,10 +571,14 @@ class AdminApp(customtkinter.CTk):
                     self._gen_progress["progress"] = (current, total)
                     if status == "generating":
                         self._gen_progress["current_tag"] = tag
+                        from admin_backend.data import update_queue_tank_status
+                        update_queue_tank_status(tag, "generating")
                     elif status in ("ok", "fail"):
                         self._gen_progress["results"][tag] = status
                         if tag in self._gen_progress["queue"]:
                             self._gen_progress["queue"].remove(tag)
+                        from admin_backend.data import update_queue_tank_status
+                        update_queue_tank_status(tag, status)
 
                 ok, done_tags, reasons = generate_builds(
                     driver, tank_db, prompts,
@@ -584,9 +589,13 @@ class AdminApp(customtkinter.CTk):
                     count = len(done_tags)
                     self.log(f"Generation complete: {count} tanks built")
                     self._queue = [t for t in self._queue if t not in done_tags]
+                    from admin_backend.data import write_pending_status
+                    write_pending_status("done", f"{count} tanks built")
                 else:
                     summary = reasons.get("summary", "unknown") if reasons else "failed"
                     self.log(f"Generation failed: {summary}")
+                    from admin_backend.data import write_pending_status
+                    write_pending_status("error", summary)
                 self.after(0, self.panel_dock.refresh)
             except Exception as e:
                 self.log(f"Generate error: {e}")
