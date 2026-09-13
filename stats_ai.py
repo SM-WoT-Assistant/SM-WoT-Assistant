@@ -24,6 +24,52 @@ for _icon, _eng in PERK_NAME_MAP.items():
     if _ks and _ks not in EN_CREW_TO_ICON:
         EN_CREW_TO_ICON[_ks] = _icon
 
+# AI internal equipment/consumable name -> icon filename (for cached builds with wrong names)
+_AI_EQUIP_TO_ICON = {
+    'gunrammer': 'rammer', 'verticalstabilizer': 'aimingStabilizer',
+    'improvedaiming': 'enhancedAimDrives', 'improvedsights': 'improvedSights',
+    'turbocharger': 'turbocharger',
+    'modernizedturbochargerrotationmechanism': 'modernizedTurbochargerRotationMechanism',
+    'additionalgrousers': 'grousers',
+    'improvedrotationmechanism': 'improvedRotationMechanism',
+    'improvedhardening': 'extraHealthReserve',
+    'antifragmentationlining': 'antifragmentationLining',
+    'modifiedconfiguration': 'improvedConfiguration',
+    'additionalinvisibilitydevice': 'additionalInvisibilityDevice',
+    'camouflagenet': 'camouflageNet', 'binoculartelescope': 'stereoscope',
+    'coatedoptics': 'coatedOptics', "commandersvisionsystem": 'commandersView',
+    "commander'svisionsystem": 'commandersView',
+    'improvedventilation': 'improvedVentilation', 'improvedventing': 'improvedVentilation',
+    'lownoiseexhaustsystem': 'additionalInvisibilityDevice',
+    'experimentalhardening': 'extraHealthReserve',
+    'experimentalturbocharger': 'turbocharger',
+    'experimentaloptics': 'coatedOptics',
+    'experimentalfirecontrolsystem': 'rammer',
+    'experimentalgunlaying': 'enhancedAimDrives',
+}
+_AI_CONS_TO_ICON = {
+    'automaticfireextinguisher': 'autoExtinguishers',
+    'manualfireextinguisher': 'handExtinguishers',
+    'smallfirstaidkit': 'smallMedkit', 'largefirstaidkit': 'largeMedkit',
+    'smallrepairkit': 'smallRepairKit', 'largerepairkit': 'largeRepairKit',
+    'improvedcombatrations': 'ration', 'extrarations': 'ration',
+    'strongcoffee': 'hotCoffee', 'chocolate': 'chocolate',
+    'cola': 'cocacola', 'onigiri': 'ration_japan',
+    'puddingandtea': 'ration_uk', 'coffeewithcinnamonbuns': 'ration_czech',
+    'breadwithsmalec': 'ration_poland', 'spaghettiwithmeatsauce': 'ration_italy',
+    'chocolate(includenationration)': 'chocolate',
+    'cola(includenationration)': 'cocacola',
+    'strongcoffee(includenationration)': 'hotCoffee',
+    'extrarations(includenationration)': 'ration',
+    'improvedcombatrations(includenationration)': 'ration',
+    'puddingandtea(includenationration)': 'ration_uk',
+    'breadwithsmalec(includenationration)': 'ration_poland',
+    'spaghettiwithmeatsauce(includenationration)': 'ration_italy',
+    'coffee(includenationration)': 'hotCoffee',
+    'caseofcola': 'cocacola', 'caseofcola(includenationration)': 'cocacola',
+    'smokedlard': 'ration_poland',
+}
+
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
 
@@ -1519,6 +1565,18 @@ class StatsAI:
             return icon
         return name
 
+    @staticmethod
+    def resolve_equipment_icon_name(name):
+        """Resolve AI-internal equipment name (e.g. 'gunrammer') to icon filename."""
+        nl = name.lower().strip().replace(' ', '').replace('-', '')
+        return _AI_EQUIP_TO_ICON.get(nl, name)
+
+    @staticmethod
+    def resolve_consumable_icon_name(name):
+        """Resolve AI-internal consumable name (e.g. 'automaticfireextinguisher') to icon filename."""
+        nl = name.lower().strip().replace(' ', '').replace('-', '')
+        return _AI_CONS_TO_ICON.get(nl, name)
+
     def _get_section_icon(self, section, size=(18, 18)):
         """Іконка секції з fallback на tth, якщо loadout-іконок немає."""
         candidates = {
@@ -2309,11 +2367,15 @@ class StatsAI:
 
         build_data = _build_data(_ai_cache_build, tank_tth=tth)
 
-        # Prewarm loadout icons from cached build data
-        for k, cat, sz in [('equipment_1','artefacts',(48,48)),('equipment_2','artefacts',(48,48)),
-                            ('consumables_1','artefacts',(48,48)),('consumables_2','artefacts',(48,48))]:
+        # Prewarm loadout icons from cached build data (resolve AI names -> icon filenames)
+        for k, cat, sz, resolver in [
+            ('equipment_1', 'artefacts', (48, 48), self.resolve_equipment_icon_name),
+            ('equipment_2', 'artefacts', (48, 48), self.resolve_equipment_icon_name),
+            ('consumables_1', 'artefacts', (48, 48), self.resolve_consumable_icon_name),
+            ('consumables_2', 'artefacts', (48, 48), self.resolve_consumable_icon_name),
+        ]:
             for item in build_data.get(k, []):
-                if item: self.get_loadout_icon(cat, item, sz)
+                if item: self.get_loadout_icon(cat, resolver(item), sz)
         for sk_list in build_data.get('crew', []):
             if isinstance(sk_list, tuple) and len(sk_list) == 2:
                 for sk in sk_list[1]:
@@ -2429,12 +2491,13 @@ class StatsAI:
                         except: pass
             except: pass
             
-        def render_items(parent, items, category, size=(48, 48)):
+        def render_items(parent, items, category, size=(48, 48), resolver=None):
             slots = []
             for name in items:
                 if not name:
                     continue
-                photo = self.get_loadout_icon(category, name, size)
+                resolved = resolver(name) if resolver else name
+                photo = self.get_loadout_icon(category, resolved, size)
                 slot = tk.Frame(parent, bg="#111111", bd=0, relief="flat")
                 icon_box = tk.Frame(slot, bg="#1d2a1a" if category == "artefacts" else "#1a1d2a", bd=1, relief="flat", width=size[0]+6, height=size[1]+6)
                 icon_box.pack(side="top")
@@ -2492,7 +2555,7 @@ class StatsAI:
         
         equip_grid_frame_1 = tk.Frame(equip_body, bg="#111111")
         equip_grid_frame_1.pack(side="left", fill="none", expand=False)
-        render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts")
+        render_items(equip_grid_frame_1, build_data.get("equipment_1", []), "artefacts", resolver=self.resolve_equipment_icon_name)
         
         loadout_num_label_2 = tk.Label(equip_body_2, text="2", font=("Arial", 10, "bold"), fg="#888888", bg="#111111", width=3, cursor="hand2")
         loadout_num_label_2.pack(side="left", padx=(0, 2))
@@ -2501,9 +2564,9 @@ class StatsAI:
         
         equip_grid_frame_2 = tk.Frame(equip_body_2, bg="#111111")
         equip_grid_frame_2.pack(side="left", fill="none", expand=False)
-        render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts")
-        render_items(cons_body, build_data.get("consumables_1", build_data.get("consumables", [])), "artefacts")
-        render_items(cons_body_2, build_data.get("consumables_2", build_data.get("consumables", [])), "artefacts")
+        render_items(equip_grid_frame_2, build_data.get("equipment_2", []), "artefacts", resolver=self.resolve_equipment_icon_name)
+        render_items(cons_body, build_data.get("consumables_1", build_data.get("consumables", [])), "artefacts", resolver=self.resolve_consumable_icon_name)
+        render_items(cons_body_2, build_data.get("consumables_2", build_data.get("consumables", [])), "artefacts", resolver=self.resolve_consumable_icon_name)
         render_ammo_items(ammo_body, build_data.get("ammo", []), "ammo")
         render_ammo_items(ammo_body_2, build_data.get("ammo", []), "ammo")
         

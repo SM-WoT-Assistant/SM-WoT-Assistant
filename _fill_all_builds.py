@@ -37,6 +37,79 @@ for _icon, _eng in PERK_NAME_MAP.items():
     if _ks and _ks not in _EN_CREW_TO_ICON:
         _EN_CREW_TO_ICON[_ks] = _icon
 
+# AI internal equipment name -> icon filename (equipment in artefacts/ folder)
+_AI_EQUIP_TO_ICON = {
+    'gunrammer': 'rammer',
+    'verticalstabilizer': 'aimingStabilizer',
+    'improvedaiming': 'enhancedAimDrives',
+    'improvedsights': 'improvedSights',
+    'turbocharger': 'turbocharger',
+    'modernizedturbochargerrotationmechanism': 'modernizedTurbochargerRotationMechanism',
+    'additionalgrousers': 'grousers',
+    'improvedrotationmechanism': 'improvedRotationMechanism',
+    'improvedhardening': 'extraHealthReserve',
+    'antifragmentationlining': 'antifragmentationLining',
+    'modifiedconfiguration': 'improvedConfiguration',
+    'additionalinvisibilitydevice': 'additionalInvisibilityDevice',
+    'camouflagenet': 'camouflageNet',
+    'binoculartelescope': 'stereoscope',
+    'coatedoptics': 'coatedOptics',
+    'commandersvisionsystem': 'commandersView',
+    'commander\'svisionsystem': 'commandersView',
+    'improvedventilation': 'improvedVentilation',
+    'improvedventing': 'improvedVentilation',
+    'lownoiseexhaustsystem': 'additionalInvisibilityDevice',
+    'experimentalhardening': 'extraHealthReserve',
+    'experimentalturbocharger': 'turbocharger',
+    'experimentaloptics': 'coatedOptics',
+    'experimentalfirecontrolsystem': 'rammer',
+    'experimentalgunlaying': 'enhancedAimDrives',
+    'deluxrammer': 'rammer',
+    'deluxturbocharger': 'turbocharger',
+    'deluximprovedventilation': 'improvedVentilation',
+    'deluxcoatedoptics': 'coatedOptics',
+    'deluximprovedsights': 'improvedSights',
+    'deluxenhancedaimdrives': 'enhancedAimDrives',
+    'deluxadditionalinvisibilitydevice': 'additionalInvisibilityDevice',
+    'deluximprovedrotationmechanism': 'improvedRotationMechanism',
+    'deluximprovedconfiguration': 'improvedConfiguration',
+    'deluxcamouflagenet': 'camouflageNet',
+    'deluxstereoscope': 'stereoscope',
+    'modifiedconfiguration': 'improvedConfiguration',
+}
+
+_AI_CONS_TO_ICON = {
+    'automaticfireextinguisher': 'autoExtinguishers',
+    'manualfireextinguisher': 'handExtinguishers',
+    'smallfirstaidkit': 'smallMedkit',
+    'largefirstaidkit': 'largeMedkit',
+    'smallrepairkit': 'smallRepairKit',
+    'largerepairkit': 'largeRepairKit',
+    'improvedcombatrations': 'ration',
+    'extrarations': 'ration',
+    'strongcoffee': 'hotCoffee',
+    'chocolate': 'chocolate',
+    'cola': 'cocacola',
+    'onigiri': 'ration_japan',
+    'puddingandtea': 'ration_uk',
+    'coffeewithcinnamonbuns': 'ration_czech',
+    'breadwithsmalec': 'ration_poland',
+    'spaghettiwithmeatsauce': 'ration_italy',
+    'chocolate(includenationration)': 'chocolate',
+    'cola(includenationration)': 'cocacola',
+    'strongcoffee(includenationration)': 'hotCoffee',
+    'extrarations(includenationration)': 'ration',
+    'improvedcombatrations(includenationration)': 'ration',
+    'puddingandtea(includenationration)': 'ration_uk',
+    'breadwithsmalec(includenationration)': 'ration_poland',
+    'spaghettiwithmeatsauce(includenationration)': 'ration_italy',
+    'coffee(includenationration)': 'hotCoffee',
+    'caseofcola': 'cocacola',
+    'caseofcola(includenationration)': 'cocacola',
+    'smokedlard': 'ration_poland',
+    'smallfirstaidkit': 'smallMedkit',
+}
+
 _PROGRESS = "_fill_progress.json"
 
 # --- helpers ---
@@ -108,11 +181,18 @@ def parse_build(text):
 
     def ci(name):
         n = name.strip().strip('*').strip()
-        nl = n.lower()
+        nl = n.lower().replace(' ','').replace('-','')
+        # 1. Direct AI internal name -> icon filename mapping
+        equip_icon = _AI_EQUIP_TO_ICON.get(nl)
+        if equip_icon: return equip_icon
+        cons_icon = _AI_CONS_TO_ICON.get(nl)
+        if cons_icon: return cons_icon
+        # 2. Localized EQUIP_MAP / CONS_MAP (Ukrainian keys from .mo files)
         for ek, ev in EQUIP_MAP.items():
-            if nl == ek.lower(): return ev
+            if nl == ek.lower().replace(' ','').replace('-',''): return ev
         for ck, cv in CONS_MAP.items():
-            if nl == ck.lower(): return cv
+            if nl == ck.lower().replace(' ','').replace('-',''): return cv
+        # 3. Fuzzy match
         best_val, best_len = None, 0
         for ek, ev in EQUIP_MAP.items():
             ekl = ek.lower()
@@ -124,7 +204,7 @@ def parse_build(text):
             if ckl in nl or nl in ckl:
                 if len(ck) > best_len: best_val, best_len = cv, len(ck)
         if best_val: return best_val
-        return n.lower().replace(' ','').replace('-','')
+        return nl
 
     for line in text.split('\n'):
         line = line.strip()
