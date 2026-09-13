@@ -25,6 +25,9 @@ EQUIP_SLOT_TAGS = {
     "coatedOptics": ["reconnaissance"],
     "commandersView": ["reconnaissance"],
     "improvedVentilation": ["universal"],
+    "modernizedAimDrivesAimingStabilizer": ["firepower"],
+    "modernizedExtraHealthReserveAntifragmentationLining": ["survivability"],
+    "modernizedImprovedSightsEnhancedAimDrives": ["firepower"],
 }
 
 SLOT_TYPE_NAMES = {
@@ -42,6 +45,28 @@ SLOT2_DEFAULT = {
     "LT": "firepower",
     "SPG": "survivability",
 }
+
+
+def sort_equipment_for_slots(equipment_names, slot_types):
+    """Sort equipment list to match tank's slot bonus categories.
+
+    slot_types: [slot1_type_id, slot2_type_id, ...] from tank_slots_full.json
+    Returns new sorted list. Items matching earlier slots come first.
+    """
+    if not slot_types or not equipment_names:
+        return equipment_names
+
+    def _slot_score(item):
+        tags = EQUIP_SLOT_TAGS.get(item, [])
+        if not tags:
+            return (len(slot_types), 0)
+        for i, st in enumerate(slot_types):
+            slot_name = SLOT_TYPE_NAMES.get(st, "universal")
+            if slot_name in tags:
+                return (i, 0)
+        return (len(slot_types), 1)
+
+    return sorted(equipment_names, key=_slot_score)
 
 _CACHED_LANG = None
 

@@ -1794,6 +1794,12 @@ def generate_builds(driver, tank_db, prompts, single_tag=None, force=False, queu
 
         # Parse
         build_data = _parse_build_response(response)
+        if build_data and build_data.get('equipment_1'):
+            slot_types = _gp.tank_slots.get(tag, {}).get("equipment_slot_types", [])
+            if slot_types:
+                from stats_data import sort_equipment_for_slots
+                build_data['equipment_1'] = sort_equipment_for_slots(build_data['equipment_1'], slot_types)
+                build_data['equipment_2'] = sort_equipment_for_slots(build_data['equipment_2'], slot_types)
         if not build_data or not _is_build_complete(build_data):
             reasons[tag] = "ai_parse_fail: no build or incomplete parse from AI response"
             print(f"    [FAIL] {reasons[tag]}")

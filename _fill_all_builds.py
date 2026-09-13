@@ -18,7 +18,7 @@ def print(*args, **kwargs):
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from generate_prompt_v2 import generate_prompt, PERK_NAME_MAP
+from generate_prompt_v2 import generate_prompt, PERK_NAME_MAP, tank_slots
 from stats_ai import _save_ai_build_cache, _load_ai_build_cache
 
 # Ensure EQUIP_MAP / CONS_MAP / CREW_SKILL_MAP are populated from .mo cache
@@ -408,6 +408,11 @@ def main():
             build_data = parse_build(combined) if success and len(lines) >= 3 and 'Build Generated:' in combined else None
 
             if build_data and build_data.get('equipment_1'):
+                slot_types = tank_slots.get(tag, {}).get("equipment_slot_types", [])
+                if slot_types:
+                    from stats_data import sort_equipment_for_slots
+                    build_data['equipment_1'] = sort_equipment_for_slots(build_data['equipment_1'], slot_types)
+                    build_data['equipment_2'] = sort_equipment_for_slots(build_data['equipment_2'], slot_types)
                 _save_ai_build_cache(tag, build_data, fail_count=0)
                 print(f"    [OK] ({elapsed:.0f}s)", flush=True)
                 ok_count += 1

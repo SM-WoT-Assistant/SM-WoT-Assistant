@@ -2304,24 +2304,11 @@ class StatsAI:
             if equipment_1:
                 try:
                     _tank_slots = json.load(open(os.path.join(os.path.dirname(__file__), "tank_slots_full.json"), encoding="utf-8"))
-                    slot_info = _tank_slots.get(tag, {})
-                    slot_types = slot_info.get("equipment_slot_types", [])
+                    slot_types = _tank_slots.get(tag, {}).get("equipment_slot_types", [])
                     if slot_types:
-                        from stats_data import EQUIP_SLOT_TAGS, SLOT_TYPE_NAMES
-                        def _slot_score(item, slot_type_code):
-                            tags = EQUIP_SLOT_TAGS.get(item, [])
-                            if not tags:
-                                return 2
-                            slot_name = SLOT_TYPE_NAMES.get(slot_type_code, "universal")
-                            if slot_name in tags or "universal" in tags:
-                                return 0
-                            return 1
-                        max_len = min(len(slot_types), len(equipment_1), 3)
-                        def _sort_key(item):
-                            scores = tuple(_slot_score(item, slot_types[i]) for i in range(max_len))
-                            return scores
-                        equipment_1.sort(key=_sort_key)
-                        equipment_2.sort(key=_sort_key)
+                        from stats_data import sort_equipment_for_slots
+                        equipment_1 = sort_equipment_for_slots(equipment_1, slot_types)
+                        equipment_2 = sort_equipment_for_slots(equipment_2, slot_types)
                 except Exception:
                     pass
             if not consumables_1:
