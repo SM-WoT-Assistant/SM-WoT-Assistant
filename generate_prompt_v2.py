@@ -49,19 +49,21 @@ generate_prompt_v2.py - Prompt Generator for World of Tanks Competitive Builds
 =================================================================================================
 """
 import json
+import os
 from datetime import datetime
+import config as _cfg
 
 
-with open('tank_slots_full.json', 'r', encoding='utf-8') as f:
+with open(os.path.join(_cfg.BASE_DIR, 'tank_slots_full.json'), 'r', encoding='utf-8') as f:
     tank_slots = json.load(f)
 
-with open('tank_db.json', 'r', encoding='utf-8') as f:
+with open(os.path.join(_cfg.BASE_DIR, 'tank_db.json'), 'r', encoding='utf-8') as f:
     tank_db = json.load(f)
 
-with open('game_entities_english.json', 'r', encoding='utf-8') as f:
+with open(os.path.join(_cfg.BASE_DIR, 'game_entities_english.json'), 'r', encoding='utf-8') as f:
     game_entities = json.load(f)
 
-with open('crew_builds.json', 'r', encoding='utf-8') as f:
+with open(os.path.join(_cfg.BASE_DIR, 'crew_builds.json'), 'r', encoding='utf-8') as f:
     crew_builds = json.load(f)
 
 
