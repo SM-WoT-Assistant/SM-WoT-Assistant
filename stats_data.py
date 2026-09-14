@@ -129,13 +129,17 @@ def sort_equipment_for_slots(equipment_names, slot_types):
     if not slot_types or not equipment_names:
         return equipment_names
     _tags_lower = {k.lower(): v for k, v in EQUIP_SLOT_TAGS.items()}
+    if slot_types and slot_types[0] < 4:
+        display_order = list(reversed(slot_types))
+    else:
+        display_order = slot_types
 
     def _slot_score(item):
         resolved = _AI_EQUIP_TO_ICON.get(item.lower(), item)
         tags = _tags_lower.get(resolved.lower(), [])
         if not tags:
             return (len(slot_types), 0)
-        for i, st in enumerate(reversed(slot_types)):
+        for i, st in enumerate(display_order):
             slot_name = SLOT_TYPE_NAMES.get(st, "universal")
             if slot_name in tags:
                 return (i, 0)

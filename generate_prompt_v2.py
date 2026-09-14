@@ -562,8 +562,12 @@ def generate_prompt(tank_id, tank_name=None):
         "universal": "Universal (Vents, Optics, any category item)",
     }
     equipment_slot_types = tank_data.get('equipment_slot_types', [])
+    if equipment_slot_types and equipment_slot_types[0] < 4:
+        display_slots = list(reversed(equipment_slot_types))
+    else:
+        display_slots = equipment_slot_types
     slot_order_lines = []
-    for si, stid in enumerate(reversed(equipment_slot_types)):
+    for si, stid in enumerate(display_slots):
         sname = slot_type_names.get(stid, "universal")
         label = slot_type_labels.get(sname, sname)
         slot_order_lines.append(f"   Slot {si+1} ({sname}): {label}")
