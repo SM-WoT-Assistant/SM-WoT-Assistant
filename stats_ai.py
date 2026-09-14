@@ -2259,15 +2259,16 @@ class StatsAI:
             # Sort equipment by slot priority
             if equipment_1:
                 try:
-                    _tank_slots = json.load(open(os.path.join(os.path.dirname(__file__), "tank_slots_full.json"), encoding="utf-8"))
+                    _tank_slots_path = os.path.join(config.BASE_DIR, "tank_slots_full.json")
+                    with open(_tank_slots_path, encoding="utf-8") as _f:
+                        _tank_slots = json.load(_f)
                     slot_types = _tank_slots.get(tag, {}).get("equipment_slot_types", [])
                     if slot_types:
                         from stats_data import sort_equipment_for_slots
                         equipment_1 = sort_equipment_for_slots(equipment_1, slot_types)
                         equipment_2 = sort_equipment_for_slots(equipment_2, slot_types)
-                        print(f"[SORT] {tag}: eq1={equipment_1} eq2={equipment_2}")
-                except Exception as _e:
-                    print(f"[SORT] ERROR {tag}: {_e}")
+                except Exception:
+                    pass
             if not consumables_1:
                 consumables_1 = cached_data.get("consumables_1", [])
             if not consumables_2:
