@@ -46,18 +46,93 @@ SLOT2_DEFAULT = {
     "SPG": "survivability",
 }
 
+# AI internal equipment name -> icon filename (single source of truth)
+# Used by: sort_equipment_for_slots(), _fill_all_builds.py parse_build(), stats_ai.py icon lookup
+_AI_EQUIP_TO_ICON = {
+    'gunrammer': 'rammer',
+    'verticalstabilizer': 'aimingStabilizer',
+    'improvedaiming': 'enhancedAimDrives',
+    'improvedsights': 'improvedSights',
+    'turbocharger': 'turbocharger',
+    'modernizedturbochargerrotationmechanism': 'modernizedTurbochargerRotationMechanism',
+    'additionalgrousers': 'grousers',
+    'improvedrotationmechanism': 'improvedRotationMechanism',
+    'improvedhardening': 'extraHealthReserve',
+    'antifragmentationlining': 'antifragmentationLining',
+    'modifiedconfiguration': 'improvedConfiguration',
+    'additionalinvisibilitydevice': 'additionalInvisibilityDevice',
+    'camouflagenet': 'camouflageNet',
+    'binoculartelescope': 'stereoscope',
+    'coatedoptics': 'coatedOptics',
+    'commandersvisionsystem': 'commandersView',
+    "commander'svisionsystem": 'commandersView',
+    'improvedventilation': 'improvedVentilation',
+    'improvedventing': 'improvedVentilation',
+    'lownoiseexhaustsystem': 'additionalInvisibilityDevice',
+    'experimentalhardening': 'extraHealthReserve',
+    'experimentalturbocharger': 'turbocharger',
+    'experimentaloptics': 'coatedOptics',
+    'experimentalfirecontrolsystem': 'rammer',
+    'experimentalgunlaying': 'enhancedAimDrives',
+    'deluxrammer': 'rammer',
+    'deluxturbocharger': 'turbocharger',
+    'deluximprovedventilation': 'improvedVentilation',
+    'deluxcoatedoptics': 'coatedOptics',
+    'deluximprovedsights': 'improvedSights',
+    'deluxenhancedaimdrives': 'enhancedAimDrives',
+    'deluxadditionalinvisibilitydevice': 'additionalInvisibilityDevice',
+    'deluximprovedrotationmechanism': 'improvedRotationMechanism',
+    'deluximprovedconfiguration': 'improvedConfiguration',
+    'deluxcamouflagenet': 'camouflageNet',
+    'deluxstereoscope': 'stereoscope',
+}
+
+_AI_CONS_TO_ICON = {
+    'automaticfireextinguisher': 'autoExtinguishers',
+    'manualfireextinguisher': 'handExtinguishers',
+    'smallfirstaidkit': 'smallMedkit',
+    'largefirstaidkit': 'largeMedkit',
+    'smallrepairkit': 'smallRepairKit',
+    'largerepairkit': 'largeRepairKit',
+    'improvedcombatrations': 'ration',
+    'extrarations': 'ration',
+    'strongcoffee': 'hotCoffee',
+    'chocolate': 'chocolate',
+    'cola': 'cocacola',
+    'onigiri': 'ration_japan',
+    'puddingandtea': 'ration_uk',
+    'coffeewithcinnamonbuns': 'ration_czech',
+    'breadwithsmalec': 'ration_poland',
+    'spaghettiwithmeatsauce': 'ration_italy',
+    'chocolate(includenationration)': 'chocolate',
+    'cola(includenationration)': 'cocacola',
+    'strongcoffee(includenationration)': 'hotCoffee',
+    'extrarations(includenationration)': 'ration',
+    'improvedcombatrations(includenationration)': 'ration',
+    'puddingandtea(includenationration)': 'ration_uk',
+    'breadwithsmalec(includenationration)': 'ration_poland',
+    'spaghettiwithmeatsauce(includenationration)': 'ration_italy',
+    'coffee(includenationration)': 'hotCoffee',
+    'caseofcola': 'cocacola',
+    'caseofcola(includenationration)': 'cocacola',
+    'smokedlard': 'ration_poland',
+}
+
 
 def sort_equipment_for_slots(equipment_names, slot_types):
     """Sort equipment list to match tank's slot bonus categories.
 
     slot_types: [slot1_type_id, slot2_type_id, ...] from tank_slots_full.json
     Returns new sorted list. Items matching earlier slots come first.
+    Resolves AI-internal names to icon filenames before lookup.
     """
     if not slot_types or not equipment_names:
         return equipment_names
+    _tags_lower = {k.lower(): v for k, v in EQUIP_SLOT_TAGS.items()}
 
     def _slot_score(item):
-        tags = EQUIP_SLOT_TAGS.get(item, [])
+        resolved = _AI_EQUIP_TO_ICON.get(item.lower(), item)
+        tags = _tags_lower.get(resolved.lower(), [])
         if not tags:
             return (len(slot_types), 0)
         for i, st in enumerate(slot_types):

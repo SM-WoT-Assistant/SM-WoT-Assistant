@@ -24,51 +24,7 @@ for _icon, _eng in PERK_NAME_MAP.items():
     if _ks and _ks not in EN_CREW_TO_ICON:
         EN_CREW_TO_ICON[_ks] = _icon
 
-# AI internal equipment/consumable name -> icon filename (for cached builds with wrong names)
-_AI_EQUIP_TO_ICON = {
-    'gunrammer': 'rammer', 'verticalstabilizer': 'aimingStabilizer',
-    'improvedaiming': 'enhancedAimDrives', 'improvedsights': 'improvedSights',
-    'turbocharger': 'turbocharger',
-    'modernizedturbochargerrotationmechanism': 'modernizedTurbochargerRotationMechanism',
-    'additionalgrousers': 'grousers',
-    'improvedrotationmechanism': 'improvedRotationMechanism',
-    'improvedhardening': 'extraHealthReserve',
-    'antifragmentationlining': 'antifragmentationLining',
-    'modifiedconfiguration': 'improvedConfiguration',
-    'additionalinvisibilitydevice': 'additionalInvisibilityDevice',
-    'camouflagenet': 'camouflageNet', 'binoculartelescope': 'stereoscope',
-    'coatedoptics': 'coatedOptics', "commandersvisionsystem": 'commandersView',
-    "commander'svisionsystem": 'commandersView',
-    'improvedventilation': 'improvedVentilation', 'improvedventing': 'improvedVentilation',
-    'lownoiseexhaustsystem': 'additionalInvisibilityDevice',
-    'experimentalhardening': 'extraHealthReserve',
-    'experimentalturbocharger': 'turbocharger',
-    'experimentaloptics': 'coatedOptics',
-    'experimentalfirecontrolsystem': 'rammer',
-    'experimentalgunlaying': 'enhancedAimDrives',
-}
-_AI_CONS_TO_ICON = {
-    'automaticfireextinguisher': 'autoExtinguishers',
-    'manualfireextinguisher': 'handExtinguishers',
-    'smallfirstaidkit': 'smallMedkit', 'largefirstaidkit': 'largeMedkit',
-    'smallrepairkit': 'smallRepairKit', 'largerepairkit': 'largeRepairKit',
-    'improvedcombatrations': 'ration', 'extrarations': 'ration',
-    'strongcoffee': 'hotCoffee', 'chocolate': 'chocolate',
-    'cola': 'cocacola', 'onigiri': 'ration_japan',
-    'puddingandtea': 'ration_uk', 'coffeewithcinnamonbuns': 'ration_czech',
-    'breadwithsmalec': 'ration_poland', 'spaghettiwithmeatsauce': 'ration_italy',
-    'chocolate(includenationration)': 'chocolate',
-    'cola(includenationration)': 'cocacola',
-    'strongcoffee(includenationration)': 'hotCoffee',
-    'extrarations(includenationration)': 'ration',
-    'improvedcombatrations(includenationration)': 'ration',
-    'puddingandtea(includenationration)': 'ration_uk',
-    'breadwithsmalec(includenationration)': 'ration_poland',
-    'spaghettiwithmeatsauce(includenationration)': 'ration_italy',
-    'coffee(includenationration)': 'hotCoffee',
-    'caseofcola': 'cocacola', 'caseofcola(includenationration)': 'cocacola',
-    'smokedlard': 'ration_poland',
-}
+from stats_data import _AI_EQUIP_TO_ICON, _AI_CONS_TO_ICON
 
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
@@ -2309,8 +2265,9 @@ class StatsAI:
                         from stats_data import sort_equipment_for_slots
                         equipment_1 = sort_equipment_for_slots(equipment_1, slot_types)
                         equipment_2 = sort_equipment_for_slots(equipment_2, slot_types)
-                except Exception:
-                    pass
+                        print(f"[SORT] {tag}: eq1={equipment_1} eq2={equipment_2}")
+                except Exception as _e:
+                    print(f"[SORT] ERROR {tag}: {_e}")
             if not consumables_1:
                 consumables_1 = cached_data.get("consumables_1", [])
             if not consumables_2:

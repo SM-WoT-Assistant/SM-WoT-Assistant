@@ -552,6 +552,22 @@ def generate_prompt(tank_id, tank_name=None):
     ammo_list = get_ammo_types(tier, tank_class)
     consumables_list = get_consumables_list(nation)
     nation_ration = get_nation_ration(nation)
+
+    slot_type_names = {1: "universal", 2: "mobility", 3: "stealth", 4: "firepower", 5: "survivability"}
+    slot_type_labels = {
+        "survivability": "Survivability (Hardening, Spall Liner, Enhanced Armor, Config)",
+        "firepower": "Firepower (Rammer, Stabilizer, Enhanced Aim, Improved Sights)",
+        "mobility": "Mobility (Turbo, Grousers, Improved Rotation)",
+        "stealth": "Stealth (Low Noise, Camouflage Net, Binoculars)",
+        "universal": "Universal (Vents, Optics, any category item)",
+    }
+    equipment_slot_types = tank_data.get('equipment_slot_types', [])
+    slot_order_lines = []
+    for si, stid in enumerate(equipment_slot_types):
+        sname = slot_type_names.get(stid, "universal")
+        label = slot_type_labels.get(sname, sname)
+        slot_order_lines.append(f"   Slot {si+1} ({sname}): {label}")
+    slot_order_text = "\n".join(slot_order_lines) if slot_order_lines else ""
     
     consumables_advanced_list = [c for c in consumables_list if c not in ["Manual Fire Extinguisher", "Automatic Fire Extinguisher"]]
     if nation_ration and nation_ration not in consumables_advanced_list:
@@ -627,8 +643,13 @@ Level VIII: "Power Supply Tuning" OR "Electrical System Shielding" OR "Additiona
     
     if equip_slot_count > 0:
         equip_section = f"""1. EQUIPMENT (Select EXACTLY {equip_slot_count} items for EACH variant - Main and Advanced):
+SLOT ORDER for this tank (equipment MUST be listed in slot order):
+{slot_order_text}
+
 - Loadout 1 (Main): Select {equip_slot_count} equipment items. Available items: {', '.join(standard_equipment_names)}.
 - Loadout 2 (Advanced): Select {equip_slot_count} equipment items (different from Main) - choose items that maximize all parameters combining both standard AND experimental equipment options. Available items: {', '.join(equipment_list)}.
+
+CRITICAL: List each loadout's equipment IN SLOT ORDER (Slot 1 first, Slot 2 second, Slot 3 third). Place the item matching each slot's bonus category in that slot for maximum benefit.
 """
         equip_output = f"""1. Equipment:
    * Loadout 1 (Main): {slots_line}

@@ -26,6 +26,9 @@ import stats_data
 if not stats_data.load_from_cache("en"):
     print("[INIT] WARNING: mo_maps cache not found — crew perk mapping may be incomplete")
 
+# Import from single source of truth in stats_data
+from stats_data import _AI_EQUIP_TO_ICON, _AI_CONS_TO_ICON
+
 # Reverse PERK_NAME_MAP: English name -> icon filename (language-independent)
 # Includes both original ("brothers in arms") and stripped ("brothersinarms") keys
 _EN_CREW_TO_ICON = {}
@@ -36,79 +39,6 @@ for _icon, _eng in PERK_NAME_MAP.items():
     _ks = _k.replace(' ', '').replace('-', '')
     if _ks and _ks not in _EN_CREW_TO_ICON:
         _EN_CREW_TO_ICON[_ks] = _icon
-
-# AI internal equipment name -> icon filename (equipment in artefacts/ folder)
-_AI_EQUIP_TO_ICON = {
-    'gunrammer': 'rammer',
-    'verticalstabilizer': 'aimingStabilizer',
-    'improvedaiming': 'enhancedAimDrives',
-    'improvedsights': 'improvedSights',
-    'turbocharger': 'turbocharger',
-    'modernizedturbochargerrotationmechanism': 'modernizedTurbochargerRotationMechanism',
-    'additionalgrousers': 'grousers',
-    'improvedrotationmechanism': 'improvedRotationMechanism',
-    'improvedhardening': 'extraHealthReserve',
-    'antifragmentationlining': 'antifragmentationLining',
-    'modifiedconfiguration': 'improvedConfiguration',
-    'additionalinvisibilitydevice': 'additionalInvisibilityDevice',
-    'camouflagenet': 'camouflageNet',
-    'binoculartelescope': 'stereoscope',
-    'coatedoptics': 'coatedOptics',
-    'commandersvisionsystem': 'commandersView',
-    'commander\'svisionsystem': 'commandersView',
-    'improvedventilation': 'improvedVentilation',
-    'improvedventing': 'improvedVentilation',
-    'lownoiseexhaustsystem': 'additionalInvisibilityDevice',
-    'experimentalhardening': 'extraHealthReserve',
-    'experimentalturbocharger': 'turbocharger',
-    'experimentaloptics': 'coatedOptics',
-    'experimentalfirecontrolsystem': 'rammer',
-    'experimentalgunlaying': 'enhancedAimDrives',
-    'deluxrammer': 'rammer',
-    'deluxturbocharger': 'turbocharger',
-    'deluximprovedventilation': 'improvedVentilation',
-    'deluxcoatedoptics': 'coatedOptics',
-    'deluximprovedsights': 'improvedSights',
-    'deluxenhancedaimdrives': 'enhancedAimDrives',
-    'deluxadditionalinvisibilitydevice': 'additionalInvisibilityDevice',
-    'deluximprovedrotationmechanism': 'improvedRotationMechanism',
-    'deluximprovedconfiguration': 'improvedConfiguration',
-    'deluxcamouflagenet': 'camouflageNet',
-    'deluxstereoscope': 'stereoscope',
-    'modifiedconfiguration': 'improvedConfiguration',
-}
-
-_AI_CONS_TO_ICON = {
-    'automaticfireextinguisher': 'autoExtinguishers',
-    'manualfireextinguisher': 'handExtinguishers',
-    'smallfirstaidkit': 'smallMedkit',
-    'largefirstaidkit': 'largeMedkit',
-    'smallrepairkit': 'smallRepairKit',
-    'largerepairkit': 'largeRepairKit',
-    'improvedcombatrations': 'ration',
-    'extrarations': 'ration',
-    'strongcoffee': 'hotCoffee',
-    'chocolate': 'chocolate',
-    'cola': 'cocacola',
-    'onigiri': 'ration_japan',
-    'puddingandtea': 'ration_uk',
-    'coffeewithcinnamonbuns': 'ration_czech',
-    'breadwithsmalec': 'ration_poland',
-    'spaghettiwithmeatsauce': 'ration_italy',
-    'chocolate(includenationration)': 'chocolate',
-    'cola(includenationration)': 'cocacola',
-    'strongcoffee(includenationration)': 'hotCoffee',
-    'extrarations(includenationration)': 'ration',
-    'improvedcombatrations(includenationration)': 'ration',
-    'puddingandtea(includenationration)': 'ration_uk',
-    'breadwithsmalec(includenationration)': 'ration_poland',
-    'spaghettiwithmeatsauce(includenationration)': 'ration_italy',
-    'coffee(includenationration)': 'hotCoffee',
-    'caseofcola': 'cocacola',
-    'caseofcola(includenationration)': 'cocacola',
-    'smokedlard': 'ration_poland',
-    'smallfirstaidkit': 'smallMedkit',
-}
 
 _PROGRESS = "_fill_progress.json"
 
