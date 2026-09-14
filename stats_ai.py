@@ -24,7 +24,14 @@ for _icon, _eng in PERK_NAME_MAP.items():
     if _ks and _ks not in EN_CREW_TO_ICON:
         EN_CREW_TO_ICON[_ks] = _icon
 
-from stats_data import _AI_EQUIP_TO_ICON, _AI_CONS_TO_ICON
+from stats_data import _AI_EQUIP_TO_ICON, _AI_CONS_TO_ICON, sort_equipment_for_slots
+
+_TANK_SLOTS_DATA = None
+try:
+    with open(os.path.join(config.BASE_DIR, "tank_slots_full.json"), encoding="utf-8") as _f:
+        _TANK_SLOTS_DATA = json.load(_f)
+except Exception:
+    pass
 
 ENABLE_POPULAR_TANK_CACHE = True
 ENABLE_AI_BUILD_CACHE = True
@@ -2256,19 +2263,12 @@ class StatsAI:
             if not equipment_2:
                 equipment_2 = cached_data.get("equipment_2", [])
             
-            # Sort equipment by slot priority
-            if equipment_1:
-                try:
-                    _tank_slots_path = os.path.join(config.BASE_DIR, "tank_slots_full.json")
-                    with open(_tank_slots_path, encoding="utf-8") as _f:
-                        _tank_slots = json.load(_f)
-                    slot_types = _tank_slots.get(tag, {}).get("equipment_slot_types", [])
-                    if slot_types:
-                        from stats_data import sort_equipment_for_slots
-                        equipment_1 = sort_equipment_for_slots(equipment_1, slot_types)
-                        equipment_2 = sort_equipment_for_slots(equipment_2, slot_types)
-                except Exception:
-                    pass
+            # Sort equipment by slot priority (uses module-level _TANK_SLOTS_DATA)
+            if equipment_1 and _TANK_SLOTS_DATA is not None:
+                slot_types = _TANK_SLOTS_DATA.get(tag, {}).get("equipment_slot_types", [])
+                if slot_types:
+                    equipment_1 = sort_equipment_for_slots(equipment_1, slot_types)
+                    equipment_2 = sort_equipment_for_slots(equipment_2, slot_types)
             if not consumables_1:
                 consumables_1 = cached_data.get("consumables_1", [])
             if not consumables_2:

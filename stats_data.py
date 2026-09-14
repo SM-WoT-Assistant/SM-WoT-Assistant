@@ -123,7 +123,7 @@ def sort_equipment_for_slots(equipment_names, slot_types):
     """Sort equipment list to match tank's slot bonus categories.
 
     slot_types: [slot1_type_id, slot2_type_id, ...] from tank_slots_full.json
-    Returns new sorted list. Items matching earlier slots come first.
+    Returns new sorted list matching visual slot order.
     Resolves AI-internal names to icon filenames before lookup.
     """
     if not slot_types or not equipment_names:
@@ -132,20 +132,31 @@ def sort_equipment_for_slots(equipment_names, slot_types):
     if slot_types and slot_types[0] < 4:
         display_order = list(reversed(slot_types))
     else:
-        display_order = slot_types
+        display_order = list(slot_types)
 
-    def _slot_score(item):
+    n_slots = len(display_order)
+    slot_items = [None] * n_slots
+    unmatched = []
+
+    for item in equipment_names:
         resolved = _AI_EQUIP_TO_ICON.get(item.lower(), item)
         tags = _tags_lower.get(resolved.lower(), [])
-        if not tags:
-            return (len(slot_types), 0)
-        for i, st in enumerate(display_order):
-            slot_name = SLOT_TYPE_NAMES.get(st, "universal")
-            if slot_name in tags:
-                return (i, 0)
-        return (len(slot_types), 1)
+        placed = False
+        if tags:
+            for i, st in enumerate(display_order):
+                slot_name = SLOT_TYPE_NAMES.get(st, "universal")
+                if slot_name in tags and slot_items[i] is None:
+                    slot_items[i] = item
+                    placed = True
+                    break
+        if not placed:
+            unmatched.append(item)
 
-    return sorted(equipment_names, key=_slot_score)
+    for i in range(n_slots):
+        if slot_items[i] is None and unmatched:
+            slot_items[i] = unmatched.pop(0)
+
+    return [x for x in slot_items if x is not None] + unmatched
 
 _CACHED_LANG = None
 
