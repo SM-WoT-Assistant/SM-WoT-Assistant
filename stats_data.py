@@ -135,7 +135,7 @@ def sort_equipment_for_slots(equipment_names, slot_types):
         tags = _tags_lower.get(resolved.lower(), [])
         if not tags:
             return (len(slot_types), 0)
-        for i, st in enumerate(slot_types):
+        for i, st in enumerate(reversed(slot_types)):
             slot_name = SLOT_TYPE_NAMES.get(st, "universal")
             if slot_name in tags:
                 return (i, 0)

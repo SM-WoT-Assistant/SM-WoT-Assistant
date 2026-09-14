@@ -563,7 +563,7 @@ def generate_prompt(tank_id, tank_name=None):
     }
     equipment_slot_types = tank_data.get('equipment_slot_types', [])
     slot_order_lines = []
-    for si, stid in enumerate(equipment_slot_types):
+    for si, stid in enumerate(reversed(equipment_slot_types)):
         sname = slot_type_names.get(stid, "universal")
         label = slot_type_labels.get(sname, sname)
         slot_order_lines.append(f"   Slot {si+1} ({sname}): {label}")
