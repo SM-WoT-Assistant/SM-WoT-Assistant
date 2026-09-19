@@ -155,6 +155,7 @@ class WotAssistantHQ:
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
+        self._use_mod_var = tk.BooleanVar(value=self.settings.get("use_mod", False))
 
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення
@@ -306,7 +307,10 @@ class WotAssistantHQ:
 
         self.map_mgr.load_map_list()
 
+        self._saved_schemes_map = {}
         self.selected_battle_mode.trace_add("write", lambda *args: self._on_battle_mode_changed())
+        self._refresh_saved_schemes_list()
+        self.root.bind('<Button-3>', self._on_root_b3_scheme, add='+')
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
 
@@ -454,6 +458,7 @@ class WotAssistantHQ:
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
         self.settings["close_with_game"] = self._close_with_game_var.get()
+        self.settings["use_mod"] = self._use_mod_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
@@ -1057,6 +1062,7 @@ class WotAssistantHQ:
                 if hasattr(self, 'painter'):
                     self.painter.canvas.delete("painter_obj")
                 self._startup_complete = True
+                self._refresh_saved_schemes_list()
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
         self.root.deiconify()
@@ -1166,6 +1172,9 @@ class WotAssistantHQ:
     def _ensure_edit_focus(self):
         if not self.edit_focus_lock or self.mode != "edit" or self.root.state() == "withdrawn":
             return
+        if getattr(self, '_edit_focus_attempts', 0) >= 3:
+            return
+        self._edit_focus_attempts = getattr(self, '_edit_focus_attempts', 0) + 1
         try:
             self.root.lift()
             self.root.focus_force()
@@ -1188,6 +1197,7 @@ class WotAssistantHQ:
 
         if going_to_edit:
             self.edit_focus_lock = True
+            self._edit_focus_attempts = 0
             self.root.after(10, self._ensure_edit_focus)
         else:
             self.edit_focus_lock = False
@@ -1210,6 +1220,7 @@ class WotAssistantHQ:
             else:
                 self._po_win.lift()
         self.painter.redraw()
+        self._refresh_saved_schemes_list()
 
     def _combo_postcommand(self):
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
@@ -1395,8 +1406,333 @@ class WotAssistantHQ:
         else:
             pass
 
+
     def _on_battle_mode_changed(self):
         self.map_mgr.load_map_list()
+        if self.active_view == "maps" and hasattr(self, 'painter'):
+            self.painter.redraw()
+        self._refresh_saved_schemes_list()
+
+    def _refresh_saved_schemes_list(self):
+        if not hasattr(self, 'saved_schemes_cb') or not hasattr(self, 'saved_schemes_var'):
+            return
+        import tactics_manager
+        mode = self.selected_battle_mode.get()
+        map_id = self.current_map_eng
+        if not map_id:
+            self.saved_schemes_cb['values'] = []
+            self.saved_schemes_var.set(self.t('ui', 'no_saved_schemes'))
+            self.saved_schemes_cb.config(state='disabled', style='GrayDisabled.TCombobox')
+            return
+        all_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
+        all_schemes = [s for s in all_schemes if s.get('map_id') == map_id]
+
+        user_schemes = []
+        downloaded_schemes = []
+        base_schemes = []
+        for s in all_schemes:
+            if s.get("is_base"):
+                base_schemes.append(s)
+            elif s.get("source", "local") in ("community", "group"):
+                downloaded_schemes.append(s)
+            else:
+                user_schemes.append(s)
+
+        user_schemes.sort(key=lambda s: s.get("scheme_name", ""))
+        downloaded_schemes.sort(key=lambda s: s.get("scheme_name", ""))
+        base_schemes.sort(key=lambda s: s.get("scheme_name", ""))
+
+        self._saved_schemes_map = {}
+        display_list = []
+
+        for s in user_schemes:
+            name = s.get('scheme_name', s.get('map_name', ''))
+            display_name = f"★ {name}" if s.get('is_default') else name
+            display_list.append(display_name)
+            self._saved_schemes_map[display_name] = s
+
+        if downloaded_schemes:
+            sep_key = "__sep_downloaded__"
+            display_list.append(sep_key)
+            self._saved_schemes_map[sep_key] = {"_separator": True, "section": "downloaded"}
+            for s in downloaded_schemes:
+                name = s.get('scheme_name', s.get('map_name', ''))
+                display_name = f"★ {name}" if s.get('is_default') else name
+                display_list.append(display_name)
+                self._saved_schemes_map[display_name] = s
+
+        if base_schemes:
+            sep_key = "__sep_base__"
+            display_list.append(sep_key)
+            self._saved_schemes_map[sep_key] = {"_separator": True, "section": "base"}
+            for s in base_schemes:
+                name = s.get('scheme_name', s.get('map_name', ''))
+                display_name = f"★ {name}" if s.get('is_default') else name
+                display_list.append(display_name)
+                self._saved_schemes_map[display_name] = s
+
+        if len(display_list) == 0:
+            self.saved_schemes_cb['values'] = []
+            self.saved_schemes_var.set(self.t('ui', 'no_saved_schemes'))
+            self.saved_schemes_cb.config(state='disabled', style='GrayDisabled.TCombobox')
+        else:
+            sep_texts = {
+                "__sep_downloaded__": "── %s ──" % self.t('ui', 'schemes_section_downloaded'),
+                "__sep_base__": "── %s ──" % self.t('ui', 'schemes_section_base'),
+            }
+            display_texts = [sep_texts.get(d, d) for d in display_list]
+            self.saved_schemes_cb['values'] = display_texts
+            last = self.settings.get("last_selected_scheme", "")
+            if last in display_list:
+                idx = display_list.index(last)
+                self.saved_schemes_var.set(display_texts[idx])
+                self._last_valid_scheme_display = display_texts[idx]
+            else:
+                last_stripped = last.lstrip("★ ").strip()
+                matched = False
+                for i, d in enumerate(display_list):
+                    if not d.startswith("__sep_") and d.lstrip("★ ").strip() == last_stripped:
+                        self.saved_schemes_var.set(display_texts[i])
+                        self._last_valid_scheme_display = display_texts[i]
+                        matched = True
+                        break
+                if not matched:
+                    non_sep = [i for i, d in enumerate(display_list) if not d.startswith("__sep_")]
+                    if non_sep:
+                        self.saved_schemes_var.set(display_texts[non_sep[0]])
+                        self._last_valid_scheme_display = display_texts[non_sep[0]]
+                    else:
+                        self.saved_schemes_var.set('')
+            self.saved_schemes_cb.config(state='readonly', style='TCombobox')
+            self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
+        self._saved_schemes_keys = display_list
+
+    def _on_saved_scheme_select(self, event=None):
+        import tactics_manager
+        sel = self.saved_schemes_var.get()
+        if not sel or not hasattr(self, '_saved_schemes_map'):
+            return
+        keys = getattr(self, '_saved_schemes_keys', [])
+        display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
+        idx = None
+        for i, dt in enumerate(display_texts):
+            if dt == sel:
+                idx = i
+                break
+        if idx is None or idx >= len(keys):
+            return
+        key = keys[idx]
+        scheme = self._saved_schemes_map.get(key)
+        if not scheme or scheme.get("_separator"):
+            if hasattr(self, '_last_valid_scheme_display'):
+                self.saved_schemes_var.set(self._last_valid_scheme_display)
+            return
+
+        map_id = scheme.get('map_id', '')
+        current_map = self.current_map_eng
+        current_drawings = self.painter.drawings.get(current_map, [])
+
+        if current_map == map_id and current_drawings:
+            existing_schemes = tactics_manager.list_schemes_from_db(
+                config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
+            current_coords_set = {tuple(e.get("coords", [])) for e in current_drawings}
+            matched_scheme_id = None
+            for s in existing_schemes:
+                if s.get("map_id") != current_map:
+                    continue
+                sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
+                if current_coords_set == sc:
+                    matched_scheme_id = s.get("drawing_id")
+                    break
+
+            if matched_scheme_id:
+                ok, msg = tactics_manager.save_scheme_to_db(
+                    config.SCHEMES_FILE, current_map,
+                    config.MAP_NAMES_EN.get(current_map, current_map),
+                    self.selected_battle_mode.get(),
+                    self.painter.drawings, source="local")
+                if ok:
+                    self._refresh_saved_schemes_list()
+            else:
+                from dialog_utils import dark_confirmbox
+                save_first = dark_confirmbox(
+                    self.root, self.t('ui', 'scheme_unsaved_title'),
+                    self.t('ui', 'scheme_unsaved_confirm'))
+                if save_first:
+                    self._palette_save_current(current_map)
+                else:
+                    if hasattr(self, '_last_valid_scheme_display'):
+                        self.saved_schemes_var.set(self._last_valid_scheme_display)
+                    return
+
+        drawing_id = scheme.get('drawing_id', '')
+        result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
+        if result:
+            scheme_map_id, elements = result
+            existing = self.painter.drawings.get(scheme_map_id, [])
+            existing_coords = {tuple(e.get("coords", [])) for e in existing}
+            new_from_scheme = [e for e in elements if tuple(e.get("coords", [])) not in existing_coords]
+            self.painter.drawings[scheme_map_id] = existing + new_from_scheme
+            self.data_mgr.save_drawings(self.painter.drawings)
+            if self.current_map_eng == scheme_map_id:
+                self.painter.redraw()
+            else:
+                self.current_map_eng = scheme_map_id
+                self.map_var.set(config.MAP_NAMES_EN.get(scheme_map_id, scheme_map_id))
+                self.on_map_select(None)
+            scheme_name = scheme.get('scheme_name', scheme.get('map_name', ''))
+            self.status_label.config(text="Loaded: %s" % scheme_name, bg="#1a3322")
+            self.settings["last_selected_scheme"] = scheme_name
+            self.save_settings()
+            self._last_valid_scheme_display = sel
+
+    def _palette_save_current(self, map_id=None):
+        """Show save dialog for current map's drawings."""
+        palette = getattr(self, 'drawing_palette', None)
+        if palette:
+            palette._choose_save_action()
+
+    def _on_root_b3_scheme(self, event):
+        """Handle right-click at root level — check if it's over the saved schemes combobox."""
+        cb = self.saved_schemes_cb
+        if not cb.winfo_exists():
+            return
+        x, y = event.x_root, event.y_root
+        cx, cy = cb.winfo_rootx(), cb.winfo_rooty()
+        cw, ch = cb.winfo_width(), cb.winfo_height()
+        if cx <= x <= cx + cw and cy <= y <= cy + ch:
+            self._show_scheme_context_menu(event)
+            return 'break'
+
+    def _show_scheme_context_menu(self, event=None):
+        """Show right-click context menu on saved schemes combobox."""
+        import tactics_manager
+        sel = self.saved_schemes_var.get()
+        if not sel or not hasattr(self, '_saved_schemes_map'):
+            return
+        keys = getattr(self, '_saved_schemes_keys', [])
+        display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
+        idx = None
+        for i, dt in enumerate(display_texts):
+            if dt == sel:
+                idx = i
+                break
+        if idx is None or idx >= len(keys):
+            return
+        key = keys[idx]
+        scheme = self._saved_schemes_map.get(key)
+        if not scheme or scheme.get("_separator"):
+            return
+        drawing_id = scheme.get('drawing_id', '')
+        scheme_name = scheme.get('scheme_name', '')
+        is_default = scheme.get('is_default', False)
+        is_base = scheme.get('is_base', False)
+
+        menu = tk.Menu(self.root, tearoff=0, bg="#333", fg="#ccc",
+                       activebackground="#444", activeforeground="#fff",
+                       font=("Arial", 9))
+        if is_default:
+            menu.add_command(label=self.t('ui', 'context_remove_default'),
+                            command=lambda: self._toggle_scheme_default(drawing_id))
+        else:
+            menu.add_command(label=self.t('ui', 'context_set_default'),
+                            command=lambda: self._toggle_scheme_default(drawing_id))
+        menu.add_separator()
+        if is_base:
+            menu.add_command(label=self.t('ui', 'context_remove_base'),
+                            command=lambda: self._toggle_scheme_base(drawing_id))
+        else:
+            menu.add_command(label=self.t('ui', 'context_make_base'),
+                            command=lambda: self._toggle_scheme_base(drawing_id))
+        menu.add_separator()
+        menu.add_command(label=self.t('ui', 'context_delete_scheme'),
+                        command=lambda: self._delete_scheme_from_context(drawing_id, scheme_name))
+        try:
+            menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            menu.grab_release()
+
+    def _toggle_scheme_default(self, drawing_id):
+        """Toggle is_default flag on a scheme."""
+        import tactics_manager
+        tactics_manager.toggle_default_scheme(config.SCHEMES_FILE, drawing_id)
+        self._refresh_saved_schemes_list()
+
+    def _toggle_scheme_base(self, drawing_id):
+        """Toggle is_base flag on a scheme."""
+        import tactics_manager
+        tactics_manager.toggle_base_scheme(config.SCHEMES_FILE, drawing_id)
+        self._refresh_saved_schemes_list()
+
+    def _delete_scheme_from_context(self, drawing_id, scheme_name):
+        """Delete scheme after confirmation."""
+        import tactics_manager
+        msg = self.t('ui', 'context_delete_confirm').format(name=scheme_name)
+        if dialog_utils.dark_confirmbox(self.root, self.t('ui', 'context_delete_scheme'), msg):
+            tactics_manager.delete_scheme_from_db(config.SCHEMES_FILE, drawing_id)
+            self._refresh_saved_schemes_list()
+
+    def _write_selected_scheme(self, scheme=None):
+        """Write selected scheme to selected_scheme.json for the in-game mod.
+        scheme dict or None (clears the file)."""
+        import json as _json
+        try:
+            if scheme is None:
+                data = None
+            else:
+                data = {
+                    "drawing_id": scheme.get("drawing_id", ""),
+                    "map_id": scheme.get("map_id", ""),
+                    "battle_mode": scheme.get("battle_mode", "Standard"),
+                    "scheme_name": scheme.get("scheme_name", ""),
+                    "elements": scheme.get("elements", []),
+                }
+            with open(config.SELECTED_SCHEME_FILE, "w", encoding="utf-8") as f:
+                if data is not None:
+                    _json.dump(data, f, ensure_ascii=False)
+                else:
+                    f.write("null")
+        except Exception:
+            pass
+
+    def _write_selected_scheme_from_combobox(self):
+        """Write current combobox selection to selected_scheme.json (called at battle start)."""
+        try:
+            sel = self.saved_schemes_var.get()
+            if not sel or not hasattr(self, '_saved_schemes_map'):
+                self._write_selected_scheme(None)
+                return
+            keys = getattr(self, '_saved_schemes_keys', [])
+            display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
+            idx = None
+            for i, dt in enumerate(display_texts):
+                if dt == sel:
+                    idx = i
+                    break
+            if idx is None or idx >= len(keys):
+                self._write_selected_scheme(None)
+                return
+            key = keys[idx]
+            scheme_info = self._saved_schemes_map.get(key, {})
+            if not scheme_info or scheme_info.get("_separator"):
+                self._write_selected_scheme(None)
+                return
+            drawing_id = scheme_info.get('drawing_id', '')
+            import tactics_manager
+            result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
+            if result:
+                map_id, elements = result
+                self._write_selected_scheme({
+                    "drawing_id": drawing_id,
+                    "map_id": map_id,
+                    "battle_mode": scheme_info.get("battle_mode", "Standard"),
+                    "scheme_name": scheme_info.get("scheme_name", ""),
+                    "elements": elements,
+                })
+            else:
+                self._write_selected_scheme(None)
+        except Exception:
+            self._write_selected_scheme(None)
 
     def _toggle_select_all(self):
         if self.active_view != "maps":
@@ -1407,10 +1743,56 @@ class WotAssistantHQ:
         self.painter.toggle_select_all()
         palette._update_select_all_btn()
 
+    def _select_default_scheme_for_battle(self, map_id, battle_mode):
+        """Select the default scheme for the given map+mode in the combobox."""
+        import tactics_manager
+        default = tactics_manager.get_default_scheme(config.SCHEMES_FILE, map_id, battle_mode)
+        if not default:
+            return
+        display_name = default.get('scheme_name', '')
+        if not display_name:
+            return
+        keys = getattr(self, '_saved_schemes_keys', [])
+        if not keys:
+            return
+        display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
+        for i, k in enumerate(keys):
+            if k.lstrip("★ ").strip() == display_name:
+                if i < len(display_texts):
+                    self.saved_schemes_var.set(display_texts[i])
+                    self._last_valid_scheme_display = display_texts[i]
+                break
+
     def on_battle_detected(self, map_id, mode):
-        self.last_battle_map = map_id
+        # Comp7 карти мають суфікс _comp7_nb в логі — обрізаємо для пошуку в map_dictionary
+        normalized_map_id = map_id
+        if normalized_map_id.endswith("_comp7_nb"):
+            normalized_map_id = normalized_map_id[:-len("_comp7_nb")]
+
+        self.last_battle_map = normalized_map_id
         self.last_battle_mode = mode
         self.last_battle_map_mode = self.map_mode
+
+        # Автовибір default-схеми для поточної мапи+режиму
+        mode_map = {
+            "ctf": "Standard",
+            "domination": "Encounter",
+            "assault": "Storm",
+            "comp7": "Onslaught",
+            "comp7_light": "OnslaughtLight",
+        }
+        ui_mode = mode_map.get(mode, "Standard")
+
+        # Оновлюємо combobox для мапи бою щоб користувач міг обрати схему
+        saved_map = self.current_map_eng
+        self.current_map_eng = normalized_map_id
+        self._refresh_saved_schemes_list()
+        self._select_default_scheme_for_battle(normalized_map_id, ui_mode)
+        if saved_map:
+            self.current_map_eng = saved_map
+
+        # Записати поточну схему для in-game мода
+        self._write_selected_scheme_from_combobox()
 
         # Новий бій скасовує відкладене повернення в edit після попереднього бою
         if self._battle_edit_return is not None:
@@ -1427,19 +1809,12 @@ class WotAssistantHQ:
         if not self.auto_sync_var.get():
             return
         
-        mode_map = {
-            "ctf": "Standard",
-            "domination": "Encounter",
-            "assault": "Storm",
-            "comp7": "Onslaught",
-            "comp7_light": "OnslaughtLight",
-        }
-        ui_mode = mode_map.get(mode, "Standard")
-        self.root.after(0, lambda: self.safe_battle_sync(map_id, ui_mode))
+        self.root.after(0, lambda: self.safe_battle_sync(normalized_map_id, ui_mode))
 
     def on_battle_ended(self):
         self.save_settings()
-        
+        self._write_selected_scheme(None)
+
         if self._restored_by_battle:
             self._restored_by_battle = False
             self.root.after(200, self._minimize_to_tray)
@@ -1535,6 +1910,48 @@ class WotAssistantHQ:
 
     def switch_to_ai_stats(self):
         self.ui_mgr.show_view("ai_stats")
+
+    def _on_close_request(self):
+        """Handle window close — ask to save unsaved drawings."""
+        if not self.current_map_eng:
+            self.quit_app()
+            return
+        current = self.painter.drawings.get(self.current_map_eng, [])
+        if not current:
+            self.quit_app()
+            return
+        import tactics_manager
+        existing_schemes = tactics_manager.list_schemes_from_db(
+            config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
+        current_coords = {tuple(e.get("coords", [])) for e in current}
+        is_saved = False
+        for s in existing_schemes:
+            if s.get("map_id") != self.current_map_eng:
+                continue
+            sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
+            if current_coords == sc:
+                is_saved = True
+                break
+        if is_saved:
+            self.quit_app()
+            return
+        from dialog_utils import dark_3button_box
+        choice = dark_3button_box(
+            self.root,
+            self.t('ui', 'close_unsaved_title'),
+            self.t('ui', 'close_unsaved_confirm'),
+            btn1_text=self.t('ui', 'close_save'),
+            btn2_text=self.t('ui', 'close_dont_save'),
+            btn3_text=self.t('ui', 'cancel_btn'))
+        if choice == 1:
+            palette = getattr(self, 'drawing_palette', None)
+            if palette:
+                palette._choose_save_action()
+            self.quit_app()
+        elif choice == 2:
+            self.quit_app()
+        else:
+            return
 
     def quit_app(self):
         self._sync_running = False
@@ -2151,7 +2568,7 @@ class WotAssistantHQ:
         self._dot_anim_active = False
         shown_at = getattr(self, "_splash_shown_at", 0.0)
         elapsed_ms = int((time.time() - shown_at) * 1000) if shown_at else 9999
-        min_visible_ms = 2000  # Принаймні 2 секунди
+        min_visible_ms = 5000  # Принаймні 5 секунд (щоб splash не промайнув)
         if not self._start_to_tray and elapsed_ms < min_visible_ms:
             self.root.after(min_visible_ms - elapsed_ms, self.finish_startup_splash)
             return
@@ -2572,4 +2989,5 @@ if __name__ == "__main__":
     root = tk.Tk()
     root.title(f"SM WoT Assistant v{config.load_version()}")
     app = WotAssistantHQ(root, splash_geometry=splash_geometry)
+    root.protocol("WM_DELETE_WINDOW", app._on_close_request)
     root.mainloop()

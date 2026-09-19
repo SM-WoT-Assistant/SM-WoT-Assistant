@@ -64,9 +64,28 @@ class UIManager:
 
         self.app.map_toolbar = tk.Frame(top_row, bg="#222")
         self.app.map_var = tk.StringVar()
-        self.app.map_selector = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.map_var, state="readonly", width=15, postcommand=self.app._combo_postcommand)
+        self.app.map_selector = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.map_var, state="readonly", width=15, font=("Arial", 8), postcommand=self.app._combo_postcommand)
         self.app.map_selector.bind("<<ComboboxSelected>>", self.app.on_map_select)
         self.app.map_selector.pack(side="left", padx=5, pady=2)
+
+        self.app.saved_schemes_var = tk.StringVar()
+        self.app.saved_schemes_cb = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.saved_schemes_var, state="readonly", width=18, font=("Arial", 8))
+        self.app.saved_schemes_cb.bind("<<ComboboxSelected>>", self.app._on_saved_scheme_select)
+        self.app.saved_schemes_cb.bind("<Button-3>", self.app._show_scheme_context_menu)
+
+        _cs_style = ttk.Style()
+        _cs_style.configure("TCombobox", background="#333", foreground="white",
+                            fieldbackground="#333", arrowcolor="#aaa",
+                            selectbackground="#333", selectforeground="white")
+        _cs_style.map("TCombobox",
+                       foreground=[("readonly", "white"), ("!disabled", "white"), ("disabled", "gray")],
+                       fieldbackground=[("readonly", "#333"), ("!disabled", "#333"), ("disabled", "#333")],
+                       background=[("readonly", "#333"), ("!disabled", "#333"), ("disabled", "#333")])
+        _cs_style.configure("GrayDisabled.TCombobox", foreground="gray", fieldbackground="#333", background="#333")
+        _cs_style.map("GrayDisabled.TCombobox",
+                       foreground=[("disabled", "gray"), ("readonly", "white"), ("!disabled", "white")],
+                       fieldbackground=[("disabled", "#333"), ("!disabled", "#333")],
+                       background=[("disabled", "#333"), ("!disabled", "#333")])
 
         self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw').upper(), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
         self.app.draw_btn.pack(side="left", padx=5, pady=2)
@@ -428,6 +447,8 @@ class UIManager:
 
         chk_launch_game.configure(command=_on_launch_on_game_start)
 
+        sep()
+        make_chk(self.app.t('ui', 'use_mod'), self.app._use_mod_var)
         sep()
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)
         sep()

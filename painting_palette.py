@@ -22,7 +22,7 @@ class DrawingPalette(tk.Toplevel):
         self._drag_data = {"x": 0, "y": 0}
         self._saved_pos = None
 
-        self.current_color = "#ffaa00"
+        self.current_color = self.app.settings.get("draw_color", "#ffaa00")
         self._default_colors = [
             "#ff0000", "#ff5500", "#ffaa00", "#ffff00",
             "#aaff00", "#00ff00", "#00ffaa", "#00ffff",
@@ -223,13 +223,11 @@ class DrawingPalette(tk.Toplevel):
 
         bf = tk.Frame(self, bg=bg)
         bf.pack(fill="x", padx=8, pady=(2, 6))
-        tk.Button(bf, text=self.app.t('ui', 'publish_map').upper(), bg="#446644", fg="#cfc", bd=0,
-                  font=("Arial", 8, "bold"), command=self._choose_publish_action).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf, text=self.app.t('ui', 'save_btn').upper(), bg="#444", fg="white", bd=0,
                   font=("Arial", 8, "bold"), command=self._choose_save_action).pack(side="left", fill="x", expand=True, padx=1)
         tk.Button(bf, text=self.app.t('ui', 'load_btn').upper(), bg="#444", fg="white", bd=0,
-                   font=("Arial", 8, "bold"), command=self._import_unified).pack(side="left", fill="x", expand=True, padx=1)
-        tk.Button(bf, text=self.app.t('ui', 'download_btn').upper(), bg="#446688", fg="white", bd=0,
+                   font=("Arial", 8, "bold"), command=self._load_from_folder).pack(side="left", fill="x", expand=True, padx=1)
+        tk.Button(bf, text=self.app.t('ui', 'community_btn').upper(), bg="#446688", fg="white", bd=0,
                    font=("Arial", 8, "bold"), command=self._show_download_dialog).pack(side="left", fill="x", expand=True, padx=1)
 
         self._choice_frame = tk.Frame(self, bg="#333")
@@ -665,8 +663,6 @@ class DrawingPalette(tk.Toplevel):
             self.painter.set_tool("marker")
         else:
             self.painter.set_tool("text")
-        maker_like = ("marker", "arrow", "brush")
-        self.current_color = "#ffaa00" if code in maker_like else "#00ff00"
         self._color_preview.config(fg=self.current_color)
         self._update_color_buttons()
         if code == "brush":
@@ -785,16 +781,46 @@ class DrawingPalette(tk.Toplevel):
                     obj["classes"] = new_classes
                 self.painter.redraw()
                 self.painter.save_drawings()
+                self._auto_save_if_matches_existing()
             return
         if self._edit_obj:
             self._write_to_object(self._edit_obj)
             self.painter.redraw()
             self.painter.save_drawings()
+            self._auto_save_if_matches_existing()
+
+    def _auto_save_if_matches_existing(self):
+        """Auto-save current drawing if it matches an existing saved scheme."""
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id:
+            return
+        current = self.painter.drawings.get(map_id, [])
+        if not current:
+            return
+        import tactics_manager
+        import config
+        mode = self.app.selected_battle_mode.get()
+        existing_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
+        current_coords = {tuple(e.get("coords", [])) for e in current}
+        for s in existing_schemes:
+            if s.get("map_id") != map_id:
+                continue
+            sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
+            if current_coords == sc:
+                ok, _ = tactics_manager.save_scheme_to_db(
+                    config.SCHEMES_FILE, map_id, s.get("map_name", map_id), mode,
+                    self.painter.drawings, scheme_name=s.get("scheme_name", ""),
+                    description=s.get("description", ""), source=s.get("source", "local"))
+                if ok:
+                    self._status_lbl.config(text="Auto-saved", bg="#1a3322")
+                break
 
     def _set_color(self, c):
         self.current_color = c
         self._color_preview.config(fg=c)
         self._update_color_buttons()
+        self.app.settings["draw_color"] = c
+        self.app.save_settings()
         self._on_any_change()
 
     def _update_color_buttons(self):
@@ -834,6 +860,71 @@ class DrawingPalette(tk.Toplevel):
     def _import_unified(self):
         self._lift_self()
         self.app.import_tactic_unified()
+
+    def _load_from_folder(self):
+        self._lift_self()
+        import tactics_manager
+        mode = self.app.selected_battle_mode.get()
+        map_id = self.app.current_map_eng
+        db_path = config.SCHEMES_FILE
+        all_schemes = tactics_manager.list_schemes_from_db(db_path, mode=mode)
+        schemes = [s for s in all_schemes if s.get('map_id') == map_id]
+        if not schemes:
+            dialog_utils.dark_messagebox(self.app.root, "Load", "No saved schemes found.", is_error=True)
+            return
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, "Load Scheme")
+        dialog_utils._DragHelper(dlg, hdr)
+        dlg.grab_set()
+        bg = "#222"
+        tk.Label(dlg, text=f"Saved schemes ({mode})", bg=bg, fg="#ffaa00",
+                 font=("Arial", 10, "bold")).pack(padx=16, pady=(12, 8), anchor="w")
+        lf = tk.Frame(dlg, bg=bg)
+        lf.pack(fill="both", expand=True, padx=16, pady=(0, 8))
+        lb = tk.Listbox(lf, bg="#1a1a1a", fg="#ccc", selectbackground="#444",
+                        selectforeground="white", font=("Arial", 9), activestyle="none")
+        lb.pack(fill="both", expand=True)
+        vsb = tk.Scrollbar(lf, orient="vertical", command=lb.yview)
+        lb.configure(yscrollcommand=vsb.set)
+        vsb.pack(side="right", fill="y")
+        for s in schemes:
+            name = s.get('scheme_name', s.get('map_name', ''))
+            label = f"{name}  ({s['saved_at'][:16]})"
+            lb.insert("end", label)
+        selected_scheme = [None]
+        def on_ok():
+            sel = lb.curselection()
+            if sel:
+                selected_scheme[0] = schemes[sel[0]]
+            dlg.destroy()
+        def on_delete():
+            sel = lb.curselection()
+            if sel:
+                sid = schemes[sel[0]]['drawing_id']
+                if dialog_utils.dark_confirmbox(dlg, "Delete", f"Delete {schemes[sel[0]]['map_name']}?"):
+                    tactics_manager.delete_scheme_from_db(db_path, sid)
+                    lb.delete(sel[0])
+                    del schemes[sel[0]]
+        bf = tk.Frame(dlg, bg=bg)
+        bf.pack(pady=(0, 12))
+        tk.Button(bf, text="Load", bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=12, pady=4, command=on_ok).pack(side="left", padx=4)
+        tk.Button(bf, text="Delete", bg="#553333", fg="#ff6666", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_delete).pack(side="left", padx=4)
+        tk.Button(bf, text="Cancel", bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=dlg.destroy).pack(side="left", padx=4)
+        dlg.update_idletasks()
+        dialog_utils._center_on_root(dlg, self.app.root)
+        dlg.geometry(f"420x350")
+        self.app.root.wait_window(dlg)
+        if selected_scheme[0]:
+            scheme = selected_scheme[0]
+            map_id = scheme.get('map_id', '')
+            elements = scheme.get('elements', [])
+            self.app.painter.drawings[map_id] = elements
+            self.app.data_mgr.save_drawings(self.app.painter.drawings)
+            if self.app.current_map_eng == map_id:
+                self.app.painter.redraw()
+            self.app.status_label.config(text=f"Loaded: {scheme.get('map_name', '')}", bg="#1a3322")
 
     def _choose_publish_action(self):
         self._lift_self()
@@ -881,18 +972,91 @@ class DrawingPalette(tk.Toplevel):
 
     def _choose_save_action(self):
         self._lift_self()
+        import tactics_manager
         import config
-        map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-        def on_map():
-            self._hide_choice_inline()
-            self._export()
-        def on_all():
-            self._hide_choice_inline()
-            self._export_all()
-        self._show_choice_inline(
-            self.app.t('ui', 'save_what'),
-            map_name, on_map,
-            self.app.t('ui', 'all_maps'), on_all)
+        map_id = self.app.current_map_eng
+        if not map_id:
+            return False
+        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+        mode = self.app.selected_battle_mode.get()
+        drawings = self.app.painter.drawings
+        if map_id not in drawings or not drawings[map_id]:
+            dialog_utils.dark_messagebox(self.app.root, "Save", "No drawings to save.", is_error=True)
+            return False
+
+        default_name = f"{map_name} [{mode}]"
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'save_scheme_title'))
+        dialog_utils._DragHelper(dlg, hdr)
+        dlg.grab_set()
+        bg = "#222"
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label'), bg=bg, fg="#ffaa00",
+                 font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4), anchor="w")
+        name_var = tk.StringVar(value=default_name)
+        name_entry = tk.Entry(dlg, textvariable=name_var, font=("Arial", 11),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=30, relief="flat", bd=4)
+        name_entry.pack(padx=20, pady=(0, 8))
+        name_entry.select_range(0, "end")
+        name_entry.focus_set()
+
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label'), bg=bg, fg="#aaa",
+                 font=("Arial", 9)).pack(padx=20, pady=(0, 4), anchor="w")
+        desc_var = tk.StringVar()
+        tk.Entry(dlg, textvariable=desc_var, font=("Arial", 10),
+                 bg="#333", fg="white", insertbackground="white",
+                 width=30, relief="flat", bd=4).pack(padx=20, pady=(0, 10))
+
+        result = [None]
+        def on_ok():
+            result[0] = (name_var.get().strip(), desc_var.get().strip())
+            dlg.destroy()
+        def on_cancel():
+            result[0] = None
+            dlg.destroy()
+        name_entry.bind("<Return>", lambda e: on_ok())
+        name_entry.bind("<Escape>", lambda e: on_cancel())
+        bf = tk.Frame(dlg, bg=bg)
+        bf.pack(pady=(0, 12))
+        tk.Button(bf, text=self.app.t('ui', 'save_btn'), bg="#446644", fg="#cfc", bd=0,
+                  font=("Arial", 9, "bold"), padx=12, pady=4, command=on_ok).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'cancel_btn'), bg="#444", fg="#aaa", bd=0,
+                  font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="left", padx=4)
+        dlg.update_idletasks()
+        dialog_utils._center_on_root(dlg, self.app.root)
+        dlg.geometry(f"420x220")
+        self.app.root.wait_window(dlg)
+
+        if not result[0]:
+            return False
+        scheme_name, description = result[0]
+        if not scheme_name:
+            return False
+
+        db = tactics_manager._load_db(config.SCHEMES_FILE)
+        duplicate_id = None
+        for did, s in db.items():
+            if (s.get("map_id") == map_id and s.get("battle_mode") == mode
+                    and s.get("scheme_name", "") == scheme_name):
+                duplicate_id = did
+                break
+
+        if duplicate_id:
+            if not dialog_utils.dark_confirmbox(
+                    self.app.root, "Replace scheme",
+                    f'Scheme "{scheme_name}" already exists.\nReplace with current drawing?'):
+                return
+
+        ok, result_text = tactics_manager.save_scheme_to_db(
+            config.SCHEMES_FILE, map_id, map_name, mode, drawings,
+            scheme_name=scheme_name, description=description)
+        if ok:
+            self.app.status_label.config(text=f"Saved: {scheme_name}", bg="#1a3322")
+            if hasattr(self.app, '_refresh_saved_schemes_list'):
+                self.app._refresh_saved_schemes_list()
+            return True
+        else:
+            self.app.status_label.config(text=f"Save error: {result_text}", bg="#332222")
+            return False
 
     def _show_choice_inline(self, title, btn1_text, btn1_cmd, btn2_text, btn2_cmd):
         for w in self._choice_frame.winfo_children():
@@ -1338,7 +1502,43 @@ class DrawingPalette(tk.Toplevel):
             self.app.t('ui', 'publish_all'), msg,
             is_error=results["errors"] > 0)
 
+    def _has_unsaved_drawings(self):
+        """Check if current map has drawings that don't match any saved scheme."""
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id:
+            return False
+        current = self.painter.drawings.get(map_id, [])
+        if not current:
+            return False
+        import tactics_manager
+        import config
+        mode = self.app.selected_battle_mode.get()
+        existing_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
+        current_coords = {tuple(e.get("coords", [])) for e in current}
+        for s in existing_schemes:
+            if s.get("map_id") != map_id:
+                continue
+            sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
+            if current_coords == sc:
+                return False
+        return True
+
     def _close(self):
+        if self._has_unsaved_drawings():
+            from dialog_utils import dark_3button_box
+            choice = dark_3button_box(
+                self.app.root,
+                self.app.t('ui', 'close_unsaved_title'),
+                self.app.t('ui', 'close_unsaved_confirm'),
+                btn1_text=self.app.t('ui', 'close_save'),
+                btn2_text=self.app.t('ui', 'close_dont_save'),
+                btn3_text=self.app.t('ui', 'cancel_btn'))
+            if choice == 1:
+                self._choose_save_action()
+            elif choice == 2:
+                pass
+            else:
+                return
         self.exit_edit_mode()
         self.withdraw()
         self._saved_pos = self.geometry()
@@ -1725,20 +1925,22 @@ class DrawingPalette(tk.Toplevel):
         tf = tk.Frame(self._download_frame, bg=bg)
         tf.pack(fill="both", expand=True, padx=8, pady=4)
 
-        columns = ("map", "comment", "author", "date", "preview")
+        columns = ("map", "mode", "comment", "author", "date", "preview")
         tree = tk.ttk.Treeview(tf, columns=columns, show="tree headings",
                                 height=7, selectmode="browse")
         tree.heading("#0", text="")
         tree.heading("map", text=t_('ui', 'download_col_map'))
+        tree.heading("mode", text="Mode")
         tree.heading("comment", text=t_('ui', 'download_col_comment'))
         tree.heading("author", text=t_('ui', 'download_col_author'))
         tree.heading("date", text=t_('ui', 'download_col_date'))
         tree.heading("preview", text="")
         tree.column("#0", width=30, anchor="center", minwidth=30, stretch=False)
-        tree.column("map", width=110)
-        tree.column("comment", width=160)
-        tree.column("author", width=85)
-        tree.column("date", width=70)
+        tree.column("map", width=100)
+        tree.column("mode", width=70, anchor="center")
+        tree.column("comment", width=140)
+        tree.column("author", width=80)
+        tree.column("date", width=65)
         tree.column("preview", width=40, anchor="center")
 
         vsb = tk.ttk.Scrollbar(tf, orient="vertical", command=tree.yview)
@@ -1768,9 +1970,16 @@ class DrawingPalette(tk.Toplevel):
                     check_vars[sid] = tk.BooleanVar(value=False)
                 cb_state = "" if not is_all else "disabled"
                 has_preview = not is_all
+                battle_mode = "—"
+                for el in (it.get("elements") or []):
+                    if isinstance(el, dict):
+                        modes = el.get("modes", [])
+                        if modes:
+                            battle_mode = modes[0]
+                            break
                 tree.insert("", "end",
                             text="☐" if not is_all else "",
-                            values=(it["map_name"], it["comment"],
+                            values=(it["map_name"], battle_mode, it["comment"],
                                     it["author"], it["created"],
                                     "Preview" if has_preview else ""),
                             iid=sid, tags=(cb_state,))

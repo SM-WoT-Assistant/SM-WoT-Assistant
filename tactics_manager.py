@@ -107,6 +107,270 @@ def import_tactic(parent, current_map_id, current_map_name, drawings, on_success
             dialog_utils.dark_messagebox(parent, _t('import_read_error', 'Error'), _t('import_read_error', 'Read failed: {error}').format(error=e), is_error=True)
 
 
+import os
+import time
+import uuid
+import re as _re
+import config
+
+
+def _load_db(db_path):
+    """Load the saved_schemes.json database. Returns dict of schemes keyed by drawing_id."""
+    try:
+        if not os.path.isfile(db_path):
+            return {}
+        with open(db_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+    return {}
+
+
+def _save_db(db_path, db):
+    """Save the saved_schemes.json database."""
+    try:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        with open(db_path, "w", encoding="utf-8") as f:
+            json.dump(db, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception as e:
+        return False
+
+
+def save_scheme_to_db(db_path, map_id, map_name, mode, drawings, scheme_name=None, description="", source="local"):
+    """Save current map's drawings into the single JSON DB.
+    Upserts by (map_id, mode, scheme_name) — replaces if same name exists for same map+mode.
+    Returns (ok, display_name)."""
+    if not map_id or map_id not in drawings or not drawings[map_id]:
+        return False, "No drawings"
+
+    db = _load_db(db_path)
+    name = scheme_name or f"{map_name} [{mode}]"
+
+    existing_id = None
+    for did, s in db.items():
+        if (s.get("map_id") == map_id and s.get("battle_mode") == mode
+                and s.get("scheme_name", "") == name):
+            existing_id = did
+            break
+
+    drawing_id = existing_id or str(uuid.uuid4())[:8]
+    now = time.strftime("%Y-%m-%d %H:%M:%S")
+    old = db.get(drawing_id, {})
+
+    db[drawing_id] = {
+        "drawing_id": drawing_id,
+        "map_id": map_id,
+        "map_name": map_name,
+        "battle_mode": mode,
+        "scheme_name": name,
+        "description": description,
+        "elements": drawings[map_id],
+        "source": source,
+        "is_base": old.get("is_base", False),
+        "is_default": old.get("is_default", False),
+        "saved_at": old.get("saved_at", now),
+        "updated_at": now,
+    }
+
+    ok = _save_db(db_path, db)
+    action = "Updated" if existing_id else "Saved"
+    return ok, f"{action}: {name}" if ok else "Save failed"
+
+
+def list_schemes_from_db(db_path, mode=None, source=None):
+    """List schemes from DB. Returns list of scheme dicts, optionally filtered by mode/source."""
+    db = _load_db(db_path)
+    result = []
+    for drawing_id, scheme in db.items():
+        if mode and scheme.get("battle_mode", "Standard") != mode:
+            continue
+        if source and scheme.get("source", "local") != source:
+            continue
+        result.append(scheme)
+    result.sort(key=lambda s: s.get("saved_at", ""), reverse=True)
+    return result
+
+
+def load_scheme_from_db(db_path, drawing_id):
+    """Load a single scheme by drawing_id. Returns (map_id, elements) or None."""
+    db = _load_db(db_path)
+    scheme = db.get(drawing_id)
+    if not scheme or "elements" not in scheme:
+        return None
+    return scheme.get("map_id", ""), scheme["elements"]
+
+
+def delete_scheme_from_db(db_path, drawing_id):
+    """Delete a scheme from DB by drawing_id."""
+    db = _load_db(db_path)
+    if drawing_id in db:
+        del db[drawing_id]
+        return _save_db(db_path, db)
+    return False
+
+
+def toggle_base_scheme(db_path, drawing_id):
+    """Toggle is_base flag on a scheme. Returns new is_base value or None if not found."""
+    db = _load_db(db_path)
+    scheme = db.get(drawing_id)
+    if not scheme:
+        return None
+    current = scheme.get("is_base", False)
+    scheme["is_base"] = not current
+    _save_db(db_path, db)
+    return scheme["is_base"]
+
+
+def toggle_default_scheme(db_path, drawing_id):
+    """Set is_default=True for this scheme and clear it from others with same map_id+battle_mode.
+    If already default, removes the default flag. Returns new is_default value or None if not found."""
+    db = _load_db(db_path)
+    scheme = db.get(drawing_id)
+    if not scheme:
+        return None
+    map_id = scheme.get("map_id", "")
+    mode = scheme.get("battle_mode", "")
+    current = scheme.get("is_default", False)
+    if current:
+        scheme["is_default"] = False
+        _save_db(db_path, db)
+        return False
+    for did, s in db.items():
+        if did != drawing_id and s.get("map_id") == map_id and s.get("battle_mode") == mode:
+            s["is_default"] = False
+    scheme["is_default"] = True
+    _save_db(db_path, db)
+    return True
+
+
+def get_default_scheme(db_path, map_id, battle_mode):
+    """Get the default scheme for a given map_id+battle_mode. Returns scheme dict or None."""
+    db = _load_db(db_path)
+    for did, s in db.items():
+        if (s.get("is_default") and s.get("map_id") == map_id
+                and s.get("battle_mode") == battle_mode):
+            return s
+    return None
+
+
+def get_scheme_count(db_path):
+    """Return number of schemes in DB."""
+    return len(_load_db(db_path))
+
+
+def save_scheme(map_id, map_name, mode, drawings, _t=None):
+    """Legacy wrapper — saves to JSON DB."""
+    db_path = config.SCHEMES_FILE
+    return save_scheme_to_db(db_path, map_id, map_name, mode, drawings)
+
+
+def list_schemes(mode=None):
+    """Legacy wrapper — lists from JSON DB."""
+    return list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
+
+
+def load_scheme(file_path):
+    """Legacy wrapper — unused, kept for backward compat."""
+    return None
+
+
+def delete_scheme(file_path):
+    """Legacy wrapper — unused, kept for backward compat."""
+    return False
+
+
+def migrate_tactik_folder():
+    """One-time migration: convert Tactik_Shemi/ files into saved_schemes.json."""
+    db_path = config.SCHEMES_FILE
+    if os.path.isfile(db_path):
+        try:
+            with open(db_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict) and len(data) > 0:
+                return False
+        except Exception:
+            pass
+
+    tactik_dir = os.path.join(config.BASE_DIR, "Tactik_Shemi")
+    if not os.path.isdir(tactik_dir):
+        return False
+
+    db = {}
+    migrated = 0
+    for fname in os.listdir(tactik_dir):
+        if not fname.endswith(".json") or fname == "all_maps.json":
+            continue
+        fpath = os.path.join(tactik_dir, fname)
+        try:
+            with open(fpath, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                continue
+            map_id = data.get("map_id", "")
+            map_name = data.get("map_name", "")
+            elements = data.get("drawings", data.get("elements", []))
+            if not map_id or not elements:
+                continue
+            drawing_id = str(uuid.uuid4())[:8]
+            db[drawing_id] = {
+                "drawing_id": drawing_id,
+                "map_id": map_id,
+                "map_name": map_name,
+                "battle_mode": "Standard",
+                "elements": elements,
+                "source": "local",
+                "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+            migrated += 1
+        except Exception:
+            continue
+
+    all_maps_path = os.path.join(tactik_dir, "all_maps.json")
+    if os.path.isfile(all_maps_path):
+        try:
+            with open(all_maps_path, "r", encoding="utf-8") as f:
+                am_data = json.load(f)
+            if isinstance(am_data, dict) and "drawings" in am_data:
+                am_drawings = am_data["drawings"]
+                if isinstance(am_drawings, dict):
+                    for map_id, elements in am_drawings.items():
+                        if not elements:
+                            continue
+                        drawing_id = str(uuid.uuid4())[:8]
+                        db[drawing_id] = {
+                            "drawing_id": drawing_id,
+                            "map_id": map_id,
+                            "map_name": map_id,
+                            "battle_mode": "Standard",
+                            "elements": elements,
+                            "source": "local",
+                            "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        }
+                        migrated += 1
+                elif isinstance(am_drawings, list):
+                    drawing_id = str(uuid.uuid4())[:8]
+                    db[drawing_id] = {
+                        "drawing_id": drawing_id,
+                        "map_id": am_data.get("map_id", ""),
+                        "map_name": am_data.get("map_name", ""),
+                        "battle_mode": "Standard",
+                        "elements": am_drawings,
+                        "source": "local",
+                        "saved_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+                    }
+                    migrated += 1
+        except Exception:
+            pass
+
+    if db:
+        _save_db(db_path, db)
+    print(f"[MIGRATE] Tactik_Shemi: {migrated} schemes migrated to saved_schemes.json")
+    return migrated > 0
+
+
 def export_all_tactics(parent, drawings, map_names=None, _t=None):
     _t = _t or (lambda k, d: d)
     if not drawings:
