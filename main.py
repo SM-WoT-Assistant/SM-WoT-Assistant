@@ -1507,7 +1507,6 @@ class WotAssistantHQ:
                         self.saved_schemes_var.set('')
             self.saved_schemes_cb.config(state='readonly', style='TCombobox')
             self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
-            self._bind_combobox_right_click()
         self._saved_schemes_keys = display_list
 
     def _on_saved_scheme_select(self, event=None):
@@ -1672,27 +1671,6 @@ class WotAssistantHQ:
             if palette:
                 palette._choose_save_action()
 
-    def _bind_combobox_right_click(self):
-        """Bind <Button-3> on the internal Entry of saved_schemes_cb for context menu."""
-        try:
-            for child in self.saved_schemes_cb.winfo_children():
-                if isinstance(child, tk.Entry):
-                    child.bind('<Button-3>', self._show_scheme_context_menu, add='+')
-                    break
-        except Exception:
-            pass
-
-    def _on_root_b3_scheme(self, event):
-        """Handle right-click at root level — check if it's over the saved schemes combobox."""
-        cb = self.saved_schemes_cb
-        if not cb.winfo_exists():
-            return
-        x, y = event.x_root, event.y_root
-        cx, cy = cb.winfo_rootx(), cb.winfo_rooty()
-        cw, ch = cb.winfo_width(), cb.winfo_height()
-        if cx <= x <= cx + cw and cy <= y <= cy + ch:
-            self._show_scheme_context_menu(event)
-            return 'break'
 
     def _show_scheme_context_menu(self, event=None):
         """Show right-click context menu on saved schemes combobox."""
