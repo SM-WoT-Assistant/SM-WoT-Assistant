@@ -304,6 +304,8 @@ class WotAssistantHQ:
         self._init_painter_overlay()
         self.drawing_palette = painting_palette.DrawingPalette(self.root, self.painter, self)
         self.drawing_palette.withdraw()
+        # Яка схема зараз редагується: {"name", "desc", "map_id", "drawing_id"|"new"}
+        self._editing_scheme = None
 
         self.map_mgr.load_map_list()
 
@@ -1207,6 +1209,7 @@ class WotAssistantHQ:
         self.root.focus_set()
         selected_ua = self.map_var.get()
         self.current_map_eng = self.map_mgr.get_eng_map_name(selected_ua)
+        self._editing_scheme = None
         if hasattr(self, 'painter'):
             self.painter._creation_history.clear()
             self.painter._editing_idx = -1
@@ -1585,6 +1588,64 @@ class WotAssistantHQ:
             self.settings["last_selected_scheme"] = scheme_name
             self.save_settings()
             self._last_valid_scheme_display = sel
+            self._editing_scheme = {
+                "name": scheme.get('scheme_name', ''),
+                "desc": scheme.get('description', ''),
+                "map_id": scheme_map_id,
+                "drawing_id": drawing_id,
+            }
+
+    def _on_new_scheme_clicked(self):
+        """Кнопка 'Нова схема': назва+опис → поточні елементи лишаються на своїй
+        схемі → чиста мапа → палітра відкривається одразу."""
+        map_id = self.current_map_eng
+        if not map_id:
+            return
+        import tactics_manager
+        palette = self.drawing_palette
+        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+        mode = self.selected_battle_mode.get()
+        # 1. Спершу назва+опис — cancel = нічого не міняється
+        result = palette._ask_scheme_name_desc('new_scheme_title', f"{map_name} [{mode}]")
+        if not result:
+            return
+        name, desc = result
+        # 2. Поточні елементи на канвасі лишаються на своїй схемі
+        current = self.painter.drawings.get(map_id, [])
+        if current:
+            es = getattr(self, '_editing_scheme', None)
+            saved = False
+            if es and es.get('name') and es.get('map_id') == map_id:
+                ok, _ = tactics_manager.save_scheme_to_db(
+                    config.SCHEMES_FILE, map_id, map_name, mode,
+                    self.painter.drawings, scheme_name=es.get('name'),
+                    description=es.get('desc', ''), source='local')
+                saved = ok
+            else:
+                cset = {tuple(e.get("coords", [])) for e in current}
+                for s in tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode):
+                    if s.get("map_id") != map_id:
+                        continue
+                    if {tuple(e.get("coords", [])) for e in s.get("elements", [])} == cset:
+                        saved = True
+                        break
+            if not saved:
+                # Елементи не належать жодній схемі — даємо користувачу назвати їх
+                if not palette._choose_save_action():
+                    return
+        # 3. Чиста мапа для нової схеми
+        self.painter.drawings[map_id] = []
+        self.painter._creation_history.clear()
+        self.painter._move_history.clear()
+        self.painter._deletion_history.clear()
+        self.painter._editing_idx = -1
+        self.data_mgr.save_drawings(self.painter.drawings)
+        self.painter.redraw()
+        # 4. Нова активна схема + палітра відкривається одразу
+        self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "new": True}
+        if palette.state() == 'withdrawn':
+            palette.show()
+        self._refresh_saved_schemes_list()
 
     def _palette_save_current(self, map_id=None):
         """Show save dialog for current map's drawings."""

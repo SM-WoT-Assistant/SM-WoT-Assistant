@@ -782,12 +782,39 @@ class DrawingPalette(tk.Toplevel):
                 self.painter.redraw()
                 self.painter.save_drawings()
                 self._auto_save_if_matches_existing()
+                self._autosave_current_scheme()
             return
         if self._edit_obj:
             self._write_to_object(self._edit_obj)
             self.painter.redraw()
             self.painter.save_drawings()
             self._auto_save_if_matches_existing()
+            self._autosave_current_scheme()
+
+    def _autosave_current_scheme(self):
+        """Auto-save current map's drawings to the active scheme (_editing_scheme)."""
+        es = getattr(self.app, '_editing_scheme', None)
+        if not es or not es.get('name'):
+            return
+        map_id = getattr(self.app, "current_map_eng", None)
+        if not map_id:
+            return
+        if es.get('map_id') and es.get('map_id') != map_id:
+            return
+        current = self.painter.drawings.get(map_id, [])
+        if not current:
+            return
+        import tactics_manager
+        import config
+        tactics_manager.save_scheme_to_db(
+            config.SCHEMES_FILE, map_id,
+            config.MAP_NAMES_EN.get(map_id, map_id),
+            self.app.selected_battle_mode.get(),
+            self.painter.drawings,
+            scheme_name=es.get('name', ''),
+            description=es.get('desc', ''),
+            source='local')
+        self._status_lbl.config(text="Auto-saved: %s" % es.get('name'), bg="#1a3322")
 
     def _auto_save_if_matches_existing(self):
         """Auto-save current drawing if it matches an existing saved scheme."""
@@ -970,22 +997,9 @@ class DrawingPalette(tk.Toplevel):
                 map_name, on_map_group,
                 self.app.t('ui', 'publish_all'), on_all_group)
 
-    def _choose_save_action(self):
-        self._lift_self()
-        import tactics_manager
-        import config
-        map_id = self.app.current_map_eng
-        if not map_id:
-            return False
-        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
-        mode = self.app.selected_battle_mode.get()
-        drawings = self.app.painter.drawings
-        if map_id not in drawings or not drawings[map_id]:
-            dialog_utils.dark_messagebox(self.app.root, "Save", "No drawings to save.", is_error=True)
-            return False
-
-        default_name = f"{map_name} [{mode}]"
-        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'save_scheme_title'))
+    def _ask_scheme_name_desc(self, title_key, default_name=""):
+        """Стандартний діалог "назва + опис" схеми. Повертає (name, desc) або None."""
+        dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', title_key))
         dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         bg = "#222"
@@ -1025,10 +1039,30 @@ class DrawingPalette(tk.Toplevel):
         dialog_utils._center_on_root(dlg, self.app.root)
         dlg.geometry(f"420x220")
         self.app.root.wait_window(dlg)
-
         if not result[0]:
+            return None
+        return result[0]
+
+    def _choose_save_action(self):
+        self._lift_self()
+        import tactics_manager
+        import config
+        map_id = self.app.current_map_eng
+        if not map_id:
             return False
-        scheme_name, description = result[0]
+        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+        mode = self.app.selected_battle_mode.get()
+        drawings = self.app.painter.drawings
+        if map_id not in drawings or not drawings[map_id]:
+            dialog_utils.dark_messagebox(self.app.root, "Save", "No drawings to save.", is_error=True)
+            return False
+
+        es = getattr(self.app, '_editing_scheme', None)
+        default_name = (es.get('name') if es and es.get('name') else f"{map_name} [{mode}]")
+        result = self._ask_scheme_name_desc('save_scheme_title', default_name)
+        if not result:
+            return False
+        scheme_name, description = result
         if not scheme_name:
             return False
 
@@ -1524,6 +1558,18 @@ class DrawingPalette(tk.Toplevel):
         return True
 
     def _close(self):
+        es = getattr(self.app, '_editing_scheme', None)
+        map_id = getattr(self.app, "current_map_eng", None)
+        if es and es.get("name"):
+            # Активна схема: зміни вже автосейвляться — зберігаємо фінально без вікна
+            current = self.painter.drawings.get(map_id, [])
+            if current:
+                self._autosave_current_scheme()
+            self.exit_edit_mode()
+            self.withdraw()
+            self._saved_pos = self.geometry()
+            self._save_position()
+            return
         if self._has_unsaved_drawings():
             from dialog_utils import dark_3button_box
             choice = dark_3button_box(

@@ -4,6 +4,43 @@
 
 ---
 
+## v1.0.74 — Drawing UX Overhaul: LMB Move + Auto-save + New Scheme (22.09.2026)
+
+**Ключові зміни:** Пересування елементів ЛКМ без Ctrl, автосейв при редагуванні збереженої схеми, кнопка «Нова схема» з діалогом назви, прибирання «незрозумілого вікна» при виході з малювання.
+
+### painter.py — LMB move (без Ctrl):
+| Подія | Що робить |
+|-------|-----------|
+| `on_press` (без інструменту) | Клік по елементу → вибір + запис `_press_candidate` (start position, original coords) |
+| `on_drag` (B1-Motion) | Якщо миша зрушила >5px → кандидат → активний рух (`move_drag`), та ж логіка `on_move_drag` |
+| `on_release` (ButtonRelease-1) | Рух → фіналізація + `_autosave_active_scheme()`; клік → тільки вибір |
+| `_autosave_active_scheme()` | Хелпер: викликає `palette._autosave_current_scheme()` |
+| Commit-точки | `on_move_release`, `on_release` (create), `_delete_edited_object`, `_delete_all_selected` → автосейв |
+
+### painting_palette.py — autosave + dialog refactor:
+| Метод | Що робить |
+|-------|-----------|
+| `_autosave_current_scheme()` | Зберігає поточний малюнок під `_editing_scheme["name"]` через `save_scheme_to_db` (upsert) |
+| `_ask_scheme_name_desc(title_key, default_name)` | Діалог назва+опис (вилучено з `_choose_save_action`, перевикористовується в New Scheme) |
+| `_choose_save_action()` | Тепер викликає `_ask_scheme_name_desc` всередині |
+| `_close()` | Якщо `_editing_scheme` є → автосейв + закрити без вікна; інакше fallback-діалог для нових без імені |
+
+### main.py — _editing_scheme + New Scheme handler:
+| Місце | Зміна |
+|-------|-------|
+| `__init__` | `self._editing_scheme = None` — відстеження «яку схему редагую» |
+| `_on_saved_scheme_select` | SET: `_editing_scheme = {"name", "desc", "map_id", "drawing_id"}` |
+| `on_map_select` | RESET: `_editing_scheme = None` |
+| `_on_new_scheme_clicked()` | НОВИЙ: діалог назви → збереження поточних елементів на їхній схемі → чиста мапа → палітра |
+
+### ui_manager.py — кнопка:
+- `new_scheme_btn` ("NEW SCHEME") в `map_toolbar` між схемою і DRAW
+
+### translations.py:
+- `new_scheme_btn`, `new_scheme_title`
+
+---
+
 ## v1.0.73 — Admin Pipeline Integration + New UI (09.09.2026)
 
 **Ключова зміна:** Інтеграція extraction pipeline в новий CustomTkinter UI адмін-програми.

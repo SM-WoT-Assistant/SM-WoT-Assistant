@@ -31,6 +31,8 @@ TRANSLATIONS = {
             "close_dont_save": "Don't save",
             "cancel_btn": "Cancel",
             "save_scheme_title": "Save Scheme",
+            "new_scheme_title": "New Scheme",
+            "new_scheme_btn": "New Scheme",
             "scheme_name_label": "Scheme name",
             "scheme_desc_label": "Description (optional)",
             "checking_updates": "Checking updates...",

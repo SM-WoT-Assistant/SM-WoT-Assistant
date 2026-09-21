@@ -87,6 +87,9 @@ class UIManager:
                        fieldbackground=[("disabled", "#333"), ("!disabled", "#333")],
                        background=[("disabled", "#333"), ("!disabled", "#333")])
 
+        self.app.new_scheme_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'new_scheme_btn').upper(), width=12, bg="#446644", fg="#99cc99", bd=0, font=("Arial", 8, "bold"), command=self.app._on_new_scheme_clicked)
+        self.app.new_scheme_btn.pack(side="left", padx=5, pady=2)
+
         self.app.draw_btn = tk.Button(self.app.map_toolbar, text=self.app.t('ui', 'draw').upper(), width=12, bg="#444", fg="gray", bd=0, font=("Arial", 8, "bold"), command=self.app.toggle_palette)
         self.app.draw_btn.pack(side="left", padx=5, pady=2)
 

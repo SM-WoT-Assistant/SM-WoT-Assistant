@@ -22,6 +22,7 @@ class MapPainter:
         self.data_mgr = data_mgr
         self.drawings = self.data_mgr.load_drawings()
         for map_id in list(self.drawings.keys()):
+            self.drawings[map_id] = self._normalize_coords(self.drawings[map_id])
             self.drawings[map_id] = self._strip_duplicates(self.drawings[map_id])
         
         self.active_tool = None
@@ -43,6 +44,8 @@ class MapPainter:
         self._thickness = int(self.app.settings.get("draw_thickness", 3))
         self._select_all = False
         self._clipboard_obj = None
+        self._press_candidate = None
+        self._press_moved = False
         # Ctrl+C/V через <Control-KeyPress> + keycode (VK 67/86) — працює в
         # будь-якій розкладці. Keysym-імена (cyrillic_es/ve) Windows Tk
         # відкидає прямо в bind() — крах старту (інцидент 26.08.2026).
@@ -72,13 +75,23 @@ class MapPainter:
                 return False
         return True
 
+    def _normalize_coords(self, items):
+        for obj in items:
+            if "coords" not in obj and ("x1" in obj or "y1" in obj):
+                x1 = obj.get("x1", 0)
+                y1 = obj.get("y1", 0)
+                x2 = obj.get("x2", x1)
+                y2 = obj.get("y2", y1)
+                obj["coords"] = [x1, y1, x2, y2]
+        return items
+
     def _is_duplicate(self, obj, others):
         for existing in others:
             if obj["type"] != existing.get("type"):
                 continue
             if obj["color"] != existing.get("color"):
                 continue
-            if not self._coords_match(obj["coords"], existing.get("coords", [])):
+            if not self._coords_match(obj.get("coords", []), existing.get("coords", [])):
                 continue
             if obj.get("text", "") != existing.get("text", ""):
                 continue
@@ -107,9 +120,13 @@ class MapPainter:
         return result
 
     def save_drawings(self):
-        for k in list(self.drawings.keys()):
-            self.drawings[k] = self._strip_duplicates(self.drawings[k])
         self.data_mgr.save_drawings(self.drawings)
+
+    def _autosave_active_scheme(self):
+        """Після commit-зміни малюнка — автосейв поточної активної схеми."""
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            palette._autosave_current_scheme()
 
     def apply_scale_to_all(self, value):
         map_id = getattr(self.app, "current_map_eng", None)
@@ -205,10 +222,9 @@ class MapPainter:
             pass
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
-            # Копія універсальна: modes порожні (видна в усіх режимах — чекбоксів
-            # режимів у палітрі більше нема, режим задається у вікні редагування),
+            # Копія: modes = поточний режим (видна в цьому режимі),
             # класи з поточних чекбоксів палітри.
-            new_obj["modes"] = []
+            new_obj["modes"] = [self.app.selected_battle_mode.get()]
             new_obj["classes"] = [k for k, v in palette.class_vars.items() if v.get()]
         if map_id not in self.drawings:
             self.drawings[map_id] = []
@@ -368,8 +384,20 @@ class MapPainter:
         palette_visible = palette and palette.state() != 'withdrawn'
 
         if palette_visible and not self.active_tool:
-            idx, _ = self._find_object_index_at(event.x, event.y)
+            idx, target_kind = self._find_object_index_at(event.x, event.y)
             if idx >= 0:
+                # Кандидат на ЛКМ-рух без Ctrl: клік = вибір, потягнув = рух
+                map_id = self.app.current_map_eng
+                obj = self.drawings[map_id][idx]
+                self._press_candidate = {
+                    "index": idx,
+                    "target_kind": target_kind,
+                    "start_event": (event.x, event.y),
+                    "original_coords": list(obj.get("coords", [])),
+                    "original_class_icon_coords": list(obj.get("class_icon_coords", [])),
+                    "original_text_coords": list(obj.get("text_coords", [])) if obj.get("text_coords") else [],
+                }
+                self._press_moved = False
                 self._edit_object_at(idx)
                 return
             elif palette.is_in_edit_mode():
@@ -403,13 +431,13 @@ class MapPainter:
                 self.start_x = snap_x
                 self.start_y = snap_y
 
-            self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=self._thickness, dash=(5, 5), tags="temp_draw")
+            self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=self._thickness, dash=(12, 6), tags="temp_draw")
             if self.active_tool == "marker":
                 self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=max(1, self._thickness-1), tags="temp_draw")
                 self.canvas.create_oval(self.start_x-4, self.start_y-4, self.start_x+4, self.start_y+4, fill="white", outline="white", tags="temp_draw")
         elif self.active_tool == "brush":
             self._brush_points = [(event.x, event.y)]
-            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=self._thickness, dash=(5, 5), tags="temp_draw")
+            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=self._thickness, dash=(12, 6), tags="temp_draw")
         elif self.active_tool == "text":
             self.temp_item = self.canvas.create_text(event.x, event.y, text="📍", fill=self.default_color, font=("Arial", 16), tags="temp_draw")
 
@@ -649,10 +677,21 @@ class MapPainter:
         self._move_history.append((idx, original))
         self.move_drag = None
         self.save_drawings()
+        self._autosave_active_scheme()
         self.app.root.after(50, self._edit_object_at, idx)
         return "break"
 
     def on_drag(self, event):
+        if self._press_candidate is not None and not self.active_tool and self.app.mode == "edit":
+            if not self._press_moved:
+                sx, sy = self._press_candidate["start_event"]
+                if math.hypot(event.x - sx, event.y - sy) < 5:
+                    return
+                self._press_moved = True
+                self.move_drag = self._press_candidate
+                self.move_drag_active = True
+            self.on_move_drag(event)
+            return
         if not self.temp_item or self.app.mode != "edit": return
         if self.active_tool in ("marker", "arrow"):
             self.canvas.coords(self.temp_item, self.start_x, self.start_y, event.x, event.y)
@@ -666,6 +705,12 @@ class MapPainter:
             self.canvas.coords(self.temp_item, event.x, event.y)
             
     def on_release(self, event):
+        if self._press_candidate is not None and not self.active_tool:
+            if self._press_moved:
+                self.on_move_release(event)
+            self._press_candidate = None
+            self._press_moved = False
+            return
         if not self.active_tool or not self.app.current_map_eng or self.app.mode != "edit": return
         if not self.temp_item: return
             
@@ -687,7 +732,7 @@ class MapPainter:
 
         new_obj = {
             "type": self.active_tool,
-            "modes": [],
+            "modes": [self.app.selected_battle_mode.get()],
             "classes": [],
             "text": "",
             "poi": [],
@@ -725,6 +770,7 @@ class MapPainter:
         self.default_color = new_obj["color"]
         self._creation_history.append(len(self.drawings[map_id]) - 1)
         self.save_drawings()
+        self._autosave_active_scheme()
         self.redraw()
         self.canvas.delete("temp_draw")
         self.temp_item = None
@@ -795,6 +841,7 @@ class MapPainter:
         del objects[idx]
         self._editing_idx = -1
         self.save_drawings()
+        self._autosave_active_scheme()
         self.redraw()
 
     def _delete_all_selected(self):
@@ -816,6 +863,7 @@ class MapPainter:
         if palette:
             palette._update_select_all_btn()
         self.save_drawings()
+        self._autosave_active_scheme()
         self.redraw()
 
     def _confirm_delete(self, label):
@@ -914,13 +962,16 @@ class MapPainter:
             tt_sz = max(6, int(10 * sc_eff))
 
             c = obj["color"]
-            coords = obj["coords"]
+            coords = obj.get("coords", [])
+            if not coords and "x1" in obj:
+                coords = [obj.get("x1", 0), obj.get("y1", 0),
+                          obj.get("x2", obj.get("x1", 0)), obj.get("y2", obj.get("y1", 0))]
 
             if obj["type"] == "marker":
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
+                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
 
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
                 canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
@@ -937,7 +988,7 @@ class MapPainter:
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
+                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -957,7 +1008,7 @@ class MapPainter:
                     arr = tk.FIRST
                 elif obj.get("arrow_end"):
                     arr = tk.LAST
-                canvas.create_line(*flat_px, arrow=arr, fill=c, width=lw, dash=(5, 5), tags="painter_obj")
+                canvas.create_line(*flat_px, arrow=arr, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -966,6 +1017,17 @@ class MapPainter:
                             mx += offset_x
                             my += offset_y
                         canvas.create_text(mx, my, text=obj["text"], fill=c, font=("Arial", mt_sz, "bold"), tags="painter_obj")
+
+            elif obj["type"] == "dot":
+                if len(coords) < 2: continue
+                x, y = coords[0]*cw + offset_x, coords[1]*ch + offset_y
+                dsz = max(2, int(obj.get("size", 3) * sc_eff))
+                canvas.create_rectangle(x-dsz, y-dsz, x+dsz, y+dsz, fill=c, outline="", tags="painter_obj")
+
+            elif obj["type"] == "zone":
+                if len(coords) < 6: continue
+                flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
+                canvas.create_polygon(*flat_px, outline=c, fill="", dash=(8, 4), width=max(1, lw-1), tags="painter_obj")
 
             elif obj["type"] == "text":
                 if len(coords) < 2: continue
@@ -1031,6 +1093,9 @@ class MapPainter:
 
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
+        if getattr(self.app, '_use_mod_var', None) and self.app._use_mod_var.get():
+            self.canvas.delete("painter_obj")
+            return
         map_id = self.app.current_map_eng
 
         if cw is None or ch is None:
@@ -1069,7 +1134,10 @@ class MapPainter:
             sel_sc = min(cw, ch) / 800.0
             margin = max(4, int(8 * sel_sc))
             for obj in visible:
-                c = obj["coords"]
+                c = obj.get("coords", [])
+                if not c and "x1" in obj:
+                    c = [obj.get("x1", 0), obj.get("y1", 0),
+                         obj.get("x2", obj.get("x1", 0)), obj.get("y2", obj.get("y1", 0))]
                 if obj["type"] in ("marker", "arrow"):
                     if len(c) < 4: continue
                     x1 = c[0]*cw; y1 = c[1]*ch; x2 = c[2]*cw; y2 = c[3]*ch
