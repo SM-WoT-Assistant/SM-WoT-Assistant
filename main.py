@@ -1510,6 +1510,15 @@ class WotAssistantHQ:
         self._saved_schemes_keys = display_list
 
     def _on_saved_scheme_select(self, event=None):
+        if getattr(self, '_scheme_switch_in_progress', False):
+            return
+        self._scheme_switch_in_progress = True
+        try:
+            self._on_saved_scheme_select_impl()
+        finally:
+            self._scheme_switch_in_progress = False
+
+    def _on_saved_scheme_select_impl(self):
         import tactics_manager
         sel = self.saved_schemes_var.get()
         if not sel or not hasattr(self, '_saved_schemes_map'):
@@ -1544,7 +1553,7 @@ class WotAssistantHQ:
                     self.painter.drawings,
                     scheme_name=es['name'], description=es.get('desc', ''),
                     source="local")
-                self._refresh_saved_schemes_list()
+                self.root.after(0, self._refresh_saved_schemes_list)
             else:
                 existing_schemes = tactics_manager.list_schemes_from_db(
                     config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
@@ -1563,7 +1572,7 @@ class WotAssistantHQ:
                         config.MAP_NAMES_EN.get(current_map, current_map),
                         self.selected_battle_mode.get(),
                         self.painter.drawings, source="local")
-                    self._refresh_saved_schemes_list()
+                    self.root.after(0, self._refresh_saved_schemes_list)
 
         drawing_id = scheme.get('drawing_id', '')
         result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
