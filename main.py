@@ -1571,11 +1571,9 @@ class WotAssistantHQ:
         drawing_id = scheme.get('drawing_id', '')
         result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
         if result:
+            import copy
             scheme_map_id, elements = result
-            existing = self.painter.drawings.get(scheme_map_id, [])
-            existing_coords = {tuple(e.get("coords", [])) for e in existing}
-            new_from_scheme = [e for e in elements if tuple(e.get("coords", [])) not in existing_coords]
-            self.painter.drawings[scheme_map_id] = existing + new_from_scheme
+            self.painter.drawings[scheme_map_id] = copy.deepcopy(elements)
             self.data_mgr.save_drawings(self.painter.drawings)
             if self.current_map_eng == scheme_map_id:
                 self.painter.redraw()
@@ -1633,7 +1631,15 @@ class WotAssistantHQ:
                 # Елементи не належать жодній схемі — даємо користувачу назвати їх
                 if not palette._choose_save_action():
                     return
-        # 3. Чиста мапа для нової схеми
+        # 3. Спочатку зберігаємо нову схему в БД (навіть з порожніми елементами)
+        ok, drawing_id = tactics_manager.save_scheme_to_db(
+            config.SCHEMES_FILE, map_id, map_name, mode,
+            self.painter.drawings, scheme_name=name,
+            description=desc, source='local')
+        if not ok:
+            self._show_custom_message("Error", "Failed to save scheme")
+            return
+        # 4. Очищуємо canvas під нову схему
         self.painter.drawings[map_id] = []
         self.painter._creation_history.clear()
         self.painter._move_history.clear()
@@ -1641,11 +1647,6 @@ class WotAssistantHQ:
         self.painter._editing_idx = -1
         self.data_mgr.save_drawings(self.painter.drawings)
         self.painter.redraw()
-        # 4. Зберігаємо нову схему в БД з порожніми елементами
-        ok, drawing_id = tactics_manager.save_scheme_to_db(
-            config.SCHEMES_FILE, map_id, map_name, mode,
-            self.painter.drawings, scheme_name=name,
-            description=desc, source='local')
         # 5. Нова активна схема + палітра відкривається одразу
         self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "drawing_id": drawing_id, "new": True}
         self._refresh_saved_schemes_list()

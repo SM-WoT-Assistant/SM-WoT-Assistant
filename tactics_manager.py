@@ -143,7 +143,9 @@ def save_scheme_to_db(db_path, map_id, map_name, mode, drawings, scheme_name=Non
     """Save current map's drawings into the single JSON DB.
     Upserts by (map_id, mode, scheme_name) — replaces if same name exists for same map+mode.
     Returns (ok, display_name)."""
-    if not map_id or map_id not in drawings or not drawings[map_id]:
+    if not map_id or map_id not in drawings:
+        return False, "No drawings"
+    if not drawings[map_id] and not scheme_name:
         return False, "No drawings"
 
     db = _load_db(db_path)

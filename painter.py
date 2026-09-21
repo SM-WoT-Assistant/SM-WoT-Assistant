@@ -155,11 +155,22 @@ class MapPainter:
 
     def _clipboard_focus_in_field(self):
         """Ctrl+C/V не перехоплюємо, коли фокус у текстовому віджеті — там
-        має працювати звичайне копіювання тексту."""
+        має працювати звичайне копіювання тексту.
+        АЛЕ: якщо фокус у DrawingPalette — НЕ блокуємо (палітра малювання,
+        не текстовий редактор)."""
         try:
             w = self.app.root.focus_get()
         except Exception:
             return False
+        if w is None:
+            return False
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette:
+            try:
+                if w.winfo_toplevel() is palette:
+                    return False
+            except Exception:
+                pass
         return getattr(w, "widgetName", "") in ("entry", "text", "spinbox", "combobox")
 
     def _on_clipboard_key(self, event=None):
