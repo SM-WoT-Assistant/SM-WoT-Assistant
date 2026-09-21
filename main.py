@@ -313,6 +313,13 @@ class WotAssistantHQ:
         self.selected_battle_mode.trace_add("write", lambda *args: self._on_battle_mode_changed())
         self._refresh_saved_schemes_list()
         self.root.bind('<Button-3>', self._on_root_b3_scheme, add='+')
+        try:
+            for child in self.saved_schemes_cb.winfo_children():
+                if str(child).endswith('Entry') or 'entry' in str(child).lower():
+                    child.bind('<Button-3>', self._on_root_b3_scheme, add='+')
+                    break
+        except Exception:
+            pass
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
 
@@ -1536,37 +1543,35 @@ class WotAssistantHQ:
         current_drawings = self.painter.drawings.get(current_map, [])
 
         if current_map == map_id and current_drawings:
-            existing_schemes = tactics_manager.list_schemes_from_db(
-                config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
-            current_coords_set = {tuple(e.get("coords", [])) for e in current_drawings}
-            matched_scheme_id = None
-            for s in existing_schemes:
-                if s.get("map_id") != current_map:
-                    continue
-                sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
-                if current_coords_set == sc:
-                    matched_scheme_id = s.get("drawing_id")
-                    break
-
-            if matched_scheme_id:
-                ok, msg = tactics_manager.save_scheme_to_db(
+            es = getattr(self, '_editing_scheme', None)
+            if es and es.get('name') and es.get('map_id') == current_map:
+                tactics_manager.save_scheme_to_db(
                     config.SCHEMES_FILE, current_map,
                     config.MAP_NAMES_EN.get(current_map, current_map),
                     self.selected_battle_mode.get(),
-                    self.painter.drawings, source="local")
-                if ok:
-                    self._refresh_saved_schemes_list()
+                    self.painter.drawings,
+                    scheme_name=es['name'], description=es.get('desc', ''),
+                    source="local")
+                self._refresh_saved_schemes_list()
             else:
-                from dialog_utils import dark_confirmbox
-                save_first = dark_confirmbox(
-                    self.root, self.t('ui', 'scheme_unsaved_title'),
-                    self.t('ui', 'scheme_unsaved_confirm'))
-                if save_first:
-                    self._palette_save_current(current_map)
-                else:
-                    if hasattr(self, '_last_valid_scheme_display'):
-                        self.saved_schemes_var.set(self._last_valid_scheme_display)
-                    return
+                existing_schemes = tactics_manager.list_schemes_from_db(
+                    config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
+                current_coords_set = {tuple(e.get("coords", [])) for e in current_drawings}
+                matched_scheme_id = None
+                for s in existing_schemes:
+                    if s.get("map_id") != current_map:
+                        continue
+                    sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
+                    if current_coords_set == sc:
+                        matched_scheme_id = s.get("drawing_id")
+                        break
+                if matched_scheme_id:
+                    tactics_manager.save_scheme_to_db(
+                        config.SCHEMES_FILE, current_map,
+                        config.MAP_NAMES_EN.get(current_map, current_map),
+                        self.selected_battle_mode.get(),
+                        self.painter.drawings, source="local")
+                    self._refresh_saved_schemes_list()
 
         drawing_id = scheme.get('drawing_id', '')
         result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
@@ -1663,10 +1668,16 @@ class WotAssistantHQ:
             palette.show()
 
     def _palette_save_current(self, map_id=None):
-        """Show save dialog for current map's drawings."""
-        palette = getattr(self, 'drawing_palette', None)
-        if palette:
-            palette._choose_save_action()
+        """Auto-save current scheme or show save dialog if no active scheme."""
+        es = getattr(self, '_editing_scheme', None)
+        if es and es.get('name'):
+            palette = getattr(self, 'drawing_palette', None)
+            if palette:
+                palette._autosave_current_scheme()
+        else:
+            palette = getattr(self, 'drawing_palette', None)
+            if palette:
+                palette._choose_save_action()
 
     def _on_root_b3_scheme(self, event):
         """Handle right-click at root level — check if it's over the saved schemes combobox."""
