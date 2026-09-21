@@ -1708,8 +1708,6 @@ class WotAssistantHQ:
         menu = tk.Menu(self.root, tearoff=0, bg="#333", fg="#ccc",
                        activebackground="#444", activeforeground="#fff",
                        font=("Arial", 9))
-        menu.add_command(label=self.t('ui', 'context_load_scheme'),
-                        command=lambda: self._load_scheme_for_edit(drawing_id))
         menu.add_command(label=self.t('ui', 'context_edit_scheme'),
                         command=lambda: self._edit_scheme_from_context(drawing_id, scheme_name, scheme.get('description', '')))
         menu.add_separator()
@@ -1770,59 +1768,6 @@ class WotAssistantHQ:
                 self._editing_scheme['name'] = new_name
                 self._editing_scheme['desc'] = new_desc
             self._refresh_saved_schemes_list()
-
-    def _load_scheme_for_edit(self, drawing_id):
-        """Load a scheme's elements into the editor for editing."""
-        import tactics_manager
-        import copy
-        palette = self.drawing_palette
-        map_id = self.current_map_eng
-        if not map_id:
-            return
-        # Save current drawings if they belong to the active scheme
-        es = getattr(self, '_editing_scheme', None)
-        if es and es.get('name') and self.painter.drawings.get(map_id):
-            tactics_manager.save_scheme_to_db(
-                config.SCHEMES_FILE, map_id,
-                config.MAP_NAMES_EN.get(map_id, map_id),
-                self.selected_battle_mode.get(),
-                self.painter.drawings,
-                scheme_name=es.get('name'),
-                description=es.get('desc', ''), source='local')
-        # Load the target scheme
-        result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
-        if not result:
-            return
-        scheme_map_id, elements = result
-        # If different map, switch to it
-        if scheme_map_id != map_id:
-            self.current_map_eng = scheme_map_id
-            self.map_var.set(self.locale_mgr.t_map(scheme_map_id))
-            self.on_map_select(None)
-        # Replace canvas with scheme elements
-        self.painter.drawings[scheme_map_id] = copy.deepcopy(elements)
-        self.data_mgr.save_drawings(self.painter.drawings)
-        # Set active scheme
-        scheme_data = tactics_manager._load_db(config.SCHEMES_FILE).get(drawing_id, {})
-        self._editing_scheme = {
-            "name": scheme_data.get("scheme_name", ""),
-            "desc": scheme_data.get("description", ""),
-            "map_id": scheme_map_id,
-            "drawing_id": drawing_id,
-        }
-        self._refresh_saved_schemes_list()
-        # Автовибір завантаженої схеми
-        scheme_name = scheme_data.get("scheme_name", "")
-        values = list(self.saved_schemes_cb['values'] or [])
-        for v in values:
-            if v.lstrip("★ ").strip() == scheme_name:
-                self.saved_schemes_var.set(v)
-                self._last_valid_scheme_display = v
-                break
-        self.settings["last_selected_scheme"] = scheme_name
-        self.painter.redraw()
-        if palette and palette.state() == 'withdrawn':
-            palette.show()
 
     def _write_selected_scheme(self, scheme=None):
         """Write selected scheme to selected_scheme.json for the in-game mod.
