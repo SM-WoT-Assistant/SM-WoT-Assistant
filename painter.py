@@ -228,7 +228,8 @@ class MapPainter:
             for key in ("coords", "text_coords"):
                 c = new_obj.get(key)
                 if isinstance(c, list) and len(c) >= 2:
-                    new_obj[key] = [c[i] + (dx if i % 2 == 0 else dy) for i in range(len(c))]
+                    new_obj[key] = [min(max(c[i] + (dx if i % 2 == 0 else dy), 0.0), 1.0)
+                                    for i in range(len(c))]
         except Exception:
             pass
         palette = getattr(self.app, 'drawing_palette', None)

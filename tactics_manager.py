@@ -263,6 +263,19 @@ def get_scheme_count(db_path):
     return len(_load_db(db_path))
 
 
+def rename_scheme_in_db(db_path, drawing_id, new_name, new_desc):
+    """Rename a scheme and update its description. Returns (ok, message)."""
+    db = _load_db(db_path)
+    scheme = db.get(drawing_id)
+    if not scheme:
+        return False, "Scheme not found"
+    scheme["scheme_name"] = new_name
+    scheme["description"] = new_desc
+    scheme["updated_at"] = time.strftime("%Y-%m-%d %H:%M:%S")
+    ok = _save_db(db_path, db)
+    return ok, f"Renamed: {new_name}" if ok else "Rename failed"
+
+
 def save_scheme(map_id, map_name, mode, drawings, _t=None):
     """Legacy wrapper — saves to JSON DB."""
     db_path = config.SCHEMES_FILE

@@ -40,6 +40,8 @@ TRANSLATIONS = {
             "confirm_title": "Confirm",
             "connect": "Connect",
             "context_delete_confirm": "Delete scheme '{name}'?",
+            "context_edit_scheme": "Edit Scheme",
+            "context_load_scheme": "Load into Editor",
             "context_delete_scheme": "Delete",
             "context_make_base": "Make base",
             "context_remove_base": "Remove from base",
