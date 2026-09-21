@@ -1641,11 +1641,16 @@ class WotAssistantHQ:
         self.painter._editing_idx = -1
         self.data_mgr.save_drawings(self.painter.drawings)
         self.painter.redraw()
-        # 4. Нова активна схема + палітра відкривається одразу
-        self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "new": True}
+        # 4. Зберігаємо нову схему в БД з порожніми елементами
+        ok, drawing_id = tactics_manager.save_scheme_to_db(
+            config.SCHEMES_FILE, map_id, map_name, mode,
+            self.painter.drawings, scheme_name=name,
+            description=desc, source='local')
+        # 5. Нова активна схема + палітра відкривається одразу
+        self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "drawing_id": drawing_id, "new": True}
+        self._refresh_saved_schemes_list()
         if palette.state() == 'withdrawn':
             palette.show()
-        self._refresh_saved_schemes_list()
 
     def _palette_save_current(self, map_id=None):
         """Show save dialog for current map's drawings."""

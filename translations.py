@@ -28,7 +28,7 @@ TRANSLATIONS = {
             "close_unsaved_title": "Unsaved drawing",
             "close_unsaved_confirm": "Current drawing not saved.\nSave before closing?",
             "close_save": "Save",
-            "close_dont_save": "Don't save",
+            "close_dont_save": "No",
             "cancel_btn": "Cancel",
             "save_scheme_title": "Save Scheme",
             "new_scheme_title": "New Scheme",

@@ -815,6 +815,7 @@ class DrawingPalette(tk.Toplevel):
             description=es.get('desc', ''),
             source='local')
         self._status_lbl.config(text="Auto-saved: %s" % es.get('name'), bg="#1a3322")
+        self.app._refresh_saved_schemes_list()
 
     def _auto_save_if_matches_existing(self):
         """Auto-save current drawing if it matches an existing saved scheme."""
