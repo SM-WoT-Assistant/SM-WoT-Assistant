@@ -164,7 +164,6 @@ class HelpManager:
         l_row(self.app.t('ui', 'help_hotkey_publish'), self.app.t('ui', 'help_publish_map'))
         l_row(self.app.t('ui', 'help_hotkey_publish_all'), self.app.t('ui', 'help_publish_all'))
         l_row(self.app.t('ui', 'save_btn').upper(), self.app.t('ui', 'help_export'))
-        l_row(self.app.t('ui', 'help_hotkey_save_all'), self.app.t('ui', 'help_all_export'))
         l_row(self.app.t('ui', 'load_btn').upper(), self.app.t('ui', 'help_import'))
         l_final()
         l_close(self.app.t('ui', 'help_close'))
@@ -174,6 +173,10 @@ class HelpManager:
         r_section(self.app.t('ui', 'help_section_filters'))
         r_row(self.app.t('ui', 'battle_mode_label'), self.app.t('ui', 'help_filter_mode'))
         r_row(self.app.t('ui', 'vehicle_class_label'), self.app.t('ui', 'help_filter_class'))
+
+        r_section(self.app.t('ui', 'help_section_saved_schemes'))
+        r_row(self.app.t('ui', 'new_scheme_btn'), self.app.t('ui', 'help_new_scheme_btn'))
+        r_row(self.app.t('ui', 'help_scheme_rclick_key'), self.app.t('ui', 'help_scheme_rclick'))
 
         r_section(self.app.t('ui', 'help_section_groups'))
         r_row(self.app.t('ui', 'help_group_filter_label'), self.app.t('ui', 'help_group_filter_desc'))
@@ -191,6 +194,14 @@ class HelpManager:
         r_row(self.app.t('ui', 'group_manage'), self.app.t('ui', 'help_group_manage_desc'))
         r_sep()
         r_row(self.app.t('ui', 'publish_map'), self.app.t('ui', 'help_group_publish_desc'))
+        r_sep()
+        r_row(self.app.t('ui', 'download_btn'), self.app.t('ui', 'help_download_community'))
+        r_sep()
+        r_row("Hide/Unhide", self.app.t('ui', 'help_scheme_hide'))
+        r_sep()
+        r_row("Link scheme", self.app.t('ui', 'help_group_link'))
+        r_sep()
+        r_row(self.app.t('ui', 'btn_delete_group'), self.app.t('ui', 'help_group_delete'))
 
         r_section(self.app.t('ui', 'help_section_settings'))
         fr_s1 = tk.Frame(right_col, bg=bg)
