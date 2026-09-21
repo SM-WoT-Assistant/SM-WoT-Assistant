@@ -1561,7 +1561,6 @@ class DrawingPalette(tk.Toplevel):
         es = getattr(self.app, '_editing_scheme', None)
         map_id = getattr(self.app, "current_map_eng", None)
         if es and es.get("name"):
-            # Активна схема: зміни вже автосейвляться — зберігаємо фінально без вікна
             current = self.painter.drawings.get(map_id, [])
             if current:
                 self._autosave_current_scheme()
@@ -1571,24 +1570,120 @@ class DrawingPalette(tk.Toplevel):
             self._save_position()
             return
         if self._has_unsaved_drawings():
-            from dialog_utils import dark_3button_box
-            choice = dark_3button_box(
-                self.app.root,
-                self.app.t('ui', 'close_unsaved_title'),
-                self.app.t('ui', 'close_unsaved_confirm'),
-                btn1_text=self.app.t('ui', 'close_save'),
-                btn2_text=self.app.t('ui', 'close_dont_save'),
-                btn3_text=self.app.t('ui', 'cancel_btn'))
-            if choice == 1:
-                self._choose_save_action()
-            elif choice == 2:
-                pass
-            else:
+            if not self._show_save_or_discard_dialog():
                 return
         self.exit_edit_mode()
         self.withdraw()
         self._saved_pos = self.geometry()
         self._save_position()
+
+    def _show_save_or_discard_dialog(self):
+        """Single dialog: name + description + Save / Don't save.
+        Returns True if saved (or discarded), False if cancelled."""
+        import tactics_manager, config
+        map_id = self.app.current_map_eng
+        if not map_id:
+            return True
+        map_name = config.MAP_NAMES_EN.get(map_id, map_id)
+        mode = self.app.selected_battle_mode.get()
+        es = getattr(self.app, '_editing_scheme', None)
+        default_name = (es.get('name') if es and es.get('name')
+                        else f"{map_name} [{mode}]")
+
+        dlg, hdr = dialog_utils.make_custom_dialog(
+            self.app.root, self.app.t('ui', 'save_scheme_title'))
+        dialog_utils._DragHelper(dlg, hdr)
+        dlg.grab_set()
+        bg = "#222"
+
+        warning_var = tk.StringVar()
+        warning_lbl = tk.Label(dlg, textvariable=warning_var, bg=bg, fg="#ff4444",
+                               font=("Arial", 9, "bold"))
+
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label'), bg=bg, fg="#ffaa00",
+                 font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4), anchor="w")
+        name_var = tk.StringVar(value=default_name)
+        name_entry = tk.Entry(dlg, textvariable=name_var, font=("Arial", 11),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=30, relief="flat", bd=4)
+        name_entry.pack(padx=20, pady=(0, 8))
+        name_entry.select_range(0, "end")
+        name_entry.focus_set()
+
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label'), bg=bg, fg="#aaa",
+                 font=("Arial", 9)).pack(padx=20, pady=(0, 4), anchor="w")
+        desc_var = tk.StringVar()
+        desc_entry = tk.Entry(dlg, textvariable=desc_var, font=("Arial", 10),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=30, relief="flat", bd=4)
+        desc_entry.pack(padx=20, pady=(0, 6))
+
+        def clear_warning(*_):
+            if name_var.get().strip():
+                warning_lbl.pack_forget()
+                name_entry.config(bg="#333")
+        name_var.trace_add("write", clear_warning)
+
+        result = [False]
+        saved = [False]
+
+        def on_save():
+            name = name_var.get().strip()
+            if not name:
+                warning_var.set(self.app.t('ui', 'save_name_required'))
+                warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
+                name_entry.config(bg="#552222")
+                return
+            db = tactics_manager._load_db(config.SCHEMES_FILE)
+            duplicate_id = None
+            for did, s in db.items():
+                if (s.get("map_id") == map_id and s.get("battle_mode") == mode
+                        and s.get("scheme_name", "") == name):
+                    duplicate_id = did
+                    break
+            if duplicate_id:
+                if not dialog_utils.dark_confirmbox(
+                        self.app.root, "Replace scheme",
+                        f'Scheme "{name}" already exists.\nReplace with current drawing?'):
+                    return
+            tactics_manager.save_scheme_to_db(
+                config.SCHEMES_FILE, map_id, map_name, mode,
+                self.app.painter.drawings,
+                scheme_name=name, description=desc_var.get().strip(),
+                source='local')
+            self.app._editing_scheme = {
+                "name": name, "desc": desc_var.get().strip(),
+                "map_id": map_id}
+            self.app.status_label.config(text=f"Saved: {name}", bg="#1a3322")
+            self.app._refresh_saved_schemes_list()
+            result[0] = True
+            saved[0] = True
+            dlg.destroy()
+
+        def on_discard():
+            result[0] = True
+            dlg.destroy()
+
+        def on_cancel():
+            dlg.destroy()
+
+        bf = tk.Frame(dlg, bg=bg)
+        bf.pack(pady=(8, 12))
+        tk.Button(bf, text=self.app.t('ui', 'save_btn'), bg="#446644", fg="#cfc",
+                  bd=0, font=("Arial", 9, "bold"), padx=15, pady=4,
+                  command=on_save).pack(side="left", padx=4)
+        tk.Button(bf, text=self.app.t('ui', 'close_dont_save'), bg="#444", fg="#aaa",
+                  bd=0, font=("Arial", 9), padx=15, pady=4,
+                  command=on_discard).pack(side="left", padx=4)
+
+        name_entry.bind("<Return>", lambda e: on_save())
+        name_entry.bind("<Escape>", lambda e: on_cancel())
+        dlg.protocol("WM_DELETE_WINDOW", on_cancel)
+
+        dlg.update_idletasks()
+        dialog_utils._center_on_root(dlg, self.app.root)
+        self.app.root.wait_window(dlg)
+        return result[0]
 
     def show(self):
         self.deiconify()

@@ -35,6 +35,7 @@ TRANSLATIONS = {
             "new_scheme_btn": "New Scheme",
             "scheme_name_label": "Scheme name",
             "scheme_desc_label": "Description (optional)",
+            "save_name_required": "Name is required to save",
             "checking_updates": "Checking updates...",
             "preparing_check": "Preparing check...",
             "data_updating": "Data is updating...",

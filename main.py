@@ -1996,20 +1996,8 @@ class WotAssistantHQ:
         if is_saved:
             self.quit_app()
             return
-        from dialog_utils import dark_3button_box
-        choice = dark_3button_box(
-            self.root,
-            self.t('ui', 'close_unsaved_title'),
-            self.t('ui', 'close_unsaved_confirm'),
-            btn1_text=self.t('ui', 'close_save'),
-            btn2_text=self.t('ui', 'close_dont_save'),
-            btn3_text=self.t('ui', 'cancel_btn'))
-        if choice == 1:
-            palette = getattr(self, 'drawing_palette', None)
-            if palette:
-                palette._choose_save_action()
-            self.quit_app()
-        elif choice == 2:
+        palette = getattr(self, 'drawing_palette', None)
+        if palette and palette._show_save_or_discard_dialog():
             self.quit_app()
         else:
             return
