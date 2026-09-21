@@ -1647,6 +1647,18 @@ class WotAssistantHQ:
         # 5. Нова активна схема + палітра відкривається одразу
         self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "drawing_id": drawing_id, "new": True}
         self._refresh_saved_schemes_list()
+        # Автовибір нової схеми в списку
+        values = list(self.saved_schemes_cb['values'] or [])
+        if name in values:
+            self.saved_schemes_var.set(name)
+            self._last_valid_scheme_display = name
+        else:
+            for v in values:
+                if v.lstrip("★ ").strip() == name:
+                    self.saved_schemes_var.set(v)
+                    self._last_valid_scheme_display = v
+                    break
+        self.settings["last_selected_scheme"] = name
         if palette.state() == 'withdrawn':
             palette.show()
 
@@ -1798,6 +1810,15 @@ class WotAssistantHQ:
             "drawing_id": drawing_id,
         }
         self._refresh_saved_schemes_list()
+        # Автовибір завантаженої схеми
+        scheme_name = scheme_data.get("scheme_name", "")
+        values = list(self.saved_schemes_cb['values'] or [])
+        for v in values:
+            if v.lstrip("★ ").strip() == scheme_name:
+                self.saved_schemes_var.set(v)
+                self._last_valid_scheme_display = v
+                break
+        self.settings["last_selected_scheme"] = scheme_name
         self.painter.redraw()
         if palette and palette.state() == 'withdrawn':
             palette.show()
