@@ -1063,7 +1063,8 @@ class WotAssistantHQ:
                 if hasattr(self, 'painter'):
                     self.painter.canvas.delete("painter_obj")
                 self._startup_complete = True
-                self._refresh_saved_schemes_list()
+        self._refresh_saved_schemes_list()
+        self.root.bind("<Button-3>", self._root_b3_scheme_fallback, add="+")
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
         self.root.deiconify()
@@ -1680,6 +1681,24 @@ class WotAssistantHQ:
             if palette:
                 palette._choose_save_action()
 
+
+    def _root_b3_scheme_fallback(self, event=None):
+        """Root-level fallback for right-click on combobox dropdown (open state)."""
+        if not event:
+            return
+        cb = getattr(self, 'saved_schemes_cb', None)
+        if not cb:
+            return
+        try:
+            cx = cb.winfo_rootx()
+            cy = cb.winfo_rooty()
+            cw = cb.winfo_width()
+            ch = cb.winfo_height()
+        except Exception:
+            return
+        if not (cx <= event.x_root <= cx + cw and cy <= event.y_root <= cy + ch + 200):
+            return
+        self._show_scheme_context_menu(event)
 
     def _show_scheme_context_menu(self, event=None):
         """Show right-click context menu on saved schemes combobox."""
