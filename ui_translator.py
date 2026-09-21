@@ -83,8 +83,146 @@ def translate(text, target_lang):
         pass
     return text
 
-_BATCH_SEP = "\n|||__BATCH_SEP__|||\n"
 _MAX_CHUNK_CHARS = 4500
+_NUMBERED_RE = re.compile(r"^\d+\.\s*(.+)$")
+
+def _build_numbered(texts):
+    """Build a numbered list from texts: '1. text1\\n2. text2'."""
+    return "\n".join(f"{i+1}. {t}" for i, t in enumerate(texts))
+
+def _parse_numbered(raw, expected_count):
+    """Parse numbered list from Google response. Returns list of translated strings.
+    Returns None if parsing fails (count mismatch, empty parts)."""
+    if not raw:
+        return None
+    parts = []
+    for line in raw.strip().split("\n"):
+        line = line.strip()
+        m = _NUMBERED_RE.match(line)
+        if m:
+            parts.append(m.group(1).strip())
+    if len(parts) != expected_count:
+        return None
+    if any(not p for p in parts):
+        return None
+    return parts
+
+def _validate_parts(parts, original_texts):
+    """Validate that translations are not shuffled (no duplicates with originals)."""
+    if not parts:
+        return False
+    seen = set()
+    for p in parts:
+        if p in seen:
+            return False
+        seen.add(p)
+    return True
+
+def _translate_one_by_one(t, chunk_texts, chunk_keys, ph_list, untranslated, cache):
+    """Translate texts one by one — slow but 100% reliable fallback."""
+    result = {}
+    for pi, orig_idx in enumerate(chunk_keys):
+        key, en_val = untranslated[orig_idx]
+        try:
+            single = t.translate(chunk_texts[pi])
+        except Exception:
+            continue
+        if single:
+            trans = _unshield(single, ph_list[orig_idx])
+            if trans and trans != en_val and not _looks_like_english(trans, en_val):
+                cache[en_val] = trans
+                result[key] = trans
+            else:
+                result[key] = en_val
+    return result
+
+def _looks_like_english(trans, original):
+    """Reject translations that look identical to English source (Google passthrough)."""
+    if not trans or not original:
+        return False
+    t = trans.strip().lower()
+    o = original.strip().lower()
+    return t == o
+
+def _translate_chunk(t, chunk_texts, chunk_keys, chunk_phs, ph_list, untranslated, cache):
+    """Translate a single chunk via GoogleTranslator using numbered format.
+    Returns translated dict. On failure, falls back to one-by-one."""
+    result = {}
+    numbered = _build_numbered(chunk_texts)
+    try:
+        raw = t.translate(numbered)
+    except Exception as e:
+        if type(e).__name__ == "TranslationNotFound":
+            print(f"[SERVICE] chunk identity-rejected — retrying one-by-one")
+            return _translate_one_by_one(t, chunk_texts, chunk_keys, ph_list, untranslated, cache)
+        print(f"[SERVICE] chunk failed ({type(e).__name__}) — retrying one-by-one")
+        return _translate_one_by_one(t, chunk_texts, chunk_keys, ph_list, untranslated, cache)
+    parts = _parse_numbered(raw, len(chunk_texts))
+    if not parts or not _validate_parts(parts, chunk_texts):
+        print(f"[SERVICE] chunk parse failed — retrying one-by-one")
+        return _translate_one_by_one(t, chunk_texts, chunk_keys, ph_list, untranslated, cache)
+    for pi, orig_idx in enumerate(chunk_keys):
+        trans = _unshield(parts[pi], chunk_phs[pi] if pi < len(chunk_phs) else ph_list[orig_idx])
+        key, en_val = untranslated[orig_idx]
+        if trans and trans != en_val:
+            cache[en_val] = trans
+            result[key] = trans
+        else:
+            result[key] = en_val
+    return result
+
+def _translate_chunk_gtx(chunk_texts, chunk_keys, chunk_phs, ph_list, untranslated, cache, target_lang="uk"):
+    """Fallback: translate via translate.googleapis.com (gtx client) using numbered format."""
+    import requests as _req
+    result = {}
+    numbered = _build_numbered(chunk_texts)
+    try:
+        r = _req.get("https://translate.googleapis.com/translate_a/single",
+                      params={"client": "gtx", "sl": "en", "tl": target_lang, "dt": "t", "q": numbered},
+                      headers={"User-Agent": "Mozilla/5.0"},
+                      timeout=10)
+        data = r.json()
+        if data and data[0]:
+            raw_text = "".join(seg[0] for seg in data[0] if seg[0])
+            parts = _parse_numbered(raw_text, len(chunk_texts))
+            if parts:
+                for pi, orig_idx in enumerate(chunk_keys):
+                    trans = _unshield(parts[pi].strip(), ph_list[orig_idx])
+                    key, en_val = untranslated[orig_idx]
+                    if trans and trans != en_val:
+                        cache[en_val] = trans
+                        result[key] = trans
+                    else:
+                        result[key] = en_val
+            else:
+                print(f"[SERVICE] gtx parse failed — retrying one-by-one")
+                return _translate_one_by_one_gtx(chunk_texts, chunk_keys, ph_list, untranslated, cache, target_lang)
+    except Exception as e:
+        print(f"[SERVICE] gtx fallback failed ({type(e).__name__})")
+    return result
+
+def _translate_one_by_one_gtx(chunk_texts, chunk_keys, ph_list, untranslated, cache, target_lang="uk"):
+    """GTX one-by-one fallback."""
+    import requests as _req
+    result = {}
+    for pi, orig_idx in enumerate(chunk_keys):
+        key, en_val = untranslated[orig_idx]
+        try:
+            r = _req.get("https://translate.googleapis.com/translate_a/single",
+                          params={"client": "gtx", "sl": "en", "tl": target_lang, "dt": "t", "q": chunk_texts[pi]},
+                          headers={"User-Agent": "Mozilla/5.0"},
+                          timeout=10)
+            data = r.json()
+            if data and data[0] and data[0][0]:
+                trans = _unshield(data[0][0][0].strip(), ph_list[orig_idx])
+                if trans and trans != en_val and not _looks_like_english(trans, en_val):
+                    cache[en_val] = trans
+                    result[key] = trans
+                else:
+                    result[key] = en_val
+        except Exception:
+            continue
+    return result
 
 def translate_batch(en_dict, target_lang, progress_cb=None):
     """Translate a dict of key->EN_value in batch requests to Google Translate.
@@ -117,7 +255,7 @@ def translate_batch(en_dict, target_lang, progress_cb=None):
     cur_phs = []
     cur_size = 0
     for i, s in enumerate(shielded_list):
-        item_size = len(s) + len(_BATCH_SEP)
+        item_size = len(s) + 10
         if cur_size + item_size > _MAX_CHUNK_CHARS and cur_keys:
             chunks.append((cur_keys, cur_phs, cur_size))
             cur_keys = []
@@ -135,74 +273,30 @@ def translate_batch(en_dict, target_lang, progress_cb=None):
     except Exception as e:
         print(f"[SERVICE] translator init ERROR for {target_lang}: {e}")
         return {}
+    gtx_failed = False
     for ci, (chunk_keys, chunk_phs, _) in enumerate(chunks):
         if ci > 0:
             time.sleep(0.5)
         chunk_texts = [shielded_list[i] for i in chunk_keys]
-        joined = _BATCH_SEP.join(chunk_texts)
-        # Фейл одного чанку раніше губив ВСІ ключі ВСІХ чанків (return {}).
-        # Тепер розрізняємо тип фейлу:
-        #  - TranslationNotFound (Google повернув дослівно = тотожний текст,
-        #    напр. "BIND", "MT") → ретрай по-ключово: перекладні перекладаються,
-        #    тотожні фіксуються як en (Fix C оздоровить їх назавжди),
-        #    мережеві фейли окремого ключа ПРОПУСКАЮТЬСЯ (лишаються в черзі).
-        #  - інші фейли (мережа тощо) → чанк пропускається ЦІЛКОМ: жоден ключ
-        #    не фіксується як en, інакше з Fix C вони б назавжди залишились
-        #    англійськими.
-        try:
-            raw = t.translate(joined)
-        except Exception as e:
-            if type(e).__name__ == "TranslationNotFound":
-                print(f"[SERVICE] chunk {ci + 1}/{len(chunks)} identity-rejected — retrying key-by-key")
-                for orig_idx in chunk_keys:
-                    key, en_val = untranslated[orig_idx]
-                    try:
-                        single = t.translate(shielded_list[orig_idx])
-                    except Exception as e2:
-                        if type(e2).__name__ == "TranslationNotFound":
-                            result[key] = en_val
-                        else:
-                            print(f"[SERVICE] key {key!r} failed ({type(e2).__name__}) — retry next start")
-                        done += 1
-                        continue
-                    if not single:
-                        done += 1
-                        continue
-                    trans = _unshield(single, ph_list[orig_idx])
-                    if trans and trans != en_val:
-                        cache[en_val] = trans
-                        result[key] = trans
-                    else:
-                        result[key] = en_val
-                    done += 1
-            else:
-                print(f"[SERVICE] chunk {ci + 1}/{len(chunks)} failed ({type(e).__name__}) — keys will retry next start")
-                for orig_idx in chunk_keys:
-                    done += 1
-            if progress_cb:
-                pct = min(99, int(done * 100 / total_items))
-                progress_cb(pct, f"Translating ({done}/{total_items})...")
-            continue
-        if raw:
-            parts = raw.split(_BATCH_SEP)
-            for pi, orig_idx in enumerate(chunk_keys):
-                trans = parts[pi] if pi < len(parts) else None
-                key, en_val = untranslated[orig_idx]
-                if trans:
-                    trans = _unshield(trans, chunk_phs[pi] if pi < len(chunk_phs) else ph_list[orig_idx])
-                    if trans and trans != en_val:
-                        cache[en_val] = trans
-                        result[key] = trans
-                        done += 1
-                        continue
-                    result[key] = en_val
-                    done += 1
-                else:
-                    # Google усік частини — ключ не фіксуємо, спробуємо далі.
-                    done += 1
-        else:
-            for orig_idx in chunk_keys:
-                done += 1
+        chunk_result = _translate_chunk(
+            t, chunk_texts, chunk_keys, chunk_phs,
+            ph_list, untranslated, cache
+        )
+        has_real = any(
+            chunk_result.get(untranslated[ci][0], "") != untranslated[ci][1]
+            for ci in chunk_keys
+            if untranslated[ci][0] in chunk_result
+        )
+        if not has_real and not gtx_failed:
+            print(f"[SERVICE] deep_translator returned no real translations — trying gtx fallback")
+            chunk_result = _translate_chunk_gtx(
+                chunk_texts, chunk_keys, chunk_phs,
+                ph_list, untranslated, cache
+            )
+            if not chunk_result:
+                gtx_failed = True
+        result.update(chunk_result)
+        done += len(chunk_keys)
         if progress_cb:
             pct = min(99, int(done * 100 / total_items))
             progress_cb(pct, f"Translating ({done}/{total_items})...")

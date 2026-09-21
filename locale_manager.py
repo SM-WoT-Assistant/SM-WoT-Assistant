@@ -122,8 +122,12 @@ class LocaleManager:
             return
 
         for key, val in translated.items():
-            curr_ui[key] = val
-            en_snapshot[key] = en_ui.get(key, "")
+            en_src = en_ui.get(key, "")
+            if val and val.strip() and val.strip() != en_src.strip():
+                curr_ui[key] = val
+                en_snapshot[key] = en_src
+            else:
+                print(f"[SERVICE] skipped English passthrough: {key} = {val}")
         self.save_locales()
         self._batch_ui_done = True
 

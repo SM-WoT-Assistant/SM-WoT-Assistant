@@ -1622,17 +1622,23 @@ class DrawingPalette(tk.Toplevel):
             if name_var.get().strip():
                 warning_lbl.pack_forget()
                 name_entry.config(bg="#333")
+                desc_entry.config(bg="#333")
         name_var.trace_add("write", clear_warning)
+        desc_var.trace_add("write", clear_warning)
 
         result = [False]
         saved = [False]
 
         def on_save():
             name = name_var.get().strip()
-            if not name:
-                warning_var.set(self.app.t('ui', 'save_name_required'))
+            desc = desc_var.get().strip()
+            if not name or not desc:
+                warning_var.set(self.app.t('ui', 'save_fields_required'))
                 warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
-                name_entry.config(bg="#552222")
+                if not name:
+                    name_entry.config(bg="#552222")
+                if not desc:
+                    desc_entry.config(bg="#552222")
                 return
             db = tactics_manager._load_db(config.SCHEMES_FILE)
             duplicate_id = None
