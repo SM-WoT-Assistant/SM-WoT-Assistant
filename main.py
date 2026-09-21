@@ -312,14 +312,6 @@ class WotAssistantHQ:
         self._saved_schemes_map = {}
         self.selected_battle_mode.trace_add("write", lambda *args: self._on_battle_mode_changed())
         self._refresh_saved_schemes_list()
-        self.root.bind('<Button-3>', self._on_root_b3_scheme, add='+')
-        try:
-            for child in self.saved_schemes_cb.winfo_children():
-                if str(child).endswith('Entry') or 'entry' in str(child).lower():
-                    child.bind('<Button-3>', self._on_root_b3_scheme, add='+')
-                    break
-        except Exception:
-            pass
         for var in self.selected_classes.values():
             var.trace_add("write", lambda *args: self.painter.redraw())
 
@@ -1515,6 +1507,7 @@ class WotAssistantHQ:
                         self.saved_schemes_var.set('')
             self.saved_schemes_cb.config(state='readonly', style='TCombobox')
             self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
+            self._bind_combobox_right_click()
         self._saved_schemes_keys = display_list
 
     def _on_saved_scheme_select(self, event=None):
@@ -1678,6 +1671,16 @@ class WotAssistantHQ:
             palette = getattr(self, 'drawing_palette', None)
             if palette:
                 palette._choose_save_action()
+
+    def _bind_combobox_right_click(self):
+        """Bind <Button-3> on the internal Entry of saved_schemes_cb for context menu."""
+        try:
+            for child in self.saved_schemes_cb.winfo_children():
+                if isinstance(child, tk.Entry):
+                    child.bind('<Button-3>', self._show_scheme_context_menu, add='+')
+                    break
+        except Exception:
+            pass
 
     def _on_root_b3_scheme(self, event):
         """Handle right-click at root level — check if it's over the saved schemes combobox."""
