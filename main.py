@@ -1861,7 +1861,9 @@ class WotAssistantHQ:
         threading.Thread(target=_rtdb, daemon=True).start()
 
     def _delete_scheme_from_context(self, drawing_id, scheme_name):
-        """Delete scheme after confirmation. Base schemes: admin only."""
+        """Delete scheme after confirmation. Base schemes: admin only.
+        After delete the combobox + canvas switch to another remaining scheme
+        (refresh only updates the label — must load elements explicitly)."""
         import tactics_manager
         db = tactics_manager._load_db(config.SCHEMES_FILE)
         scheme = db.get(drawing_id) or {}
@@ -1869,8 +1871,18 @@ class WotAssistantHQ:
             return
         msg = self.t('ui', 'context_delete_confirm').format(name=scheme_name)
         if dialog_utils.dark_confirmbox(self.root, self.t('ui', 'context_delete_scheme'), msg):
+            was_editing = bool(
+                self._editing_scheme
+                and self._editing_scheme.get('drawing_id') == drawing_id)
             tactics_manager.delete_scheme_from_db(config.SCHEMES_FILE, drawing_id)
+            if was_editing:
+                self._editing_scheme = None
+            if self.settings.get("last_selected_scheme") == scheme_name:
+                self.settings["last_selected_scheme"] = ""
             self._refresh_saved_schemes_list()
+            # Load whatever scheme is now selected so name and canvas match
+            if getattr(self, 'saved_schemes_cb', None) and (self.saved_schemes_cb['values'] or []):
+                self.root.after(0, self._on_saved_scheme_select)
             if scheme.get('is_base') and getattr(self, '_admin_present', False):
                 def _rtdb():
                     try:

@@ -948,9 +948,18 @@ class DrawingPalette(tk.Toplevel):
             if sel:
                 sid = schemes[sel[0]]['drawing_id']
                 if dialog_utils.dark_confirmbox(dlg, "Delete", f"Delete {schemes[sel[0]]['map_name']}?"):
+                    es = getattr(self.app, '_editing_scheme', None)
+                    was_editing = bool(es and es.get('drawing_id') == sid)
                     tactics_manager.delete_scheme_from_db(db_path, sid)
+                    if was_editing:
+                        self.app._editing_scheme = None
+                    if self.app.settings.get("last_selected_scheme") == schemes[sel[0]].get('scheme_name', ''):
+                        self.app.settings["last_selected_scheme"] = ""
                     lb.delete(sel[0])
                     del schemes[sel[0]]
+                    self.app._refresh_saved_schemes_list()
+                    if getattr(self.app, 'saved_schemes_cb', None) and (self.app.saved_schemes_cb['values'] or []):
+                        self.app.root.after(0, self.app._on_saved_scheme_select)
         bf = tk.Frame(dlg, bg=bg)
         bf.pack(pady=(0, 12))
         tk.Button(bf, text="Load", bg="#446644", fg="#cfc", bd=0,
