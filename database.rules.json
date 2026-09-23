@@ -72,6 +72,20 @@
     "drawings": {
       ".read": true,
       ".write": false
+    },
+    "base_schemes": {
+      ".read": true,
+      ".write": "auth != null && auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'",
+      ".indexOn": ["map_id", "battle_mode"]
+    },
+    "news": {
+      ".read": true,
+      ".write": "auth != null && auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'",
+      ".indexOn": ["created_at", "type"]
+    },
+    "news_config": {
+      ".read": true,
+      ".write": "auth != null && auth.uid == 'W0bTk96xJMeVEEbplvMbxtl5igo2'"
     }
   }
 }

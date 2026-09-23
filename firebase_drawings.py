@@ -13,7 +13,7 @@ import firebase_identity
 import firebase_reporter
 
 
-def publish_drawing(map_name, map_id, elements_data, title="", comment="", on_done=None):
+def publish_drawing(map_name, map_id, elements_data, title="", comment="", comment_en="", on_done=None):
     """Публікує малюнок у RTDB (schemes/)."""
     if not firebase_reporter._is_configured():
         if on_done:
@@ -47,6 +47,15 @@ def publish_drawing(map_name, map_id, elements_data, title="", comment="", on_do
         elements_str = "[]"
         element_count = 0
 
+    battle_mode = "Standard"
+    if isinstance(elements_data, list):
+        for el in elements_data:
+            if isinstance(el, dict):
+                m = el.get("modes", [])
+                if m:
+                    battle_mode = m[0]
+                    break
+
     scheme = {
         "drawing_id": drawing_id,
         "map_id": map_id,
@@ -56,6 +65,8 @@ def publish_drawing(map_name, map_id, elements_data, title="", comment="", on_do
         "pin_hash": pin_hash,
         "title": title[:60] if title else "",
         "comment": comment[:500] if comment else "",
+        "comment_en": comment_en[:500] if comment_en else "",
+        "battle_mode": battle_mode,
         "elements": elements_str,
         "element_count": element_count,
         "created_at": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -194,3 +205,77 @@ def get_all_schemes():
     except Exception:
         pass
     return {}
+
+
+def publish_base_scheme(drawing_id, scheme, on_done=None):
+    """Admin: PUT base_schemes/{drawing_id} (ID token write)."""
+    import admin_auth
+    if not admin_auth.has_credentials():
+        if on_done:
+            on_done(False, "admin_creds.json missing")
+        return
+    try:
+        url = admin_auth._rtdb_url_with_token(f"base_schemes/{drawing_id}")
+        if not url:
+            if on_done:
+                on_done(False, "no admin token")
+            return
+        r = requests.put(url, json=scheme, headers=config.HEADERS, timeout=10)
+        ok = 200 <= r.status_code < 300
+        if on_done:
+            on_done(ok, "ok" if ok else f"HTTP {r.status_code}")
+    except Exception as e:
+        if on_done:
+            on_done(False, str(e))
+
+
+def delete_base_scheme(drawing_id, on_done=None):
+    """Admin: PUT null → base_schemes/{drawing_id}."""
+    import admin_auth
+    if not admin_auth.has_credentials():
+        if on_done:
+            on_done(False, "admin_creds.json missing")
+        return
+    try:
+        url = admin_auth._rtdb_url_with_token(f"base_schemes/{drawing_id}")
+        if not url:
+            if on_done:
+                on_done(False, "no admin token")
+            return
+        r = requests.put(url, data=b"null",
+                         headers={"Content-Type": "application/json"}, timeout=10)
+        ok = 200 <= r.status_code < 300
+        if on_done:
+            on_done(ok, "ok" if ok else f"HTTP {r.status_code}")
+    except Exception as e:
+        if on_done:
+            on_done(False, str(e))
+
+
+def fetch_base_schemes_sync():
+    """GET all base_schemes from RTDB. Returns dict {drawing_id: scheme} or {}."""
+    if not firebase_reporter._is_configured():
+        return {}
+    try:
+        url = firebase_reporter._rtdb_url("base_schemes")
+        r = requests.get(url, headers=config.HEADERS, timeout=15)
+        if r.status_code != 200:
+            return {}
+        data = r.json()
+        if not data or not isinstance(data, dict):
+            return {}
+        result = {}
+        for key, item in data.items():
+            if not item or not isinstance(item, dict):
+                continue
+            try:
+                if isinstance(item.get("elements"), str):
+                    item["elements"] = json.loads(item["elements"])
+            except Exception:
+                continue
+            item.setdefault("drawing_id", key)
+            item["is_base"] = True
+            result[key] = item
+        return result
+    except Exception:
+        return {}

@@ -235,6 +235,26 @@ def clean_dist():
         print("[BUILD] Cleaned build/ cache")
 
 
+def pull_base_schemes():
+    """Pull base_schemes from RTDB into base_schemes.json for bundling."""
+    import urllib.request
+    RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
+    out_path = os.path.join(BASE_DIR, "base_schemes.json")
+    try:
+        req = urllib.request.Request(f"{RTDB_URL}/base_schemes.json", method="GET")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8") or "{}")
+        if not isinstance(data, dict):
+            data = {}
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"[BUILD] base_schemes.json: {len(data)} schemes from RTDB")
+        return True
+    except Exception as e:
+        print(f"[BUILD] base_schemes pull failed ({e}) — keeping existing file")
+        return False
+
+
 def run_pyinstaller():
     print("[BUILD] Running PyInstaller (onedir)...")
     result = subprocess.run(
@@ -967,6 +987,69 @@ def write_version_to_rtdb(version, release_date=None, is_beta=False):
     return True
 
 
+def auto_publish_news(version, release_date=None, is_beta=True):
+    """Publish release as news item if auto_publish is enabled in news_config."""
+    import urllib.request
+    RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
+
+    token = admin_auth.get_id_token()
+    if not token:
+        print("[BUILD] News publish skipped: no admin credentials")
+        return False
+
+    # Check if auto_publish is enabled
+    try:
+        config_url = f"{RTDB_URL}/news_config/auto_publish.json"
+        req = urllib.request.Request(config_url)
+        resp = urllib.request.urlopen(req, timeout=5)
+        val = resp.read().decode("utf-8").strip()
+        if val != "true":
+            print("[BUILD] News publish skipped: auto_publish is disabled")
+            return False
+    except Exception as e:
+        print(f"[BUILD] News config check failed: {e}")
+        return False
+
+    # Read CHANGELOG.md for content
+    changelog_path = os.path.join(BASE_DIR, "CHANGELOG.md")
+    content = ""
+    if os.path.exists(changelog_path):
+        try:
+            with open(changelog_path, "r", encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            pass
+
+    if not content:
+        content = f"Release v{version}"
+
+    today = release_date or time.strftime("%Y-%m-%d")
+    display_ver = version + (" Beta" if is_beta else "")
+    github_url = f"https://github.com/SM-WoT-Assistant/SM-WoT-Assistant/releases/tag/v{version}"
+
+    data = json.dumps({
+        "title": f"SM WoT Assistant v{display_ver}",
+        "content": content,
+        "type": "release",
+        "created_at": today + "T12:00:00",
+        "pinned": False,
+        "version": version,
+        "github_url": github_url,
+    }).encode("utf-8")
+
+    news_key = version.replace(".", "_")
+    url = f"{RTDB_URL}/news/{news_key}.json?auth={token}"
+    req = urllib.request.Request(url, data=data, method="PUT")
+    req.add_header("Content-Type", "application/json")
+    try:
+        resp = urllib.request.urlopen(req, timeout=10)
+        print(f"[BUILD] News published: v{display_ver} (HTTP {resp.status})")
+        return True
+    except Exception as e:
+        print(f"[BUILD] News publish failed: {e}")
+        return False
+
+
 def main():
     new_version = None
     release_date = None
@@ -996,6 +1079,7 @@ def main():
     # Phase 2: PyInstaller — завжди чистий version
     update_nsi_version(version)
     generate_verify_json(version)
+    pull_base_schemes()
     commit_version_files(version)
     create_git_tag(version)
     run_pyinstaller()
@@ -1051,6 +1135,8 @@ def main():
         if write_version_to_rtdb(version, release_date, is_beta):
             # RTDB audit: verify download_url
             audit_rtdb_entry(version, is_beta)
+            # Auto-publish release as news
+            auto_publish_news(version, release_date, is_beta)
 
     print(f"[BUILD] Done: v{display_ver}")
 

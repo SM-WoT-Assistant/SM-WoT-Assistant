@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 import os
+import threading
 import dialog_utils
 import firebase_identity
 import firebase_drawings
@@ -796,6 +797,8 @@ class DrawingPalette(tk.Toplevel):
         es = getattr(self.app, '_editing_scheme', None)
         if not es or not es.get('name'):
             return
+        if es.get('is_base') and not getattr(self.app, '_admin_present', False):
+            return
         map_id = getattr(self.app, "current_map_eng", None)
         if not map_id:
             return
@@ -816,6 +819,19 @@ class DrawingPalette(tk.Toplevel):
             source='local')
         self._status_lbl.config(text="Auto-saved: %s" % es.get('name'), bg="#1a3322")
         self.app._refresh_saved_schemes_list()
+        if es.get('is_base') and getattr(self.app, '_admin_present', False):
+            def _push():
+                try:
+                    import firebase_drawings
+                    db = tactics_manager._load_db(config.SCHEMES_FILE)
+                    for did, s in db.items():
+                        if (s.get('scheme_name') == es.get('name')
+                                and s.get('map_id') == map_id):
+                            firebase_drawings.publish_base_scheme(did, s)
+                            break
+                except Exception as e:
+                    print(f"[BASE] RTDB push error: {e}")
+            threading.Thread(target=_push, daemon=True).start()
 
     def _auto_save_if_matches_existing(self):
         """Auto-save current drawing if it matches an existing saved scheme."""
@@ -827,11 +843,14 @@ class DrawingPalette(tk.Toplevel):
             return
         import tactics_manager
         import config
+        is_admin = getattr(self.app, '_admin_present', False)
         mode = self.app.selected_battle_mode.get()
         existing_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
         current_coords = {tuple(e.get("coords", [])) for e in current}
         for s in existing_schemes:
             if s.get("map_id") != map_id:
+                continue
+            if s.get("is_base") and not is_admin:
                 continue
             sc = {tuple(e.get("coords", [])) for e in s.get("elements", [])}
             if current_coords == sc:
@@ -1076,6 +1095,12 @@ class DrawingPalette(tk.Toplevel):
                 break
 
         if duplicate_id:
+            dup = db.get(duplicate_id) or {}
+            if dup.get('is_base') and not getattr(self.app, '_admin_present', False):
+                dialog_utils.dark_messagebox(
+                    self.app.root, "Save", self.app.t('ui', 'base_no_overwrite'),
+                    is_error=True)
+                return False
             if not dialog_utils.dark_confirmbox(
                     self.app.root, "Replace scheme",
                     f'Scheme "{scheme_name}" already exists.\nReplace with current drawing?'):
@@ -1174,7 +1199,7 @@ class DrawingPalette(tk.Toplevel):
         firebase_drawings.publish_drawing(
             map_name=map_name, map_id=self.app.current_map_eng,
             elements_data=drawings, title=map_name,
-            comment=desc_en, on_done=on_done)
+            comment=desc_en, comment_en=desc_en, on_done=on_done)
 
     def _publish_all(self):
         import config
@@ -1217,7 +1242,7 @@ class DrawingPalette(tk.Toplevel):
         firebase_drawings.publish_drawing(
             map_name="All Maps", map_id="all_maps",
             elements_data=bundle, title="All Maps",
-            comment=desc_en, on_done=on_done)
+            comment=desc_en, comment_en=desc_en, on_done=on_done)
 
     def _ask_publish_description(self, name, count=0, existing_comments=None,
                                   map_id=None, map_ids=None):
@@ -1329,6 +1354,15 @@ class DrawingPalette(tk.Toplevel):
         import config
         map_name = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
 
+        # Description dialog
+        existing = self._fetch_existing_comments({self.app.current_map_eng})
+        desc = self._ask_publish_description(
+            map_name, existing_comments=existing,
+            map_id=self.app.current_map_eng)
+        if desc is None:
+            return
+        desc_en = self._translate_to_english(desc)
+
         # Upsert: check if a scheme for this map already exists in the group
         group_schemes = firebase_groups.get_group_schemes(active_group)
         existing_drawing_id = None
@@ -1340,7 +1374,8 @@ class DrawingPalette(tk.Toplevel):
         import time
         if existing_drawing_id:
             ok, msg = firebase_groups.update_group_scheme(
-                active_group, existing_drawing_id, elements_data=drawings, comment="")
+                active_group, existing_drawing_id, elements_data=drawings,
+                comment=desc, comment_en=desc_en)
             if ok:
                 self.painter._group_schemes[existing_drawing_id] = {
                     "drawing_id": existing_drawing_id,
@@ -1348,7 +1383,8 @@ class DrawingPalette(tk.Toplevel):
                     "map_id": self.app.current_map_eng,
                     "map_name": map_name,
                     "elements": list(drawings),
-                    "comment": "",
+                    "comment": desc,
+                    "comment_en": desc_en,
                     "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 }
@@ -1365,7 +1401,8 @@ class DrawingPalette(tk.Toplevel):
                 map_id=self.app.current_map_eng,
                 map_name=map_name,
                 elements_data=drawings,
-                comment="",
+                comment=desc,
+                comment_en=desc_en,
             )
             if ok and drawing_id:
                 self.painter._group_schemes[drawing_id] = {
@@ -1374,7 +1411,8 @@ class DrawingPalette(tk.Toplevel):
                     "map_id": self.app.current_map_eng,
                     "map_name": map_name,
                     "elements": list(drawings),
-                    "comment": "",
+                    "comment": desc,
+                    "comment_en": desc_en,
                     "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                     "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                 }
@@ -1419,6 +1457,15 @@ class DrawingPalette(tk.Toplevel):
 
         group_name = ginfo.get("name", "?") if isinstance(ginfo, dict) else "?"
 
+        # Description dialog (one for all maps)
+        existing = self._fetch_existing_comments({"all_group"})
+        desc = self._ask_publish_description(
+            group_name, count=len(maps_with),
+            existing_comments=existing, map_ids={"all_group"})
+        if desc is None:
+            return
+        desc_en = self._translate_to_english(desc)
+
         import config
         ok_count = 0
         err_count = 0
@@ -1435,7 +1482,8 @@ class DrawingPalette(tk.Toplevel):
             existing_id = scheme_by_map.get(map_id)
             if existing_id:
                 ok, _ = firebase_groups.update_group_scheme(
-                    active_group, existing_id, elements_data=elements, comment="")
+                    active_group, existing_id, elements_data=elements,
+                    comment=desc, comment_en=desc_en)
                 if ok:
                     ok_count += 1
                     self.painter._group_schemes[existing_id] = {
@@ -1444,7 +1492,8 @@ class DrawingPalette(tk.Toplevel):
                         "map_id": map_id,
                         "map_name": map_name,
                         "elements": list(elements),
-                        "comment": "",
+                        "comment": desc,
+                        "comment_en": desc_en,
                         "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                         "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                     }
@@ -1456,7 +1505,8 @@ class DrawingPalette(tk.Toplevel):
                     map_id=map_id,
                     map_name=map_name,
                     elements_data=elements,
-                    comment="",
+                    comment=desc,
+                    comment_en=desc_en,
                 )
                 if ok:
                     ok_count += 1
@@ -1467,7 +1517,8 @@ class DrawingPalette(tk.Toplevel):
                             "map_id": map_id,
                             "map_name": map_name,
                             "elements": list(elements),
-                            "comment": "",
+                            "comment": desc,
+                            "comment_en": desc_en,
                             "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                             "_synced_at": time.strftime("%Y-%m-%d %H:%M:%S"),
                         }
@@ -1558,10 +1609,40 @@ class DrawingPalette(tk.Toplevel):
                 return False
         return True
 
+    def _base_scheme_changed(self, es=None):
+        """True if current drawings differ from the stored Base scheme."""
+        if es is None:
+            es = getattr(self.app, '_editing_scheme', None)
+        if not es or not es.get('drawing_id'):
+            return False
+        map_id = es.get('map_id') or getattr(self.app, "current_map_eng", None)
+        if not map_id:
+            return False
+        current = self.painter.drawings.get(map_id, [])
+        import tactics_manager
+        import config
+        result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, es['drawing_id'])
+        if not result:
+            return bool(current)
+        _, elements = result
+        cur = {tuple(e.get("coords", [])) for e in current}
+        orig = {tuple(e.get("coords", [])) for e in elements}
+        return cur != orig
+
     def _close(self):
         es = getattr(self.app, '_editing_scheme', None)
         map_id = getattr(self.app, "current_map_eng", None)
+        is_admin = getattr(self.app, '_admin_present', False)
         if es and es.get("name"):
+            if es.get('is_base') and not is_admin:
+                if self._base_scheme_changed(es):
+                    if not self._show_save_or_discard_dialog(force_new_name=True):
+                        return
+                self.exit_edit_mode()
+                self.withdraw()
+                self._saved_pos = self.geometry()
+                self._save_position()
+                return
             current = self.painter.drawings.get(map_id, [])
             if current:
                 self._autosave_current_scheme()
@@ -1578,7 +1659,7 @@ class DrawingPalette(tk.Toplevel):
         self._saved_pos = self.geometry()
         self._save_position()
 
-    def _show_save_or_discard_dialog(self):
+    def _show_save_or_discard_dialog(self, force_new_name=False):
         """Single dialog: name + description + Save / Don't save.
         Returns True if saved (or discarded), False if cancelled."""
         import tactics_manager, config
@@ -1588,8 +1669,14 @@ class DrawingPalette(tk.Toplevel):
         map_name = config.MAP_NAMES_EN.get(map_id, map_id)
         mode = self.app.selected_battle_mode.get()
         es = getattr(self.app, '_editing_scheme', None)
-        default_name = (es.get('name') if es and es.get('name')
-                        else f"{map_name} [{mode}]")
+        is_admin = getattr(self.app, '_admin_present', False)
+        orig_base_name = (es.get('name') if force_new_name and es and es.get('name')
+                          else '')
+        if force_new_name:
+            default_name = f"{orig_base_name} (edited)" if orig_base_name else ""
+        else:
+            default_name = (es.get('name') if es and es.get('name')
+                            else f"{map_name} [{mode}]")
 
         dlg, hdr = dialog_utils.make_custom_dialog(
             self.app.root, self.app.t('ui', 'save_scheme_title'))
@@ -1641,6 +1728,11 @@ class DrawingPalette(tk.Toplevel):
                 if not desc:
                     desc_entry.config(bg="#552222")
                 return
+            if force_new_name and name == orig_base_name:
+                warning_var.set(self.app.t('ui', 'base_no_overwrite'))
+                warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
+                name_entry.config(bg="#552222")
+                return
             db = tactics_manager._load_db(config.SCHEMES_FILE)
             duplicate_id = None
             for did, s in db.items():
@@ -1649,6 +1741,12 @@ class DrawingPalette(tk.Toplevel):
                     duplicate_id = did
                     break
             if duplicate_id:
+                dup = db.get(duplicate_id) or {}
+                if dup.get('is_base') and not is_admin:
+                    warning_var.set(self.app.t('ui', 'base_no_overwrite'))
+                    warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
+                    name_entry.config(bg="#552222")
+                    return
                 if not dialog_utils.dark_confirmbox(
                         self.app.root, "Replace scheme",
                         f'Scheme "{name}" already exists.\nReplace with current drawing?'):
@@ -1660,7 +1758,7 @@ class DrawingPalette(tk.Toplevel):
                 source='local')
             self.app._editing_scheme = {
                 "name": name, "desc": desc_var.get().strip(),
-                "map_id": map_id}
+                "map_id": map_id, "is_base": False}
             self.app.status_label.config(text=f"Saved: {name}", bg="#1a3322")
             self.app._refresh_saved_schemes_list()
             result[0] = True
@@ -1993,7 +2091,7 @@ class DrawingPalette(tk.Toplevel):
             author = data.get("author_nickname", "")
             created = (data.get("created_at") or "")[:10]
             el_count = data.get("element_count", 0)
-            comment = (data.get("comment") or "")[:40]
+            comment = (data.get("comment_en") or data.get("comment") or "")[:40]
             source = data.get("_source", "public")
             source_name = group_names.get(source, source)
             items.append({

@@ -306,8 +306,13 @@ class WotAssistantHQ:
         self.drawing_palette.withdraw()
         # Яка схема зараз редагується: {"name", "desc", "map_id", "drawing_id"|"new"}
         self._editing_scheme = None
+        self._admin_present = self._detect_admin_installed()
+        if self._admin_present:
+            print("[BASE] Admin app detected — base scheme tools enabled")
+            threading.Thread(target=self._sync_base_schemes_from_rtdb, daemon=True).start()
 
         self.map_mgr.load_map_list()
+        self._load_base_schemes_bundle()
 
         self._saved_schemes_map = {}
         self.selected_battle_mode.trace_add("write", lambda *args: self._on_battle_mode_changed())
@@ -328,6 +333,78 @@ class WotAssistantHQ:
         if cat == "ui": return self.locale.t_ui(key)
         if cat == "tanks": return self.locale.t_tank(key, key)
         return self.locale.t_map(key)
+
+    @staticmethod
+    def _detect_admin_installed():
+        """A+B: admin_settings/admin_creds in AppData OR HKCU\\Run admin autostart."""
+        for fname in ("admin_settings.json", "admin_creds.json"):
+            if os.path.isfile(os.path.join(config.USER_DATA_DIR, fname)):
+                return True
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run")
+            try:
+                winreg.QueryValueEx(key, "SM WoT Assistant Admin")
+                return True
+            finally:
+                winreg.CloseKey(key)
+        except OSError:
+            return False
+        except Exception:
+            return False
+
+    def _load_base_schemes_bundle(self):
+        """Merge bundled base_schemes.json into local saved_schemes (is_base=True)."""
+        try:
+            if not os.path.isfile(config.BASE_SCHEMES_FILE):
+                return
+            with open(config.BASE_SCHEMES_FILE, "r", encoding="utf-8") as f:
+                base_db = json.load(f)
+            if not isinstance(base_db, dict) or not base_db:
+                return
+            local = tactics_manager._load_db(config.SCHEMES_FILE)
+            changed = False
+            for did, s in base_db.items():
+                if not isinstance(s, dict) or not s.get("elements"):
+                    continue
+                s = dict(s)
+                s["drawing_id"] = did
+                s["is_base"] = True
+                local[did] = s
+                changed = True
+            if changed:
+                tactics_manager._save_db(config.SCHEMES_FILE, local)
+                print(f"[BASE] Merged {len(base_db)} base schemes from bundle")
+        except Exception as e:
+            print(f"[BASE] Bundle load error: {e}")
+
+    def _sync_base_schemes_from_rtdb(self):
+        """Admin: pull base_schemes from RTDB into local DB (background)."""
+        try:
+            if not getattr(self, '_admin_present', False):
+                return
+            remote = firebase_drawings.fetch_base_schemes_sync()
+            if not remote:
+                return
+            import tactics_manager
+            local = tactics_manager._load_db(config.SCHEMES_FILE)
+            changed = False
+            for did, s in remote.items():
+                if not isinstance(s, dict) or not s.get('elements'):
+                    continue
+                s = dict(s)
+                s['drawing_id'] = did
+                s['is_base'] = True
+                local[did] = s
+                changed = True
+            if changed:
+                tactics_manager._save_db(config.SCHEMES_FILE, local)
+                print(f"[BASE] Merged {len(remote)} base schemes from RTDB")
+                self.root.after(0, self._refresh_saved_schemes_list)
+        except Exception as e:
+            print(f"[BASE] RTDB pull error: {e}")
 
     def _init_painter_overlay(self):
         self._po_win = tk.Toplevel(self.root)
@@ -1546,14 +1623,22 @@ class WotAssistantHQ:
         if current_map == map_id and current_drawings:
             es = getattr(self, '_editing_scheme', None)
             if es and es.get('name') and es.get('map_id') == current_map:
-                tactics_manager.save_scheme_to_db(
-                    config.SCHEMES_FILE, current_map,
-                    config.MAP_NAMES_EN.get(current_map, current_map),
-                    self.selected_battle_mode.get(),
-                    self.painter.drawings,
-                    scheme_name=es['name'], description=es.get('desc', ''),
-                    source="local")
-                self.root.after(0, self._refresh_saved_schemes_list)
+                if (es.get('is_base') and not getattr(self, '_admin_present', False)
+                        and self.drawing_palette._base_scheme_changed(es)):
+                    if not self.drawing_palette._show_save_or_discard_dialog(
+                            force_new_name=True):
+                        if hasattr(self, '_last_valid_scheme_display'):
+                            self.saved_schemes_var.set(self._last_valid_scheme_display)
+                        return
+                elif not (es.get('is_base') and not getattr(self, '_admin_present', False)):
+                    tactics_manager.save_scheme_to_db(
+                        config.SCHEMES_FILE, current_map,
+                        config.MAP_NAMES_EN.get(current_map, current_map),
+                        self.selected_battle_mode.get(),
+                        self.painter.drawings,
+                        scheme_name=es['name'], description=es.get('desc', ''),
+                        source="local")
+                    self.root.after(0, self._refresh_saved_schemes_list)
             else:
                 existing_schemes = tactics_manager.list_schemes_from_db(
                     config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
@@ -1567,12 +1652,16 @@ class WotAssistantHQ:
                         matched_scheme_id = s.get("drawing_id")
                         break
                 if matched_scheme_id:
-                    tactics_manager.save_scheme_to_db(
-                        config.SCHEMES_FILE, current_map,
-                        config.MAP_NAMES_EN.get(current_map, current_map),
-                        self.selected_battle_mode.get(),
-                        self.painter.drawings, source="local")
-                    self.root.after(0, self._refresh_saved_schemes_list)
+                    matched = next((x for x in existing_schemes
+                                    if x.get("drawing_id") == matched_scheme_id), None)
+                    matched_is_base = bool(matched and matched.get("is_base"))
+                    if not (matched_is_base and not getattr(self, '_admin_present', False)):
+                        tactics_manager.save_scheme_to_db(
+                            config.SCHEMES_FILE, current_map,
+                            config.MAP_NAMES_EN.get(current_map, current_map),
+                            self.selected_battle_mode.get(),
+                            self.painter.drawings, source="local")
+                        self.root.after(0, self._refresh_saved_schemes_list)
 
         drawing_id = scheme.get('drawing_id', '')
         result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
@@ -1597,6 +1686,7 @@ class WotAssistantHQ:
                 "desc": scheme.get('description', ''),
                 "map_id": scheme_map_id,
                 "drawing_id": drawing_id,
+                "is_base": scheme.get('is_base', False),
             }
 
     def _on_new_scheme_clicked(self):
@@ -1620,11 +1710,12 @@ class WotAssistantHQ:
             es = getattr(self, '_editing_scheme', None)
             saved = False
             if es and es.get('name') and es.get('map_id') == map_id:
-                ok, _ = tactics_manager.save_scheme_to_db(
-                    config.SCHEMES_FILE, map_id, map_name, mode,
-                    self.painter.drawings, scheme_name=es.get('name'),
-                    description=es.get('desc', ''), source='local')
-                saved = ok
+                if not (es.get('is_base') and not getattr(self, '_admin_present', False)):
+                    ok, _ = tactics_manager.save_scheme_to_db(
+                        config.SCHEMES_FILE, map_id, map_name, mode,
+                        self.painter.drawings, scheme_name=es.get('name'),
+                        description=es.get('desc', ''), source='local')
+                    saved = ok
             else:
                 cset = {tuple(e.get("coords", [])) for e in current}
                 for s in tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode):
@@ -1704,13 +1795,16 @@ class WotAssistantHQ:
         scheme_name = scheme.get('scheme_name', '')
         is_default = scheme.get('is_default', False)
         is_base = scheme.get('is_base', False)
+        is_admin = getattr(self, '_admin_present', False)
 
         menu = tk.Menu(self.root, tearoff=0, bg="#333", fg="#ccc",
                        activebackground="#444", activeforeground="#fff",
                        font=("Arial", 9))
-        menu.add_command(label=self.t('ui', 'context_edit_scheme'),
-                        command=lambda: self._edit_scheme_from_context(drawing_id, scheme_name, scheme.get('description', '')))
-        menu.add_separator()
+        # Rename/Edit base — admin only (user must Save-as-new for drawing edits)
+        if is_admin or not is_base:
+            menu.add_command(label=self.t('ui', 'context_edit_scheme'),
+                            command=lambda: self._edit_scheme_from_context(drawing_id, scheme_name, scheme.get('description', '')))
+            menu.add_separator()
         if is_default:
             menu.add_command(label=self.t('ui', 'context_remove_default'),
                             command=lambda: self._toggle_scheme_default(drawing_id))
@@ -1718,15 +1812,17 @@ class WotAssistantHQ:
             menu.add_command(label=self.t('ui', 'context_set_default'),
                             command=lambda: self._toggle_scheme_default(drawing_id))
         menu.add_separator()
-        if is_base:
-            menu.add_command(label=self.t('ui', 'context_remove_base'),
-                            command=lambda: self._toggle_scheme_base(drawing_id))
-        else:
-            menu.add_command(label=self.t('ui', 'context_make_base'),
-                            command=lambda: self._toggle_scheme_base(drawing_id))
-        menu.add_separator()
-        menu.add_command(label=self.t('ui', 'context_delete_scheme'),
-                        command=lambda: self._delete_scheme_from_context(drawing_id, scheme_name))
+        if is_admin:
+            if is_base:
+                menu.add_command(label=self.t('ui', 'context_remove_base'),
+                                command=lambda: self._toggle_scheme_base(drawing_id))
+            else:
+                menu.add_command(label=self.t('ui', 'context_make_base'),
+                                command=lambda: self._toggle_scheme_base(drawing_id))
+            menu.add_separator()
+        if is_admin or not is_base:
+            menu.add_command(label=self.t('ui', 'context_delete_scheme'),
+                            command=lambda: self._delete_scheme_from_context(drawing_id, scheme_name))
         try:
             menu.tk_popup(event.x_root, event.y_root)
         finally:
@@ -1739,22 +1835,57 @@ class WotAssistantHQ:
         self._refresh_saved_schemes_list()
 
     def _toggle_scheme_base(self, drawing_id):
-        """Toggle is_base flag on a scheme."""
+        """Toggle is_base flag on a scheme. Admin-only + RTDB sync."""
+        if not getattr(self, '_admin_present', False):
+            return
         import tactics_manager
-        tactics_manager.toggle_base_scheme(config.SCHEMES_FILE, drawing_id)
+        new_val = tactics_manager.toggle_base_scheme(config.SCHEMES_FILE, drawing_id)
+        es = getattr(self, '_editing_scheme', None)
+        if es and es.get('drawing_id') == drawing_id:
+            es['is_base'] = bool(new_val)
         self._refresh_saved_schemes_list()
+        if new_val is None:
+            return
+        def _rtdb():
+            try:
+                import firebase_drawings
+                if new_val:
+                    db = tactics_manager._load_db(config.SCHEMES_FILE)
+                    scheme = db.get(drawing_id)
+                    if scheme:
+                        firebase_drawings.publish_base_scheme(drawing_id, scheme)
+                else:
+                    firebase_drawings.delete_base_scheme(drawing_id)
+            except Exception as e:
+                print(f"[BASE] RTDB sync error: {e}")
+        threading.Thread(target=_rtdb, daemon=True).start()
 
     def _delete_scheme_from_context(self, drawing_id, scheme_name):
-        """Delete scheme after confirmation."""
+        """Delete scheme after confirmation. Base schemes: admin only."""
         import tactics_manager
+        db = tactics_manager._load_db(config.SCHEMES_FILE)
+        scheme = db.get(drawing_id) or {}
+        if scheme.get('is_base') and not getattr(self, '_admin_present', False):
+            return
         msg = self.t('ui', 'context_delete_confirm').format(name=scheme_name)
         if dialog_utils.dark_confirmbox(self.root, self.t('ui', 'context_delete_scheme'), msg):
             tactics_manager.delete_scheme_from_db(config.SCHEMES_FILE, drawing_id)
             self._refresh_saved_schemes_list()
+            if scheme.get('is_base') and getattr(self, '_admin_present', False):
+                def _rtdb():
+                    try:
+                        firebase_drawings.delete_base_scheme(drawing_id)
+                    except Exception as e:
+                        print(f"[BASE] RTDB delete error: {e}")
+                threading.Thread(target=_rtdb, daemon=True).start()
 
     def _edit_scheme_from_context(self, drawing_id, current_name, current_desc):
-        """Rename scheme via dialog."""
+        """Rename scheme via dialog. Base schemes: admin only."""
         import tactics_manager
+        db = tactics_manager._load_db(config.SCHEMES_FILE)
+        scheme = db.get(drawing_id) or {}
+        if scheme.get('is_base') and not getattr(self, '_admin_present', False):
+            return
         palette = self.drawing_palette
         if not palette:
             return
@@ -2018,6 +2149,14 @@ class WotAssistantHQ:
             self.quit_app()
             return
         import tactics_manager
+        es = getattr(self, '_editing_scheme', None)
+        palette = getattr(self, 'drawing_palette', None)
+        if (es and es.get('is_base') and not getattr(self, '_admin_present', False)
+                and palette and palette._base_scheme_changed(es)):
+            if not palette._show_save_or_discard_dialog(force_new_name=True):
+                return
+            self.quit_app()
+            return
         existing_schemes = tactics_manager.list_schemes_from_db(
             config.SCHEMES_FILE, mode=self.selected_battle_mode.get())
         current_coords = {tuple(e.get("coords", [])) for e in current}
@@ -2032,7 +2171,6 @@ class WotAssistantHQ:
         if is_saved:
             self.quit_app()
             return
-        palette = getattr(self, 'drawing_palette', None)
         if palette and palette._show_save_or_discard_dialog():
             self.quit_app()
         else:

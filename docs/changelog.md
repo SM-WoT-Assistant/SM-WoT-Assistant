@@ -4,6 +4,35 @@
 
 ---
 
+## Base Schemes: admin-only mark/delete/edit + force Save-as-new + RTDB (23.09.2026)
+
+**Механіка:** Base-схеми в розділі Base за замовчуванням; позначити/видалити/редагувати rename може лише адмін; користувач при правці base зобов'язаний зберегти як НОВУ схему (назва+опис); доставка з релізу (`base_schemes.json` bundle) + RTDB `base_schemes/` для будь-якого адміна з будь-якого ПК.
+
+### Права:
+| Дія | Адмін | Користувач |
+|-----|-------|------------|
+| Make/Remove base | ✅ → RTDB | ❌ (немає в меню) |
+| Delete base | ✅ → RTDB | ❌ |
+| Rename/Edit base | ✅ | ❌ (немає в меню) |
+| Бачити розділ Base | ✅ | ✅ з bundle |
+| ★ Default на base | ✅ | ✅ |
+| Правка малюнка base → Save as new | ✅ (автосейв поверх) | ✅ зобов'язання |
+
+### Файли:
+- `main.py`: `_detect_admin_installed()` (A: admin_settings/admin_creds в AppData, B: HKCU\Run) → `_admin_present`; `_load_base_schemes_bundle()`; `_sync_base_schemes_from_rtdb()` (admin, background); context menu гейтинг; `_editing_scheme.is_base`; `_on_close_request` force_new_name
+- `painting_palette.py`: автосейв no-op для base не-адміна; admin → `publish_base_scheme` після автосейву; `_close` → `_show_save_or_discard_dialog(force_new_name=True)`; заборона перезапису base при Save-as-new
+- `firebase_drawings.py`: `publish_base_scheme`, `delete_base_scheme`, `fetch_base_schemes_sync` (admin_auth ID token)
+- `config.py`: `BASE_SCHEMES_FILE` (bundle root)
+- `database.rules.json`: `base_schemes/` `.read:true`, `.write: auth.uid==admin`
+- `build.py`: `pull_base_schemes()` RTDB → `base_schemes.json` перед PyInstaller
+- `base_schemes.json`: seed `{}` (bundle, spec glob *.json)
+- `translations.py`: `base_no_overwrite`, `base_modified_title`
+
+### Верифікація:
+ast-parse 7 файлів + 38 smoke-тестів — ALL PASSED (`_smoke_base_schemes.py`, видалено після прогону).
+
+---
+
 ## v1.0.74 — Drawing UX Overhaul: LMB Move + Auto-save + New Scheme (22.09.2026)
 
 **Ключові зміни:** Пересування елементів ЛКМ без Ctrl, автосейв при редагуванні збереженої схеми, кнопка «Нова схема» з діалогом назви, прибирання «незрозумілого вікна» при виході з малювання.

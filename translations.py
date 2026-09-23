@@ -239,6 +239,8 @@ TRANSLATIONS = {
             "save_btn": "Save",
             "save_fields_required": "Name and description are required to save",
             "save_scheme_title": "Save Scheme",
+            "base_no_overwrite": "Base scheme cannot be overwritten.\nEnter a NEW name and description.",
+            "base_modified_title": "Base scheme modified",
             "scheme_desc_label": "Description",
             "scheme_name_label": "Scheme name",
             "scheme_unsaved_confirm": "Current drawing not saved.\nSave before loading scheme?",
