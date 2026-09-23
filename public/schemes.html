@@ -8,10 +8,13 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: #0a0a0a; color: #ccc; }
-        header { background: #1a1a1a; padding: 14px 24px; border-bottom: 2px solid #ff4500; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-        header h1 { font-size: 18px; }
-        header h1 a { color: #ff4500; text-decoration: none; }
-        nav { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .top-nav { background: #111; border-bottom: 1px solid #222; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { color: #ff4500; text-decoration: none; font-size: 16px; font-weight: bold; }
+        .top-nav .logo:hover { color: #ff5722; }
+        .top-nav nav { display: flex; gap: 4px; align-items: center; }
+        .top-nav nav a { color: #aaa; text-decoration: none; padding: 6px 14px; border-radius: 4px; font-size: 13px; transition: all .2s; }
+        .top-nav nav a:hover { background: #222; color: #fff; }
+        .top-nav nav a.active { background: #ff4500; color: #fff; }
         .btn { display: inline-block; background: #333; color: #ccc; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 13px; text-decoration: none; }
         .btn:hover { background: #444; }
         .btn-primary { background: #ff4500; color: #fff; }
@@ -54,13 +57,15 @@
 </head>
 <body>
 
-<header>
-    <h1><a href="index.html">SM WoT Assistant</a> — Tactical Schemes</h1>
+<nav class="top-nav">
+    <a href="index.html" class="logo">SM WoT Assistant</a>
     <nav>
-        <button class="btn btn-blue" onclick="openHelp()" title="Help">?</button>
-        <a href="index.html" class="btn">Home</a>
+        <a href="index.html">Home</a>
+        <a href="news.html">News</a>
+        <a href="schemes.html" class="active">Schemes</a>
+        <button class="btn btn-blue" onclick="openHelp()" title="Help" style="margin-left:4px;">?</button>
     </nav>
-</header>
+</nav>
 
 <main>
     <div class="filters">
@@ -69,6 +74,14 @@
         </select>
         <select id="author-filter" onchange="filterSchemes()">
             <option value="">All authors</option>
+        </select>
+        <select id="mode-filter" onchange="filterSchemes()">
+            <option value="">All modes</option>
+            <option value="Standard">Standard</option>
+            <option value="Encounter">Encounter</option>
+            <option value="Storm">Storm</option>
+            <option value="Onslaught">Onslaught</option>
+            <option value="OnslaughtLight">Onslaught Light</option>
         </select>
         <span class="stats" id="stats"></span>
     </div>
@@ -201,12 +214,14 @@ function renderSchemes(schemes) {
         container.innerHTML = '<div class="empty">No published schemes yet.</div>';
         return;
     }
-    let html = '<table><tr><th>Map</th><th>Description</th><th>Author</th><th>Date</th><th>Elem.</th><th></th></tr>';
+    let html = '<table><tr><th>Map</th><th>Mode</th><th>Description</th><th>Author</th><th>Date</th><th>Elem.</th><th></th></tr>';
     schemes.forEach(s => {
-        const desc = (s.comment || '').slice(0, 60);
+        const desc = (s.comment_en || s.comment || '').slice(0, 60);
+        const mode = s.battle_mode || '—';
         html += `<tr>
             <td class="scheme-map" title="${(s.map_id || '')}">${s.map_id === "all_maps" ? "All Maps" : (mapLabel(s.map_id) || s.map_name || '')}</td>
-            <td style="color:#999;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.comment || '').replace(/"/g, '&quot;')}">${desc || '—'}</td>
+            <td style="color:#ffaa00;font-size:11px;white-space:nowrap">${mode}</td>
+            <td style="color:#999;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${(s.comment_en || s.comment || '').replace(/"/g, '&quot;')}">${desc || '—'}</td>
             <td class="scheme-author">${s.author_nickname || '—'}</td>
             <td class="scheme-date">${(s.created_at || '').slice(0, 16)}</td>
             <td class="scheme-count">${s.element_count || 0}</td>
@@ -224,9 +239,11 @@ function renderSchemes(schemes) {
 function filterSchemes() {
     const mapVal = document.getElementById("map-filter").value;
     const authorVal = document.getElementById("author-filter").value;
+    const modeVal = document.getElementById("mode-filter").value;
     let filtered = allSchemes;
     if (mapVal) filtered = filtered.filter(s => s.map_id === mapVal || s.map_name === mapVal);
     if (authorVal) filtered = filtered.filter(s => s.author_nickname === authorVal);
+    if (modeVal) filtered = filtered.filter(s => (s.battle_mode || 'Standard') === modeVal);
     document.getElementById("stats").textContent =
         `${filtered.length} / ${allSchemes.length} schemes`;
     renderSchemes(filtered);
@@ -250,7 +267,7 @@ function downloadScheme(drawingId) {
     if (s.map_id === "all_maps") {
         const bundle = typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || {});
         if (bundle && bundle.type === "all_maps") {
-            bundle.comment = s.comment || "";
+            bundle.comment = s.comment_en || s.comment || "";
             bundle.author = s.author_nickname;
             downloadJSON(bundle, `All_Maps_${s.author_nickname || "anon"}.json`);
             return;
@@ -259,7 +276,7 @@ function downloadScheme(drawingId) {
     const data = {
         map_id: s.map_id,
         map_name: mapLabel(s.map_id) || s.map_name,
-        comment: s.comment || "",
+        comment: s.comment_en || s.comment || "",
         author: s.author_nickname,
         elements: typeof s.elements === "string" ? JSON.parse(s.elements) : (s.elements || [])
     };

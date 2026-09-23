@@ -61,6 +61,17 @@
         #drilldownTable tr:hover { background: #222; }
         #drilldownStatus { font-size: 10px; color: #888; margin-top: 6px; }
         #drilldownClose { align-self: flex-end; margin-top: 8px; }
+        /* News modal */
+        #newsModal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; z-index: 1000; align-items: center; justify-content: center; }
+        #newsModal.open { display: flex; }
+        #newsModalBox { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 20px; width: 600px; max-width: 90vw; max-height: 85vh; overflow-y: auto; }
+        #newsModalBox h3 { color: #ffaa00; margin: 0 0 12px 0; font-size: 14px; }
+        #newsModalBox label { display: block; font-size: 12px; color: #888; margin-bottom: 4px; margin-top: 10px; }
+        #newsModalBox input[type="text"],
+        #newsModalBox input[type="url"],
+        #newsModalBox select { width: 100%; background: #222; color: #ccc; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+        #newsModalBox textarea { width: 100%; background: #222; color: #ccc; border: 1px solid #333; padding: 6px 10px; border-radius: 4px; font-size: 13px; min-height: 150px; resize: vertical; font-family: 'Consolas', monospace; }
+        #newsModalBox .modal-btns { display: flex; gap: 8px; margin-top: 14px; justify-content: flex-end; }
     </style>
 </head>
 <body>
@@ -106,6 +117,37 @@
                     <span style="color:#888;font-size:12px;" id="release-count"></span>
                 </div>
                 <div id="releases-container"><div class="empty">Loading...</div></div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="section-header" onclick="toggleSection(this)">▶ News (RTDB news/)</h2>
+            <div class="section-body">
+                <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px;">
+                    <div class="stat-box"><div class="num" id="news-count">—</div><div class="label">Total</div></div>
+                    <div class="stat-box"><div class="num" id="news-pinned-count">—</div><div class="label">Pinned</div></div>
+                    <div class="stat-box"><div class="num" id="news-releases-count">—</div><div class="label">Releases</div></div>
+                </div>
+                <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <button class="btn" onclick="openNewsCreate()" style="background:#2a5a2a;color:#9f9;">+ Create News</button>
+                    <button class="btn btn-danger" onclick="deleteSelectedNews()" id="delete-news-btn">Delete selected (0)</button>
+                    <span style="color:#888;font-size:12px;" id="news-status"></span>
+                </div>
+                <div id="news-container"><div class="empty">Loading...</div></div>
+                <div style="margin-top:16px;padding-top:12px;border-top:1px solid #222;">
+                    <h3 style="color:#ffaa00;font-size:13px;margin-bottom:8px;">Settings</h3>
+                    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;">
+                        <label style="font-size:13px;color:#ccc;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" id="news-auto-publish" onchange="saveNewsConfig()"> Auto-publish releases as news
+                        </label>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <label for="news-ann-count" style="font-size:13px;color:#ccc;">Announcements on main page:</label>
+                            <input type="number" id="news-ann-count" min="1" max="10" value="3"
+                                   style="background:#222;color:#ccc;border:1px solid #333;padding:4px 8px;border-radius:3px;font-size:13px;width:50px;"
+                                   onchange="saveNewsConfig()">
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -266,6 +308,7 @@ function loadDashboard() {
     loadInstallations();
     loadAdminSchemes();
     loadAdminReleases();
+    loadNewsData();
     loadUsers();
     loadBuildsData();
     loadAdminAppData();
@@ -752,6 +795,187 @@ function deleteSelectedUsers() {
     }
 }
 
+// ═══ News management ═══
+let allAdminNews = [];
+
+function loadNewsData() {
+    db.ref("news").orderByChild("created_at").once("value")
+        .then(snap => {
+            const data = snap.val();
+            if (!data) {
+                allAdminNews = [];
+                document.getElementById("news-container").innerHTML = '<div class="empty">No news yet</div>';
+                updateNewsStats();
+                return;
+            }
+            allAdminNews = Object.entries(data)
+                .map(([key, val]) => ({ ...val, _key: key }))
+                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+            renderNewsTable();
+            updateNewsStats();
+        })
+        .catch(() => {
+            document.getElementById("news-container").innerHTML = '<div class="empty">Loading error</div>';
+        });
+
+    // Load config
+    db.ref("news_config/auto_publish").once("value").then(s => {
+        document.getElementById("news-auto-publish").checked = s.val() === true;
+    }).catch(() => {});
+    db.ref("news_config/announcements_count").once("value").then(s => {
+        const v = s.val();
+        if (typeof v === 'number') document.getElementById("news-ann-count").value = v;
+    }).catch(() => {});
+}
+
+function updateNewsStats() {
+    document.getElementById("news-count").textContent = allAdminNews.length || '—';
+    document.getElementById("news-pinned-count").textContent = allAdminNews.filter(n => n.pinned).length || '—';
+    document.getElementById("news-releases-count").textContent = allAdminNews.filter(n => n.type === 'release').length || '—';
+}
+
+function renderNewsTable() {
+    const container = document.getElementById("news-container");
+    if (!allAdminNews.length) {
+        container.innerHTML = '<div class="empty">No news yet. Create the first news item.</div>';
+        return;
+    }
+    let html = '<table><tr>';
+    html += '<th><input type="checkbox" onchange="toggleSelectAll(this, \'news-check\', \'delete-news-btn\')" title="Select all"></th>';
+    html += '<th>Date</th><th>Title</th><th>Type</th><th>Pinned</th><th>Actions</th></tr>';
+    allAdminNews.forEach(n => {
+        const date = (n.created_at || '').slice(0, 16).replace('T', ' ');
+        const typeBadge = {
+            'release': '<span class="badge badge-success">release</span>',
+            'announcement': '<span class="badge badge-info">announcement</span>',
+            'update': '<span class="badge badge-warning">update</span>'
+        }[n.type] || '<span class="badge">' + (n.type || '—') + '</span>';
+        const pinned = n.pinned ? '📌' : '—';
+        html += `<tr>
+            <td><input type="checkbox" class="news-check" value="${n._key}" onchange="updateDeleteCount('news-check', 'delete-news-btn')"></td>
+            <td style="font-size:11px;color:#888;">${date}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${n.title || '—'}</td>
+            <td>${typeBadge}</td>
+            <td style="text-align:center;">${pinned}</td>
+            <td>
+                <button class="btn" onclick="openNewsEdit('${n._key}')" style="font-size:10px;padding:2px 8px;">Edit</button>
+                <button class="btn btn-danger" onclick="deleteNewsItem('${n._key}')" style="font-size:10px;padding:2px 8px;">Del</button>
+            </td>
+        </tr>`;
+    });
+    html += '</table>';
+    container.innerHTML = html;
+}
+window.render_news = renderNewsTable;
+
+function openNewsCreate() {
+    document.getElementById("newsModalTitle").textContent = "Create News";
+    document.getElementById("news-edit-key").value = "";
+    document.getElementById("news-title-input").value = "";
+    document.getElementById("news-type-input").value = "announcement";
+    document.getElementById("news-version-input").value = "";
+    document.getElementById("news-github-input").value = "";
+    document.getElementById("news-content-input").value = "";
+    document.getElementById("news-pinned-input").checked = false;
+    document.getElementById("newsModal").classList.add("open");
+}
+
+function openNewsEdit(key) {
+    const item = allAdminNews.find(n => n._key === key);
+    if (!item) return;
+    document.getElementById("newsModalTitle").textContent = "Edit News";
+    document.getElementById("news-edit-key").value = key;
+    document.getElementById("news-title-input").value = item.title || "";
+    document.getElementById("news-type-input").value = item.type || "announcement";
+    document.getElementById("news-version-input").value = item.version || "";
+    document.getElementById("news-github-input").value = item.github_url || "";
+    document.getElementById("news-content-input").value = item.content || "";
+    document.getElementById("news-pinned-input").checked = !!item.pinned;
+    document.getElementById("newsModal").classList.add("open");
+}
+
+function closeNewsModal() {
+    document.getElementById("newsModal").classList.remove("open");
+}
+
+function saveNewsItem() {
+    const key = document.getElementById("news-edit-key").value;
+    const title = document.getElementById("news-title-input").value.trim();
+    const type = document.getElementById("news-type-input").value;
+    const version = document.getElementById("news-version-input").value.trim();
+    const github_url = document.getElementById("news-github-input").value.trim();
+    const content = document.getElementById("news-content-input").value;
+    const pinned = document.getElementById("news-pinned-input").checked;
+
+    if (!title) { alert("Title is required."); return; }
+
+    const data = {
+        title, type, content, pinned,
+        version: version || null,
+        github_url: github_url || null,
+    };
+
+    if (key) {
+        // Edit existing
+        data.created_at = allAdminNews.find(n => n._key === key)?.created_at || new Date().toISOString();
+        db.ref("news/" + key).update(data)
+            .then(() => { closeNewsModal(); loadNewsData(); })
+            .catch(e => alert("Error: " + e.message));
+    } else {
+        // Create new
+        data.created_at = new Date().toISOString();
+        const newKey = data.created_at.replace(/[:.]/g, '-').slice(0, 19);
+        db.ref("news/" + newKey).set(data)
+            .then(() => { closeNewsModal(); loadNewsData(); })
+            .catch(e => alert("Error: " + e.message));
+    }
+}
+
+function deleteNewsItem(key) {
+    if (!confirm("Delete this news item? This cannot be undone.")) return;
+    db.ref("news/" + key).remove()
+        .then(() => loadNewsData())
+        .catch(e => alert("Error: " + e.message));
+}
+
+function deleteSelectedNews() {
+    const keys = getSelectedKeys("news-check");
+    if (!keys.length) { alert("No news selected."); return; }
+    if (!confirm(`Delete ${keys.length} selected news item(s)?\nThis cannot be undone!`)) return;
+    let done = 0, failed = 0, total = keys.length;
+    keys.forEach(key => {
+        db.ref("news/" + key).remove()
+            .then(() => { done++; if (done + failed >= total) finish(); })
+            .catch(() => { failed++; if (done + failed >= total) finish(); });
+    });
+    function finish() {
+        alert(`Deleted: ${done}, failed: ${failed}`);
+        loadNewsData();
+    }
+}
+
+function saveNewsConfig() {
+    const autoPublish = document.getElementById("news-auto-publish").checked;
+    const annCount = parseInt(document.getElementById("news-ann-count").value) || 3;
+    const clamped = Math.max(1, Math.min(10, annCount));
+    document.getElementById("news-ann-count").value = clamped;
+
+    Promise.all([
+        db.ref("news_config/auto_publish").set(autoPublish),
+        db.ref("news_config/announcements_count").set(clamped)
+    ]).then(() => {
+        document.getElementById("news-status").textContent = "Settings saved";
+        setTimeout(() => { document.getElementById("news-status").textContent = ""; }, 2000);
+    }).catch(e => {
+        document.getElementById("news-status").textContent = "Error: " + e.message;
+    });
+}
+
+// Close news modal on backdrop click
+document.getElementById("newsModal").addEventListener("click", (e) => {
+    if (e.target.id === "newsModal") closeNewsModal();
+});
+
 // ═══ Releases management ═══
 let allAdminReleases = [];
 
@@ -1187,6 +1411,36 @@ document.getElementById('drilldownModal').addEventListener('click', (e) => {
 });
 
 </script>
+
+<div id="newsModal">
+    <div id="newsModalBox">
+        <h3 id="newsModalTitle">Create News</h3>
+        <input type="hidden" id="news-edit-key">
+        <label for="news-title-input">Title</label>
+        <input type="text" id="news-title-input" placeholder="SM WoT Assistant vX.Y.Z Beta">
+        <label for="news-type-input">Type</label>
+        <select id="news-type-input">
+            <option value="release">Release</option>
+            <option value="announcement">Announcement</option>
+            <option value="update">Update</option>
+        </select>
+        <label for="news-version-input">Version (optional, for releases)</label>
+        <input type="text" id="news-version-input" placeholder="1.0.79">
+        <label for="news-github-input">GitHub URL (optional)</label>
+        <input type="url" id="news-github-input" placeholder="https://github.com/...">
+        <label for="news-content-input">Content (Markdown supported)</label>
+        <textarea id="news-content-input" placeholder="## Changes&#10;- Feature X&#10;- Bugfix Y"></textarea>
+        <div style="margin-top:10px;">
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px;color:#ccc;">
+                <input type="checkbox" id="news-pinned-input"> Pin to top
+            </label>
+        </div>
+        <div class="modal-btns">
+            <button class="btn" onclick="closeNewsModal()">Cancel</button>
+            <button class="btn" onclick="saveNewsItem()" style="background:#2a5a2a;color:#9f9;">Save</button>
+        </div>
+    </div>
+</div>
 
 <div id="drilldownModal">
     <div id="drilldownBox">

@@ -93,6 +93,51 @@ class MapManager:
                         self.app.save_settings()
                         break
 
+    def fast_integrity_check(self):
+        """Lightweight check: are local cached data files present and non-empty?
+        Returns True if data looks OK for a fast skip, False if full pipeline needed."""
+        import os as _os
+        base = config.BASE_DIR
+        ud = config.USER_DATA_DIR
+        # 1. tank_db.json exists and has data
+        try:
+            path = _os.path.join(base, "tank_db.json")
+            if not _os.path.exists(path):
+                return False
+            with open(path, "r", encoding="utf-8") as f:
+                db = json.load(f)
+            if not isinstance(db, dict) or len(db) < 100:
+                return False
+        except Exception:
+            return False
+        # 2. tank_tth.json exists and has data
+        try:
+            path = _os.path.join(base, "tank_tth.json")
+            if not _os.path.exists(path):
+                return False
+            with open(path, "r", encoding="utf-8") as f:
+                tth = json.load(f)
+            if not isinstance(tth, dict) or len(tth) < 100:
+                return False
+        except Exception:
+            return False
+        # 3. loadout icon directories have PNG files
+        loadout_base = _os.path.join(base, "extracted_icons", "loadout")
+        for subdir in ("artefacts", "ammo", "crew_skills"):
+            d = _os.path.join(loadout_base, subdir)
+            if not _os.path.isdir(d):
+                return False
+            try:
+                if not any(n.lower().endswith(".png") for n in _os.listdir(d)):
+                    return False
+            except Exception:
+                return False
+        # 4. game version saved in settings
+        saved_v = self.app.settings.get("game_version", "")
+        if not saved_v:
+            return False
+        return True
+
     def check_game_version(self, progress_cb=None, done_cb=None, allow_map_decode=True):
         def emit(percent, text_key, fg="yellow", **fmt):
             text = self.app.t('ui', text_key).format(**fmt) if fmt else self.app.t('ui', text_key)
@@ -127,6 +172,15 @@ class MapManager:
 
                 real_version_changed = current_v != saved_v
                 force_update_on_startup = bool(getattr(self.app, "settings", {}).get("force_update_on_startup", False))
+
+                if not real_version_changed and not force_update_on_startup:
+                    if self.fast_integrity_check():
+                        print(f"[MAP_MGR] Fast path: version {current_v} unchanged, local data OK — skipping extraction")
+                        emit(100, "version_unchanged", "lime", version=current_v)
+                        self._detect_pending_tactic_maps()
+                        self._install_tactics_mod()
+                        return
+
                 version_changed = real_version_changed
                 if version_changed:
                     print(f"[MAP_MGR] Game version changed: {saved_v} → {current_v}")
@@ -395,6 +449,7 @@ class MapManager:
                     emit(100, "update_failed", "red")
 
                 self._detect_pending_tactic_maps()
+                self._install_tactics_mod()
             except Exception as e:
                 import traceback
                 print(f"[MAP_MGR] Background update error: {e}")
@@ -482,6 +537,32 @@ class MapManager:
                 json.dump(pending, f)
         except Exception:
             pass
+
+    def _install_tactics_mod(self):
+        """Copy sm_tactics.wotmod to <wot_path>/mods/<game_version>/ if use_mod is enabled."""
+        try:
+            use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
+        except Exception:
+            use_mod = False
+        if not use_mod:
+            return
+        wotmod_src = config.MOD_WOTMOD_FILE
+        if not os.path.isfile(wotmod_src):
+            print("[MAP_MGR] sm_tactics.wotmod not found, skipping install")
+            return
+        try:
+            wot_path = self.app.settings.get("wot_path", "")
+            game_version = self.app.settings.get("game_version", "")
+            if not wot_path or not game_version:
+                return
+            mods_dir = os.path.join(wot_path, "mods", game_version)
+            os.makedirs(mods_dir, exist_ok=True)
+            dst = os.path.join(mods_dir, "sm_tactics.wotmod")
+            import shutil
+            shutil.copy2(wotmod_src, dst)
+            print(f"[MAP_MGR] Installed sm_tactics.wotmod -> {mods_dir}")
+        except Exception as e:
+            print(f"[MAP_MGR] Mod install error: {e}")
 
     def run_map_updater(self):
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":

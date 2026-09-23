@@ -60,9 +60,41 @@
         .support-card a:hover { color: #9cf; }
         .support-card img { width: 160px; height: 160px; border-radius: 8px; border: 1px solid #2a2a2a; display: block; margin: 0 auto; }
         .support-card img:hover { border-color: #ff4500; }
+        /* Announcements */
+        .announcements { max-width: 820px; margin: 0 auto; padding: 32px 24px 0; }
+        .announcements h2 { font-size: 20px; color: #ffaa00; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid #222; }
+        .ann-card { background: #151515; border: 1px solid #222; border-radius: 8px; padding: 10px 16px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
+        .ann-card.pinned { border-color: #ffaa00; }
+        .ann-title { font-size: 14px; color: #ff4500; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
+        .ann-meta { display: flex; gap: 10px; align-items: center; flex-shrink: 0; }
+        .ann-date { color: #666; font-size: 12px; }
+        .ann-link { color: #7ab; font-size: 12px; text-decoration: none; }
+        .ann-link:hover { color: #9cf; text-decoration: underline; }
+        .ann-badge { display: inline-block; padding: 1px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; }
+        .ann-badge-release { background: #335533; color: #66cc66; }
+        .ann-badge-announcement { background: #334455; color: #6699cc; }
+        .ann-badge-update { background: #555533; color: #ffcc66; }
+        .ann-more { text-align: center; margin-top: 12px; }
+        /* Top navigation bar */
+        .top-nav { background: #111; border-bottom: 1px solid #222; padding: 10px 24px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
+        .top-nav .logo { color: #ff4500; text-decoration: none; font-size: 16px; font-weight: bold; }
+        .top-nav .logo:hover { color: #ff5722; }
+        .top-nav nav { display: flex; gap: 4px; }
+        .top-nav nav a { color: #aaa; text-decoration: none; padding: 6px 14px; border-radius: 4px; font-size: 13px; transition: all .2s; }
+        .top-nav nav a:hover { background: #222; color: #fff; }
+        .top-nav nav a.active { background: #ff4500; color: #fff; }
     </style>
 </head>
 <body>
+
+<nav class="top-nav">
+    <a href="index.html" class="logo">SM WoT Assistant</a>
+    <nav>
+        <a href="index.html" class="active">Home</a>
+        <a href="news.html">News</a>
+        <a href="schemes.html">Schemes</a>
+    </nav>
+</nav>
 
 <header>
     <img src="logo.png" alt="SM WoT Assistant">
@@ -74,6 +106,14 @@
     <p class="version" style="color:#777;font-size:11px;margin-top:4px;">Windows SmartScreen may warn about an unknown publisher. Click "Run anyway".</p>
     <p class="version" style="color:#ffaa00;font-size:12px;margin-top:6px;font-weight:bold;">⚠ Set game to borderless window mode before using overlay!</p>
 </header>
+
+<div class="announcements" id="announcements-section" style="display:none;">
+    <h2>Latest News</h2>
+    <div id="announcements-list"></div>
+    <div class="ann-more">
+        <a href="news.html" class="btn" style="font-size:13px;padding:8px 20px;">All News →</a>
+    </div>
+</div>
 
 <div class="video-wrap">
     <iframe src="https://www.youtube.com/embed/4JlDkM65PxY" title="SM WoT Assistant" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
@@ -225,6 +265,62 @@ function loadLatestVersion() {
         });
 }
 loadLatestVersion();
+
+function loadAnnouncements() {
+    const section = document.getElementById('announcements-section');
+    const list = document.getElementById('announcements-list');
+
+    // Read configured count (default 3)
+    db.ref("news_config/announcements_count").once("value")
+        .then(snap => {
+            const count = snap.val();
+            return typeof count === 'number' ? count : 3;
+        })
+        .catch(() => 3)
+        .then(count => {
+            return db.ref("news").orderByChild("created_at").once("value")
+                .then(snap => {
+                    const data = snap.val();
+                    if (!data) return;
+                    const items = Object.entries(data)
+                        .map(([key, val]) => ({ ...val, _key: key }))
+                        .sort((a, b) => {
+                            if (a.pinned && !b.pinned) return -1;
+                            if (!a.pinned && b.pinned) return 1;
+                            return (b.created_at || '').localeCompare(a.created_at || '');
+                        })
+                        .slice(0, count);
+
+                    if (!items.length) return;
+
+                    let html = '';
+                    items.forEach((n, idx) => {
+                        const pinned = n.pinned ? ' pinned' : '';
+                        const date = (n.created_at || '').slice(0, 10);
+
+                        const badgeCls = {
+                            'release': 'ann-badge-release',
+                            'announcement': 'ann-badge-announcement',
+                            'update': 'ann-badge-update'
+                        }[n.type] || 'ann-badge-announcement';
+                        const badgeLabel = n.type ? n.type.charAt(0).toUpperCase() + n.type.slice(1) : '';
+
+                        html += `<a href="news.html#news-${n._key}" class="ann-card${pinned}" style="text-decoration:none;color:inherit;">
+                            <div class="ann-title">${n.title || 'Untitled'}</div>
+                            <div class="ann-meta">
+                                <span class="ann-badge ${badgeCls}">${badgeLabel}</span>
+                                <span class="ann-date">${date}</span>
+                            </div>
+                        </a>`;
+                    });
+
+                    list.innerHTML = html;
+                    section.style.display = 'block';
+                });
+        })
+        .catch(() => {});
+}
+loadAnnouncements();
 
 function openLightbox(src) {
     document.getElementById("lightbox-img").src = src;

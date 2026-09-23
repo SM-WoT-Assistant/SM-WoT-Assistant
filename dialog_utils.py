@@ -113,6 +113,46 @@ def dark_confirmbox(parent, title, message, yes_text="Yes", no_text="No"):
     parent.wait_window(dlg)
     return result[0]
 
+def dark_3button_box(parent, title, message, btn1_text="Yes", btn2_text="No", btn3_text="Cancel"):
+    """3-button dialog. Returns 1, 2, or 3 (button index), or 0 if closed via X."""
+    dlg, hdr = make_custom_dialog(parent, title)
+    _DragHelper(dlg, hdr)
+    dlg.grab_set()
+    dlg.lift()
+    dlg.focus_force()
+
+    result = [0]
+    def on_b1():
+        result[0] = 1
+        dlg.destroy()
+    def on_b2():
+        result[0] = 2
+        dlg.destroy()
+    def on_b3():
+        result[0] = 3
+        dlg.destroy()
+
+    tk.Label(dlg, text=title, bg="#222", fg="#ffaa00",
+             font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 6))
+    tk.Label(dlg, text=message, bg="#222", fg="#cccccc",
+             font=("Arial", 9), wraplength=400, justify="left").pack(padx=20, pady=(4, 12))
+
+    bf = tk.Frame(dlg, bg="#222")
+    bf.pack(pady=(0, 12))
+    tk.Button(bf, text=btn1_text, bg="#446644", fg="#cfc", bd=0,
+              font=("Arial", 9, "bold"), padx=15, pady=4,
+              command=on_b1).pack(side="left", padx=6)
+    tk.Button(bf, text=btn2_text, bg="#553333", fg="#ff6666", bd=0,
+              font=("Arial", 9), padx=15, pady=4,
+              command=on_b2).pack(side="left", padx=6)
+    tk.Button(bf, text=btn3_text, bg="#444", fg="#aaa", bd=0,
+              font=("Arial", 9), padx=15, pady=4,
+              command=on_b3).pack(side="left", padx=6)
+
+    _center_on_root(dlg, parent)
+    parent.wait_window(dlg)
+    return result[0]
+
 def dark_promptbox(parent, title, prompt, initialvalue="", ok_text="OK", cancel_text="Cancel"):
     dlg, hdr = make_custom_dialog(parent, title)
     _DragHelper(dlg, hdr)

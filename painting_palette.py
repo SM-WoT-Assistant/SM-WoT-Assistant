@@ -1026,13 +1026,24 @@ class DrawingPalette(tk.Toplevel):
                 map_name, on_map_group,
                 self.app.t('ui', 'publish_all'), on_all_group)
 
-    def _ask_scheme_name_desc(self, title_key, default_name=""):
-        """Стандартний діалог "назва + опис" схеми. Повертає (name, desc) або None."""
+    def _ask_scheme_name_desc(self, title_key, default_name="", exclude_id=None):
+        """Стандартний діалог "назва + опис" схеми. Повертає (name, desc) або None.
+
+        Валідація: обидва поля обов'язкові; назва унікальна по всьому БД
+        (крім exclude_id — для rename поточної схеми). Опис без обмежень.
+        """
+        import tactics_manager
+        import config
         dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', title_key))
         dialog_utils._DragHelper(dlg, hdr)
         dlg.grab_set()
         bg = "#222"
-        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label'), bg=bg, fg="#ffaa00",
+
+        warning_var = tk.StringVar()
+        warning_lbl = tk.Label(dlg, textvariable=warning_var, bg=bg, fg="#ff4444",
+                               font=("Arial", 9, "bold"))
+
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label') + " *", bg=bg, fg="#ffaa00",
                  font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4), anchor="w")
         name_var = tk.StringVar(value=default_name)
         name_entry = tk.Entry(dlg, textvariable=name_var, font=("Arial", 11),
@@ -1042,22 +1053,61 @@ class DrawingPalette(tk.Toplevel):
         name_entry.select_range(0, "end")
         name_entry.focus_set()
 
-        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label'), bg=bg, fg="#aaa",
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label') + " *", bg=bg, fg="#aaa",
                  font=("Arial", 9)).pack(padx=20, pady=(0, 4), anchor="w")
         desc_var = tk.StringVar()
-        tk.Entry(dlg, textvariable=desc_var, font=("Arial", 10),
-                 bg="#333", fg="white", insertbackground="white",
-                 width=30, relief="flat", bd=4).pack(padx=20, pady=(0, 10))
+        desc_entry = tk.Entry(dlg, textvariable=desc_var, font=("Arial", 10),
+                              bg="#333", fg="white", insertbackground="white",
+                              width=30, relief="flat", bd=4)
+        desc_entry.pack(padx=20, pady=(0, 4))
+
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_fields_hint'), bg=bg, fg="#666",
+                 font=("Arial", 8)).pack(padx=20, pady=(0, 2), anchor="w")
+
+        def clear_warning(*_):
+            warning_lbl.pack_forget()
+            name_entry.config(bg="#333")
+            desc_entry.config(bg="#333")
+        name_var.trace_add("write", clear_warning)
+        desc_var.trace_add("write", clear_warning)
 
         result = [None]
+
         def on_ok():
-            result[0] = (name_var.get().strip(), desc_var.get().strip())
+            name = name_var.get().strip()
+            desc = desc_var.get().strip()
+            if not name or not desc:
+                warning_var.set(self.app.t('ui', 'save_fields_required'))
+                warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
+                if not name:
+                    name_entry.config(bg="#552222")
+                if not desc:
+                    desc_entry.config(bg="#552222")
+                return
+            # user-wide uniqueness: будь-яка мапа/режим, крім exclude_id
+            try:
+                db = tactics_manager._load_db(config.SCHEMES_FILE)
+                for did, s in db.items():
+                    if exclude_id and did == exclude_id:
+                        continue
+                    if (s.get("scheme_name") or "").strip() == name:
+                        warning_var.set(self.app.t('ui', 'scheme_name_duplicate'))
+                        warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
+                        name_entry.config(bg="#552222")
+                        return
+            except Exception:
+                pass  # БД недоступна — не блокуємо збереження
+            result[0] = (name, desc)
             dlg.destroy()
+
         def on_cancel():
             result[0] = None
             dlg.destroy()
+
         name_entry.bind("<Return>", lambda e: on_ok())
+        desc_entry.bind("<Return>", lambda e: on_ok())
         name_entry.bind("<Escape>", lambda e: on_cancel())
+        desc_entry.bind("<Escape>", lambda e: on_cancel())
         bf = tk.Frame(dlg, bg=bg)
         bf.pack(pady=(0, 12))
         tk.Button(bf, text=self.app.t('ui', 'save_btn'), bg="#446644", fg="#cfc", bd=0,
@@ -1066,7 +1116,7 @@ class DrawingPalette(tk.Toplevel):
                   font=("Arial", 9), padx=12, pady=4, command=on_cancel).pack(side="left", padx=4)
         dlg.update_idletasks()
         dialog_utils._center_on_root(dlg, self.app.root)
-        dlg.geometry(f"420x220")
+        dlg.geometry(f"420x280")
         self.app.root.wait_window(dlg)
         if not result[0]:
             return None
@@ -1088,32 +1138,13 @@ class DrawingPalette(tk.Toplevel):
 
         es = getattr(self.app, '_editing_scheme', None)
         default_name = (es.get('name') if es and es.get('name') else f"{map_name} [{mode}]")
-        result = self._ask_scheme_name_desc('save_scheme_title', default_name)
+        # Діалог сам валідує: name+desc обов'язкові + user-wide унікальність назви
+        exclude_id = es.get('drawing_id') if es and es.get('drawing_id') else None
+        result = self._ask_scheme_name_desc('save_scheme_title', default_name,
+                                            exclude_id=exclude_id)
         if not result:
             return False
         scheme_name, description = result
-        if not scheme_name:
-            return False
-
-        db = tactics_manager._load_db(config.SCHEMES_FILE)
-        duplicate_id = None
-        for did, s in db.items():
-            if (s.get("map_id") == map_id and s.get("battle_mode") == mode
-                    and s.get("scheme_name", "") == scheme_name):
-                duplicate_id = did
-                break
-
-        if duplicate_id:
-            dup = db.get(duplicate_id) or {}
-            if dup.get('is_base') and not getattr(self.app, '_admin_present', False):
-                dialog_utils.dark_messagebox(
-                    self.app.root, "Save", self.app.t('ui', 'base_no_overwrite'),
-                    is_error=True)
-                return False
-            if not dialog_utils.dark_confirmbox(
-                    self.app.root, "Replace scheme",
-                    f'Scheme "{scheme_name}" already exists.\nReplace with current drawing?'):
-                return
 
         ok, result_text = tactics_manager.save_scheme_to_db(
             config.SCHEMES_FILE, map_id, map_name, mode, drawings,
@@ -1697,7 +1728,7 @@ class DrawingPalette(tk.Toplevel):
         warning_lbl = tk.Label(dlg, textvariable=warning_var, bg=bg, fg="#ff4444",
                                font=("Arial", 9, "bold"))
 
-        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label'), bg=bg, fg="#ffaa00",
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_name_label') + " *", bg=bg, fg="#ffaa00",
                  font=("Arial", 10, "bold")).pack(padx=20, pady=(14, 4), anchor="w")
         name_var = tk.StringVar(value=default_name)
         name_entry = tk.Entry(dlg, textvariable=name_var, font=("Arial", 11),
@@ -1707,13 +1738,15 @@ class DrawingPalette(tk.Toplevel):
         name_entry.select_range(0, "end")
         name_entry.focus_set()
 
-        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label'), bg=bg, fg="#aaa",
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_desc_label') + " *", bg=bg, fg="#aaa",
                  font=("Arial", 9)).pack(padx=20, pady=(0, 4), anchor="w")
         desc_var = tk.StringVar()
         desc_entry = tk.Entry(dlg, textvariable=desc_var, font=("Arial", 10),
                               bg="#333", fg="white", insertbackground="white",
                               width=30, relief="flat", bd=4)
         desc_entry.pack(padx=20, pady=(0, 6))
+        tk.Label(dlg, text=self.app.t('ui', 'scheme_fields_hint'), bg=bg, fg="#666",
+                 font=("Arial", 8)).pack(padx=20, pady=(0, 2), anchor="w")
 
         def clear_warning(*_):
             if name_var.get().strip():
@@ -1742,23 +1775,20 @@ class DrawingPalette(tk.Toplevel):
                 warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
                 name_entry.config(bg="#552222")
                 return
+            # user-wide uniqueness: будь-яка мапа/режим, крім поточної схеми
+            exclude_id = es.get('drawing_id') if es and es.get('drawing_id') else None
             db = tactics_manager._load_db(config.SCHEMES_FILE)
-            duplicate_id = None
             for did, s in db.items():
-                if (s.get("map_id") == map_id and s.get("battle_mode") == mode
-                        and s.get("scheme_name", "") == name):
-                    duplicate_id = did
-                    break
-            if duplicate_id:
-                dup = db.get(duplicate_id) or {}
-                if dup.get('is_base') and not is_admin:
-                    warning_var.set(self.app.t('ui', 'base_no_overwrite'))
+                if exclude_id and did == exclude_id:
+                    continue
+                if (s.get("scheme_name") or "").strip() == name:
+                    dup = s
+                    if dup.get('is_base') and not is_admin:
+                        warning_var.set(self.app.t('ui', 'base_no_overwrite'))
+                    else:
+                        warning_var.set(self.app.t('ui', 'scheme_name_duplicate'))
                     warning_lbl.pack(padx=20, pady=(0, 2), anchor="w")
                     name_entry.config(bg="#552222")
-                    return
-                if not dialog_utils.dark_confirmbox(
-                        self.app.root, "Replace scheme",
-                        f'Scheme "{name}" already exists.\nReplace with current drawing?'):
                     return
             tactics_manager.save_scheme_to_db(
                 config.SCHEMES_FILE, map_id, map_name, mode,

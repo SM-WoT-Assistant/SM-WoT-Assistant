@@ -143,6 +143,7 @@ class LogWatcher:
                                         3: "assault",
                                         4: "comp7",
                                         5: "comp7_light",
+                                        30: "comp7",
                                     }
                                     mode = type_to_mode.get(self.last_type, "ctf")
                                     if self.callback:

@@ -238,6 +238,8 @@ TRANSLATIONS = {
             "save": "Save",
             "save_btn": "Save",
             "save_fields_required": "Name and description are required to save",
+            "scheme_name_duplicate": "Scheme name must be unique.\nThis name is already used by another scheme.",
+            "scheme_fields_hint": "* both fields required",
             "save_scheme_title": "Save Scheme",
             "base_no_overwrite": "Base scheme cannot be overwritten.\nEnter a NEW name and description.",
             "base_modified_title": "Base scheme modified",

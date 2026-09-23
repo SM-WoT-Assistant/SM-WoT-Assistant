@@ -207,7 +207,7 @@ def _get_scheme_elements(elements_data):
     return "[]", 0
 
 
-def publish_to_group(group_id, map_id, map_name, elements_data, comment="", author_id=None, author_nick=None):
+def publish_to_group(group_id, map_id, map_name, elements_data, comment="", comment_en="", author_id=None, author_nick=None):
     """Публікує схему в групу. Повертає (drawing_id, ok, msg)."""
     if not firebase_reporter._is_configured():
         return None, False, "Firebase не налаштовано"
@@ -231,6 +231,7 @@ def publish_to_group(group_id, map_id, map_name, elements_data, comment="", auth
         "elements": elements_str,
         "element_count": el_count,
         "comment": (comment or "")[:500],
+        "comment_en": (comment_en or "")[:500],
         "created_at": now,
         "updated_at": now,
         "updated_by": anick,
@@ -243,7 +244,7 @@ def publish_to_group(group_id, map_id, map_name, elements_data, comment="", auth
     return drawing_id, True, "Опубліковано в групу!"
 
 
-def update_group_scheme(group_id, drawing_id, elements_data, comment="", updated_by=None):
+def update_group_scheme(group_id, drawing_id, elements_data, comment="", comment_en="", updated_by=None):
     """Оновлює існуючу схему в групі (той самий drawing_id)."""
     if not firebase_reporter._is_configured():
         return False, "Firebase не налаштовано"
@@ -267,6 +268,8 @@ def update_group_scheme(group_id, drawing_id, elements_data, comment="", updated
     existing["updated_by"] = ub
     if comment:
         existing["comment"] = comment[:500]
+    if comment_en:
+        existing["comment_en"] = comment_en[:500]
 
     ok = _put(path, existing, timeout=10)
     if not ok:
@@ -319,6 +322,7 @@ def get_group_schemes_meta(group_id):
             "element_count": sdata.get("element_count", 0),
             "map_id": sdata.get("map_id", ""),
             "comment": (sdata.get("comment") or "")[:40],
+            "comment_en": (sdata.get("comment_en") or "")[:40],
             "updated_by": sdata.get("updated_by", ""),
         }
     return meta
@@ -423,6 +427,7 @@ def import_between_groups(src_group_id, drawing_id, dst_group_id, author_nick=No
         "elements": elements_str,
         "element_count": el_count,
         "comment": (src.get("comment") or "")[:500],
+        "comment_en": (src.get("comment_en") or "")[:500],
         "created_at": now,
         "updated_at": now,
         "updated_by": anick,

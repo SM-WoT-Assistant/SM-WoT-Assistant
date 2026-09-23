@@ -1901,11 +1901,14 @@ class WotAssistantHQ:
         palette = self.drawing_palette
         if not palette:
             return
-        result = palette._ask_scheme_name_desc('context_edit_scheme', current_name)
+        result = palette._ask_scheme_name_desc('context_edit_scheme', current_name,
+                                               exclude_id=drawing_id)
         if not result:
             return
         new_name, new_desc = result
-        if new_name and new_name != current_name or new_desc != current_desc:
+        if not new_name or not new_desc:
+            return
+        if new_name != current_name or new_desc != current_desc:
             ok, _ = tactics_manager.rename_scheme_in_db(config.SCHEMES_FILE, drawing_id, new_name, new_desc)
             if ok and self._editing_scheme and self._editing_scheme.get('drawing_id') == drawing_id:
                 self._editing_scheme['name'] = new_name

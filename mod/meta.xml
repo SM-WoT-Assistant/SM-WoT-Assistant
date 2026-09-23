@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mod>
+    <id>sm.wo-tactics</id>
+    <version>1.0.0</version>
+    <name>SM WoT Tactics</name>
+    <author>SM WoT Assistant</author>
+    <description>Displays tactical schemes from SM WoT Assistant on the in-game minimap</description>
+    <url>https://sm-wot-assistant.web.app</url>
+</mod>
