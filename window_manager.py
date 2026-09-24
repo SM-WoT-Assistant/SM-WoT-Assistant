@@ -86,6 +86,7 @@ class WindowManager:
         self._drag_mode = None  # Режим (edit/norm), у якому почався drag — при зміні режиму drag скасовується
         self._last_tomato_size = None
         self._ct_transparent = None  # Останній застосований стан WS_EX_TRANSPARENT кореневого вікна
+        self._ct_po_transparent = None  # Те саме для overlay _po_win (накриває канвас)
         
         # Запуск моніторингу миші для drag
         self.start_mouse_drag_monitor()
@@ -509,15 +510,31 @@ class WindowManager:
         self.app.map_renderer.show_main_splash()
 
     def set_clickthrough(self, enabled):
+        """WS_EX_TRANSPARENT для root І overlay _po_win (накриває канвас —
+        без цього кліки по оверлею не доходять до мінімапи гри при замку)."""
         try:
-            hwnd = ctypes.windll.user32.GetParent(self.app.root.winfo_id())
-            style = _get_window_long(hwnd, GWL_EXSTYLE)
-            if enabled:
-                style |= (WS_EX_LAYERED | WS_EX_TRANSPARENT)
-            else:
-                style &= ~WS_EX_TRANSPARENT
-            _set_window_long(hwnd, GWL_EXSTYLE, style)
+            hwnds = []
+            root_hwnd = ctypes.windll.user32.GetParent(self.app.root.winfo_id())
+            if root_hwnd:
+                hwnds.append(root_hwnd)
+            po = getattr(self.app, "_po_win", None)
+            if po is not None:
+                try:
+                    if po.winfo_exists():
+                        po_hwnd = ctypes.windll.user32.GetParent(po.winfo_id())
+                        if po_hwnd:
+                            hwnds.append(po_hwnd)
+                except Exception:
+                    pass
+            for hwnd in hwnds:
+                style = _get_window_long(hwnd, GWL_EXSTYLE)
+                if enabled:
+                    style |= (WS_EX_LAYERED | WS_EX_TRANSPARENT)
+                else:
+                    style &= ~WS_EX_TRANSPARENT
+                _set_window_long(hwnd, GWL_EXSTYLE, style)
             self._ct_transparent = bool(enabled)
+            self._ct_po_transparent = bool(enabled)
         except Exception:
             pass
 
@@ -536,7 +553,8 @@ class WindowManager:
                     or not self.app.root.winfo_viewable()):
                 return
             want = not ctrl_pressed
-            if want != self._ct_transparent:
+            if (want != self._ct_transparent
+                    or want != self._ct_po_transparent):
                 self.set_clickthrough(want)
         except Exception:
             pass

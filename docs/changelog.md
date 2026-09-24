@@ -4,6 +4,47 @@
 
 ---
 
+## Натиск: бази/спавни + мінікарта comp7 + click-through замка (23.09.2026)
+
+**Симптом:** на деяких мапах Натиску 10 бази/спавни не на місці; при закритому замку оверлей не пропускає кліки на мінімапу гри.
+
+**Корені (аудит 30 мап):**
+1. `map_extractor` екстрактував лише `mmap.dds` — у Натиску гра малює **`mmap_comp7.dds`** (відрізняється для 28/30 мап) → бази накладалися на інше зображення.
+2. `28_desert` vs `28_desert_comp7_nb` — **різні** бази/spawns; обрізка суфікса для `map_data` показувала хибні координати.
+3. `114_czech`, `31_airfield` — JSON застарів від XML клієнта.
+4. Вкладений `<comp7><boundingBox>` (6 мап) ігнорувався; `draw_arena_bases` мав фіксований `border=20` vs scaled у `draw_grid`.
+5. **Click-through:** `set_clickthrough` чіпав лише root; overlay `_po_win` (накриває канвас) лишався clickable → кліки з'їдалися, мінімапа гри недоступна.
+
+**Зміни:**
+- `map_extractor.py`: екстракція `mmap_comp7.dds` → `{map_id}_comp7.png` (+ 29 PNG уже витягнуто)
+- `map_renderer.py`: `_resolve_map_data_id()` (raw `_comp7_nb` лише для активної мапи), `_active_bbox()` (вкладений comp7 bbox), border scaling = `draw_grid`, завантаження `{id}_comp7.png` в режимі Onslaught/OnslaughtLight
+- `main.py`: `battle_map_data_id` (raw з логу) в `on_battle_detected`, скид в `on_battle_ended`
+- `wot_decoder.py`: парсинг вкладеного `boundingBox` у `gameplayTypes/*`
+- `map_data.json`: 114_czech + 31_airfield (bases/spawns з клієнта), nested bbox для 6 мап
+- `window_manager.py`: `set_clickthrough` = root **і** `_po_win`; трекери `_ct_transparent` + `_ct_po_transparent`; Ctrl вимикає прозорість обох (unlock)
+
+**Верифікація:** AST OK ×5; smoke — resolve raw/fallback, nested bbox airfield, 114_czech/31_airfield bases, border=25 @1000px, clickthrough AST — OK. Live: Натиск (бази+мінікарта) + замок+клік по мінімапі гри.
+
+---
+
+## Battle mode auto-switch: arenaType 30/33/34/35 for Onslaught (23.09.2026)
+
+**Симптом:** при автоперемиканні на початку бою в Натиску у фільтрах стояв «Стандартний бій».
+
+**Корінь:** у `game.log` Натиск пише `arenaType = 30` (рідше 33), у мапінгу `type_to_mode` були лише 1–5 → fallback `"ctf"` → Standard. Типи 4/5 у логу не зустрічаються.
+
+**Джерело типів (клієнт `menu.json` → `loading/battleTypes`):** 30/33=Onslaught, 34=Onslaught Training, 35=Onslaught Light (Лайт). Ангар Натиску: `h33_comp7` (виключається з arena-детекції). Мапи Натиску з суфіксом `_comp7_nb` обрізаються в `on_battle_detected`.
+
+**Зміни:**
+- `log_reader.py`: `type_to_mode` + 30/33/34→`comp7`, 35→`comp7_light`; тимчасові `[DEBUG]` print'и — **прибрано перед релізом v1.0.79** (офлайн-верифікація пройдена)
+- `main.py`: `[DEBUG]` у `on_battle_detected` / `safe_battle_sync` — прибрано перед v1.0.79
+- `map_extractor.py`: прибрано `[DEBUG]` module-loaded / extract-called (Forbidden #7)
+- `ARCHITECTURE.md`: Battle Detection Flow — реальний мапінг типів
+
+**Верифікація:** офлайн — рядки логу → `last_type=30` → `mode=comp7` → `ui_mode=Onslaught`; AST OK; live-бій Натиску очікується.
+
+---
+
 ## Base Schemes: admin-only mark/delete/edit + force Save-as-new + RTDB (23.09.2026)
 
 **Механіка:** Base-схеми в розділі Base за замовчуванням; позначити/видалити/редагувати rename може лише адмін; користувач при правці base зобов'язаний зберегти як НОВУ схему (назва+опис); доставка з релізу (`base_schemes.json` bundle) + RTDB `base_schemes/` для будь-якого адміна з будь-якого ПК.

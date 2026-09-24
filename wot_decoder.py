@@ -72,35 +72,52 @@ class WotXmlDecoder:
                 # Обов'язковий .strip() для координат
                 if bl: bb_dict["bottomLeft"] = [float(x) for x in bl.strip().split()]
                 if ur: bb_dict["upperRight"] = [float(x) for x in ur.strip().split()]
-                
+
             gameplay_types = {}
             gpt = root.find("gameplayTypes")
             if gpt is not None:
                 for mode in gpt:
                     mode_name = mode.tag
-                    mode_data = {"bases": [], "spawns": []}
-                    
+                    mode_data = {"bases": [], "spawns": [], "boundingBox": None}
+                    nested_bb = None
+
                     bases = mode.find("teamBasePositions")
                     if bases is not None:
                         for team in bases:
                             for pos in team:
-                                if pos.text: 
+                                if pos.text:
                                     mode_data["bases"].append([float(x) for x in pos.text.strip().split()])
-                                    
+
                     cp = mode.find("controlPoint")
                     if cp is not None and cp.text:
                         mode_data["bases"].append([float(x) for x in cp.text.strip().split()])
-                        
+
                     spawns = mode.find("teamSpawnPoints")
                     if spawns is not None:
                         for team in spawns:
                             for pos in team:
-                                if pos.text: 
+                                if pos.text:
                                     mode_data["spawns"].append([float(x) for x in pos.text.strip().split()])
-                                    
+
+                    # Вкладений boundingBox усередині режиму (напр. comp7) —
+                    # ігнорувався раніше; гра використовує його для мінікарти Натиску
+                    nested = mode.find("boundingBox")
+                    if nested is not None:
+                        nbl = nested.findtext("bottomLeft")
+                        nur = nested.findtext("upperRight")
+                        if nbl and nur:
+                            nested_bb = {
+                                "bottomLeft": [float(x) for x in nbl.strip().split()],
+                                "upperRight": [float(x) for x in nur.strip().split()],
+                            }
+
                     if mode_data["bases"] or mode_data["spawns"]:
+                        if nested_bb is not None:
+                            mode_data["boundingBox"] = nested_bb
+                        else:
+                            mode_data.pop("boundingBox", None)
                         gameplay_types[mode_name] = mode_data
-                        
+
             return {"boundingBox": bb_dict, "gameplayTypes": gameplay_types}
             
         except Exception:

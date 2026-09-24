@@ -8,8 +8,6 @@ import wot_decoder
 import struct
 import config
 
-print("[DEBUG] map_extractor module loaded")
-
 
 class MapExtractor:
     def __init__(self):
@@ -180,7 +178,6 @@ class MapExtractor:
         return {}
 
     def extract(self, callback_status=None, force_full=False):
-        print("[DEBUG] MapExtractor.extract called")
         if not self.wot_path:
             return False
 
@@ -298,24 +295,36 @@ class MapExtractor:
         with open(os.path.join(self.out_path, "map_dictionary.json"), "w", encoding="utf-8") as f:
             json.dump(dictionary, f, indent=4, ensure_ascii=False)
 
-        # Витягуємо minimap з space-пакетів ({map_id}.pkg → mmap.dds)
+        # Витягуємо minimap з space-пакетів ({map_id}.pkg → mmap.dds
+        # та mmap_comp7.dds для Натиску → {map_id}_comp7.png)
         from PIL import Image
         from io import BytesIO
         extracted_png = 0
+        extracted_comp7_png = 0
         for map_id in all_map_data:
             space_pkg = os.path.join(self.wot_path, "res", "packages", f"{map_id}.pkg")
             if not os.path.exists(space_pkg):
                 continue
             try:
                 with zipfile.ZipFile(space_pkg, 'r') as z:
-                    data = z.read(f"spaces/{map_id}/mmap.dds")
-                img = Image.open(BytesIO(data)).convert("RGB")
-                img.save(os.path.join(self.out_path, f"{map_id}.png"))
-                extracted_png += 1
+                    names = set(z.namelist())
+                    if f"spaces/{map_id}/mmap.dds" in names:
+                        data = z.read(f"spaces/{map_id}/mmap.dds")
+                        img = Image.open(BytesIO(data)).convert("RGB")
+                        img.save(os.path.join(self.out_path, f"{map_id}.png"))
+                        extracted_png += 1
+                    # Окрема мінікарта Натиску (comp7) — інша графіка, інші бази
+                    if f"spaces/{map_id}/mmap_comp7.dds" in names:
+                        data = z.read(f"spaces/{map_id}/mmap_comp7.dds")
+                        img = Image.open(BytesIO(data)).convert("RGB")
+                        img.save(os.path.join(self.out_path, f"{map_id}_comp7.png"))
+                        extracted_comp7_png += 1
             except Exception as e:
                 pass
         if extracted_png:
             print(f"[ЕКСТРАКТОР] Вивантажено {extracted_png} minimap з space-пакетів")
+        if extracted_comp7_png:
+            print(f"[ЕКСТРАКТОР] Вивантажено {extracted_comp7_png} comp7 (Натиск) minimap")
 
         if callback_status:
             callback_status(f"Оновлено {len(all_map_data)} мап")

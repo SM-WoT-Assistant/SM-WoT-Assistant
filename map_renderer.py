@@ -12,15 +12,26 @@ class MapRenderer:
 
     def load_and_resize_map(self, cw, ch, use_border=False):
         if not self.app.current_map_eng: return None
-        
+
         paths = []
         if self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
-            paths.append(os.path.join(config.BASE_DIR, "extracted_maps", f"{self.app.current_map_eng}.png"))
+            base_id = self._resolve_map_data_id()
+            base_dir = os.path.join(config.BASE_DIR, "extracted_maps")
+            ui_mode = self.app.selected_battle_mode.get()
+            # Натиск: окрема мінікарта mmap_comp7 → {space_id}_comp7.png
+            # Для _comp7_nb арен свій space pkg і свій mmap_comp7 (назва зберігає суфікс)
+            if ui_mode in ("Onslaught", "OnslaughtLight"):
+                paths.append(os.path.join(base_dir, f"{base_id}_comp7.png"))
+            paths.append(os.path.join(base_dir, f"{base_id}.png"))
+            # Якщо raw nb-арена не має свого comp7 png — базовий comp7 тієї ж мапи
+            if base_id.endswith("_comp7_nb"):
+                paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}_comp7.png"))
+                paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}.png"))
         else:
             map_nice = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
             eng_name = self.app.map_mgr._resolve_tactic_folder(map_nice)
             safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
-            paths = [os.path.join(config.MAPS_DIR, safe_folder, "map.webp"), 
+            paths = [os.path.join(config.MAPS_DIR, safe_folder, "map.webp"),
                      os.path.join(config.MAPS_DIR, f"{eng_name}.jpg"),
                      os.path.join(config.MAPS_DIR, f"{eng_name}.png")]
                      
@@ -67,20 +78,56 @@ class MapRenderer:
         except Exception:
             pass
 
+    def _resolve_map_data_id(self):
+        """Ключ у map_data: raw id з логу (_comp7_nb) лише коли він відповідає
+        поточній мапі (без урахування суфікса). Інакше current_map_eng."""
+        app = self.app
+        raw = getattr(app, "battle_map_data_id", None)
+        cur = app.current_map_eng
+        if raw and cur and getattr(app, "map_data", None) and raw in app.map_data:
+            stripped = raw[:-len("_comp7_nb")] if raw.endswith("_comp7_nb") else raw
+            if cur in (raw, stripped):
+                return raw
+        return cur
+
+    def _active_bbox(self, data, internal_mode):
+        """boundingBox для активного режиму: вкладений (comp7) якщо є і він
+        відрізняється від кореневого, інакше кореневий bbox мапи."""
+        root_bb = data.get("boundingBox", {}) or {}
+        mode_data = (data.get("gameplayTypes") or {}).get(internal_mode) or {}
+        nested = mode_data.get("boundingBox")
+        if nested and isinstance(nested, dict):
+            if (nested.get("bottomLeft") != root_bb.get("bottomLeft")
+                    or nested.get("upperRight") != root_bb.get("upperRight")):
+                return nested
+        return root_bb
+
     def draw_arena_bases(self, cw, ch):
         app = self.app
-        if not app.map_data or app.current_map_eng not in app.map_data: return
-        data = app.map_data[app.current_map_eng]
-        bbox = data.get("boundingBox", {})
+        data_id = self._resolve_map_data_id()
+        if not app.map_data or data_id not in app.map_data: return
+        data = app.map_data[data_id]
+
+        ui_mode = app.selected_battle_mode.get()
+        mode_mapping = {
+            "Standard": "ctf",
+            "Encounter": "domination",
+            "Storm": "assault",
+            "Onslaught": "comp7",
+            "OnslaughtLight": "comp7",
+        }
+        internal_mode = mode_mapping.get(ui_mode, "ctf")
+
+        bbox = self._active_bbox(data, internal_mode)
         bl = bbox.get("bottomLeft", [-500.0, -500.0])
         ur = bbox.get("upperRight", [500.0, 500.0])
-        
+
         if not isinstance(bl, list) or len(bl) < 2: bl = [-500.0, -500.0]
         if not isinstance(ur, list) or len(ur) < 2: ur = [500.0, 500.0]
         if bbox and ("bottomLeft" not in bbox or "upperRight" not in bbox):
             self._report_fallback_async("boundingBox",
-                f"Missing boundingBox in map_data for {app.current_map_eng}")
-        
+                f"Missing boundingBox in map_data for {data_id}")
+
         minX, minZ = bl[0], bl[1]
         maxX, maxZ = ur[0], ur[1]
         width_game = maxX - minX
@@ -88,7 +135,10 @@ class MapRenderer:
 
         if width_game <= 0 or height_game <= 0: return
 
-        border = self.grid_border
+        # Border scaling — має збігатися з draw_grid/load_and_resize_map,
+        # інакше бази зсуваються відносно мінікарти при canvas != 800
+        sc = min(cw, ch) / 800.0
+        border = max(5, int(self.grid_border * sc))
         size = min(cw, ch) - 2 * border
         if size <= 10: return
         map_x = border
@@ -103,16 +153,6 @@ class MapRenderer:
             py = map_y + (maxZ - gz) / height_game * map_h
             return px, py
 
-        ui_mode = app.selected_battle_mode.get()
-        mode_mapping = {
-            "Standard": "ctf",
-            "Encounter": "domination",
-            "Storm": "assault",
-            "Onslaught": "comp7",
-            "OnslaughtLight": "comp7",
-        }
-        internal_mode = mode_mapping.get(ui_mode, "ctf")
-        
         gameplay_types = data.get("gameplayTypes", {})
         if internal_mode not in gameplay_types:
             if internal_mode == "assault" and "assault2" in gameplay_types:
@@ -147,16 +187,26 @@ class MapRenderer:
 
     def draw_grid(self, cw, ch):
         app = self.app
-        if not app.map_data or app.current_map_eng not in app.map_data: return
-        data = app.map_data[app.current_map_eng]
-        bbox = data.get("boundingBox", {})
+        data_id = self._resolve_map_data_id()
+        if not app.map_data or data_id not in app.map_data: return
+        data = app.map_data[data_id]
+        ui_mode = app.selected_battle_mode.get()
+        mode_mapping = {
+            "Standard": "ctf",
+            "Encounter": "domination",
+            "Storm": "assault",
+            "Onslaught": "comp7",
+            "OnslaughtLight": "comp7",
+        }
+        internal_mode = mode_mapping.get(ui_mode, "ctf")
+        bbox = self._active_bbox(data, internal_mode)
         bl = bbox.get("bottomLeft", [-500.0, -500.0])
         ur = bbox.get("upperRight", [500.0, 500.0])
         if not isinstance(bl, list) or len(bl) < 2: bl = [-500.0, -500.0]
         if not isinstance(ur, list) or len(ur) < 2: ur = [500.0, 500.0]
         if bbox and ("bottomLeft" not in bbox or "upperRight" not in bbox):
             self._report_fallback_async("boundingBox",
-                f"Missing boundingBox in draw_grid for {app.current_map_eng}")
+                f"Missing boundingBox in draw_grid for {data_id}")
         minX, minZ = bl[0], bl[1]
         maxX, maxZ = ur[0], ur[1]
         width_game = maxX - minX

@@ -179,6 +179,7 @@ class WotAssistantHQ:
         
         self.map_list_eng = []
         self.current_map_eng = None
+        self.battle_map_data_id = None  # raw map_id з логу бою (_comp7_nb) для map_data/картинок
         self.current_tk_map = None
         self.drag = None
         self.help_manager = help_system.HelpManager(self)
@@ -2007,7 +2008,9 @@ class WotAssistantHQ:
                 break
 
     def on_battle_detected(self, map_id, mode):
-        # Comp7 карти мають суфікс _comp7_nb в логі — обрізаємо для пошуку в map_dictionary
+        # Raw id з логу (з суфіксом _comp7_nb) — для map_data/картинок;
+        # обрізаний — лише для dictionary/combobox (там немає _comp7_nb ключів)
+        self.battle_map_data_id = map_id
         normalized_map_id = map_id
         if normalized_map_id.endswith("_comp7_nb"):
             normalized_map_id = normalized_map_id[:-len("_comp7_nb")]
@@ -2057,6 +2060,8 @@ class WotAssistantHQ:
     def on_battle_ended(self):
         self.save_settings()
         self._write_selected_scheme(None)
+        # Raw id бою більше не актуальний — малювання повертається на current_map_eng
+        self.battle_map_data_id = None
 
         if self._restored_by_battle:
             self._restored_by_battle = False

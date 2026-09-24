@@ -137,6 +137,8 @@ class LogWatcher:
                                         self._countdown_fired_for_arena = None
                                     self._battle_active = True
                                     self._last_arena_id = map_id
+                                    # loading/battleTypes from client menu.json:
+                                    # 30=Onslaught, 33=Onslaught, 34=Onslaught Training, 35=Onslaught Light
                                     type_to_mode = {
                                         1: "ctf",
                                         2: "domination",
@@ -144,6 +146,9 @@ class LogWatcher:
                                         4: "comp7",
                                         5: "comp7_light",
                                         30: "comp7",
+                                        33: "comp7",
+                                        34: "comp7",
+                                        35: "comp7_light",
                                     }
                                     mode = type_to_mode.get(self.last_type, "ctf")
                                     if self.callback:

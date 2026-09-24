@@ -106,6 +106,9 @@ popular_tanks_seed.json
 # Decoded temp files
 temp_decoded_*.xml
 
+# In-game mod build artifact (build_mod.py output)
+*.wotmod
+
 # Session test/temp files
 _cookie_test*
 _diff_*
