@@ -4,6 +4,18 @@
 
 ---
 
+## Реліз v1.0.79 Beta (24.09.2026)
+
+**Зміст релізу (з v1.0.78):** base schemes (admin mark/delete/rename + force Save-as-new + RTDB + bundle), scheme save/load UX overhaul (auto-save, New Scheme, context menu, validation), 187 мертвих translation-ключів видалено, Onslaught comp7 мінікарта + бази/спавни + click-through замка (root+overlay), arenaType 30/33/34/35 → Onslaught-фільтри.
+
+**Збірка:** `python build.py 1.0.79` — preflight clean → PyInstaller (Python 3.12.7, onedir) → 3219 data files → launcher 35.8 MB (bundle PASSED) → tray watcher 7.1 MB → NSIS `SM_WoT_Assistant_Setup_v1.0.79_Beta.exe` 311.4 MB → portable ZIP 350.4 MB → verification PASSED (EXE 31.2 MB, 52 maps, 104 extracted_maps, 1268 icons) → manifest → **GitHub release v1.0.79 Beta** (audit PASSED) → **RTDB publish** (HTTP 200, latest → 1.0.79 Beta, audit PASSED) → news published (HTTP 200).
+
+**Smoke:** dist EXE запускається (вікно «SM WoT Assistant v1.0.79 Beta»), чистий kill. AST 7/7 OK, offline type→mode mapping OK, nested bbox ×6 OK, no DEBUG.
+
+**Release Cleanup Protocol (#1497):** dist → 5 (1.0.75–1.0.79); GitHub → 5 (v1.0.74 видалено, тег лишився); RTDB versions → 5 + latest (1_0_72/73/74 PUT null admin-токеном).
+
+---
+
 ## Натиск: бази/спавни + мінікарта comp7 + click-through замка (23.09.2026)
 
 **Симптом:** на деяких мапах Натиску 10 бази/спавни не на місці; при закритому замку оверлей не пропускає кліки на мінімапу гри.
