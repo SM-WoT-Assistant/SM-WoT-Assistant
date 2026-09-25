@@ -1285,11 +1285,19 @@ class WotAssistantHQ:
     def on_map_select(self, event=None):
         self.root.focus_set()
         selected_ua = self.map_var.get()
-        self.current_map_eng = self.map_mgr.get_eng_map_name(selected_ua)
-        self._editing_scheme = None
-        if hasattr(self, 'painter'):
-            self.painter._creation_history.clear()
-            self.painter._editing_idx = -1
+        new_map = self.map_mgr.get_eng_map_name(selected_ua)
+        map_changed = new_map != self.current_map_eng
+        self.current_map_eng = new_map
+        if map_changed:
+            # Прив'язка схеми та undo-історія належать конкретній мапі:
+            # скидаємо ТІЛЬКИ при реальній зміні мапи. Бойовий автосинк
+            # (safe_battle_sync) викликає цей метод для ТІЄЇ Ж мапи — без
+            # цього гарда _editing_scheme губився при кожному вході в бій і
+            # автозбереження схем мовчки припинялося (редакції зникали).
+            self._editing_scheme = None
+            if hasattr(self, 'painter'):
+                self.painter._creation_history.clear()
+                self.painter._editing_idx = -1
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
@@ -1587,6 +1595,18 @@ class WotAssistantHQ:
             self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
         self._saved_schemes_keys = display_list
 
+    def scheme_save_mode(self):
+        """Режим бою для збереження поточної прив'язаної схеми.
+
+        Повертає ВЛАСНИЙ режим схеми (_editing_scheme.battle_mode), а не
+        поточний UI-фільтр: auto_mode_filter автоскидає selected_battle_mode
+        під час бою, і збереження за UI-фільтром створювало дублікат тієї ж
+        схеми під іншим режимом (схема «переходила» і зникала зі списку)."""
+        es = getattr(self, '_editing_scheme', None)
+        if es and es.get('battle_mode'):
+            return es['battle_mode']
+        return self.selected_battle_mode.get()
+
     def _on_saved_scheme_select(self, event=None):
         if getattr(self, '_scheme_switch_in_progress', False):
             return
@@ -1635,7 +1655,7 @@ class WotAssistantHQ:
                     tactics_manager.save_scheme_to_db(
                         config.SCHEMES_FILE, current_map,
                         config.MAP_NAMES_EN.get(current_map, current_map),
-                        self.selected_battle_mode.get(),
+                        self.scheme_save_mode(),
                         self.painter.drawings,
                         scheme_name=es['name'], description=es.get('desc', ''),
                         source="local")
@@ -1688,6 +1708,7 @@ class WotAssistantHQ:
                 "map_id": scheme_map_id,
                 "drawing_id": drawing_id,
                 "is_base": scheme.get('is_base', False),
+                "battle_mode": scheme.get('battle_mode', self.selected_battle_mode.get()),
             }
 
     def _on_new_scheme_clicked(self):
@@ -1713,7 +1734,8 @@ class WotAssistantHQ:
             if es and es.get('name') and es.get('map_id') == map_id:
                 if not (es.get('is_base') and not getattr(self, '_admin_present', False)):
                     ok, _ = tactics_manager.save_scheme_to_db(
-                        config.SCHEMES_FILE, map_id, map_name, mode,
+                        config.SCHEMES_FILE, map_id, map_name,
+                        self.scheme_save_mode(),
                         self.painter.drawings, scheme_name=es.get('name'),
                         description=es.get('desc', ''), source='local')
                     saved = ok
@@ -1743,7 +1765,7 @@ class WotAssistantHQ:
         self.data_mgr.save_drawings(self.painter.drawings)
         self.painter.redraw()
         # 5. Нова активна схема + палітра відкривається одразу
-        self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "drawing_id": drawing_id, "new": True}
+        self._editing_scheme = {"name": name, "desc": desc, "map_id": map_id, "drawing_id": drawing_id, "new": True, "battle_mode": mode}
         self._refresh_saved_schemes_list()
         # Автовибір нової схеми в списку
         values = list(self.saved_schemes_cb['values'] or [])
@@ -2029,32 +2051,39 @@ class WotAssistantHQ:
         }
         ui_mode = mode_map.get(mode, "Standard")
 
-        # Оновлюємо combobox для мапи бою щоб користувач міг обрати схему
-        saved_map = self.current_map_eng
-        self.current_map_eng = normalized_map_id
-        self._refresh_saved_schemes_list()
-        self._select_default_scheme_for_battle(normalized_map_id, ui_mode)
-        if saved_map:
-            self.current_map_eng = saved_map
+        # ВСЯ робота з Tk — ТІЛЬКИ в головному потоці через after(0)!
+        # Прямі виклики з потоку LogWatcher ганяються з mainloop
+        # (tkinter не thread-safe) і дають мерехтіння вікна при вході в бій —
+        # той самий корінь, що й у фіксі 339d896 (16.08.2026).
+        def _apply_battle_detection():
+            # Оновлюємо combobox для мапи бою щоб користувач міг обрати схему
+            saved_map = self.current_map_eng
+            self.current_map_eng = normalized_map_id
+            self._refresh_saved_schemes_list()
+            self._select_default_scheme_for_battle(normalized_map_id, ui_mode)
+            if saved_map:
+                self.current_map_eng = saved_map
 
-        # Записати поточну схему для in-game мода
-        self._write_selected_scheme_from_combobox()
+            # Записати поточну схему для in-game мода
+            self._write_selected_scheme_from_combobox()
 
-        # Новий бій скасовує відкладене повернення в edit після попереднього бою
-        if self._battle_edit_return is not None:
-            try:
-                self.root.after_cancel(self._battle_edit_return)
-            except Exception:
-                pass
-            self._battle_edit_return = None
+            # Новий бій скасовує відкладене повернення в edit після попереднього бою
+            if self._battle_edit_return is not None:
+                try:
+                    self.root.after_cancel(self._battle_edit_return)
+                except Exception:
+                    pass
+                self._battle_edit_return = None
 
-        if self._unhide_on_battle_var.get() and self._hidden_by_f10:
-            self._restored_by_battle = True
-            self.root.after(0, self._battle_restore_from_tray)
+            if self._unhide_on_battle_var.get() and self._hidden_by_f10:
+                self._restored_by_battle = True
+                self._battle_restore_from_tray()
+
+        self.root.after(0, _apply_battle_detection)
 
         if not self.auto_sync_var.get():
             return
-        
+
         self.root.after(0, lambda: self.safe_battle_sync(normalized_map_id, ui_mode))
 
     def on_battle_ended(self):

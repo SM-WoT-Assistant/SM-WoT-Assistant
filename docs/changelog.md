@@ -4,6 +4,27 @@
 
 ---
 
+## Фікси після v1.0.79: мерехтіння при вході в бій + зламане збереження схем (25.09.2026)
+
+**Симптоми (користувач, 25.09):** після релізу 1.0.79 при автовході в бій вікно дуже швидко кілька разів перемикає edit→norm→edit; механізм збереження схем «хаотично зберігає, потім зникає» — без видимих помилок.
+
+**Корені (аудит коду + реального saved_schemes.json + game.log):**
+1. **Мерехтіння — regresia 1.0.79, той самий корінь що у фіксі 339d896 (16.08):** `on_battle_detected` виконується в потоці LogWatcher, а з 1.0.79 отримав важкі прямі Tk-операції (`_refresh_saved_schemes_list`, `_select_default_scheme_for_battle`, `_write_selected_scheme_from_combobox`, `after_cancel`) — ганяються з mainloop через `safe_battle_sync` (пакування віджетів з двох потоків → нестабільний стан вікна). Лог-сторона чиста: 1 ARENA + 1 countdown + 1 hangar на бій (перевірено на 96 боях).
+2. **Схеми губилися:** `on_map_select` (новий код 1.0.79) безумовно скидав `_editing_scheme` + undo-історію — бойовий автосинк викликає його для ТІЄЇ Ж мапи при кожному вході в бій → прив'язка автозбереження мовчки відмикалася, редакції не писалися в схему.
+3. **Дублікати схем:** усі save-шляхи брали `selected_battle_mode` (UI-фільтр), який `auto_mode_filter` автоскидає під час бою → збереження йшло під іншим `battle_mode` → upsert не знаходив оригінал → дубль під новим режимом; при поверненні фільтра оригінал зі старим вмістом («редакції зникли»), дубль ховався («схема зникла»). Доказ у БД: `Westfield` (16:51) + `Westfield [Standard]` (17:01) — два записи з однаковим вмістом.
+
+**Зміни:**
+- `main.py on_battle_detected`: ВСЯ Tk-робота перенесена в один замикання `_apply_battle_detection` через `root.after(0, ...)`; у тілі колбеку — лише звичайні атрибути + планування (відновлено інваріант 339d896).
+- `main.py on_map_select`: `_editing_scheme = None` + очистка undo-історії ТІЛЬКИ при реальній зміні мапи (`map_changed`).
+- `main.py scheme_save_mode()` (новий): режим збереження = власний `battle_mode` прив'язаної схеми, fallback — UI-фільтр.
+- Save-шляхи переведені на `scheme_save_mode()`: автозбереження палітри, збереження при перемиканні/створенні схеми (`main`), ручний SAVE і save-as-copy діалоги (`painting_palette`).
+- `_editing_scheme` тепер зберігає `battle_mode` при всіх sites прив'язки (select/new/dialog).
+- Навмисно НЕ змінено: coords-match автозбереження (консистентний у межах UI-режиму), фільтр комбобокса map+battle_mode (#1942 — за дизайном), створення `Map [Mode]` при перемиканні з не-прив'язаними майданчиками (safety-net проти втрати даних).
+
+**Верифікація:** AST 2/2 OK; статичний інваріант — top-level `on_battle_detected` = лише attrs/after (Tk лише в after-замиканні); `on_map_select` гард; `scheme_save_mode` логіка 3/3; карта всіх 8 save-сайтів — es-mode де потрібно; live smoke: старт застосунку без помилок (LogWatcher з кінця game.log), чистий kill. Live-тест користувачем: вхід у бій з трей + збереження/перемикання схем.
+
+---
+
 ## Реліз v1.0.79 Beta (24.09.2026)
 
 **Зміст релізу (з v1.0.78):** base schemes (admin mark/delete/rename + force Save-as-new + RTDB + bundle), scheme save/load UX overhaul (auto-save, New Scheme, context menu, validation), 187 мертвих translation-ключів видалено, Onslaught comp7 мінікарта + бази/спавни + click-through замка (root+overlay), arenaType 30/33/34/35 → Onslaught-фільтри.

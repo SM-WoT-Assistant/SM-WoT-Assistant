@@ -812,7 +812,7 @@ class DrawingPalette(tk.Toplevel):
         tactics_manager.save_scheme_to_db(
             config.SCHEMES_FILE, map_id,
             config.MAP_NAMES_EN.get(map_id, map_id),
-            self.app.selected_battle_mode.get(),
+            self.app.scheme_save_mode(),
             self.painter.drawings,
             scheme_name=es.get('name', ''),
             description=es.get('desc', ''),
@@ -1130,13 +1130,15 @@ class DrawingPalette(tk.Toplevel):
         if not map_id:
             return False
         map_name = config.MAP_NAMES_EN.get(map_id, map_id)
-        mode = self.app.selected_battle_mode.get()
         drawings = self.app.painter.drawings
         if map_id not in drawings or not drawings[map_id]:
             dialog_utils.dark_messagebox(self.app.root, "Save", "No drawings to save.", is_error=True)
             return False
 
         es = getattr(self.app, '_editing_scheme', None)
+        # Режим прив'язаної схеми, а не UI-фільтр — інакше при авто-скиді
+        # selected_battle_mode під час бою створюється дублікат під іншим режимом
+        mode = self.app.scheme_save_mode()
         default_name = (es.get('name') if es and es.get('name') else f"{map_name} [{mode}]")
         # Діалог сам валідує: name+desc обов'язкові + user-wide унікальність назви
         exclude_id = es.get('drawing_id') if es and es.get('drawing_id') else None
@@ -1707,8 +1709,10 @@ class DrawingPalette(tk.Toplevel):
         if not map_id:
             return True
         map_name = config.MAP_NAMES_EN.get(map_id, map_id)
-        mode = self.app.selected_battle_mode.get()
         es = getattr(self.app, '_editing_scheme', None)
+        # Режим прив'язаної схеми, а не UI-фільтр (авто-скид під час бою
+        # створював дублікати: збереження йшло під іншим battle_mode)
+        mode = self.app.scheme_save_mode()
         is_admin = getattr(self.app, '_admin_present', False)
         orig_base_name = (es.get('name') if force_new_name and es and es.get('name')
                           else '')
@@ -1797,7 +1801,8 @@ class DrawingPalette(tk.Toplevel):
                 source='local')
             self.app._editing_scheme = {
                 "name": name, "desc": desc_var.get().strip(),
-                "map_id": map_id, "is_base": False}
+                "map_id": map_id, "is_base": False,
+                "battle_mode": mode}
             self.app.status_label.config(text=f"Saved: {name}", bg="#1a3322")
             self.app._refresh_saved_schemes_list()
             result[0] = True
