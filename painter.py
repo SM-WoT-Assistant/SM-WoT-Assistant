@@ -435,13 +435,13 @@ class MapPainter:
                 self.start_x = snap_x
                 self.start_y = snap_y
 
-            self.temp_item = self.canvas.create_line(self.start_x, self.start_y, event.x, event.y, arrow=tk.LAST, fill=self.default_color, width=self._thickness, dash=(12, 6), tags="temp_draw")
+            self._draw_temp_line([self.start_x, self.start_y, event.x, event.y], arrow=True)
             if self.active_tool == "marker":
                 self.canvas.create_oval(self.start_x-12, self.start_y-12, self.start_x+12, self.start_y+12, outline=self.default_color, width=max(1, self._thickness-1), tags="temp_draw")
                 self.canvas.create_oval(self.start_x-4, self.start_y-4, self.start_x+4, self.start_y+4, fill="white", outline="white", tags="temp_draw")
         elif self.active_tool == "brush":
             self._brush_points = [(event.x, event.y)]
-            self.temp_item = self.canvas.create_line(event.x, event.y, event.x, event.y, fill=self.default_color, width=self._thickness, dash=(12, 6), tags="temp_draw")
+            self._draw_temp_line([event.x, event.y, event.x, event.y], arrow=False)
         elif self.active_tool == "text":
             self.temp_item = self.canvas.create_text(event.x, event.y, text="📍", fill=self.default_color, font=("Arial", 16), tags="temp_draw")
 
@@ -698,13 +698,13 @@ class MapPainter:
             return
         if not self.temp_item or self.app.mode != "edit": return
         if self.active_tool in ("marker", "arrow"):
-            self.canvas.coords(self.temp_item, self.start_x, self.start_y, event.x, event.y)
+            self._draw_temp_line([self.start_x, self.start_y, event.x, event.y], arrow=True)
         elif self.active_tool == "brush":
             last_x, last_y = self._brush_points[-1]
             if math.hypot(event.x - last_x, event.y - last_y) >= 10:
                 self._brush_points.append((event.x, event.y))
                 flat = [coord for p in self._brush_points for coord in p]
-                self.canvas.coords(self.temp_item, *flat)
+                self._draw_temp_line(flat, arrow=False)
         elif self.active_tool == "text":
             self.canvas.coords(self.temp_item, event.x, event.y)
             
@@ -944,6 +944,78 @@ class MapPainter:
                 
         return True
 
+    @staticmethod
+    def _dash_runs(points, on, off):
+        """Розбити ламану (flat [x0,y0,...]) на видимі (ON) відрізки пунктиру.
+
+        Tk -dash на цій платформі ненадійний: значення off ігнорується, а
+        відступ малюється рівним товщині лінії (заміри 26.09.2026: (5,5)/(12,6)/(6,30)
+        дають однаковий результат, зв'язок on->довжина штриха нелінійний).
+        Тому пунктир малюється явними сегментами: штрих = 2*lw, відступ = lw —
+        детерміновано на будь-якій товщині/DPI: вдвічі довші штрихи при
+        незміненому відступі (відступ і раніше дорівнював товщині).
+        """
+        if len(points) < 4:
+            return []
+        runs = []
+        cur = None
+        px, py = points[0], points[1]
+        need = float(on)
+        on_phase = True
+        i = 2
+        while i + 1 < len(points):
+            qx, qy = points[i], points[i + 1]
+            seg = math.hypot(qx - px, qy - py)
+            travelled = 0.0
+            while seg - travelled > 1e-9:
+                step = min(need, seg - travelled)
+                sx = px + (qx - px) * travelled / seg
+                sy = py + (qy - py) * travelled / seg
+                travelled += step
+                nx = px + (qx - px) * travelled / seg
+                ny = py + (qy - py) * travelled / seg
+                if on_phase:
+                    if cur is None:
+                        cur = [sx, sy]
+                    cur.extend((nx, ny))
+                need -= step
+                if need <= 1e-9:
+                    if on_phase:
+                        runs.append(cur)
+                        cur = None
+                        on_phase = False
+                        need = float(off)
+                    else:
+                        on_phase = True
+                        need = float(on)
+                        cur = [nx, ny]
+            px, py = qx, qy
+            i += 2
+        if on_phase and cur is not None and len(cur) >= 4:
+            runs.append(cur)
+        return runs
+
+    def _draw_temp_line(self, flat, arrow=False):
+        """Прев'ю лінії при малюванні з явним пунктиром (див. _dash_runs)."""
+        self.canvas.delete("temp_line")
+        lw = self._thickness
+        for run in self._dash_runs(flat, 2 * lw, lw):
+            self.canvas.create_line(*run, fill=self.default_color, width=lw,
+                                    tags=("temp_draw", "temp_line"))
+        if arrow and len(flat) >= 4:
+            x1, y1, x2, y2 = flat[0], flat[1], flat[-2], flat[-1]
+            d = math.hypot(x2 - x1, y2 - y1)
+            # Стрілка: суцільний «хвіст» розміром у товщину (накривається
+            # власне стрілкою, як і у Tk-варіанті — стрілка суцільна завжди)
+            if d > lw * 2:
+                self.canvas.create_line(x2 - (x2 - x1) / d * lw, y2 - (y2 - y1) / d * lw,
+                                        x2, y2, arrow=tk.LAST, fill=self.default_color,
+                                        width=lw, tags=("temp_draw", "temp_line"))
+            elif d > 0:
+                self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=self.default_color,
+                                        width=lw, tags=("temp_draw", "temp_line"))
+        self.temp_item = "temp_line"
+
     def _render_elements(self, canvas, elements, cw, ch, offset_x=0, offset_y=0, img_w=None, img_h=None, screen_scale=1.0):
         """Render elements on a given canvas. No visibility filtering — renders all.
         offset_x/offset_y: image offset within canvas (for preview).
@@ -975,7 +1047,13 @@ class MapPainter:
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
+                for _run in self._dash_runs([x1, y1, x2, y2], 2 * lw, lw):
+                    canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
+                _d = math.hypot(x2 - x1, y2 - y1)
+                if _d > lw * 2:
+                    canvas.create_line(x2 - (x2 - x1) / _d * lw, y2 - (y2 - y1) / _d * lw, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                elif _d > 0:
+                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
 
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
                 canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
@@ -992,7 +1070,13 @@ class MapPainter:
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
+                for _run in self._dash_runs([x1, y1, x2, y2], 2 * lw, lw):
+                    canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
+                _d = math.hypot(x2 - x1, y2 - y1)
+                if _d > lw * 2:
+                    canvas.create_line(x2 - (x2 - x1) / _d * lw, y2 - (y2 - y1) / _d * lw, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                elif _d > 0:
+                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -1005,14 +1089,22 @@ class MapPainter:
             elif obj["type"] == "brush":
                 if len(coords) < 4: continue
                 flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
-                arr = tk.NONE
-                if obj.get("arrow_start") and obj.get("arrow_end"):
-                    arr = tk.BOTH
-                elif obj.get("arrow_start"):
-                    arr = tk.FIRST
-                elif obj.get("arrow_end"):
-                    arr = tk.LAST
-                canvas.create_line(*flat_px, arrow=arr, fill=c, width=lw, dash=(12, 6), tags="painter_obj")
+                for _run in self._dash_runs(flat_px, 2 * lw, lw):
+                    canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
+                if obj.get("arrow_start") and len(flat_px) >= 4:
+                    _ax0, _ay0 = flat_px[0], flat_px[1]
+                    _ax1, _ay1 = flat_px[2], flat_px[3]
+                    _da = math.hypot(_ax1 - _ax0, _ay1 - _ay0)
+                    if _da > 0:
+                        _tl = min(lw, _da)
+                        canvas.create_line(_ax0, _ay0, _ax0 + (_ax1 - _ax0) / _da * _tl, _ay0 + (_ay1 - _ay0) / _da * _tl, arrow=tk.FIRST, fill=c, width=lw, tags="painter_obj")
+                if obj.get("arrow_end") and len(flat_px) >= 4:
+                    _bx0, _by0 = flat_px[-4], flat_px[-3]
+                    _bx1, _by1 = flat_px[-2], flat_px[-1]
+                    _db = math.hypot(_bx1 - _bx0, _by1 - _by0)
+                    if _db > 0:
+                        _tl = min(lw, _db)
+                        canvas.create_line(_bx1 - (_bx1 - _bx0) / _db * _tl, _by1 - (_by1 - _by0) / _db * _tl, _bx1, _by1, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -1031,7 +1123,9 @@ class MapPainter:
             elif obj["type"] == "zone":
                 if len(coords) < 6: continue
                 flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
-                canvas.create_polygon(*flat_px, outline=c, fill="", dash=(8, 4), width=max(1, lw-1), tags="painter_obj")
+                wz = max(1, lw - 1)
+                for _run in self._dash_runs(flat_px + flat_px[:2], 2 * wz, wz):
+                    canvas.create_line(*_run, fill=c, width=wz, tags="painter_obj")
 
             elif obj["type"] == "text":
                 if len(coords) < 2: continue
