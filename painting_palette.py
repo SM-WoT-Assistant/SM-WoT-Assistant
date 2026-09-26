@@ -1942,30 +1942,31 @@ class DrawingPalette(tk.Toplevel):
             self._update_color_buttons()
             self._update_sliders_state()
 
-            # Сталість інструментів (Етап 3): якщо інструмент активний — він
-            # лишається підсвіченим у тулбарі; підсвітка типу об'єкта +
-            # вимкнення інструмента — лише коли інструмент неактивний.
-            if not self.painter.active_tool:
-                if obj["type"] == "text":
-                    poi_data = obj.get("poi", [])
-                    if isinstance(poi_data, str):
-                        if poi_data.startswith("xvm_"):
-                            poi_data = [int(poi_data.split("_")[1], 16)]
-                        else:
-                            poi_data = []
-                    if "tree" in poi_data:
-                        self._highlight_toolbar_button("tree")
-                    elif poi_data:
-                        code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
-                        self._highlight_toolbar_button(code)
+            # Індикатор виділення (підтвердження користувача 26.09): вибраний
+            # елемент ПІДСВІЧУЄТЬСЯ кнопкою свого типу в палітрі — завжди,
+            # незалежно від активного інструмента. Вимкнення інструмента —
+            # лише коли він неактивний (сталість, Етап 3).
+            if obj["type"] == "text":
+                poi_data = obj.get("poi", [])
+                if isinstance(poi_data, str):
+                    if poi_data.startswith("xvm_"):
+                        poi_data = [int(poi_data.split("_")[1], 16)]
                     else:
-                        self._highlight_toolbar_button(0x2B)
-                elif obj["type"] == "arrow":
-                    self._highlight_toolbar_button("arrow")
-                elif obj["type"] == "brush":
-                    self._highlight_toolbar_button("brush")
+                        poi_data = []
+                if "tree" in poi_data:
+                    self._highlight_toolbar_button("tree")
+                elif poi_data:
+                    code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
+                    self._highlight_toolbar_button(code)
                 else:
-                    self._highlight_toolbar_button("marker")
+                    self._highlight_toolbar_button(0x2B)
+            elif obj["type"] == "arrow":
+                self._highlight_toolbar_button("arrow")
+            elif obj["type"] == "brush":
+                self._highlight_toolbar_button("brush")
+            else:
+                self._highlight_toolbar_button("marker")
+            if not self.painter.active_tool:
                 self.painter.set_tool(None)
             self._del_btn.config(state="normal", bg="#cc3333", fg="white")
             if obj["type"] == "marker":
@@ -2035,11 +2036,15 @@ class DrawingPalette(tk.Toplevel):
         self._edit_obj = None
         self.painter._editing_idx = -1
         # Сталість інструментів (Етап 3): зняття виділення елемента НЕ вимикає
-        # активний інструмент — вимикається лише кнопкою/перемиканням.
+        # активний інструмент — вимикається лише кнопкою/перемиканням. Підсвітка
+        # при цьому повертається на кнопку активного інструмента (інакше кнопка
+        # типу елемента лишалась би світитись після зняття виділення).
         if not self.painter.active_tool:
             self._active_tool_code = None
             self._update_toolbar_buttons()
             self.painter.set_tool(None)
+        else:
+            self._highlight_toolbar_button(self.painter.active_tool)
         self._del_btn.config(state="disabled", bg="#555555", fg="#888888")
         self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
