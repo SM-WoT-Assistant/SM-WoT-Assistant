@@ -1097,16 +1097,16 @@ class MapPainter:
     def is_visible(self, obj):
         current_mode = self.app.selected_battle_mode.get()
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
-        
+
         if obj.get("modes") and current_mode not in obj["modes"]:
             return False
-            
+
         req_classes = obj.get("classes", [])
         if req_classes:
             req_en = [self._UKR_TO_EN.get(c, c) for c in req_classes]
             if not any(cls in active_classes for cls in req_en):
                 return False
-                
+
         return True
 
     @staticmethod
@@ -1354,6 +1354,27 @@ class MapPainter:
                     ty = y + int(15 * sc) if poi_data else y
                     canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
 
+    def _selection_bbox(self, obj, cw, ch, margin):
+        """bbox елемента у пікселях для рамки виділення; None — не підтримується."""
+        c = obj.get("coords", [])
+        if not c and "x1" in obj:
+            c = [obj.get("x1", 0), obj.get("y1", 0),
+                 obj.get("x2", obj.get("x1", 0)), obj.get("y2", obj.get("y1", 0))]
+        if not c:
+            return None
+        if obj["type"] == "text":
+            return (c[0]*cw - 30*margin, c[1]*ch - 30*margin,
+                    c[0]*cw + 30*margin, c[1]*ch + 30*margin)
+        xs = [c[i]*cw for i in range(0, len(c), 2)]
+        ys = [c[i+1]*ch for i in range(1, len(c), 2)]
+        if not xs or not ys:
+            return None
+        if len(xs) == 1:
+            return (xs[0] - 4*margin, ys[0] - 4*margin,
+                    xs[0] + 4*margin, ys[0] + 4*margin)
+        return (min(xs) - margin, min(ys) - margin,
+                max(xs) + margin, max(ys) + margin)
+
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
         if getattr(self.app, '_use_mod_var', None) and self.app._use_mod_var.get():
@@ -1419,5 +1440,18 @@ class MapPainter:
                 else:
                     continue
                 self.canvas.create_rectangle(l, t, r, b, outline="yellow", dash=(4, 4), width=max(1, int(2*sel_sc)), tags="painter_obj")
+
+        # Рамка виділення ОДНОГО елемента (F-SEL): жовтий пунктир навколо
+        # _editing_idx. Раніше існувала лише рамка select-all (вище), тому
+        # не було видно, що елемент виділений ЛКМ.
+        if not self._select_all and self._editing_idx >= 0:
+            _objs = self.drawings.get(self.app.current_map_eng, [])
+            if 0 <= self._editing_idx < len(_objs):
+                _sel_obj = _objs[self._editing_idx]
+                _sel_sc = min(cw, ch) / 800.0
+                _bbox = self._selection_bbox(_sel_obj, cw, ch, max(4, int(8 * _sel_sc)))
+                if _bbox and self.is_visible(_sel_obj):
+                    self.canvas.create_rectangle(*_bbox, outline="yellow", dash=(4, 4),
+                                                  width=max(1, int(2 * _sel_sc)), tags="painter_obj")
 
         self.app._lift_overlay()
