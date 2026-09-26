@@ -72,6 +72,9 @@ class UIManager:
         self.app.saved_schemes_cb = ttk.Combobox(self.app.map_toolbar, textvariable=self.app.saved_schemes_var, state="readonly", width=18, font=("Arial", 8))
         self.app.saved_schemes_cb.bind("<<ComboboxSelected>>", self.app._on_saved_scheme_select)
         self.app.saved_schemes_cb.bind("<Button-3>", self.app._show_scheme_context_menu)
+        # Гард: пакуємо одразу (без before= — draw_btn ще не створено);
+        # перший _refresh_saved_schemes_list на старті перевставить перед draw_btn.
+        self.app.saved_schemes_cb.pack(side="left", padx=5, pady=2)
 
         _cs_style = ttk.Style()
         _cs_style.configure("TCombobox", background="#333", foreground="white",

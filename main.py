@@ -1511,6 +1511,9 @@ class WotAssistantHQ:
             self.saved_schemes_cb['values'] = []
             self.saved_schemes_var.set(self.t('ui', 'no_saved_schemes'))
             self.saved_schemes_cb.config(state='disabled', style='GrayDisabled.TCombobox')
+            # Комбобокс має бути в тулбарі завжди (сірий плейсхолдер),
+            # інакше при старті на мапі без схем віджет фізично зникає.
+            self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
             return
         all_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
         all_schemes = [s for s in all_schemes if s.get('map_id') == map_id]
@@ -1563,6 +1566,8 @@ class WotAssistantHQ:
             self.saved_schemes_cb['values'] = []
             self.saved_schemes_var.set(self.t('ui', 'no_saved_schemes'))
             self.saved_schemes_cb.config(state='disabled', style='GrayDisabled.TCombobox')
+            # Див. гілку not map_id вище: без pack віджет зникає з тулбару.
+            self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
         else:
             sep_texts = {
                 "__sep_downloaded__": "── %s ──" % self.t('ui', 'schemes_section_downloaded'),
