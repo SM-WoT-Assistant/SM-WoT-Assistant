@@ -329,7 +329,6 @@ class WotAssistantHQ:
             allow_map_decode=allow_decode,
         )
 
-
     def t(self, cat, key):
         if cat == "ui": return self.locale.t_ui(key)
         if cat == "tanks": return self.locale.t_tank(key, key)
@@ -423,6 +422,12 @@ class WotAssistantHQ:
         # належить _po_win, і root-бінд у його bindtags-ланцюг не входить —
         # без цього бінда буфер мовчазно не спрацьовував (28.08.2026).
         self._po_win.bind("<Control-KeyPress>", self.painter._on_clipboard_key)
+        self._po_win.bind("<KeyPress>", self.painter._on_tool_hotkey, add="+")
+        self._po_win.bind("<Delete>", self.painter._on_delete_key, add="+")
+        self._po_win.bind("<KeyPress-Alt_L>", self.painter._on_alt_press, add="+")
+        self._po_win.bind("<KeyPress-Alt_R>", self.painter._on_alt_press, add="+")
+        self._po_win.bind("<KeyRelease-Alt_L>", self.painter._on_alt_release, add="+")
+        self._po_win.bind("<KeyRelease-Alt_R>", self.painter._on_alt_release, add="+")
         self.canvas.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Unmap>", self._on_root_hide, "+")
@@ -1599,6 +1604,55 @@ class WotAssistantHQ:
             self.saved_schemes_cb.config(state='readonly', style='TCombobox')
             self.saved_schemes_cb.pack(side="left", padx=5, pady=2, before=self.draw_btn)
         self._saved_schemes_keys = display_list
+        self._maybe_autoload_displayed_scheme()
+
+    def _maybe_autoload_displayed_scheme(self):
+        """F1: відображена в комбобоксі схема має бути активною ціллю автосейву.
+
+        Діагностика 26.09.2026 (D1/D2): es виставлявся лише при ручному кліку /
+        «Нова схема» / збереженні — на старті та після зміни мапи/бою назва схеми
+        лишалась у комбобоксі, а es=None → `_autosave_current_scheme` мовчки
+        повертався («autosave SKIP: es=None»), поки ручний клік не оживляв
+        автосейв («autosave OK»). Повна підміна canvas (варіант A) — лише за
+        безпечних умов; якщо es=None і на мапі вже лежить чужий вміст — лише
+        прив'язуємо es (наступний автосейв наздожене схему до canvas)."""
+        if getattr(self, '_scheme_switch_in_progress', False):
+            return
+        keys = getattr(self, '_saved_schemes_keys', None) or []
+        if not keys or not hasattr(self, '_saved_schemes_map') or not hasattr(self, 'painter'):
+            return
+        sel = self.saved_schemes_var.get()
+        if not sel:
+            return
+        display_texts = list(self.saved_schemes_cb['values'] or ())
+        idx = None
+        for i, dt in enumerate(display_texts):
+            if dt == sel:
+                idx = i
+                break
+        if idx is None or idx >= len(keys):
+            return
+        scheme = self._saved_schemes_map.get(keys[idx])
+        if not scheme or scheme.get("_separator"):
+            return
+        new_id = scheme.get('drawing_id', '')
+        es = getattr(self, '_editing_scheme', None)
+        if es and es.get('name') == scheme.get('scheme_name', '') and es.get('drawing_id', '') == new_id:
+            return  # вже активна ціль автосейву
+        current_drawings = self.painter.drawings.get(self.current_map_eng, [])
+        scheme_coords = {tuple(e.get("coords", [])) for e in (scheme.get('elements') or [])}
+        current_coords = {tuple(e.get("coords", [])) for e in current_drawings}
+        if es is None and current_drawings and current_coords != scheme_coords:
+            self._editing_scheme = {
+                "name": scheme.get('scheme_name', ''),
+                "desc": scheme.get('description', ''),
+                "map_id": scheme.get('map_id', ''),
+                "drawing_id": new_id,
+                "is_base": scheme.get('is_base', False),
+                "battle_mode": scheme.get('battle_mode', self.selected_battle_mode.get()),
+            }
+            return
+        self.root.after(0, self._on_saved_scheme_select)
 
     def scheme_save_mode(self):
         """Режим бою для збереження поточної прив'язаної схеми.

@@ -46,10 +46,20 @@ class MapPainter:
         self._clipboard_obj = None
         self._press_candidate = None
         self._press_moved = False
+        self._alt_active = False
         # Ctrl+C/V через <Control-KeyPress> + keycode (VK 67/86) — працює в
         # будь-якій розкладці. Keysym-імена (cyrillic_es/ve) Windows Tk
         # відкидає прямо в bind() — крах старту (інцидент 26.08.2026).
         self.app.root.bind("<Control-KeyPress>", self._on_clipboard_key)
+        # V (VK 86) → select tool + Alt spring-loaded move (Етапи 4-5),
+        # Del → видалення виділеного (Етап 6) — на root, доки фокус не в Entry.
+        self.app.root.bind("<KeyPress>", self._on_tool_hotkey, add="+")
+        self.app.root.bind("<Delete>", self._on_delete_key, add="+")
+        self.app.root.bind("<KeyPress-Alt_L>", self._on_alt_press, add="+")
+        self.app.root.bind("<KeyPress-Alt_R>", self._on_alt_press, add="+")
+        self.app.root.bind("<KeyRelease-Alt_L>", self._on_alt_release, add="+")
+        self.app.root.bind("<KeyRelease-Alt_R>", self._on_alt_release, add="+")
+        self.app.root.bind("<FocusOut>", self._on_focus_out, add="+")
 
     def apply_thickness_to_all(self, value):
         """Apply thickness to ALL existing drawings on current map."""
@@ -277,17 +287,134 @@ class MapPainter:
             ("<Control-ButtonRelease-1>", self.on_move_release),
             ("<Button-3>", self.on_right_click),
             ("<Escape>", self.on_escape_deselect),
+            ("<Delete>", self._on_delete_key),
+            ("<KeyPress>", self._on_tool_hotkey),
+            ("<KeyPress-Alt_L>", self._on_alt_press),
+            ("<KeyPress-Alt_R>", self._on_alt_press),
+            ("<KeyRelease-Alt_L>", self._on_alt_release),
+            ("<KeyRelease-Alt_R>", self._on_alt_release),
             ("<Control-KeyPress>", self._on_clipboard_key),
         ]:
             target_canvas.bind(ev, cb, add="+")
 
     def on_escape_deselect(self, event=None):
+        # Esc (Етап 6): пріоритети — (1) скасувати активний рух/прев'ю з
+        # відновленням оригіналів, (2) select-all → off, (3) зняти виділення.
+        # Інструмент при цьому НЕ вимикається (сталість, Етап 3).
+        drag = None
+        if self._press_candidate is not None:
+            drag = self._press_candidate
+        elif self.move_drag_active and self.move_drag:
+            drag = self.move_drag
+        if drag is not None:
+            if self._press_moved or self.move_drag_active:
+                idx = drag.get("index", -1)
+                map_id = self.app.current_map_eng
+                objects = self.drawings.get(map_id, []) if map_id else []
+                if 0 <= idx < len(objects):
+                    obj = objects[idx]
+                    if drag.get("original_coords"):
+                        obj["coords"] = list(drag["original_coords"])
+                    if drag.get("original_class_icon_coords"):
+                        obj["class_icon_coords"] = list(drag["original_class_icon_coords"])
+                    if drag.get("original_text_coords"):
+                        obj["text_coords"] = list(drag["original_text_coords"])
+                    self.save_drawings()
+            self._press_candidate = None
+            self._press_moved = False
+            self.move_drag = None
+            self.move_drag_active = False
+            try:
+                self.redraw()
+            except Exception:
+                pass
+            return
+        if self.temp_item is not None:
+            # Скасування в процесі малювання прев'ю (інструмент лишається)
+            self.canvas.delete("temp_draw")
+            self.temp_item = None
+            self._brush_points = []
+            return
+        if self._select_all:
+            self.toggle_select_all()
+            return
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             palette.exit_edit_mode()
+
+    def _on_tool_hotkey(self, event=None):
+        """V (VK 86, keycode-dispatch #1671) → select tool (Етап 4)."""
+        if event is None or event.keycode != 86:
+            return None
+        if event.state & 0x0004:
+            return None  # Ctrl+V = паста. Біт 0x8 НЕ є Alt на цій системі
+        # (звичайна V приходить з state=8, замір 26.09.2026) — не гартуємо.
+        if self._clipboard_focus_in_field():
+            return None  # фокус у Entry/Text — V друкується текстом
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette or palette.state() == 'withdrawn':
+            return None
+        if self.app.mode != "edit" or not self.app.current_map_eng:
+            return None
+        palette._set_tool_from_code("select")
+        return "break"
+
+    def _on_delete_key(self, event=None):
+        """Del (Етап 6): видалити виділений елемент (select-all → всі виділені)."""
+        if self._clipboard_focus_in_field():
+            return None
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette or palette.state() == 'withdrawn':
+            return None
+        if not palette.is_in_edit_mode() and not self._select_all:
+            return None
+        palette._delete_selected()
+        return "break"
+
+    def _on_alt_press(self, event=None):
+        """Alt утримання (Етап 5): тимчасовий move — курсор fleur.
+        Флаг `_alt_active` — головне джерело правди для on_press (state-біти
+        на цій системі ненадійні, див. коментар про біт 0x8 у _on_clipboard_key)."""
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette or palette.state() == 'withdrawn' or self.app.mode != "edit":
+            return None
+        if self._alt_active:
+            return None
+        self._alt_active = True
+        try:
+            self.canvas.config(cursor="fleur")
+        except Exception:
+            pass
+        return None
+
+    def _on_alt_release(self, event=None):
+        """Відпустили Alt (Етап 5): повернення до попереднього інструменту."""
+        if not self._alt_active:
+            return None
+        self._alt_active = False
+        try:
+            self.canvas.config(cursor="fleur" if self.active_tool == "move" else "")
+        except Exception:
+            pass
+        return None
+
+    def _on_focus_out(self, event=None):
+        # Втрата фокусу під час утримання Alt → скид spring-loaded стану:
+        # KeyRelease може загубитись (фокус пішов з вікна) і флаг застрягне би.
+        if self._alt_active:
+            self._alt_active = False
+            try:
+                self.canvas.config(cursor="fleur" if self.active_tool == "move" else "")
+            except Exception:
+                pass
     
     def set_tool(self, tool):
         self.active_tool = tool
+        try:
+            # Візуальний фідбек: move та Alt-тимчасовий рух — курсор-рух (fleur).
+            self.canvas.config(cursor="fleur" if tool == "move" else "")
+        except Exception:
+            pass
         palette = getattr(self.app, 'drawing_palette', None)
         if not palette or not palette.is_in_edit_mode():
             pass
@@ -387,10 +514,35 @@ class MapPainter:
         palette = getattr(self.app, 'drawing_palette', None)
         palette_visible = palette and palette.state() != 'withdrawn'
 
-        if palette_visible and not self.active_tool:
+        # Alt = spring-loaded move (Етап 5): флаг від keysym-біндів
+        # (<KeyPress-Alt_L>), НЕ від state-бітів — біт 0x8 на цій системі
+        # ненадійний (супроводжує звичайний Ctrl, [CLIP] 28.08.2026).
+        # Елемент під курсором рухається з автовибором (PS Ctrl+Move),
+        # доки Alt утримується. Порожнє поле при Alt — нічого
+        # (малювання не стартує).
+        if palette_visible and self._alt_active:
+            idx, target_kind = self._find_object_index_at(event.x, event.y)
+            if idx >= 0:
+                map_id = self.app.current_map_eng
+                obj = self.drawings[map_id][idx]
+                self._press_candidate = {
+                    "index": idx,
+                    "target_kind": target_kind,
+                    "start_event": (event.x, event.y),
+                    "original_coords": list(obj.get("coords", [])),
+                    "original_class_icon_coords": list(obj.get("class_icon_coords", [])),
+                    "original_text_coords": list(obj.get("text_coords", [])) if obj.get("text_coords") else [],
+                    "via_alt": True,
+                }
+                self._press_moved = False
+                self._edit_object_at(idx)
+            return
+
+        if palette_visible and (not self.active_tool or self.active_tool in ("select", "move")):
             idx, target_kind = self._find_object_index_at(event.x, event.y)
             if idx >= 0:
                 # Кандидат на ЛКМ-рух без Ctrl: клік = вибір, потягнув = рух
+                # (для select/move це теж діє — AI-логіка: потяг виділеного = рух)
                 map_id = self.app.current_map_eng
                 obj = self.drawings[map_id][idx]
                 self._press_candidate = {
@@ -404,7 +556,12 @@ class MapPainter:
                 self._press_moved = False
                 self._edit_object_at(idx)
                 return
+            elif self.active_tool == "move":
+                # move: клік по порожньому — нічого (виділення лишається,
+                # доки не вибрано інший елемент / не знято).
+                return
             elif palette.is_in_edit_mode():
+                # select (AI) та режим без інструмента: клік по порожньому = зняти виділення
                 palette.exit_edit_mode()
                 return
 
@@ -417,6 +574,10 @@ class MapPainter:
 
         self.start_x = event.x
         self.start_y = event.y
+        # Захист від stale-кандидата: сюди доходимо лише з диспетчера
+        # малювання — будь-який кандидат тут уже з попередньої взаємодії.
+        self._press_candidate = None
+        self._press_moved = False
         
         if self.active_tool in ("marker", "arrow"):
             map_id = self.app.current_map_eng
@@ -686,7 +847,9 @@ class MapPainter:
         return "break"
 
     def on_drag(self, event):
-        if self._press_candidate is not None and not self.active_tool and self.app.mode == "edit":
+        if (self._press_candidate is not None and self.app.mode == "edit"
+                and (not self.active_tool or self.active_tool in ("select", "move")
+                     or self._press_candidate.get("via_alt"))):
             if not self._press_moved:
                 sx, sy = self._press_candidate["start_event"]
                 if math.hypot(event.x - sx, event.y - sy) < 5:
@@ -709,7 +872,9 @@ class MapPainter:
             self.canvas.coords(self.temp_item, event.x, event.y)
             
     def on_release(self, event):
-        if self._press_candidate is not None and not self.active_tool:
+        if (self._press_candidate is not None
+                and (not self.active_tool or self.active_tool in ("select", "move")
+                     or self._press_candidate.get("via_alt"))):
             if self._press_moved:
                 self.on_move_release(event)
             self._press_candidate = None
@@ -723,12 +888,10 @@ class MapPainter:
         if cw < 10 or ch < 10: return
         
         if self.active_tool in ("marker", "arrow", "brush") and self.start_x == event.x and self.start_y == event.y:
+            # Сталість інструментів (Етап 3): скасування прев'ю НЕ вимикає
+            # інструмент — доки не вимкнено кнопкою тулбара / не перемкнено.
             self.canvas.delete("temp_draw")
             self.temp_item = None
-            palette = getattr(self.app, 'drawing_palette', None)
-            if palette:
-                palette._deactivate_tool()
-            self.active_tool = None
             return
         
         px1, py1 = self.start_x / cw, self.start_y / ch
@@ -779,7 +942,9 @@ class MapPainter:
         self.canvas.delete("temp_draw")
         self.temp_item = None
         self._edit_object_at(len(self.drawings[map_id]) - 1)
-        self.active_tool = None
+        # Сталість інструментів (Етап 3): після створення елемента інструмент
+        # лишається активним — наступний ЛКМ малює наступний елемент, доки
+        # інструмент не вимкнено (тап по кнопці) і не перемкнено на інший.
         self.app.root.after(10, palette._lift_self)
             
     def on_right_click(self, event):

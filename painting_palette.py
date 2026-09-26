@@ -55,8 +55,15 @@ class DrawingPalette(tk.Toplevel):
         self._restore_position()
         self.after(0, self._refresh_linked_schemes_list)
         self.after(50, self._update_sliders_state)
-        self.bind("<Escape>", lambda e: self.exit_edit_mode())
+        self.bind("<Escape>", self._on_escape_key)
         self.bind("<Control-KeyPress>", self._on_clipboard_key)
+        # V/Del/Alt на рівні палітри (фокус у текстовому полі = гард у хендлері)
+        self.bind("<KeyPress>", self._on_tool_hotkey)
+        self.bind("<Delete>", self._on_delete_key)
+        self.bind("<KeyPress-Alt_L>", self._on_alt_press)
+        self.bind("<KeyPress-Alt_R>", self._on_alt_press)
+        self.bind("<KeyRelease-Alt_L>", self._on_alt_release)
+        self.bind("<KeyRelease-Alt_R>", self._on_alt_release)
 
     def _build_ui(self):
         bg = "#222"
@@ -79,9 +86,11 @@ class DrawingPalette(tk.Toplevel):
         tb.pack(fill="x", padx=4, pady=(4, 2))
 
         all_tools = [
+            ("select", chr(0xF245), FONT_AWE),
             ("marker", chr(0xF01B), FONT_AWE),
             ("arrow", chr(0xF062), FONT_AWE),
             ("brush", chr(0xF040), FONT_AWE),
+            ("move", chr(0xF047), FONT_AWE),
             (0x3A, chr(0x3A), "XVMSymbol"),
             (0x3B, chr(0x3B), "XVMSymbol"),
             (0x3F, chr(0x3F), "XVMSymbol"),
@@ -98,7 +107,7 @@ class DrawingPalette(tk.Toplevel):
             (0x2C, chr(0x2C), "XVMSymbol"),
         ]
 
-        mid = 8
+        mid = 10
         rows = [all_tools[:mid], all_tools[mid:]]
 
         for row_items in rows:
@@ -108,7 +117,7 @@ class DrawingPalette(tk.Toplevel):
                 btn_frame = tk.Frame(r, bg="#1a1a1a", width=38, height=38)
                 btn_frame.pack(side="left", padx=1)
                 btn_frame.pack_propagate(False)
-                fs = 11 if code == "arrow" else 13 if code == "brush" else 16
+                fs = 11 if code == "arrow" else 13 if code in ("brush", "select", "move") else 16
                 btn = tk.Button(btn_frame, text=text, font=(font_name, fs), bg="#333", fg="#aaa",
                                 bd=0, command=lambda c=code: self._on_toolbar_click(c))
                 btn.pack(expand=True, fill="both")
@@ -662,6 +671,8 @@ class DrawingPalette(tk.Toplevel):
             self.painter.set_tool(code)
         elif code == "marker":
             self.painter.set_tool("marker")
+        elif code in ("select", "move"):
+            self.painter.set_tool(code)
         else:
             self.painter.set_tool("text")
         self._color_preview.config(fg=self.current_color)
@@ -757,10 +768,14 @@ class DrawingPalette(tk.Toplevel):
             return
         if self.painter.select_all_active():
             self.painter.apply_scale_to_all(self._size_var.get())
+            self._auto_save_if_matches_existing()
+            self._autosave_current_scheme()
         elif self._edit_obj and self.app.current_map_eng:
             self._edit_obj["scale"] = self._size_var.get()
             self.painter.save_drawings()
             self.painter.redraw()
+            self._auto_save_if_matches_existing()
+            self._autosave_current_scheme()
         self.app.settings["draw_size"] = self._size_var.get()
         self._save_draw_prefs()
 
@@ -1918,27 +1933,31 @@ class DrawingPalette(tk.Toplevel):
             self._update_color_buttons()
             self._update_sliders_state()
 
-            if obj["type"] == "text":
-                poi_data = obj.get("poi", [])
-                if isinstance(poi_data, str):
-                    if poi_data.startswith("xvm_"):
-                        poi_data = [int(poi_data.split("_")[1], 16)]
+            # Сталість інструментів (Етап 3): якщо інструмент активний — він
+            # лишається підсвіченим у тулбарі; підсвітка типу об'єкта +
+            # вимкнення інструмента — лише коли інструмент неактивний.
+            if not self.painter.active_tool:
+                if obj["type"] == "text":
+                    poi_data = obj.get("poi", [])
+                    if isinstance(poi_data, str):
+                        if poi_data.startswith("xvm_"):
+                            poi_data = [int(poi_data.split("_")[1], 16)]
+                        else:
+                            poi_data = []
+                    if "tree" in poi_data:
+                        self._highlight_toolbar_button("tree")
+                    elif poi_data:
+                        code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
+                        self._highlight_toolbar_button(code)
                     else:
-                        poi_data = []
-                if "tree" in poi_data:
-                    self._highlight_toolbar_button("tree")
-                elif poi_data:
-                    code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
-                    self._highlight_toolbar_button(code)
+                        self._highlight_toolbar_button(0x2B)
+                elif obj["type"] == "arrow":
+                    self._highlight_toolbar_button("arrow")
+                elif obj["type"] == "brush":
+                    self._highlight_toolbar_button("brush")
                 else:
-                    self._highlight_toolbar_button(0x2B)
-            elif obj["type"] == "arrow":
-                self._highlight_toolbar_button("arrow")
-            elif obj["type"] == "brush":
-                self._highlight_toolbar_button("brush")
-            else:
-                self._highlight_toolbar_button("marker")
-            self.painter.set_tool(None)
+                    self._highlight_toolbar_button("marker")
+                self.painter.set_tool(None)
             self._del_btn.config(state="normal", bg="#cc3333", fg="white")
             if obj["type"] == "marker":
                 label = self.app.t('ui', 'status_editing_marker')
@@ -1968,6 +1987,36 @@ class DrawingPalette(tk.Toplevel):
             return p._on_clipboard_key(event)
         return None
 
+    def _on_escape_key(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p.on_escape_deselect(event)
+        return None
+
+    def _on_tool_hotkey(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p._on_tool_hotkey(event)
+        return None
+
+    def _on_delete_key(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p._on_delete_key(event)
+        return None
+
+    def _on_alt_press(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p._on_alt_press(event)
+        return None
+
+    def _on_alt_release(self, event=None):
+        p = getattr(self, "painter", None)
+        if p:
+            return p._on_alt_release(event)
+        return None
+
     def exit_edit_mode(self):
         if self._edit_obj is None:
             return
@@ -1976,9 +2025,12 @@ class DrawingPalette(tk.Toplevel):
         self.painter.save_drawings()
         self._edit_obj = None
         self.painter._editing_idx = -1
-        self._active_tool_code = None
-        self._update_toolbar_buttons()
-        self.painter.set_tool(None)
+        # Сталість інструментів (Етап 3): зняття виділення елемента НЕ вимикає
+        # активний інструмент — вимикається лише кнопкою/перемиканням.
+        if not self.painter.active_tool:
+            self._active_tool_code = None
+            self._update_toolbar_buttons()
+            self.painter.set_tool(None)
         self._del_btn.config(state="disabled", bg="#555555", fg="#888888")
         self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
