@@ -87,10 +87,10 @@ class DrawingPalette(tk.Toplevel):
 
         all_tools = [
             ("select", chr(0xF245), FONT_AWE),
+            ("move", chr(0xF047), FONT_AWE),
             ("marker", chr(0xF01B), FONT_AWE),
             ("arrow", chr(0xF062), FONT_AWE),
             ("brush", chr(0xF040), FONT_AWE),
-            ("move", chr(0xF047), FONT_AWE),
             (0x3A, chr(0x3A), "XVMSymbol"),
             (0x3B, chr(0x3B), "XVMSymbol"),
             (0x3F, chr(0x3F), "XVMSymbol"),
@@ -118,7 +118,12 @@ class DrawingPalette(tk.Toplevel):
                 btn_frame.pack(side="left", padx=1)
                 btn_frame.pack_propagate(False)
                 fs = 11 if code == "arrow" else 13 if code in ("brush", "select", "move") else 16
-                btn = tk.Button(btn_frame, text=text, font=(font_name, fs), bg="#333", fg="#aaa",
+                # select/move (навігаційні інструменти) — світліший фон,
+                # щоб відрізнятись від інструментів малювання.
+                is_light = code in ("select", "move")
+                btn = tk.Button(btn_frame, text=text, font=(font_name, fs),
+                                bg="#555" if is_light else "#333",
+                                fg="#ccc" if is_light else "#aaa",
                                 bd=0, command=lambda c=code: self._on_toolbar_click(c))
                 btn.pack(expand=True, fill="both")
                 self._toolbar_buttons[code] = btn
@@ -697,10 +702,14 @@ class DrawingPalette(tk.Toplevel):
         active_fg = "black"
         inactive_bg = "#333"
         inactive_fg = "#aaa"
+        # select/move (навігаційні) — світліший неактивний стан, як при
+        # створенні кнопок (#555/#ccc), щоб відрізнятись від малювання.
+        light_codes = ("select", "move")
         for code, btn in self._toolbar_buttons.items():
             is_active = (code == self._active_tool_code)
-            btn.config(bg=active_bg if is_active else inactive_bg,
-                       fg=active_fg if is_active else inactive_fg)
+            light = code in light_codes
+            btn.config(bg=active_bg if is_active else ("#555" if light else inactive_bg),
+                       fg=active_fg if is_active else ("#ccc" if light else inactive_fg))
 
     def _on_select_all_toggle(self):
         self.painter.toggle_select_all()

@@ -339,10 +339,22 @@ class WindowManager:
         
         def on_mouse_click(event):
             if event.button == 'left' and keyboard.is_pressed('alt'):
+                # Edit-режим: Alt зарезервований під spring-loaded рух ЕЛЕМЕНТА
+                # (painter.on_press alt-branch) — вікно не рухаємо, навіть поверх
+                # курсора. Norm (бойовий) — Alt+ЛКМ рухає вікно, як і раніше.
+                if self.app.mode == "edit":
+                    return
                 if self.app.mode == "norm" or self._cursor_over_app():
                     self.mouse_drag_active = True
                     self._drag_mode = self.app.mode
-                    self.mouse_last_pos = (event.x, event.y)
+                    # ButtonEvent (mouse-lib namedtuple) НЕ має .x/.y — рядок
+                    # `event.x` крав з AttributeError на КОЖЕН Alt+ЛКМ і лишав
+                    # mouse_drag_active=True (доказ: трейсбеки 26.09.2026).
+                    # get_position() = екранні координати, сумісні з MoveEvent.x/y.
+                    try:
+                        self.mouse_last_pos = mouse.get_position()
+                    except Exception:
+                        self.mouse_last_pos = None
         
         def on_mouse_release(event):
             if event.button == 'left':

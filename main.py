@@ -1607,15 +1607,23 @@ class WotAssistantHQ:
         self._maybe_autoload_displayed_scheme()
 
     def _maybe_autoload_displayed_scheme(self):
-        """F1: відображена в комбобоксі схема має бути активною ціллю автосейву.
+        """F1 (варіант Б, 26.09.2026): відображена в комбобоксі схема =
+        активна ціль автосейву, але canvas НІКОЛИ не підмінюється автоматично.
 
         Діагностика 26.09.2026 (D1/D2): es виставлявся лише при ручному кліку /
         «Нова схема» / збереженні — на старті та після зміни мапи/бою назва схеми
         лишалась у комбобоксі, а es=None → `_autosave_current_scheme` мовчки
         повертався («autosave SKIP: es=None»), поки ручний клік не оживляв
-        автосейв («autosave OK»). Повна підміна canvas (варіант A) — лише за
-        безпечних умов; якщо es=None і на мапі вже лежить чужий вміст — лише
-        прив'язуємо es (наступний автосейв наздожене схему до canvas)."""
+        автосейв («autosave OK»).
+
+        ВАРІАНТ A (авто-завантаження через `_on_saved_scheme_select`) ЗНИЩУВАВ
+        вміст користувача: черга after(0) виконувалась при наступному idle →
+        повний load → `save_drawings` перезаписував map_drawings вмістом
+        схеми; елементи «зникали безслідно», а ctrl_z_undo не мав чого
+        відкочувати (заміна списку не іде в історію). Тому: ТІЛЬКИ прив'язка
+        es + синхрон settings.last_selected_scheme (display ≡ es), canvas
+        недоторканий; ручний вибір у комбобоксі лишається єдиним шляхом
+        повного завантаження."""
         if getattr(self, '_scheme_switch_in_progress', False):
             return
         keys = getattr(self, '_saved_schemes_keys', None) or []
@@ -1636,23 +1644,23 @@ class WotAssistantHQ:
         if not scheme or scheme.get("_separator"):
             return
         new_id = scheme.get('drawing_id', '')
+        scheme_name = scheme.get('scheme_name', '')
         es = getattr(self, '_editing_scheme', None)
-        if es and es.get('name') == scheme.get('scheme_name', '') and es.get('drawing_id', '') == new_id:
+        if es and es.get('name') == scheme_name and es.get('drawing_id', '') == new_id:
             return  # вже активна ціль автосейву
-        current_drawings = self.painter.drawings.get(self.current_map_eng, [])
-        scheme_coords = {tuple(e.get("coords", [])) for e in (scheme.get('elements') or [])}
-        current_coords = {tuple(e.get("coords", [])) for e in current_drawings}
-        if es is None and current_drawings and current_coords != scheme_coords:
-            self._editing_scheme = {
-                "name": scheme.get('scheme_name', ''),
-                "desc": scheme.get('description', ''),
-                "map_id": scheme.get('map_id', ''),
-                "drawing_id": new_id,
-                "is_base": scheme.get('is_base', False),
-                "battle_mode": scheme.get('battle_mode', self.selected_battle_mode.get()),
-            }
-            return
-        self.root.after(0, self._on_saved_scheme_select)
+        self._editing_scheme = {
+            "name": scheme_name,
+            "desc": scheme.get('description', ''),
+            "map_id": scheme.get('map_id', ''),
+            "drawing_id": new_id,
+            "is_base": scheme.get('is_base', False),
+            "battle_mode": scheme.get('battle_mode', self.selected_battle_mode.get()),
+        }
+        # display ≡ es: наступний refresh обчислює display з того ж налаштування,
+        # розбіжність «показане інше, автосейвить це» більше неможлива.
+        if self.settings.get("last_selected_scheme") != scheme_name:
+            self.settings["last_selected_scheme"] = scheme_name
+            self.save_settings()
 
     def scheme_save_mode(self):
         """Режим бою для збереження поточної прив'язаної схеми.

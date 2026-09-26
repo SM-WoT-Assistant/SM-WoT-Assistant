@@ -4,6 +4,22 @@
 
 ---
 
+## Фікси: Alt рухав вікно, select «зникав» вміст + Ctrl+Z, тулбар (26.09.2026, вечір)
+
+**1. Alt+ЛКМ у edit рухав ВІКНО програми (навіть коли заблоковане) + traceback на кожен клік (window_manager, `_setup_mouse_drag.on_mouse_click`):**
+- **Корінь (доказ від source mouse-lib):** `ButtonEvent = namedtuple('ButtonEvent', ['event_type', 'button', 'time'])` — **не має `.x`** → `self.mouse_last_pos = (event.x, event.y)` (старий 345) крав `AttributeError` на **КОЖЕН** Alt+ЛКМ; краш стається **ПІСЛЯ** `mouse_drag_active = True` → стан застрягав → `on_mouse_move` (MoveEvent має x,y) рухав вікно; жодного гейту edit/Lock у хука не було. Лог користувача: трейсбеки `AttributeError: 'ButtonEvent' object has no attribute 'x'` на кожен Alt-клік.
+- **Фікси:** (1) `if self.app.mode == "edit": return` — у edit Alt зарезервований під spring-loaded рух ЕЛЕМЕНТА (painter alt-branch); (2) `self.mouse_last_pos = mouse.get_position()` (публічний API, екранні координати, сумісні з MoveEvent) з try/except. **Norm (бойовий) режим — без змін** (Alt+ЛКМ рухає вікно як документована фіча).
+
+**2. «Select видаляє елементи безслідно, Ctrl+Z не працює» → корінь у F1 варіанта A (main, `_maybe_autoload_displayed_scheme`):**
+- **Механізм:** авто-черга `after(0, _on_saved_scheme_select)` після refresh виконувалась при наступному idle (тому «при кліку») → повний load → `save_drawings` **перезаписував map_drawings вмістом відображеної схеми** → canvas підмінювався, елементи «зникали безслідно»; `ctrl_z_undo` (painter:439, механічно справний — 3 стеки історії) не мав чого відкочувати, бо це **заміна списку, а не видалення** (в історію не іде). Аудит: шлях клік→`_delete_*` у коді відсутній, діалоги не з'являлись — підтверджує заміну, а не видалення.
+- **Фікс (варіант Б, схвалений користувачем):** F1 тепер **ТІЛЬКИ link-only** — виставляє es з відображеної схеми + синхронізує `settings.last_selected_scheme` (display ≡ es, між показаним і цільовим більше нема розбіжності); **canvas НІКОЛИ не підмінюється автоматично**; повний load — лише при ручному виборі в комбобоксі (та пре-існуючий шлях після видалення схеми, main:1975 — залишено). Автосейв наздоганяє схему до canvas при наступній зміні.
+
+**3. Тулбар палітри (painting_palette):** `move` переміщено **одразу після `select`** (ряд1: select, move, marker, arrow, brush, 5×XVM; mid=10); select/move отримали **світліший фон** — при створенні `bg="#555"/fg="#ccc"` (інші `#333/#aaa`) + той самий світліший неактивний стан у `_update_toolbar_buttons` (per-code `light_codes`), активний — `#ffaa00` як у всіх.
+
+**Верифікація:** AST×3 OK; grep: F1 без авто-full-load (залишок `after(0,…)` лише в шляху видалення 1975), WM edit-gate+`get_position` без реального `event.x`, порядок `select, move, marker, arrow, brush`, mid=10, світлі кольори обидва; живий smoke 22с — stderr=0, 0 traceback. LSP-діагностики всі пре-існуючі (god-object / tkinter-stub / optional-mouse).
+
+---
+
 ## Автосейв схем + сталі інструменти + select/move/V/Alt/Del/Esc (26.09.2026)
 
 **Корінь «автосейв не працює» (діагностика [DEBUG-AS], живі сценарії):** es (`_editing_scheme`) виставлявся **лише** при ручному кліку по комбобоксі / «Нова схема» / діалозі Save (main:1710/1773, palette:1802); `_refresh_saved_schemes_list` **показував назву** схеми (last_selected) **без завантаження** → на старті та після кожної зміни мапи/бойового автосинку (on_map_select `map_changed` скидав es, main:1297) комбобокс містив назву, а `_autosave_current_scheme` мовчки повертався (`autosave SKIP: es=None`) → схема лишалась старою, а `load_scheme_from_db` при наступному виборі **підміняв canvas старим вмістом** (втрата змін). Додатково `_on_size_change` взагалі без автосейву.
