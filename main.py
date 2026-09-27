@@ -1648,6 +1648,16 @@ class WotAssistantHQ:
         es = getattr(self, '_editing_scheme', None)
         if es and es.get('name') == scheme_name and es.get('drawing_id', '') == new_id:
             return  # вже активна ціль автосейву
+        # Етап 3 (27.09.2026, варіант A): es переприв'язується ТІЛЬКИ якщо
+        # canvas реально належить відображуваній схемі. Інакше (зміна бойового
+        # режиму → display стрибає на першу схему нового режиму) es ЛИШАЄТЬСЯ
+        # колишнім: автосейв далі пише canvas у його справжню схему (canvas ≡ es),
+        # а не у чужу — раніше переприв'язка писала чужі елементи у відображену
+        # схему («елементи, яких я не ставив»). es НЕ знімається: зняття
+        # зупиняло б автосейв робочої схеми. При розбіжності es не чіпаємо
+        # і settings не переписуємо (display ≡ es відновлюється лише за збігом).
+        if not self._canvas_matches_scheme(scheme):
+            return
         self._editing_scheme = {
             "name": scheme_name,
             "desc": scheme.get('description', ''),
@@ -1661,6 +1671,36 @@ class WotAssistantHQ:
         if self.settings.get("last_selected_scheme") != scheme_name:
             self.settings["last_selected_scheme"] = scheme_name
             self.save_settings()
+
+    def _canvas_matches_scheme(self, scheme):
+        """Чи належить вміст canvas саме цій схемі (Етап 3, варіант A).
+
+        Порівнює повний канонікал елементів (json.dumps sort_keys) — не тільки
+        coords: легасі-об'єкти без coords (#1966) мають x1/y1, а також
+        text/color/thickness/modes відрізняють схеми з однаковими coords."""
+        if not scheme or scheme.get("_separator"):
+            return False
+        map_id = scheme.get('map_id', '')
+        if not map_id or not hasattr(self, 'painter'):
+            return False
+        elements = scheme.get('elements')
+        if not isinstance(elements, list):
+            return False
+        canvas = self.painter.drawings.get(map_id, [])
+
+        def _sig(items):
+            out = []
+            for e in items:
+                if not isinstance(e, dict):
+                    out.append(repr(e))
+                    continue
+                try:
+                    out.append(json.dumps(e, sort_keys=True, default=str))
+                except Exception:
+                    out.append(repr(e))
+            return sorted(out)
+
+        return _sig(canvas) == _sig(elements)
 
     def scheme_save_mode(self):
         """Режим бою для збереження поточної прив'язаної схеми.
@@ -1750,6 +1790,17 @@ class WotAssistantHQ:
                             self.selected_battle_mode.get(),
                             self.painter.drawings, source="local")
                         self.root.after(0, self._refresh_saved_schemes_list)
+                else:
+                    # Етап 3 (27.09.2026): canvas містить малюнки, які НЕ
+                    # належать жодній схемі (es=None, coords не збігаються) —
+                    # завантаження іншої схеми перезаписало б їх мовчки.
+                    # Даємо вибір: зберегти (з новою назвою) / не зберігати /
+                    # скасувати вибір.
+                    if not self.drawing_palette._show_save_or_discard_dialog(
+                            force_new_name=True):
+                        if hasattr(self, '_last_valid_scheme_display'):
+                            self.saved_schemes_var.set(self._last_valid_scheme_display)
+                        return
 
         drawing_id = scheme.get('drawing_id', '')
         result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)

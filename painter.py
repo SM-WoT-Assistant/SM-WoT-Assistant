@@ -538,11 +538,15 @@ class MapPainter:
                 self._edit_object_at(idx)
             return
 
-        if palette_visible and (not self.active_tool or self.active_tool in ("select", "move")):
+        if palette_visible:
             idx, target_kind = self._find_object_index_at(event.x, event.y)
             if idx >= 0:
-                # Кандидат на ЛКМ-рух без Ctrl: клік = вибір, потягнув = рух
-                # (для select/move це теж діє — AI-логіка: потяг виділеного = рух)
+                # Етап 4 (27.09.2026): клік по існуючому елементу = ВИДІЛЕННЯ
+                # при БУДЬ-ЯКОМУ активному інструменті (малюємо тільки по
+                # порожньому) — інакше при активному marker/arrow/brush/текст
+                # клік по елементу малював поверх / створював зайвий елемент,
+                # а виділення/рух/видалення були недоступні.
+                # AI-логіка: клік = вибір, потяг = рух.
                 map_id = self.app.current_map_eng
                 obj = self.drawings[map_id][idx]
                 self._press_candidate = {
@@ -556,14 +560,16 @@ class MapPainter:
                 self._press_moved = False
                 self._edit_object_at(idx)
                 return
-            elif self.active_tool == "move":
+            if self.active_tool == "move":
                 # move: клік по порожньому — нічого (виділення лишається,
                 # доки не вибрано інший елемент / не знято).
                 return
-            elif palette.is_in_edit_mode():
-                # select (AI) та режим без інструмента: клік по порожньому = зняти виділення
-                palette.exit_edit_mode()
-                return
+            if not self.active_tool or self.active_tool == "select":
+                if palette.is_in_edit_mode():
+                    # select (AI) та режим без інструмента: клік по порожньому = зняти виділення
+                    palette.exit_edit_mode()
+                    return
+            # активний інструмент малювання + порожнє поле → малюємо нижче
 
         if not self.active_tool:
             return
@@ -574,6 +580,11 @@ class MapPainter:
 
         self.start_x = event.x
         self.start_y = event.y
+        # Сира точка пресу ДО snap: on_release скасовує бід-лінію за відстанню
+        # від неї (фікс 27.09.2026). Раніше compare був start==event після
+        # snap (радіус 15px) → чистий клік біля існуючого marker/arrow
+        # СТВОРЮВАВ елемент ("незрозумілі елементи, яких я не ставив").
+        self._raw_press = (event.x, event.y)
         # Захист від stale-кандидата: сюди доходимо лише з диспетчера
         # малювання — будь-який кандидат тут уже з попередньої взаємодії.
         self._press_candidate = None
@@ -847,9 +858,10 @@ class MapPainter:
         return "break"
 
     def on_drag(self, event):
-        if (self._press_candidate is not None and self.app.mode == "edit"
-                and (not self.active_tool or self.active_tool in ("select", "move")
-                     or self._press_candidate.get("via_alt"))):
+        # _press_candidate виставляється ТІЛЬКИ при попаданні на елемент
+        # (Етап 4) або Alt — тож активний інструмент малювання не заважає:
+        # потяг виділеного = рух, малювання стартує лише з порожнього поля.
+        if self._press_candidate is not None and self.app.mode == "edit":
             if not self._press_moved:
                 sx, sy = self._press_candidate["start_event"]
                 if math.hypot(event.x - sx, event.y - sy) < 5:
@@ -872,9 +884,10 @@ class MapPainter:
             self.canvas.coords(self.temp_item, event.x, event.y)
             
     def on_release(self, event):
-        if (self._press_candidate is not None
-                and (not self.active_tool or self.active_tool in ("select", "move")
-                     or self._press_candidate.get("via_alt"))):
+        # Кандидат (Етап 4 / Alt) обробляється ЗАВЖДДИ — незалежно від
+        # активного інструмента; інакше кандидат «застрягав» і наступний
+        # клік малював зі станим start-пунктом.
+        if self._press_candidate is not None:
             if self._press_moved:
                 self.on_move_release(event)
             self._press_candidate = None
@@ -887,12 +900,24 @@ class MapPainter:
         ch = self.canvas.winfo_height()
         if cw < 10 or ch < 10: return
         
-        if self.active_tool in ("marker", "arrow", "brush") and self.start_x == event.x and self.start_y == event.y:
+        rx, ry = getattr(self, "_raw_press", (self.start_x, self.start_y))
+        raw_dist = math.hypot(event.x - rx, event.y - ry)
+
+        if self.active_tool in ("marker", "arrow", "brush") and raw_dist < 4:
             # Сталість інструментів (Етап 3): скасування прев'ю НЕ вимикає
             # інструмент — доки не вимкнено кнопкою тулбара / не перемкнено.
             self.canvas.delete("temp_draw")
             self.temp_item = None
+            # Етап 4 (27.09.2026): клік по існуючому елементу при активному
+            # інструменті = ВИДІЛЕННЯ (малюємо тільки по порожньому/потягом).
+            self._select_at(rx, ry)
             return
+        if self.active_tool == "text" and raw_dist < 4:
+            # POI/текст: клік по елементу = виділення; по порожньому = створення.
+            if self._select_at(rx, ry):
+                self.canvas.delete("temp_draw")
+                self.temp_item = None
+                return
         
         px1, py1 = self.start_x / cw, self.start_y / ch
         px2, py2 = event.x / cw, event.y / ch
@@ -961,6 +986,19 @@ class MapPainter:
         menu.add_separator(background="#555")
         menu.add_command(label=self.app.t('ui', 'delete_btn'), command=lambda: self.app.root.after(50, self._delete_object_at, idx))
         menu.post(event.x_root, event.y_root)
+
+    def _select_at(self, x, y):
+        """Виділення елемента під точкою (Етап 4): клік при активному
+        інструменті малювання вибирає елемент замість створення нового.
+        Повертає True, якщо елемент знайдено."""
+        palette = getattr(self.app, 'drawing_palette', None)
+        if not palette or palette.state() == 'withdrawn':
+            return False
+        idx, _ = self._find_object_index_at(x, y)
+        if idx < 0:
+            return False
+        self._edit_object_at(idx)
+        return True
 
     def _edit_object_at(self, idx):
         if not self.app.current_map_eng:

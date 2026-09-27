@@ -32,7 +32,15 @@ class DrawingPalette(tk.Toplevel):
         ]
         self._color_buttons = []
 
+        # Два РІЗНІ стани (фікс 27.09.2026 — "самовільне перемикання інструментів"):
+        # _active_tool_code — ЯКИЙ ІНСТРУМЕНТ реально активний (малювання/V/Alt);
+        # _sel_code — індикатор ВИДІЛЕННЯ об'єкта на кнопці його типу (#2016).
+        # Раніше вони ділили одну змінну: load_object підсвічував кнопку типу
+        # об'єкта, а _on_toolbar_click порівнював її з code і мовчки АКТИВУВАВ
+        # інструмент замість вимкнення → "самовільне перемикання".
         self._active_tool_code = None
+        self._sel_code = None
+        self._sel_poi = None  # оригінальний poi виділеного text-об'єкта
 
         self.class_vars = {
             "LT": tk.BooleanVar(value=False),
@@ -694,7 +702,9 @@ class DrawingPalette(tk.Toplevel):
         self._brush_frame.pack_forget()
 
     def _highlight_toolbar_button(self, code):
-        self._active_tool_code = code
+        # Індикатор ВИДІЛЕННЯ об'єкта (#2016) — пише тільки в _sel_code.
+        # _active_tool_code не чіпає: це стан реально активного інструмента.
+        self._sel_code = code
         self._update_toolbar_buttons()
 
     def _update_toolbar_buttons(self):
@@ -702,14 +712,25 @@ class DrawingPalette(tk.Toplevel):
         active_fg = "black"
         inactive_bg = "#333"
         inactive_fg = "#aaa"
+        # Виділений об'єкт (не активний інструмент) — темно-помаранчевий:
+        # відрізняється і від активного (#ffaa00), і від неактивного (#333).
+        sel_bg = "#6b4400"
+        sel_fg = "#ffcc66"
         # select/move (навігаційні) — світліший неактивний стан, як при
         # створенні кнопок (#555/#ccc), щоб відрізнятись від малювання.
         light_codes = ("select", "move")
         for code, btn in self._toolbar_buttons.items():
             is_active = (code == self._active_tool_code)
+            is_sel = (not is_active) and (code == self._sel_code)
             light = code in light_codes
-            btn.config(bg=active_bg if is_active else ("#555" if light else inactive_bg),
-                       fg=active_fg if is_active else ("#ccc" if light else inactive_fg))
+            if is_active:
+                bg, fg = active_bg, active_fg
+            elif is_sel:
+                bg, fg = sel_bg, sel_fg
+            else:
+                bg = "#555" if light else inactive_bg
+                fg = "#ccc" if light else inactive_fg
+            btn.config(bg=bg, fg=fg)
 
     def _on_select_all_toggle(self):
         self.painter.toggle_select_all()
@@ -1877,6 +1898,10 @@ class DrawingPalette(tk.Toplevel):
         if not active:
             self._active_tool_code = None
             self._palette_compact_geo = None
+        elif active in ("select", "move"):
+            # Гілки select/move були відсутні: _active_tool_code лишався
+            # старим (наприклад, від підсвітки виділення) → кнопки брехали.
+            self._active_tool_code = active
         elif active == "marker":
             self._active_tool_code = "marker"
         elif active == "arrow":
@@ -1884,7 +1909,11 @@ class DrawingPalette(tk.Toplevel):
         elif active == "brush":
             self._active_tool_code = "brush"
         elif active == "text":
-            self._active_tool_code = 0x2B
+            # Не спалювати вибраний POI-код (tree/інша іконка): 0x2B — лише
+            # якщо поточний код не є валідним poi (не int і не "tree").
+            if not (isinstance(self._active_tool_code, int)
+                    or self._active_tool_code == "tree"):
+                self._active_tool_code = 0x2B
         self._update_toolbar_buttons()
 
     def _drag_start(self, event):
@@ -1942,31 +1971,36 @@ class DrawingPalette(tk.Toplevel):
             self._update_color_buttons()
             self._update_sliders_state()
 
-            # Сталість інструментів (Етап 3): якщо інструмент активний — він
-            # лишається підсвіченим у тулбарі; підсвітка типу об'єкта +
-            # вимкнення інструмента — лише коли інструмент неактивний.
-            if not self.painter.active_tool:
-                if obj["type"] == "text":
-                    poi_data = obj.get("poi", [])
-                    if isinstance(poi_data, str):
-                        if poi_data.startswith("xvm_"):
-                            poi_data = [int(poi_data.split("_")[1], 16)]
-                        else:
-                            poi_data = []
-                    if "tree" in poi_data:
-                        self._highlight_toolbar_button("tree")
-                    elif poi_data:
-                        code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
-                        self._highlight_toolbar_button(code)
+            # Індикатор виділення (#2016) — БЕЗУМОВНА підсвітка типу об'єкта.
+            # З розділеними станами (_sel_code ≠ _active_tool_code) вона більше
+            # не перекриває стан активного інструмента і не вмикає його.
+            if obj["type"] == "text":
+                poi_data = obj.get("poi", [])
+                if isinstance(poi_data, str):
+                    if poi_data.startswith("xvm_"):
+                        poi_data = [int(poi_data.split("_")[1], 16)]
                     else:
-                        self._highlight_toolbar_button(0x2B)
-                elif obj["type"] == "arrow":
+                        poi_data = []
+                # Точне збереження poi об'єкта для редагування: _write_to_object
+                # поверне його БЕЗ змін (раніше порожній poi отримував 0x2B,
+                # а активний інструмент міг стерти poi → "елементи, яких я не ставив").
+                self._sel_poi = list(poi_data)
+                if "tree" in poi_data:
+                    self._highlight_toolbar_button("tree")
+                elif poi_data:
+                    code = poi_data[0] if isinstance(poi_data[0], int) else 0x2B
+                    self._highlight_toolbar_button(code)
+                else:
+                    self._sel_poi = []
+                    self._highlight_toolbar_button(0x2B)
+            else:
+                self._sel_poi = None
+                if obj["type"] == "arrow":
                     self._highlight_toolbar_button("arrow")
                 elif obj["type"] == "brush":
                     self._highlight_toolbar_button("brush")
                 else:
                     self._highlight_toolbar_button("marker")
-                self.painter.set_tool(None)
             self._del_btn.config(state="normal", bg="#cc3333", fg="white")
             if obj["type"] == "marker":
                 label = self.app.t('ui', 'status_editing_marker')
@@ -2034,12 +2068,15 @@ class DrawingPalette(tk.Toplevel):
         self.painter.save_drawings()
         self._edit_obj = None
         self.painter._editing_idx = -1
-        # Сталість інструментів (Етап 3): зняття виділення елемента НЕ вимикає
-        # активний інструмент — вимикається лише кнопкою/перемиканням.
+        # Скид індикатора ВИДІЛЕННЯ (не активного інструмента — сталість Етап 3).
+        self._sel_code = None
+        self._sel_poi = None
+        # _active_tool_code торкаємось лише коли інструмент реально неактивний
+        # (інваріант: тоді він і так None; оновлення — для візуалу кнопок).
         if not self.painter.active_tool:
             self._active_tool_code = None
-            self._update_toolbar_buttons()
             self.painter.set_tool(None)
+        self._update_toolbar_buttons()
         self._del_btn.config(state="disabled", bg="#555555", fg="#888888")
         self._brush_frame.pack_forget()
         self._status_lbl.config(text="")
@@ -2052,7 +2089,12 @@ class DrawingPalette(tk.Toplevel):
         obj["thickness"] = self._thickness_var.get()
         obj["scale"] = self._size_var.get()
         if obj.get("type") == "text":
-            if self._active_tool_code == "tree":
+            if self._edit_obj is obj and self._sel_poi is not None:
+                # Редагування існуючого об'єкта: повертаємо його ОРИГІНАЛЬНИЙ
+                # poi (з load_object), не залежно від активного інструмента —
+                # фікс стирання poi (збій «елементи змінилися самі»).
+                obj["poi"] = list(self._sel_poi)
+            elif self._active_tool_code == "tree":
                 obj["poi"] = ["tree"]
             elif isinstance(self._active_tool_code, int):
                 obj["poi"] = [self._active_tool_code]
