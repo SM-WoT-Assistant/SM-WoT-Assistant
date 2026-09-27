@@ -1097,16 +1097,16 @@ class MapPainter:
     def is_visible(self, obj):
         current_mode = self.app.selected_battle_mode.get()
         active_classes = [k for k, v in self.app.selected_classes.items() if v.get()]
-
+        
         if obj.get("modes") and current_mode not in obj["modes"]:
             return False
-
+            
         req_classes = obj.get("classes", [])
         if req_classes:
             req_en = [self._UKR_TO_EN.get(c, c) for c in req_classes]
             if not any(cls in active_classes for cls in req_en):
                 return False
-
+                
         return True
 
     @staticmethod
