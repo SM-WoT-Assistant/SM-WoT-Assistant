@@ -525,6 +525,16 @@ class WindowManager:
         """WS_EX_TRANSPARENT для root І overlay _po_win (накриває канвас —
         без цього кліки по оверлею не доходять до мінімапи гри при замку)."""
         try:
+            # Гард від TOCTOU гонки (фікс 27.09.2026): поллер у фоновому
+            # потоці проходить перевірку mode=="norm", а поки він обчислює
+            # `want`, головний потік уже зробив toggle_editor → mode="edit"
+            # + set_clickthrough(False) — і поллер ПІСЛЯ цього встигає
+            # включити прозорість на edit-вікні. Далі поллер у edit не
+            # торкається стилів (ранній return) → вікно лишається прозорим
+            # для ЛКМ довічно. Включати прозорість можна ТІЛЬКИ в бойовому
+            # режимі — перевірка в тому ж місці, що й запис.
+            if enabled and self.app.mode != "norm":
+                return
             hwnds = []
             root_hwnd = ctypes.windll.user32.GetParent(self.app.root.winfo_id())
             if root_hwnd:
@@ -558,8 +568,17 @@ class WindowManager:
         формат ON, drag, діалог, згорнуте вікно) не втручається — стилями
         володіє існуюча логіка."""
         try:
+            # Самолікування (фікс 27.09.2026): якщо гонка поллера встигла
+            # включити WS_EX_TRANSPARENT ДО перемикання mode в edit (див.
+            # гард у set_clickthrough), або стан уже застряг звідкись —
+            # поза бойовим режимом прозорість завжди помилка. Поллер у edit
+            # раніше просто повертався і ніколи не виправляв стиль →
+            # «вікно редагування прозоре для ЛКМ» до перезапуску.
+            if self.app.mode != "norm":
+                if self._ct_transparent or self._ct_po_transparent:
+                    self.set_clickthrough(False)
+                return
             if (self.format_mode_enabled
-                    or self.app.mode != "norm"
                     or self.mouse_drag_active
                     or getattr(self.app, "dialog_open", False)
                     or not self.app.root.winfo_viewable()):
