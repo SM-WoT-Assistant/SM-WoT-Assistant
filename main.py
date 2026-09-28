@@ -1301,7 +1301,7 @@ class WotAssistantHQ:
             # автозбереження схем мовчки припинялося (редакції зникали).
             self._editing_scheme = None
             if hasattr(self, 'painter'):
-                self.painter._creation_history.clear()
+                self.painter._undo_stack.clear()
                 self.painter._editing_idx = -1
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
@@ -1957,9 +1957,7 @@ class WotAssistantHQ:
             return
         # 4. Очищуємо canvas під нову схему
         self.painter.drawings[map_id] = []
-        self.painter._creation_history.clear()
-        self.painter._move_history.clear()
-        self.painter._deletion_history.clear()
+        self.painter._undo_stack.clear()
         self.painter._editing_idx = -1
         self.data_mgr.save_drawings(self.painter.drawings)
         self.painter.redraw()

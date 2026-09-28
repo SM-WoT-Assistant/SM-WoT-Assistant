@@ -34,9 +34,21 @@ class MapPainter:
         self.move_drag = None
         self.move_drag_active = False
         self._editing_idx = -1
-        self._creation_history = []
-        self._move_history = []
-        self._deletion_history = []
+        # Єдиний хронологічний undo-стек (фікс 27.09.2026): раніше були ТРИ
+        # незалежні стеки (creation/move/deletion) з фіксованим пріоритетом
+        # у ctrl_z_undo — Ctrl+Z відкочував НЕ останню дію (створив A →
+        # видалив B → Ctrl+Z відновлював B), move/deletion переживали зміну
+        # мапи (idx з чужої мапи застосовувався до поточної), а хак-корекція
+        # індексів creation ламала LIFO-порядок.
+        # Операції: ("create", map_id, obj) — видалення за ідентичністю (`is`);
+        # ("delete", map_id, idx, obj) — вставка на idx (LIFO → idx валідний);
+        # ("delete_all", map_id, [(idx, obj), ...]) — відновлення за зростанням;
+        # ("move", map_id, idx, original) — відкат coords;
+        # ("update", map_id, idx, snapshot) — відкат мутації на місці (resize).
+        # Об'єкти в операціях — САМІ живі dict (без deepcopy): видалений з
+        # списку об'єкт ніхто не мутує, тож `is`-пошук create лишається
+        # коректним після послідовності delete→undo→undo.
+        self._undo_stack = []
 
         self._group_schemes = {}  # {drawing_id: {map_id, elements, group_id, updated_at, ...}}
         self._scheme_downloaded_at = {}  # {drawing_id: "2026-06-29 15:30:00"}
@@ -243,7 +255,7 @@ class MapPainter:
         if map_id not in self.drawings:
             self.drawings[map_id] = []
         self.drawings[map_id].append(new_obj)
-        self._creation_history.append(len(self.drawings[map_id]) - 1)
+        self._undo_stack.append(("create", map_id, new_obj))
         # Паста — свідоме дублювання: зберігаємо БЕЗ _strip_duplicates,
         # інакше копія, тотожна оригіналу (типові порожні теги), мовчазно
         # зрізалась і «паста не вставляла на поточну мапу» (28.08.2026).
@@ -427,8 +439,13 @@ class MapPainter:
 
     def _do_clear(self, confirmed):
         if confirmed and self.app.current_map_eng:
-            self.drawings[self.app.current_map_eng] = []
-            self._creation_history.clear()
+            map_id = self.app.current_map_eng
+            old = self.drawings.get(map_id, [])
+            if old:
+                # Один запис delete_all — Ctrl+Z відновлює все одразу.
+                self._undo_stack.append(
+                    ("delete_all", map_id, [(i, o) for i, o in enumerate(old)]))
+            self.drawings[map_id] = []
             self._editing_idx = -1
             palette = getattr(self.app, 'drawing_palette', None)
             if palette:
@@ -437,39 +454,60 @@ class MapPainter:
             self.redraw()
 
     def ctrl_z_undo(self):
+        """Відкат ОСТАННЬОЇ дії (справжній LIFO за єдиним стеком)."""
         if not self.app.current_map_eng:
             return
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
             palette.exit_edit_mode()
-        map_id = self.app.current_map_eng
-        if self._move_history:
-            idx, original = self._move_history.pop()
-            if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
-                obj = self.drawings[map_id][idx]
-                if original["coords"]:
-                    obj["coords"] = original["coords"]
-                if original["class_icon_coords"]:
-                    obj["class_icon_coords"] = original["class_icon_coords"]
-                if original["text_coords"]:
-                    obj["text_coords"] = original["text_coords"]
-                self.save_drawings()
-                self.redraw()
+        if not self._undo_stack:
             return
-        if self._deletion_history:
-            d_map_id, d_idx, d_obj = self._deletion_history.pop()
-            if d_map_id in self.drawings:
-                self.drawings[d_map_id].insert(d_idx, d_obj)
-            self.save_drawings()
-            self.redraw()
+        op = self._undo_stack.pop()
+        kind = op[0]
+        try:
+            if kind == "move":
+                _, map_id, idx, original = op
+                objs = self.drawings.get(map_id, [])
+                if 0 <= idx < len(objs):
+                    obj = objs[idx]
+                    if original["coords"]:
+                        obj["coords"] = original["coords"]
+                    if original["class_icon_coords"]:
+                        obj["class_icon_coords"] = original["class_icon_coords"]
+                    if original["text_coords"]:
+                        obj["text_coords"] = original["text_coords"]
+            elif kind == "update":
+                _, map_id, idx, snapshot = op
+                objs = self.drawings.get(map_id, [])
+                if 0 <= idx < len(objs):
+                    obj = objs[idx]
+                    for key, val in snapshot.items():
+                        obj[key] = copy.deepcopy(val)
+            elif kind == "delete":
+                _, map_id, idx, obj = op
+                objs = self.drawings.setdefault(map_id, [])
+                objs.insert(max(0, min(idx, len(objs))), obj)
+            elif kind == "delete_all":
+                _, map_id, entries = op
+                objs = self.drawings.setdefault(map_id, [])
+                # Зростаючий idx: відновлюємо зліва направо — позиції валідні.
+                for e_idx, e_obj in sorted(entries, key=lambda e: e[0]):
+                    objs.insert(max(0, min(e_idx, len(objs))), e_obj)
+            elif kind == "create":
+                _, map_id, obj = op
+                objs = self.drawings.get(map_id, [])
+                # Ідентичність (`is`), а не індекс: після серії вставок/
+                # видалень індекс міг зміститись, об'єкт — ні.
+                for j, o in enumerate(objs):
+                    if o is obj:
+                        del objs[j]
+                        break
+        except Exception as e:
+            print(f"[UNDO] failed ({kind}): {e}")
             return
-        if not self._creation_history:
-            return
-        idx = self._creation_history.pop()
-        if map_id in self.drawings and 0 <= idx < len(self.drawings[map_id]):
-            del self.drawings[map_id][idx]
-            self.save_drawings()
-            self.redraw()
+        self.save_drawings()
+        self._autosave_active_scheme()
+        self.redraw()
 
     def resize_selected(self, direction):
         """Resize the edited element. direction: 1 = bigger, -1 = smaller."""
@@ -484,6 +522,14 @@ class MapPainter:
         step = 0.1
         new_scale = scale + direction * step
         new_scale = max(0.3, min(3.0, new_scale))
+        if new_scale == scale:
+            return
+        # Snapshot ДО мутації — Ctrl+Z відкочує resize (фікс 27.09.2026:
+        # раніше resize мутував coords/scale без запису в історію, тож Ctrl+Z
+        # після resize відкочував сторонню дію).
+        snapshot = {k: copy.deepcopy(v) for k, v in obj.items()
+                    if k in ("scale", "coords", "class_icon_coords", "text_coords")}
+        self._undo_stack.append(("update", map_id, self._editing_idx, snapshot))
         obj["scale"] = new_scale
         cw = self.canvas.winfo_width()
         ch = self.canvas.winfo_height()
@@ -571,7 +617,10 @@ class MapPainter:
                     return
             # активний інструмент малювання + порожнє поле → малюємо нижче
 
-        if not self.active_tool:
+        if not self.active_tool or not palette_visible:
+            # Оборонний гард (27.09.2026): при ЗАКРИТІЙ палітрі жодних
+            # елементів/виділень — малювання можливе лише після активації
+            # кнопкою DRAW (стан інструмента міг пережити закриття раніше).
             return
         
         cw = self.canvas.winfo_width()
@@ -657,12 +706,20 @@ class MapPainter:
         if cw < 10 or ch < 10:
             return -1, "object"
 
-        click_px, click_py = event_x / cw, event_y / ch
-        threshold_px = 18
-        threshold_norm = threshold_px / max(1, min(cw, ch))
+        # Усі відстані нижче рахуються у ПІКСЕЛЯХ (фікс 27.09.2026): раніше
+        # поріг був глобальним 18px у НОРМАЛІЗОВАНИХ координатах, ділився на
+        # min(cw,ch) — на асиметричному канвасі горизонтальний радіус
+        # виростав до 18*cw/ch (~24px), тож «поле вибору» було набагато
+        # більшим за сам елемент і сусідні елементи не можна було розділити.
+        TH_MARKER = 14   # marker: коло r≈12px
+        TH_SEGMENT = 8   # arrow/brush: лінія/сегмент
+        TH_TEXT = 10     # text/POI-іконка
+        TH_TIP = 10      # marker_tip / marker_text (пріоритетний хіт)
+
+        click_x, click_y = float(event_x), float(event_y)
         closest_idx = -1
         closest_kind = "object"
-        min_dist = threshold_norm
+        min_dist = float('inf')
 
         maker_types = ("marker", "arrow", "brush")
 
@@ -675,28 +732,35 @@ class MapPainter:
             special_dist = float('inf')
             obj_best_dist = float('inf')
             obj_best_kind = "object"
+            obj_threshold = TH_MARKER
 
             if obj.get("type") in maker_types and obj.get("text"):
                 tx, ty = self._get_marker_text_pos(obj, cw, ch)
                 if tx is not None:
-                    d = math.hypot((tx / cw) - click_px, (ty / ch) - click_py)
+                    d = math.hypot(tx - click_x, ty - click_y)
                     if d < special_dist:
                         special_dist = d
                         special_kind = "marker_text"
 
             if obj.get("type") in ("marker", "arrow") and len(coords) >= 4:
-                d = math.hypot(coords[2] - click_px, coords[3] - click_py)
+                obj_threshold = TH_SEGMENT
+                c0x, c0y = coords[0] * cw, coords[1] * ch
+                c1x, c1y = coords[2] * cw, coords[3] * ch
+                d = math.hypot(c1x - click_x, c1y - click_y)
                 if d < special_dist:
                     special_dist = d
                     special_kind = "marker_tip"
 
                 general_dist = min(
-                    math.hypot(coords[0] - click_px, coords[1] - click_py),
-                    math.hypot(coords[2] - click_px, coords[3] - click_py),
-                    self._distance_to_segment(click_px, click_py, coords[0], coords[1], coords[2], coords[3]),
+                    math.hypot(c0x - click_x, c0y - click_y),
+                    math.hypot(c1x - click_x, c1y - click_y),
+                    self._distance_to_segment(click_x, click_y, c0x, c0y, c1x, c1y),
                 )
+                # marker: голова стрілки/коло біля початку — більший поріг
+                if obj.get("type") == "marker":
+                    obj_threshold = TH_MARKER
 
-                if special_kind is not None and special_dist < threshold_norm:
+                if special_kind is not None and special_dist < TH_TIP:
                     obj_best_kind = special_kind
                     obj_best_dist = special_dist
                 else:
@@ -704,17 +768,22 @@ class MapPainter:
                     obj_best_dist = general_dist
 
             elif obj.get("type") == "brush" and len(coords) >= 4:
+                obj_threshold = TH_SEGMENT
+                c0x, c0y = coords[0] * cw, coords[1] * ch
+                clx, cly = coords[-2] * cw, coords[-1] * ch
                 poly_end_d = min(
-                    math.hypot(coords[0] - click_px, coords[1] - click_py),
-                    math.hypot(coords[-2] - click_px, coords[-1] - click_py),
+                    math.hypot(c0x - click_x, c0y - click_y),
+                    math.hypot(clx - click_x, cly - click_y),
                 )
                 brush_seg_dist = float('inf')
                 for j in range(0, len(coords)-2, 2):
-                    d = self._distance_to_segment(click_px, click_py, coords[j], coords[j+1], coords[j+2], coords[j+3])
+                    sx, sy = coords[j] * cw, coords[j+1] * ch
+                    ex, ey = coords[j+2] * cw, coords[j+3] * ch
+                    d = self._distance_to_segment(click_x, click_y, sx, sy, ex, ey)
                     brush_seg_dist = min(brush_seg_dist, d)
                 general_dist = min(poly_end_d, brush_seg_dist)
 
-                if special_kind is not None and special_dist < threshold_norm:
+                if special_kind is not None and special_dist < TH_TIP:
                     obj_best_kind = special_kind
                     obj_best_dist = special_dist
                 else:
@@ -722,24 +791,28 @@ class MapPainter:
                     obj_best_dist = general_dist
 
             elif obj.get("type") == "text" and len(coords) >= 2:
-                tx_norm, ty_norm = coords[0], coords[1]
-                obj_best_dist = math.hypot(tx_norm - click_px, ty_norm - click_py)
+                obj_threshold = TH_TEXT
+                tx = coords[0] * cw
+                ty = coords[1] * ch
+                obj_best_dist = math.hypot(tx - click_x, ty - click_y)
                 obj_best_kind = "object"
                 poi = obj.get("poi", [])
                 txt = obj.get("text", "")
                 if poi:
-                    d = math.hypot(tx_norm - click_px, ty_norm - 24/ch - click_py)
+                    d = math.hypot(tx - click_x, ty - 24 - click_y)
                     if d < obj_best_dist:
                         obj_best_dist = d
                 if txt:
-                    ofs = 15/ch if poi else 0
-                    d = math.hypot(tx_norm - click_px, ty_norm + ofs - click_py)
+                    ofs = 15 if poi else 0
+                    d = math.hypot(tx - click_x, ty + ofs - click_y)
                     if d < obj_best_dist:
                         obj_best_dist = d
             else:
                 continue
 
-            if obj_best_dist < min_dist:
+            # Пер-типовий поріг: кожен елемент «магнітиться» лише у межах
+            # свого радіуса — сусідні елементи не перехоплюють клік.
+            if obj_best_dist < obj_threshold and obj_best_dist < min_dist:
                 min_dist = obj_best_dist
                 closest_idx = i
                 closest_kind = obj_best_kind
@@ -850,7 +923,7 @@ class MapPainter:
             "class_icon_coords": self.move_drag.get("original_class_icon_coords", []),
             "text_coords": self.move_drag.get("original_text_coords", []),
         }
-        self._move_history.append((idx, original))
+        self._undo_stack.append(("move", self.app.current_map_eng, idx, original))
         self.move_drag = None
         self.save_drawings()
         self._autosave_active_scheme()
@@ -960,7 +1033,7 @@ class MapPainter:
         palette.exit_edit_mode()
         palette.apply_to_new_object(new_obj, cw, ch)
         self.default_color = new_obj["color"]
-        self._creation_history.append(len(self.drawings[map_id]) - 1)
+        self._undo_stack.append(("create", map_id, new_obj))
         self.save_drawings()
         self._autosave_active_scheme()
         self.redraw()
@@ -1043,8 +1116,9 @@ class MapPainter:
         label = self.app.t('ui', type_labels.get(obj.get("type", ""), "text_type"))
         if not self._confirm_delete(label):
             return
-        self._deletion_history.append((map_id, idx, copy.deepcopy(obj)))
-        self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
+        # Живий obj (не deepcopy): він виходить зі списку, ніхто його не мутує,
+        # тож ідентичність зберігається для зворотного зв'язку з create-op.
+        self._undo_stack.append(("delete", map_id, idx, obj))
         del objects[idx]
         self._editing_idx = -1
         self.save_drawings()
@@ -1061,10 +1135,9 @@ class MapPainter:
         if not self._confirm_delete(self.app.t('ui', 'select_all')):
             return
         palette = getattr(self.app, 'drawing_palette', None)
-        for idx in range(len(objects) - 1, -1, -1):
-            self._deletion_history.append((map_id, idx, copy.deepcopy(objects[idx])))
+        self._undo_stack.append(
+            ("delete_all", map_id, [(i, o) for i, o in enumerate(objects)]))
         self.drawings[map_id] = []
-        self._creation_history.clear()
         self._editing_idx = -1
         self._select_all = False
         if palette:
@@ -1117,9 +1190,8 @@ class MapPainter:
             label = self.app.t('ui', 'text_type')
         ok = self._confirm_delete(label)
         if ok:
-            self._deletion_history.append((map_id, idx, copy.deepcopy(obj)))
+            self._undo_stack.append(("delete", map_id, idx, obj))
             del objects[idx]
-            self._creation_history = [i - 1 if i > idx else i for i in self._creation_history if i != idx]
             if self._editing_idx == idx:
                 self._editing_idx = -1
                 palette = getattr(self.app, 'drawing_palette', None)

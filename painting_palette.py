@@ -1740,6 +1740,7 @@ class DrawingPalette(tk.Toplevel):
                     if not self._show_save_or_discard_dialog(force_new_name=True):
                         return
                 self.exit_edit_mode()
+                self._deactivate_tool()
                 self.withdraw()
                 self._saved_pos = self.geometry()
                 self._save_position()
@@ -1748,6 +1749,7 @@ class DrawingPalette(tk.Toplevel):
             if current:
                 self._autosave_current_scheme()
             self.exit_edit_mode()
+            self._deactivate_tool()
             self.withdraw()
             self._saved_pos = self.geometry()
             self._save_position()
@@ -1756,6 +1758,7 @@ class DrawingPalette(tk.Toplevel):
             if not self._show_save_or_discard_dialog():
                 return
         self.exit_edit_mode()
+        self._deactivate_tool()
         self.withdraw()
         self._saved_pos = self.geometry()
         self._save_position()
@@ -2501,7 +2504,7 @@ class DrawingPalette(tk.Toplevel):
                         painter.drawings[kid] = kdrawings
             else:
                 painter.drawings[map_id] = elements
-            painter._creation_history.clear()
+            painter._undo_stack.clear()
             painter._editing_idx = -1
             self.exit_edit_mode()
 
