@@ -1685,6 +1685,11 @@ class DrawingPalette(tk.Toplevel):
             return False
         import tactics_manager
         import config
+        # Спершу ТОЧНИЙ збіг по всіх режимах (не лише UI-фільтр): вміст уже
+        # збережено під іншим battle_mode → діалог зайвий.
+        if (hasattr(self.app, '_find_exact_scheme_for_canvas')
+                and self.app._find_exact_scheme_for_canvas(map_id) is not None):
+            return False
         mode = self.app.selected_battle_mode.get()
         existing_schemes = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE, mode=mode)
         current_coords = {tuple(e.get("coords", [])) for e in current}
@@ -1718,6 +1723,15 @@ class DrawingPalette(tk.Toplevel):
 
     def _close(self):
         es = getattr(self.app, '_editing_scheme', None)
+        if es is None and hasattr(self.app, '_maybe_autoload_displayed_scheme'):
+            # es не прив'язана (наприклад, прив'язка відхилилась під час
+            # стартового refresh) — остання спроба перед діалогом: canvas
+            # належить відображуваній/іншій схемі → es + автосейв, без діалогу.
+            try:
+                self.app._maybe_autoload_displayed_scheme()
+            except Exception as e:
+                print(f"[SCHEME] rebind on close failed: {e}")
+            es = getattr(self.app, '_editing_scheme', None)
         map_id = getattr(self.app, "current_map_eng", None)
         is_admin = getattr(self.app, '_admin_present', False)
         if es and es.get("name"):

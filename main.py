@@ -1648,16 +1648,41 @@ class WotAssistantHQ:
         es = getattr(self, '_editing_scheme', None)
         if es and es.get('name') == scheme_name and es.get('drawing_id', '') == new_id:
             return  # вже активна ціль автосейву
-        # Етап 3 (27.09.2026, варіант A): es переприв'язується ТІЛЬКИ якщо
-        # canvas реально належить відображуваній схемі. Інакше (зміна бойового
-        # режиму → display стрибає на першу схему нового режиму) es ЛИШАЄТЬСЯ
-        # колишнім: автосейв далі пише canvas у його справжню схему (canvas ≡ es),
-        # а не у чужу — раніше переприв'язка писала чужі елементи у відображену
-        # схему («елементи, яких я не ставив»). es НЕ знімається: зняття
-        # зупиняло б автосейв робочої схеми. При розбіжності es не чіпаємо
-        # і settings не переписуємо (display ≡ es відновлюється лише за збігом).
-        if not self._canvas_matches_scheme(scheme):
+        if es is not None:
+            # es вже прив'язана до іншої схеми — не переприв'язуємо (гард
+            # від запису canvas у чужу схему). Автосейв уже працює на es.
             return
+        # Етап 3 (27.09.2026): es прив'язується ТІЛЬКИ якщо canvas належить
+        # відображуваній схемі. Два рівні звірки (діагностика 27.09.2026 на
+        # реальних даних: last_selected='Berlin [Standard]' 28 el, canvas=32 —
+        # точний збіг ніколи не спрацьовував → es=None → автосейв мовчав →
+        # діалог при закритті палітри):
+        #  1) ТОЧНИЙ збіг канонікал JSON — спершу відображена схема, потім
+        #     будь-яка інша схема цієї мапи (Ensk-кейс: canvas ≡ 'Ensk (uk)',
+        #     а display випадково показував 'Ensk [Standard]' — канва належить
+        #     саме (uk)-версії, display синхронізується з нею, інваріант
+        #     display ≡ es зберігається);
+        #  2) ЧАСТКОВИЙ збіг (coverage coords ≥ 0.5) — canvas виріс із
+        #     відображеної схеми (додані/видалені елементи в попередніх
+        #     сесіях при es=None). Поріг 0.5: випадкова чужа схема не має
+        #     50% спільних coords (coords — точні float, збіг випадковий
+        #     малоймовірний).
+        if not self._canvas_matches_scheme(scheme):
+            exact = self._find_exact_scheme_for_canvas(
+                scheme.get('map_id', ''), db=False)
+            switched = exact is not None
+            if switched:
+                scheme = exact
+                scheme_name = scheme.get('scheme_name', '')
+                new_id = scheme.get('drawing_id', '')
+            elif self._scheme_coverage(scheme) < 0.5:
+                # Canvas не належить відображуваній схемі (і жодній іншій не
+                # точний) — es НЕ прив'язуємо: це новий/чужий вміст, автосейв
+                # у схему знищив би її оригінал. При закритті палітри
+                # `_has_unsaved_drawings` запропонує зберегти — правильний захист.
+                return
+        else:
+            switched = False
         self._editing_scheme = {
             "name": scheme_name,
             "desc": scheme.get('description', ''),
@@ -1671,6 +1696,14 @@ class WotAssistantHQ:
         if self.settings.get("last_selected_scheme") != scheme_name:
             self.settings["last_selected_scheme"] = scheme_name
             self.save_settings()
+        # Якщо точний збіг знайдено не в відображуваній схемі — синхронізуємо
+        # комбобокс з реальною власницею canvas (display ≡ es).
+        if switched:
+            display_texts_now = list(self.saved_schemes_cb['values'] or ())
+            target = scheme_name if not scheme.get('is_default') else f"★ {scheme_name}"
+            if target in display_texts_now:
+                self.saved_schemes_var.set(target)
+                self._last_valid_scheme_display = target
 
     def _canvas_matches_scheme(self, scheme):
         """Чи належить вміст canvas саме цій схемі (Етап 3, варіант A).
@@ -1701,6 +1734,54 @@ class WotAssistantHQ:
             return sorted(out)
 
         return _sig(canvas) == _sig(elements)
+
+    def _find_exact_scheme_for_canvas(self, map_id, db=True):
+        """Схема для map_id, чий elements ≡ canvas — ТОЧНИЙ збіг канонікал JSON.
+
+        db=True (для `_has_unsaved_drawings`): пошук по всьому saved_schemes
+        (будь-який режим) — якщо вміст уже збережено під іншим battle_mode,
+        діалог збереження зайвий.
+        db=False (для прив'язки es): ТІЛЬКИ display-список поточного режиму
+        (_saved_schemes_map) — es поза комбобоксом порушив би інваріант
+        display ≡ es (показане інше, автосейвить це)."""
+        if not map_id:
+            return None
+        canvas = self.painter.drawings.get(map_id, [])
+        if not canvas:
+            return None
+        if db:
+            import tactics_manager
+            import config
+            candidates = tactics_manager.list_schemes_from_db(config.SCHEMES_FILE)
+        else:
+            candidates = list((getattr(self, '_saved_schemes_map', None) or {}).values())
+        for s in candidates:
+            if not s or s.get('map_id') != map_id or s.get('_separator'):
+                continue
+            if self._canvas_matches_scheme(s):
+                return s
+        return None
+
+    def _scheme_coverage(self, scheme):
+        """Jaccard-покриття coords: |canvas ∩ scheme| / |canvas ∪ scheme|.
+
+        Схема "власниця" canvas коли більшість елементів спільні В ОБОХ
+        напрямках: 26/34=0.76 для Berlin (28→32 з 26 спільних) — прив'язка;
+        маленька випадкова схема в великому чужому canvas (10/(10+32-10)=0.31)
+        — НЕ прив'язуємо (захист від запису у чужу схему)."""
+        map_id = scheme.get('map_id', '')
+        elements = scheme.get('elements')
+        if not map_id or not isinstance(elements, list) or not elements:
+            return 0.0
+        canvas = self.painter.drawings.get(map_id, [])
+        if not canvas:
+            return 0.0
+        cur = {tuple(e.get('coords', [])) for e in canvas if isinstance(e, dict)}
+        orig = {tuple(e.get('coords', [])) for e in elements if isinstance(e, dict)}
+        union = cur | orig
+        if not union:
+            return 0.0
+        return len(cur & orig) / len(union)
 
     def scheme_save_mode(self):
         """Режим бою для збереження поточної прив'язаної схеми.

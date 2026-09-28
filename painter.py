@@ -1198,6 +1198,15 @@ class MapPainter:
             runs.append(cur)
         return runs
 
+    @staticmethod
+    def _arrow_shape(lw):
+        """Стрілка Tk = (довжина, ширина, надріз); дефолт "8 10 3".
+
+        Робимо її ×2 від дефолту і прив'язуємо до товщини лінії (lw вже
+        містить sc_eff → масштабується з DPI/масштабом об'єкта)."""
+        k = max(1.0, lw / 3.0)
+        return "%.1f %.1f %.1f" % (16.0 * k, 20.0 * k, 6.0 * k)
+
     def _draw_temp_line(self, flat, arrow=False):
         """Прев'ю лінії при малюванні з явним пунктиром (див. _dash_runs)."""
         self.canvas.delete("temp_line")
@@ -1208,14 +1217,18 @@ class MapPainter:
         if arrow and len(flat) >= 4:
             x1, y1, x2, y2 = flat[0], flat[1], flat[-2], flat[-1]
             d = math.hypot(x2 - x1, y2 - y1)
-            # Стрілка: суцільний «хвіст» розміром у товщину (накривається
-            # власне стрілкою, як і у Tk-варіанті — стрілка суцільна завжди)
-            if d > lw * 2:
-                self.canvas.create_line(x2 - (x2 - x1) / d * lw, y2 - (y2 - y1) / d * lw,
-                                        x2, y2, arrow=tk.LAST, fill=self.default_color,
+            # Стрілка: суцільний «хвіст» = її довжина (накриває проміжок
+            # пунктиру під збільшеною стрілкою, див. _arrow_shape)
+            _ash = self._arrow_shape(lw)
+            _alen = float(_ash.split()[0])
+            if d > _alen:
+                self.canvas.create_line(x2 - (x2 - x1) / d * _alen, y2 - (y2 - y1) / d * _alen,
+                                        x2, y2, arrow=tk.LAST, arrowshape=_ash,
+                                        fill=self.default_color,
                                         width=lw, tags=("temp_draw", "temp_line"))
             elif d > 0:
-                self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=self.default_color,
+                self.canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, arrowshape=_ash,
+                                        fill=self.default_color,
                                         width=lw, tags=("temp_draw", "temp_line"))
         self.temp_item = "temp_line"
 
@@ -1253,10 +1266,12 @@ class MapPainter:
                 for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, lw):
                     canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
                 _d = math.hypot(x2 - x1, y2 - y1)
-                if _d > lw * 2:
-                    canvas.create_line(x2 - (x2 - x1) / _d * lw, y2 - (y2 - y1) / _d * lw, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                _ash = self._arrow_shape(lw)
+                _alen = float(_ash.split()[0])
+                if _d > _alen:
+                    canvas.create_line(x2 - (x2 - x1) / _d * _alen, y2 - (y2 - y1) / _d * _alen, x2, y2, arrow=tk.LAST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
                 elif _d > 0:
-                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
 
                 canvas.create_oval(x1-r12, y1-r12, x1+r12, y1+r12, outline=c, width=max(1, lw-1), tags="painter_obj")
                 canvas.create_oval(x1-r4, y1-r4, x1+r4, y1+r4, fill="white", outline="white", tags="painter_obj")
@@ -1276,10 +1291,12 @@ class MapPainter:
                 for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, lw):
                     canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
                 _d = math.hypot(x2 - x1, y2 - y1)
-                if _d > lw * 2:
-                    canvas.create_line(x2 - (x2 - x1) / _d * lw, y2 - (y2 - y1) / _d * lw, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                _ash = self._arrow_shape(lw)
+                _alen = float(_ash.split()[0])
+                if _d > _alen:
+                    canvas.create_line(x2 - (x2 - x1) / _d * _alen, y2 - (y2 - y1) / _d * _alen, x2, y2, arrow=tk.LAST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
                 elif _d > 0:
-                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                    canvas.create_line(x1, y1, x2, y2, arrow=tk.LAST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
@@ -1299,15 +1316,19 @@ class MapPainter:
                     _ax1, _ay1 = flat_px[2], flat_px[3]
                     _da = math.hypot(_ax1 - _ax0, _ay1 - _ay0)
                     if _da > 0:
-                        _tl = min(lw, _da)
-                        canvas.create_line(_ax0, _ay0, _ax0 + (_ax1 - _ax0) / _da * _tl, _ay0 + (_ay1 - _ay0) / _da * _tl, arrow=tk.FIRST, fill=c, width=lw, tags="painter_obj")
+                        _ash = self._arrow_shape(lw)
+                        _alen = float(_ash.split()[0])
+                        _tl = min(_alen, _da)
+                        canvas.create_line(_ax0, _ay0, _ax0 + (_ax1 - _ax0) / _da * _tl, _ay0 + (_ay1 - _ay0) / _da * _tl, arrow=tk.FIRST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
                 if obj.get("arrow_end") and len(flat_px) >= 4:
                     _bx0, _by0 = flat_px[-4], flat_px[-3]
                     _bx1, _by1 = flat_px[-2], flat_px[-1]
                     _db = math.hypot(_bx1 - _bx0, _by1 - _by0)
                     if _db > 0:
-                        _tl = min(lw, _db)
-                        canvas.create_line(_bx1 - (_bx1 - _bx0) / _db * _tl, _by1 - (_by1 - _by0) / _db * _tl, _bx1, _by1, arrow=tk.LAST, fill=c, width=lw, tags="painter_obj")
+                        _ash = self._arrow_shape(lw)
+                        _alen = float(_ash.split()[0])
+                        _tl = min(_alen, _db)
+                        canvas.create_line(_bx1 - (_bx1 - _bx0) / _db * _tl, _by1 - (_by1 - _by0) / _db * _tl, _bx1, _by1, arrow=tk.LAST, arrowshape=_ash, fill=c, width=lw, tags="painter_obj")
 
                 if obj.get("text"):
                     mx, my = self._get_marker_text_pos(obj, cw, ch, sc)
