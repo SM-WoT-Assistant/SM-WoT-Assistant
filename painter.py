@@ -1228,9 +1228,9 @@ class MapPainter:
         Tk -dash на цій платформі ненадійний: значення off ігнорується, а
         відступ малюється рівним товщині лінії (заміри 26.09.2026: (5,5)/(12,6)/(6,30)
         дають однаковий результат, зв'язок on->довжина штриха нелінійний).
-        Тому пунктир малюється явними сегментами: штрих = 2.6*lw, відступ = lw —
-        детерміновано на будь-якій товщині/DPI: вдвічі довші штрихи при
-        незміненому відступі (відступ і раніше дорівнював товщині).
+        Тому пунктир малюється явними сегментами: штрих = 2.6*lw,
+        відступ = 1.5*lw — детерміновано на будь-якій товщині/DPI
+        (відступ ×1.5 від товщини з 28.09.2026 за запитом користувача).
         """
         if len(points) < 4:
             return []
@@ -1285,7 +1285,7 @@ class MapPainter:
         """Прев'ю лінії при малюванні з явним пунктиром (див. _dash_runs)."""
         self.canvas.delete("temp_line")
         lw = self._thickness
-        for run in self._dash_runs(flat, 2.6 * lw, lw):
+        for run in self._dash_runs(flat, 2.6 * lw, 1.5 * lw):
             self.canvas.create_line(*run, fill=self.default_color, width=lw,
                                     tags=("temp_draw", "temp_line"))
         if arrow and len(flat) >= 4:
@@ -1337,7 +1337,7 @@ class MapPainter:
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, lw):
+                for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, 1.5 * lw):
                     canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
                 _d = math.hypot(x2 - x1, y2 - y1)
                 _ash = self._arrow_shape(lw)
@@ -1362,7 +1362,7 @@ class MapPainter:
                 if len(coords) < 4: continue
                 x1, y1 = coords[0]*cw + offset_x, coords[1]*ch + offset_y
                 x2, y2 = coords[2]*cw + offset_x, coords[3]*ch + offset_y
-                for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, lw):
+                for _run in self._dash_runs([x1, y1, x2, y2], 2.6 * lw, 1.5 * lw):
                     canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
                 _d = math.hypot(x2 - x1, y2 - y1)
                 _ash = self._arrow_shape(lw)
@@ -1383,7 +1383,7 @@ class MapPainter:
             elif obj["type"] == "brush":
                 if len(coords) < 4: continue
                 flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
-                for _run in self._dash_runs(flat_px, 2.6 * lw, lw):
+                for _run in self._dash_runs(flat_px, 2.6 * lw, 1.5 * lw):
                     canvas.create_line(*_run, fill=c, width=lw, tags="painter_obj")
                 if obj.get("arrow_start") and len(flat_px) >= 4:
                     _ax0, _ay0 = flat_px[0], flat_px[1]
@@ -1422,7 +1422,7 @@ class MapPainter:
                 if len(coords) < 6: continue
                 flat_px = [(coords[i]*cw + offset_x) if i%2==0 else (coords[i]*ch + offset_y) for i in range(len(coords))]
                 wz = max(1, lw - 1)
-                for _run in self._dash_runs(flat_px + flat_px[:2], 2.6 * wz, wz):
+                for _run in self._dash_runs(flat_px + flat_px[:2], 2.6 * wz, 1.5 * wz):
                     canvas.create_line(*_run, fill=c, width=wz, tags="painter_obj")
 
             elif obj["type"] == "text":
