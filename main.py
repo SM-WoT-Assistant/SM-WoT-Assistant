@@ -98,6 +98,7 @@ class WotAssistantHQ:
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
+        self._hidden_by_battle = False  # mod ON: window withdrawn for the battle
         self._restored_by_battle = False
         self._battle_edit_return = None  # after-id повернення в edit після бою (скасовується при новому бою)
         self._restore_button = None
@@ -868,8 +869,33 @@ class WotAssistantHQ:
 
         self._last_mode_hotkey_ts = 0
 
+    def _battle_hide_window(self):
+        """Mod ON: the app must not appear over the battle at all - the user
+        rule is "either the overlay or the minimap mod, never both"
+        (01.10.2026). Skipped when the window is already in the tray (F10)."""
+        if self._hidden_by_f10 or self._hidden_by_battle:
+            return
+        try:
+            self.root.withdraw()
+            self._hidden_by_battle = True
+        except Exception:
+            pass
+
+    def _battle_show_window(self):
+        if not self._hidden_by_battle:
+            return
+        self._hidden_by_battle = False
+        if self._hidden_by_f10:
+            return  # the user sent it to the tray - keep it there
+        try:
+            self.root.deiconify()
+        except Exception:
+            pass
+
     def toggle_editor(self):
-        if self.dialog_open: return 
+        if self.dialog_open: return
+        # Tab explicitly asks for the editor: show a battle-hidden window back
+        self._battle_show_window()
 
         if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
             msg = self.t('ui', 'status_auto_mode_unavailable')
@@ -2314,7 +2340,13 @@ class WotAssistantHQ:
                     pass
                 self._battle_edit_return = None
 
-            if self._unhide_on_battle_var.get() and self._hidden_by_f10:
+            # Mod ON -> the app must not appear over the battle at all
+            # ("either overlay or minimap mod, never both" - user rule).
+            _use_mod_now = bool(self._use_mod_var.get())
+            if _use_mod_now:
+                self._battle_hide_window()
+            if (not _use_mod_now and self._unhide_on_battle_var.get()
+                    and self._hidden_by_f10):
                 self._restored_by_battle = True
                 self._battle_restore_from_tray()
 
@@ -2343,6 +2375,7 @@ class WotAssistantHQ:
         def _redraw_after_battle():
             if hasattr(self, 'painter'):
                 self.painter.redraw()
+            self._battle_show_window()
         self.root.after(0, _redraw_after_battle)
 
         if self._restored_by_battle:

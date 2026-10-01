@@ -97,7 +97,21 @@ class SmTacticsOverlay(View):
             LOG.info('%s attach=%r ping=%r', TAG,
                      self.flashObject.as_attachInfo(),
                      self.flashObject.as_ping())
+            LOG.info('%s render-info %s', TAG,
+                     self.flashObject.as_getDebugInfo())
             _apply_visibility()
+
+            def _recheck():
+                v = _g.get('view')
+                if v is None:
+                    return
+                try:
+                    LOG.info('%s render-info(+5s) %s', TAG,
+                             v.flashObject.as_getDebugInfo())
+                except Exception:
+                    pass
+
+            BigWorld.callback(5.0, _recheck)
         except Exception:
             LOG.error('%s push failed:\n%s', TAG, traceback.format_exc())
 

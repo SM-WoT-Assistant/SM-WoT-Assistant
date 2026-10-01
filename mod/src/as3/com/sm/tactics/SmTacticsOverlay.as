@@ -215,6 +215,31 @@ package com.sm.tactics
             return "ok";
         }
 
+        // Render-side diagnostics for the python log: how many elements
+        // actually reached the SWF, attach state, and where the first
+        // element sits in minimap-local pixels (vs flags.width size).
+        public function as_getDebugInfo():String
+        {
+            var n:int = _elements ? int(_elements.length) : 0;
+            var first:Array = [];
+            if (n > 0 && _elements[0] != null && _elements[0].coords != null)
+            {
+                var c:Array = _elements[0].coords as Array;
+                if (c != null && c.length >= 2)
+                {
+                    var p:Array = px(Number(c[0]), Number(c[1]));
+                    first = [int(p[0]), int(p[1])];
+                }
+            }
+            var hasLayer:int = (_layer != null && _layer.parent != null) ? 1 : 0;
+            var childIdx:int = hasLayer ? int(_layer.parent.getChildIndex(_layer)) : -1;
+            return JSON.stringify({
+                n: n, size: int(_size), attached: _attached ? 1 : 0,
+                registered: _registered ? 1 : 0, branch: _attachBranch,
+                visibleOn: _visibleOn ? 1 : 0, hasLayer: hasLayer,
+                childIdx: childIdx, first: first});
+        }
+
         public function as_attachInfo():String
         {
             return _attachBranch + ";size=" + _size + ";n=" + _elements.length;

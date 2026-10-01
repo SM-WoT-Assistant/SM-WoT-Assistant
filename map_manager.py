@@ -546,6 +546,18 @@ class MapManager:
         except Exception:
             use_mod = False
         wot_path = self.app.settings.get("wot_path", "")
+        # Stale folder created by the old raw-version bug (path from
+        # version.xml with leading/trailing spaces, Win32-mangled name).
+        # Exact name only - no wildcards (#1492). Checked on every call.
+        if wot_path:
+            _junk = os.path.join(wot_path, "mods", " v.2.4.0.1 #952")
+            if os.path.isdir(_junk):
+                try:
+                    import shutil
+                    shutil.rmtree(_junk)
+                    print("[MAP_MGR] Removed stale version folder:", _junk)
+                except Exception as _je:
+                    print("[MAP_MGR] Stale folder cleanup failed:", _je)
         if not use_mod:
             self._uninstall_tactics_mod(wot_path)
             return
