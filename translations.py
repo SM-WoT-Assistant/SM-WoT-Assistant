@@ -205,6 +205,7 @@ TRANSLATIONS = {
             "login": "LOG IN",
             "map_not_found_msg": "Map {} not found",
             "marker_type": "Marker",
+            "mode_overlay": "Display schemes on window overlay",
             "new_pin": "New PIN",
             "new_scheme_btn": "New Scheme",
             "nickname_label": "Nickname:",

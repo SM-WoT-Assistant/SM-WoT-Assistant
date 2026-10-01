@@ -1,4 +1,4 @@
-                        
+                                
 
 import os, sys, json, ctypes, re
 
@@ -156,6 +156,8 @@ class WotAssistantHQ:
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
         self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
         self._use_mod_var = tk.BooleanVar(value=self.settings.get("use_mod", False))
+        # Похідна змінна режиму показу схем: оверлей = НЕ мод (єдине джерело правди — use_mod)
+        self._use_overlay_var = tk.BooleanVar(value=not self.settings.get("use_mod", False))
 
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення
@@ -1396,6 +1398,28 @@ class WotAssistantHQ:
             self.painter.redraw()
         self.save_settings()
 
+    def _on_overlay_mode_toggle(self):
+        # Взаємовиключні чекбокси Оверлей/Мод: один режим завжди активний
+        if self._use_overlay_var.get():
+            self._use_mod_var.set(False)
+            self._after_mode_change()
+        else:
+            self._use_overlay_var.set(True)
+
+    def _on_mod_mode_toggle(self):
+        if self._use_mod_var.get():
+            self._use_overlay_var.set(False)
+            self._after_mode_change()
+        else:
+            self._use_mod_var.set(True)
+
+    def _after_mode_change(self):
+        self.save_settings()
+        if hasattr(self, 'map_mgr'):
+            self.map_mgr.apply_mod_mode()
+        if hasattr(self, 'painter'):
+            self.painter.redraw()
+
     def set_painter_tool(self, tool):
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
@@ -2276,6 +2300,13 @@ class WotAssistantHQ:
                 self._restored_by_battle = True
                 self._battle_restore_from_tray()
 
+            # Старт бою: з увімкненим модом гейт (painter.redraw, умова
+            # use_mod+бій+norm) одразу знімає оверлей — без цього виклику
+            # на екрані зависало б застаріле малювання; з вимкненим модом
+            # це просто освіження показу.
+            if hasattr(self, 'painter'):
+                self.painter.redraw()
+
         self.root.after(0, _apply_battle_detection)
 
         if not self.auto_sync_var.get():
@@ -2288,6 +2319,13 @@ class WotAssistantHQ:
         self._write_selected_scheme(None)
         # Raw id бою більше не актуальний — малювання повертається на current_map_eng
         self.battle_map_data_id = None
+        # Гейт вимикається разом з battle_map_data_id → показ схем треба
+        # відновити одразу (напр., auto_battle вимкнено і режим лишається
+        # norm). Потік LogWatcher — ТІЛЬКИ через after (#2005).
+        def _redraw_after_battle():
+            if hasattr(self, 'painter'):
+                self.painter.redraw()
+        self.root.after(0, _redraw_after_battle)
 
         if self._restored_by_battle:
             self._restored_by_battle = False

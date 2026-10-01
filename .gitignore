@@ -118,3 +118,11 @@ _run_*.bat
 _temp_*.txt
 _v*_generate_*.txt
 _decoded_*.txt
+# Portable Python 2.7 toolchain (auto-provisioned by build_mod.py for py2.7 pyc compilation)
+tools/python27/
+# build_mod.py intermediate staging dir
+_mod_build_tmp/
+# fonts copied beside the .as source for mxmlc [Embed] (build step)
+mod/src/as3/com/sm/tactics/*.ttf
+mod/src/as3/fonts/
+mod/src/as3/libs/

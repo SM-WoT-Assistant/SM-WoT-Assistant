@@ -15,6 +15,11 @@ if os.path.exists(fa_path):
     FR_PRIVATE = 0x10
     ctypes.windll.gdi32.AddFontResourceExW(fa_path, FR_PRIVATE, 0)
 
+# _dbg_render: [RENDER-DBG] temporary diagnostic flag (01.10.2026).
+# Set to False to silence; remove this line together with every
+# `if _dbg_render:` block (grep [RENDER-DBG]) after live verification (#1463).
+_dbg_render = True
+
 class MapPainter:
     def __init__(self, canvas, app, data_mgr):
         self.canvas = canvas
@@ -1489,7 +1494,14 @@ class MapPainter:
 
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
-        if getattr(self.app, '_use_mod_var', None) and self.app._use_mod_var.get():
+        # Взаємовиключність мод/оверлей діє ТІЛЬКИ в бойовому контексті
+        # (режим norm поверх гри, поки бій триває) — там мод малює натомість.
+        # У редакторі (mode == "edit") та в hangar схеми малюються ЗАВЖДИ:
+        # раніше гейт вимикав показ скрізь при use_mod і схеми зникали з
+        # мапи редактора саме в момент перемикання чекбокса (скарга 30.09.2026).
+        if (getattr(self.app, '_use_mod_var', None) and self.app._use_mod_var.get()
+                and getattr(self.app, 'battle_map_data_id', None)
+                and getattr(self.app, 'mode', 'edit') == "norm"):
             self.canvas.delete("painter_obj")
             return
         map_id = self.app.current_map_eng
@@ -1520,6 +1532,10 @@ class MapPainter:
         all_visible = visible + group_scheme_els
 
         if not all_visible:
+            # _dbg_render: [RENDER-DBG] temporary diagnostic (01.10.2026) - remove with the block at the end (#1463)
+            if _dbg_render:
+                print('[RENDER-DBG] nothing visible: local=%d group=%d (is_visible filtered)' % (
+                    len(visible), len(group_scheme_els)))
             self.app._lift_overlay()
             return
 
@@ -1552,5 +1568,61 @@ class MapPainter:
                 else:
                     continue
                 self.canvas.create_rectangle(l, t, r, b, outline="yellow", dash=(4, 4), width=max(1, int(2*sel_sc)), tags="painter_obj")
+
+        # _dbg_render: [RENDER-DBG] temporary diagnostic (01.10.2026).
+        # Prints the data->pixel transform, the REAL item bboxes on both
+        # canvases and the overlay window geometry so a misplaced/broken
+        # render can be pinned from one live run. Remove this whole block
+        # (guard: `_dbg_render` / [RENDER-DBG]) after verification (#1463).
+        if _dbg_render:
+            try:
+                out = ['[RENDER-DBG] map=%s cw=%d ch=%d scale=%.3f els=%d' % (
+                    map_id, cw, ch, screen_scale, len(all_visible))]
+                for obj in all_visible[:8]:
+                    cc = obj.get("coords") or []
+                    if len(cc) >= 2:
+                        out.append('[RENDER-DBG]  %s coords=%s -> px=(%.0f,%.0f)' % (
+                            obj.get("type"), [round(v, 3) for v in cc[:4]],
+                            cc[0] * cw, cc[1] * ch))
+                out.append('[RENDER-DBG] canvas root=(%d,%d) size=%dx%d' % (
+                    self.canvas.winfo_rootx(), self.canvas.winfo_rooty(),
+                    self.canvas.winfo_width(), self.canvas.winfo_height()))
+                items = self.canvas.find_withtag("painter_obj")
+                out.append('[RENDER-DBG] self.canvas painter_obj=%d' % len(items))
+                for it in list(items)[:8]:
+                    out.append('[RENDER-DBG]   item bbox=%s' % (self.canvas.bbox(it),))
+                po_c = getattr(self, "_po_canvas", None)
+                if po_c is not None:
+                    po_items = po_c.find_withtag("painter_obj")
+                    out.append('[RENDER-DBG] _po_canvas painter_obj=%d root=(%d,%d) size=%dx%d' % (
+                        len(po_items), po_c.winfo_rootx(), po_c.winfo_rooty(),
+                        po_c.winfo_width(), po_c.winfo_height()))
+                    for it in list(po_items)[:8]:
+                        out.append('[RENDER-DBG]   po item bbox=%s' % (po_c.bbox(it),))
+                po_w = getattr(self, "_po_win", None)
+                if po_w is not None and po_w.winfo_exists():
+                    out.append('[RENDER-DBG] _po_win geom=%s root=(%d,%d)' % (
+                        po_w.geometry(), po_w.winfo_rootx(), po_w.winfo_rooty()))
+                probe = self.canvas.create_text(0, 0, text=chr(45),
+                                                font=("XVMSymbol", 37), state="hidden")
+                pb = self.canvas.bbox(probe)
+                self.canvas.delete(probe)
+                out.append('[RENDER-DBG] XVMSymbol(37) probe bbox=%s (fallback if w<=15)' % (pb,))
+                text = "\n".join(out)
+                print(text)
+                # _dbg_render: also append to a file so the diagnostic can be
+                # read without terminal copy-paste (01.10.2026)
+                try:
+                    _p = os.path.join(os.environ.get("TEMP", r"C:\Temp"),
+                                      "opencode", "render_dbg.txt")
+                    _d = os.path.dirname(_p)
+                    if not os.path.isdir(_d):
+                        os.makedirs(_d)
+                    with open(_p, "a") as _f:
+                        _f.write(text + "\n")
+                except Exception:
+                    pass
+            except Exception as _dbg_err:
+                print("[RENDER-DBG] err: %r" % (_dbg_err,))
 
         self.app._lift_overlay()

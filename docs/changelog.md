@@ -4,6 +4,77 @@
 
 ---
 
+## Перебудова мінімап-оверлею за спільнотним зразком — View замість ExternalFlash, 01.10.2026
+
+**Симптом:** попередня архітектура (окремий `ExternalFlashComponent` + екранний rect + z-стек + прив'язка 400/300) не давала видимості в бою попри доведений дохід даних (`as_ping='ok'`, `push=True`); кілька циклів live-тестів без результату. Користувач зупинив процес і вказав: вивчати готові робочі моди (модпак на машині + мережа) замість власних експериментів.
+**Корінь:** невірна архітектура — окремий повноекранний шар конкурує за шар/координати з мінімапом; спільнота (відкритий `wotstat/wotstat-positions` → Minimap Overlay; хуки `locastan.yayaminimap` у модпаку) робить принципово інакше.
+**Рішення (повна перебудова, один live-тест = працює):**
+- **AS3**: `SmTacticsOverlay extends AbstractView` (WG SWC з `as3/libs/` wotstat-репо, авто-завантаження з `build_mod.py`) — шар `addChildAt` **всередині `minimap.entriesContainer`** (розмір з `flags.width`, координати нормалізовані 0..1 — формат наших схем); зникають екранний rect, прив'язка-400/300, z-стек і backgroundAlpha за конструкцією; SWF у `res/gui/flash/` (підтверджено їх `build.sh`);
+- **Python**: View (`ViewSettings` + `app.loadView` на `AppLifeCycleEvent.INITIALIZED(SF_BATTLE)`) + event bus `ComponentEvent.COMPONENT_REGISTERED/UNREGISTERED(BATTLE_VIEW_ALIASES.MINIMAP)` — **без monkeypatch** `_populate/_dispose`; збережено: читання `selected_scheme.json`, Alt-режими (`InputHandler` + `isAltDown`), ModsSettingsAPI (soft-dep), `[SM Tactics]`-лог;
+- **Збірка**: py2.7 pyc (magic 62211) + ZIP_STORED + авто-fetch WG-SWC/шрифтів.
+**Докази:** лог `view registered → battle app → SFWindow[SM_TACTICS_OVERLAY_VIEW] → minimap registered (scheme='Ensk для ТТ', 13 elements) → attach='minimap;size=210' ping='ok'`; скриншот: зелена debug-рамка точно по панелі мінімапа + маркери схеми на мінімапі.
+**Статус:** debug активний (`as_setDebug`, `[RENDER-DBG]` у painter, `_dbg_render=True`) — прибирається після фіксів редактора; відомий баг: «стрілки неправильно масштабуються» (скриншот 380, лівий верхній — редактор) — у плані після коміту.
+
+---
+
+## Етапи 3-4: AS3-рендерер та новий Python-мод (мінімап-схема), 30.09.2026
+
+**Симптом:** старий `mod_sm_tactics.pyc` не імпортувався (`No module named LAYERS`) → тост «Failed to load» що старту; тестовий пробник блокував клавіатуру і малював червоний прямокутник (знятий з гри).
+**Корінь:** (1) старий код писався під неіснуючі модулі клієнта; (2) flash-компонент без `wg_inputKeyMode = NO_HANDLE` перехоплював весь ввід (патерн pruszko: InputKeyMode.NO_HANDLE + focus/moveFocus=False); (3) SWF без `as_populate/as_dispose` → AttributeError «PyGFxDisplayObject has no attribute» (контракт фреймворку).
+**Фікс:** повна заміна: `mod/src/as3/com/sm/tactics/SmTacticsFlash.as` (as_populate/as_dispose, as_setLayout/as_setElements/as_setVisible/as_setDebug; рендер marker/arrow/brush/zone/dot/text + POI-гліфи через вбудовані XVMSymbol/FontAwesome, пунктир сегментами як painter, стрілки за arrowshape 2.2/2.6/0.9lw; прив'язка кореня HALF 400/300 — SWF задекларовано 800×600) + перепис `mod_sm_tactics.py` (чисті імпорти, хуки `MinimapComponent._populate/_dispose` із збереженням ланцюжка, rect із `flashObject.x/y + currentWidth/currentHeight` (пробник: 1290+630=1920 — кут збігається точно), Alt через `InputHandler.onKeyDown/Up + isAltDown()`, ModsSettingsAPI soft-dep з dropdown «Always/Show on Alt/Hide on Alt», читання `selected_scheme.json` на populate, debug-рамка #1463) + `build_mod.py` (збірка SWF за рецептом: пробілова форма опцій, CWD=frameworks, `-default-size 800 600`; пакування meta+pyc+swf, STORED, magic-верифікації).
+**Верифікація:** py2.7 `COMPILE OK` (magic 62211); SWF v36 264KB; збірка 3 entry all STORED; read-back `mods/2.4.0.1/sm_tactics.wotmod` (meta `<root>`, CWS v36, pyc 03F3). LIVE-тест — окремим кроком (тренувальна кімната).
+
+## Фікс: wotmod-пакети відхилялись грою — «compression not supported», 30.09.2026
+
+**Симптом:** гра показувала діалоги `World Of Tanks - Load error: Mod package './mods/2.4.0.1/sm_tactics(.probe).wotmod' not loaded` — ні наш бандл, ні тестовий пробник не завантажувались.
+**Корінь (game.log PY_DEBUG):** `Mod package '...' load error: compression not supported` — читач пакетів BigWorld у клієнті 2.4.0.1 приймає **тільки ZIP_STORED (compress=0)**; обидва наші пакети були DEFLATE (build_mod.py → `ZIP_DEFLATED`, дефолт Python zipfile; пробник → .NET Optimal). Еталон: усі робочі моди (pruszko.distance_marker, FastReconnect, Damage-Sticker) — STORE. Другорядне: meta.xml бандла мав нетиповий root-тег `<mod>` (робочі — `<root>`, без XML-декларації). Мод ніколи не працював у грі також і через це (плюс py3-pyc під Python 2.7 — див. попередні діагнози).
+**Фікс:** `build_mod.py` — `ZIP_STORED` + прибрано компіляцію py3-pyc (пакується лише `.py`; лоадер `gui/mods/__init__` приймає `.py`/`.pyc`, гра — Python 2.7/magic 62211); `mod/meta.xml` → `<root>` + 4 теги як у робочих; бандл і пробник перезібрано та встановлено в `mods/2.4.0.1/`.
+**Верифікація:** усі entry обох встановлених пакетів `compress=0`, розділювачі `/`, meta `<root>` (python zipfile read-back). Остаточно — живий запуск гри: відсутність діалогів та `load error` у game.log.
+
+---
+
+## Перемикач Оверлей/Мод: два взаємовиключні чекбокси + sweep-очищення, 29.09.2026
+
+**Симптом:** один чекбокс `use_mod` у Settings не гарантував взаємовиключення
+показу схеми оверлеєм та модом мінімапа — при вимкненні галочки раніше
+встановлений `sm_tactics.wotmod` лишався в `mods/<версія>/` → мод продовжував
+малювати схему разом з оверлеєм = накладання. Чекбокс був без `command`:
+клік не ставив/не прибирав мод і не перемальовував оверлей миттєво.
+
+**Корінь:** `_install_tactics_mod` (map_manager.py) мав тільки гілку
+копіювання (enabled), гілки видалення не існувало взагалі; checkbox
+(ui_manager.py) мав дефолтний `command=save_settings` без жодної
+побічної дії.
+
+**Фікс (4 файли):**
+- `main.py`: нова похідна `_use_overlay_var` (канонічне джерело —
+  `settings["use_mod"]`, зворотна сумісність без нового ключа);
+  обробники `_on_overlay_mode_toggle` / `_on_mod_mode_toggle` (взаємне
+  вимкнення; клік по активному → повторне підтвердження, «обох вимкнено»
+  не буває) → `_after_mode_change` = `save_settings()` +
+  `map_mgr.apply_mod_mode()` + `painter.redraw()`.
+- `ui_manager.py`: два чекбокси ПІДРЯД у Settings —
+  «Display schemes on window overlay» (`mode_overlay`) згори,
+  «Display schemes on game minimap (mod)” (`use_mod`) знизу.
+- `map_manager.py`: `_install_tactics_mod` → `apply_mod_mode` —
+  enabled = копіювання (була логіка), disabled = `_uninstall_tactics_mod`
+  sweep: точне ім'я `sm_tactics.wotmod` з усіх `mods/<*​>/` (побудова
+  шляхів у Python, без wildcard — #1492); сусідні моди/пробник не
+  чіпаються. Стартові виклики (map_manager:181, 452) тепер приводять
+  стан гри у відповідність до галочки при КОЖНОМУ старті.
+- `translations.py`: новий ключ `mode_overlay`.
+
+**Верифікація:** AST OK (4 файли); ізольований тест на реальних методах
+**11/11 PASS** (sweep прибирає лише `sm_tactics.wotmod` з двох версійних
+папок, сусіди/пробник/директорія з таким ім'ям/файл на рівні mods/ — цілі;
+enable встановлює, disable прибирає, edge-шляхи не кидають); живий запуск
+— stderr 0 байт, fast-path з `apply_mod_mode` відпрацював без помилок.
+Новий лейбл до перекладу: Google Translate цього разу відповів
+rate-limit → лейбл тимчасово англійський, самозагоїться при наступному
+вдалому батчі (#1670).
+
+---
+
 ## Фікс: неможливо намалювати два елемента близько (конфлікт «клік=виділення» з малюванням, 27.09.2026)
 
 **Симптом:** при активному інструменті малювання прес біля/на існуючому

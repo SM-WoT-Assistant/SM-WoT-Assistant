@@ -1,335 +1,342 @@
 # -*- coding: utf-8 -*-
-"""
-SM WoT Tactics — in-game minimap overlay for tactical schemes.
-Reads selected_scheme.json from %APPDATA%/SM WoT Assistant/
-Renders markers, arrows, and brush routes on the minimap.
+"""SM WoT Tactics - tactical scheme on the in-game minimap.
 
-WoT Python 2.7 — uses MinimapComponent hooks and Flash graphics API.
+Architecture follows the open-source community reference
+wotstat/wotstat-positions (Minimap Overlay):
+
+- a Scaleform View (ViewSettings + app.loadView on the battle app) hosts
+  the AS3 side (SmTacticsOverlay.swf);
+- lifecycle comes from ComponentEvent.COMPONENT_REGISTERED for
+  BATTLE_VIEW_ALIASES.MINIMAP - no monkeypatch hooks;
+- the AS3 layer attaches INSIDE minimap.entriesContainer, so all drawing
+  is in minimap-local pixels and coordinates stay normalized 0..1 (the
+  exact format of the desktop app's scheme data) - no screen rect, no
+  root anchoring, no z-stack handling.
+
+Data flow: the desktop app writes selected_scheme.json at battle start
+(main.py:_write_selected_scheme); this mod reads it when the minimap
+registers and pushes the elements to the SWF.
+
+Client constraints (live-verified): Python 2.7 (pyc magic 62211);
+ModsSettingsAPI is an optional soft-dep; Alt visibility modes use
+InputHandler (isAltDown - proven by pruszko and yaya mods).
 """
 import os
+import sys
 import json
-import math
-import BigWorld
-import GUI
-from gui.Scaleform.daapi.view.battle.shared.minimap.component import MinimapComponent
-from gui.Scaleform.daapi.view.battle.shared.minimap.settings import TRANSFORM_FLAG
-from gui.Scaleform.genConsts.LAYERS import LAYERS
-from PlayerEvents import g_playerEvents
-from gui import g_guiResetters
-from gui.shared import g_eventBus, events
-import Keys
+import logging
+import traceback
 
+import BigWorld
+from gui import InputHandler
+from gui.Scaleform.framework import g_entitiesFactories, ScopeTemplates, ViewSettings
+from gui.Scaleform.framework.entities.View import View
+from gui.Scaleform.genConsts.BATTLE_VIEW_ALIASES import BATTLE_VIEW_ALIASES
+from gui.app_loader.settings import APP_NAME_SPACE
+from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
+from gui.shared import events, EVENT_BUS_SCOPE, g_eventBus
+from gui.shared.personality import ServicesLocator
+from frameworks.wulf import WindowLayer
+
+LOG = logging.getLogger('sm_tactics')
 TAG = '[SM Tactics]'
+
+VIEW_ALIAS = 'SM_TACTICS_OVERLAY_VIEW'
+SWF_NAME = 'SmTacticsOverlay.swf'
+LINKAGE = 'sm.wo-tactics'
 SCHEME_FILE = os.path.join(
     os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'selected_scheme.json')
 
-_scheme = None
-_visible = True
-_active = False
-_minimap = None
-_overlay_swf = None
+DEBUG = True  # attach/ping logs + green frame on the minimap (#1463)
 
+MODE_ALWAYS = 0
+MODE_SHOW_ON_ALT = 1
+MODE_HIDE_ON_ALT = 2
+MODE_LABELS = ['Always', 'Show on Alt', 'Hide on Alt']
 
-def _read_scheme():
-    global _scheme
-    try:
-        if not os.path.isfile(SCHEME_FILE):
-            _scheme = None
-            return
-        with open(SCHEME_FILE, 'r') as f:
-            raw = f.read()
-        if raw.strip() == 'null' or not raw.strip():
-            _scheme = None
-            return
-        data = json.loads(raw)
-        if data and isinstance(data, dict) and data.get('elements'):
-            _scheme = data
-            print('%s Loaded: %s (%d elements)' % (
-                TAG, data.get('scheme_name', '?'), len(data.get('elements', []))))
-        else:
-            _scheme = None
-    except Exception as e:
-        print('%s Read error: %s' % (TAG, e))
-        _scheme = None
-
-
-def _get_minimap_comp():
-    try:
-        session = BigWorld.player().sessionProvider
-        if session is None:
-            return None
-        gui = session.gui
-        if gui is None:
-            return None
-        battlePage = getattr(gui, '_battlePage', None)
-        if battlePage is None:
-            return None
-        minimap = getattr(battlePage, '_minimap', None)
-        return minimap
-    except Exception:
-        return None
-
-
-def _get_minimap_size(minimap):
-    try:
-        w = minimap.as_width()
-        h = minimap.as_height()
-        if w > 0 and h > 0:
-            return w, h
-    except Exception:
-        pass
-    return None, None
-
-
-def _draw_marker(gfx, x, y, size=4, color=0xFF4444):
-    try:
-        gfx.lineStyle(0, color, 0.0)
-        gfx.beginFill(color, 0.8)
-        gfx.drawCircle(x, y, size)
-        gfx.endFill()
-    except Exception:
-        pass
-
-
-def _draw_arrow(gfx, x1, y1, x2, y2, color=0xFF4444, width=2):
-    try:
-        gfx.lineStyle(width, color, 0.8)
-        gfx.moveTo(x1, y1)
-        gfx.lineTo(x2, y2)
-        angle = math.atan2(y2 - y1, x2 - x1)
-        arrow_len = 6
-        a1x = x2 - arrow_len * math.cos(angle - 0.4)
-        a1y = y2 - arrow_len * math.sin(angle - 0.4)
-        a2x = x2 - arrow_len * math.cos(angle + 0.4)
-        a2y = y2 - arrow_len * math.sin(angle + 0.4)
-        gfx.lineStyle(width, color, 0.8)
-        gfx.moveTo(x2, y2)
-        gfx.lineTo(a1x, a1y)
-        gfx.moveTo(x2, y2)
-        gfx.lineTo(a2x, a2y)
-    except Exception:
-        pass
-
-
-def _draw_brush(gfx, coords_flat, color=0xFF4444, width=2):
-    """Draw a polyline (brush) element via Flash graphics.
-    coords_flat is [x1,y1, x2,y2, ...] in normalized 0..1."""
-    try:
-        if len(coords_flat) < 4:
-            return
-        gfx.lineStyle(width, color, 0.6)
-        x0 = coords_flat[0]
-        y0 = coords_flat[1]
-        gfx.moveTo(x0, y0)
-        i = 2
-        while i < len(coords_flat) - 1:
-            gfx.lineTo(coords_flat[i], coords_flat[i + 1])
-            i += 2
-    except Exception:
-        pass
-
-
-def _draw_dot(gfx, x, y, size=3, color=0xFF4444):
-    """Draw a small filled rectangle (position marker)."""
-    try:
-        gfx.lineStyle(0, color, 0.0)
-        gfx.beginFill(color, 0.8)
-        gfx.drawRect(x - size, y - size, size * 2, size * 2)
-        gfx.endFill()
-    except Exception:
-        pass
-
-
-def _draw_zone(gfx, coords_flat, color=0xFF4444):
-    """Draw a dashed closed polygon outline (zone boundary).
-    Flash doesn't have native dash, so we draw segments with gaps."""
-    try:
-        n = len(coords_flat)
-        if n < 6:
-            return
-        gfx.lineStyle(1, color, 0.7)
-        dash_on = True
-        i = 0
-        while i < n:
-            x1 = coords_flat[i]
-            y1 = coords_flat[i + 1]
-            x2 = coords_flat[(i + 2) % n]
-            y2 = coords_flat[(i + 3) % n]
-            if dash_on:
-                gfx.moveTo(x1, y1)
-                gfx.lineTo(x2, y2)
-            dash_on = not dash_on
-            i += 2
-    except Exception:
-        pass
-
-
-POI_SCALES = {
-    0x3F: 1.0,   # HT (heavy tank) - largest
-    0x3B: 0.85,  # MT (medium tank)
-    0x2E: 0.75,  # TD (tank destroyer)
-    0x2D: 0.65,  # SPG (artillery)
-    0x3A: 0.50,  # LT (light tank) - smallest
+_g = {
+    'view': None,
+    'should_register': False,
+    'elements': None,
+    'scheme_name': None,
+    'mode': MODE_ALWAYS,
+    'alt': False,
+    'listeners': False,
+    'keys': None,
 }
 
 
-def _draw_poi(gfx, x, y, code, size=6, color=0xFF4444):
-    """Draw a vehicle class icon as a geometric shape on the minimap.
-    Uses WoT minimap-style symbols: diamond (LT/MT/HT), triangle (TD), square (SPG).
-    Size is scaled by class: HT largest, LT smallest."""
-    try:
-        s = size * POI_SCALES.get(code, 0.7)
-        gfx.lineStyle(1, color, 0.9)
-        gfx.beginFill(color, 0.7)
+class SmTacticsOverlay(View):
+    """Python side of the overlay view; as_* methods forward to the SWF."""
 
-        if code in (0x3A, 0x3B, 0x3F):
-            gfx.moveTo(x, y - s)
-            gfx.lineTo(x + s * 0.7, y)
-            gfx.lineTo(x, y + s)
-            gfx.lineTo(x - s * 0.7, y)
-            gfx.lineTo(x, y - s)
-        elif code == 0x2E:
-            gfx.moveTo(x, y + s)
-            gfx.lineTo(x - s * 0.7, y - s * 0.6)
-            gfx.lineTo(x + s * 0.7, y - s * 0.6)
-            gfx.lineTo(x, y + s)
-        elif code == 0x2D:
-            gfx.drawRect(x - s * 0.6, y - s * 0.6, s * 1.2, s * 1.2)
-        else:
-            gfx.drawCircle(x, y, s * 0.7)
+    def _populate(self):
+        super(SmTacticsOverlay, self)._populate()
+        _g['view'] = self
+        LOG.info('%s view populated (scheme=%r, elements=%s)', TAG,
+                 _g['scheme_name'],
+                 len(_g['elements']) if _g['elements'] else 0)
+        if _g['should_register']:
+            self.register_and_push()
 
-        gfx.endFill()
-    except Exception:
-        pass
+    def _destroy(self):
+        if _g.get('view') is self:
+            _g['view'] = None
+        LOG.info('%s view destroyed', TAG)
+        super(SmTacticsOverlay, self)._destroy()
 
+    def register_and_push(self):
+        elements = _g['elements']
+        if not elements:
+            LOG.info('%s no scheme - layer not registered', TAG)
+            return
+        try:
+            self.as_setDebug(DEBUG)
+            self.as_register()
+            self.as_setElements(json.dumps(elements))
+            LOG.info('%s attach=%r ping=%r', TAG,
+                     self.flashObject.as_attachInfo(),
+                     self.flashObject.as_ping())
+            _apply_visibility()
+        except Exception:
+            LOG.error('%s push failed:\n%s', TAG, traceback.format_exc())
 
-def _hex_to_int(hex_str):
-    try:
-        hex_str = hex_str.lstrip('#')
-        return int(hex_str, 16)
-    except Exception:
-        return 0xFF4444
+    def as_register(self):
+        self.flashObject.as_register()
 
+    def as_unregister(self):
+        self.flashObject.as_unregister()
 
-def _el_coords_to_px(el, mm_w, mm_h):
-    """Extract pixel coords from element using 'coords' array."""
-    coords = el.get('coords', [])
-    if len(coords) < 2:
-        return None
-    px = []
-    for i, c in enumerate(coords):
-        if i % 2 == 0:
-            px.append(c * mm_w)
-        else:
-            px.append(c * mm_h)
-    return px
+    def as_setElements(self, payload):
+        self.flashObject.as_setElements(payload)
+
+    def as_setVisible(self, on):
+        self.flashObject.as_setVisible(bool(on))
+
+    def as_setDebug(self, on):
+        self.flashObject.as_setDebug(bool(on))
 
 
-def _render_scheme(minimap, mm_w, mm_h):
-    if not _scheme or not _visible:
+# ---------------- view framework setup (wotstat pattern) ----------------
+
+def on_app_initialized(event):
+    if event.ns != APP_NAME_SPACE.SF_BATTLE:
         return
-    elements = _scheme.get('elements', [])
-    if not elements:
+    LOG.info('%s battle app initialized - loading overlay view', TAG)
+
+    def _load():
+        try:
+            app = ServicesLocator.appLoader.getApp(event.ns)
+            if not app:
+                LOG.error('%s battle app not found', TAG)
+                return
+            app.loadView(SFViewLoadParams(VIEW_ALIAS))
+        except Exception:
+            LOG.error('%s loadView failed:\n%s', TAG, traceback.format_exc())
+
+    BigWorld.callback(0, _load)
+
+
+def on_component_registered(event):
+    if event.alias != BATTLE_VIEW_ALIASES.MINIMAP:
+        return
+    _g['should_register'] = True
+    name, elements = _read_scheme()
+    _g['scheme_name'] = name
+    _g['elements'] = elements
+    LOG.info('%s minimap registered (scheme=%r, elements=%s)', TAG, name,
+             len(elements) if elements else 0)
+    view = _g['view']
+    if view is not None:
+        view.register_and_push()
+
+
+def on_component_unregistered(event):
+    if event.alias != BATTLE_VIEW_ALIASES.MINIMAP:
+        return
+    _g['should_register'] = False
+    view = _g['view']
+    if view is not None:
+        try:
+            view.as_unregister()
+        except Exception:
+            LOG.warning('%s unregister failed:\n%s', TAG, traceback.format_exc())
+
+
+def _setup_view_framework():
+    g_entitiesFactories.addSettings(ViewSettings(
+        VIEW_ALIAS, SmTacticsOverlay, SWF_NAME,
+        WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE))
+    g_eventBus.addListener(events.AppLifeCycleEvent.INITIALIZED,
+                           on_app_initialized, EVENT_BUS_SCOPE.GLOBAL)
+    g_eventBus.addListener(events.ComponentEvent.COMPONENT_REGISTERED,
+                           on_component_registered, EVENT_BUS_SCOPE.GLOBAL)
+    g_eventBus.addListener(events.ComponentEvent.COMPONENT_UNREGISTERED,
+                           on_component_unregistered, EVENT_BUS_SCOPE.GLOBAL)
+    _g['listeners'] = True
+    LOG.info('%s view registered (alias=%s, swf=%s)', TAG, VIEW_ALIAS, SWF_NAME)
+
+
+# ---------------- scheme data ----------------
+
+def _read_scheme():
+    try:
+        if not os.path.isfile(SCHEME_FILE):
+            return None, None
+        with open(SCHEME_FILE, 'r') as fh:
+            raw = fh.read()
+        if not raw.strip() or raw.strip() == 'null':
+            return None, None
+        data = json.loads(raw)
+        elements = data.get('elements') if isinstance(data, dict) else None
+        if not elements:
+            return None, None
+        return data.get('scheme_name'), elements
+    except Exception:
+        LOG.error('%s scheme read failed:\n%s', TAG, traceback.format_exc())
+        return None, None
+
+
+# ---------------- visibility (Alt modes) ----------------
+
+class _KeyState(object):
+    """Alt tracking via InputHandler events (isAltDown pattern)."""
+
+    def __init__(self):
+        self.alt = False
+        InputHandler.g_instance.onKeyDown += self._on_key_down
+        InputHandler.g_instance.onKeyUp += self._on_key_up
+
+    def _on_key_down(self, event):
+        try:
+            self.alt = bool(event.isAltDown())
+            _g['alt'] = self.alt
+            _apply_visibility()
+        except Exception:
+            pass
+
+    def _on_key_up(self, event):
+        try:
+            self.alt = bool(event.isAltDown())
+            _g['alt'] = self.alt
+            _apply_visibility()
+        except Exception:
+            pass
+
+    def close(self):
+        try:
+            InputHandler.g_instance.onKeyDown -= self._on_key_down
+            InputHandler.g_instance.onKeyUp -= self._on_key_up
+        except Exception:
+            pass
+
+
+def _apply_visibility():
+    view = _g['view']
+    if view is None:
+        return
+    mode = _g['mode']
+    alt = _g['alt']
+    if mode == MODE_SHOW_ON_ALT:
+        on = alt
+    elif mode == MODE_HIDE_ON_ALT:
+        on = not alt
+    else:
+        on = True
+    try:
+        view.as_setVisible(on)
+    except Exception:
+        LOG.warning('%s setVisible failed:\n%s', TAG, traceback.format_exc())
+
+
+# ---------------- settings (ModsSettingsAPI soft-dep) ----------------
+
+def _settings_template(templates):
+    return {
+        'modDisplayName': 'SM Tactics: scheme on minimap',
+        'enabled': True,
+        'column1': [
+            templates.createDropdown(
+                'When to show the scheme', 'displayMode', list(MODE_LABELS),
+                MODE_ALWAYS,
+                tooltip=('{HEADER}Scheme visibility{/HEADER}{BODY}'
+                         'Always - the scheme is always drawn on the minimap. '
+                         'Show on Alt - appears while Alt is held. '
+                         'Hide on Alt - hides while Alt is held.{/BODY}'),
+                width=200),
+        ],
+    }
+
+
+def _on_settings_changed(linkage, new_settings):
+    if linkage != LINKAGE:
         return
     try:
-        gfx = minimap._Flash__component
-        for el in elements:
-            etype = el.get('type', '')
-            color = _hex_to_int(el.get('color', '#FF4444'))
-            thickness = el.get('thickness', 2)
-            size = el.get('size', 4)
-
-            if etype == 'marker':
-                px = _el_coords_to_px(el, mm_w, mm_h)
-                if px and len(px) >= 2:
-                    _draw_marker(gfx, px[0], px[1], size=size, color=color)
-
-            elif etype == 'dot':
-                px = _el_coords_to_px(el, mm_w, mm_h)
-                if px and len(px) >= 2:
-                    dot_sz = max(2, int(size * 0.8))
-                    _draw_dot(gfx, px[0], px[1], size=dot_sz, color=color)
-
-            elif etype == 'arrow':
-                px = _el_coords_to_px(el, mm_w, mm_h)
-                if px and len(px) >= 4:
-                    _draw_arrow(gfx, px[0], px[1], px[2], px[3],
-                                color=color, width=thickness)
-
-            elif etype == 'brush':
-                coords = el.get('coords', [])
-                if len(coords) >= 4:
-                    flat_px = []
-                    for i, c in enumerate(coords):
-                        if i % 2 == 0:
-                            flat_px.append(c * mm_w)
-                        else:
-                            flat_px.append(c * mm_h)
-                    _draw_brush(gfx, flat_px, color=color, width=thickness)
-
-            elif etype == 'zone':
-                coords = el.get('coords', [])
-                if len(coords) >= 6:
-                    flat_px = []
-                    for i, c in enumerate(coords):
-                        if i % 2 == 0:
-                            flat_px.append(c * mm_w)
-                        else:
-                            flat_px.append(c * mm_h)
-                    _draw_zone(gfx, flat_px, color=color)
-
-            elif etype == 'text':
-                px = _el_coords_to_px(el, mm_w, mm_h)
-                if px and len(px) >= 2:
-                    poi = el.get('poi', [])
-                    if isinstance(poi, list) and poi:
-                        poi_scale = el.get('poi_scale', 0.7)
-                        base_sz = max(3, int(6 * poi_scale))
-                        _draw_poi(gfx, px[0], px[1], poi[0], size=base_sz, color=color)
-                    else:
-                        _draw_dot(gfx, px[0], px[1], size=3, color=color)
-
-    except Exception as e:
-        print('%s Render error: %s' % (TAG, e))
+        _g['mode'] = int(new_settings.get('displayMode', MODE_ALWAYS))
+        _apply_visibility()
+        LOG.info('%s settings: mode=%d', TAG, _g['mode'])
+    except Exception:
+        LOG.warning('%s settings change:\n%s', TAG, traceback.format_exc())
 
 
-def _on_avatar_ready():
-    global _active, _scheme
-    _active = True
-    _read_scheme()
-    print('%s Battle started. Scheme: %s' % (
-        TAG, _scheme.get('scheme_name', 'none') if _scheme else 'none'))
+def _on_settings_button(linkage, var_name, value):
+    pass
 
 
-def _on_become_non_player():
-    global _active, _scheme, _minimap
-    _active = False
-    _scheme = None
-    _minimap = None
+def _load_settings():
+    try:
+        from gui.modsSettingsApi import g_modsSettingsApi, templates
+    except Exception:
+        LOG.info('%s ModsSettingsAPI unavailable - default mode: Always', TAG)
+        return
+    try:
+        template = _settings_template(templates)
+        saved = g_modsSettingsApi.getModSettings(LINKAGE, template)
+        if saved:
+            _g['mode'] = int(saved.get('displayMode', MODE_ALWAYS))
+            g_modsSettingsApi.registerCallback(
+                LINKAGE, _on_settings_changed, _on_settings_button)
+        else:
+            st = g_modsSettingsApi.setModTemplate(
+                LINKAGE, template, _on_settings_changed, _on_settings_button)
+            _g['mode'] = int(st.get('displayMode', MODE_ALWAYS))
+        LOG.info('%s settings registered (mode=%d)', TAG, _g['mode'])
+    except Exception:
+        LOG.warning('%s settings registration:\n%s', TAG, traceback.format_exc())
 
 
-def _toggle_visible():
-    global _visible
-    _visible = not _visible
-    print('%s Overlay %s' % (TAG, 'visible' if _visible else 'hidden'))
-
-
-def _handle_key(event):
-    if event.key == Keys.KEY_F12:
-        _toggle_visible()
-        return True
-    return False
-
+# ---------------- entry points ----------------
 
 def init():
-    g_playerEvents.onAvatarReady += _on_avatar_ready
-    g_playerEvents.onAvatarBecomeNonPlayer += _on_become_non_player
-    BigWorld.addKeyEventHandler(_handle_key)
-    print('%s Loaded (F12 to toggle)' % TAG)
+    try:
+        LOG.info('%s init (python %s)', TAG, sys.version.split()[0])
+        _load_settings()
+        _g['keys'] = _KeyState()
+        _setup_view_framework()
+        LOG.info('%s ready', TAG)
+    except Exception:
+        LOG.error('%s init failed:\n%s', TAG, traceback.format_exc())
 
 
 def fini():
-    g_playerEvents.onAvatarReady -= _on_avatar_ready
-    g_playerEvents.onAvatarBecomeNonPlayer -= _on_become_non_player
-    BigWorld.removeKeyEventHandler(_handle_key)
-    print('%s Unloaded' % TAG)
+    try:
+        if _g['listeners']:
+            g_eventBus.removeListener(events.AppLifeCycleEvent.INITIALIZED,
+                                      on_app_initialized, EVENT_BUS_SCOPE.GLOBAL)
+            g_eventBus.removeListener(events.ComponentEvent.COMPONENT_REGISTERED,
+                                      on_component_registered, EVENT_BUS_SCOPE.GLOBAL)
+            g_eventBus.removeListener(events.ComponentEvent.COMPONENT_UNREGISTERED,
+                                      on_component_unregistered, EVENT_BUS_SCOPE.GLOBAL)
+            _g['listeners'] = False
+        if _g['keys'] is not None:
+            _g['keys'].close()
+            _g['keys'] = None
+        view = _g['view']
+        if view is not None:
+            try:
+                view.as_unregister()
+            except Exception:
+                pass
+            _g['view'] = None
+        LOG.info('%s fini', TAG)
+    except Exception:
+        LOG.error('%s fini failed:\n%s', TAG, traceback.format_exc())

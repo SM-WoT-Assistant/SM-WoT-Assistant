@@ -454,7 +454,10 @@ class UIManager:
         chk_launch_game.configure(command=_on_launch_on_game_start)
 
         sep()
-        make_chk(self.app.t('ui', 'use_mod'), self.app._use_mod_var)
+        chk_mode_overlay = make_chk(self.app.t('ui', 'mode_overlay'), self.app._use_overlay_var)
+        chk_mode_overlay.configure(command=self.app._on_overlay_mode_toggle)
+        chk_mode_mod = make_chk(self.app.t('ui', 'use_mod'), self.app._use_mod_var)
+        chk_mode_mod.configure(command=self.app._on_mod_mode_toggle)
         sep()
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)
         sep()

@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import threading
 import config
 
@@ -178,7 +179,7 @@ class MapManager:
                         print(f"[MAP_MGR] Fast path: version {current_v} unchanged, local data OK — skipping extraction")
                         emit(100, "version_unchanged", "lime", version=current_v)
                         self._detect_pending_tactic_maps()
-                        self._install_tactics_mod()
+                        self.apply_mod_mode()
                         return
 
                 version_changed = real_version_changed
@@ -449,7 +450,7 @@ class MapManager:
                     emit(100, "update_failed", "red")
 
                 self._detect_pending_tactic_maps()
-                self._install_tactics_mod()
+                self.apply_mod_mode()
             except Exception as e:
                 import traceback
                 print(f"[MAP_MGR] Background update error: {e}")
@@ -538,24 +539,40 @@ class MapManager:
         except Exception:
             pass
 
-    def _install_tactics_mod(self):
-        """Copy sm_tactics.wotmod to <wot_path>/mods/<game_version>/ if use_mod is enabled."""
+    def apply_mod_mode(self):
+        """Install sm_tactics.wotmod if use_mod enabled; remove it from every mods/<ver>/ when disabled."""
         try:
             use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
         except Exception:
             use_mod = False
+        wot_path = self.app.settings.get("wot_path", "")
         if not use_mod:
+            self._uninstall_tactics_mod(wot_path)
             return
         wotmod_src = config.MOD_WOTMOD_FILE
         if not os.path.isfile(wotmod_src):
             print("[MAP_MGR] sm_tactics.wotmod not found, skipping install")
             return
         try:
-            wot_path = self.app.settings.get("wot_path", "")
             game_version = self.app.settings.get("game_version", "")
             if not wot_path or not game_version:
                 return
-            mods_dir = os.path.join(wot_path, "mods", game_version)
+            # Сира версія з version.xml (« v.2.4.0.1 #952 ») має пробіли по
+            # краях: makedirs «створює» таку папку (Win32 тимчасово обрізає
+            # пробіл), але shutil.copy2 падає з [WinError 3] на компоненті з
+            # кінцевим пробілом — встановлення мовчки не відбувалося.
+            # Нормалізуємо до 4-частинної версії та ПРЕФЕРУЄМО наявну папку
+            # версії на диску (лагідний монтаж гри mods/<ver>/).
+            m = re.search(r"\d+\.\d+\.\d+\.\d+", game_version)
+            ver = m.group(0) if m else str(game_version).strip()
+            mods_root = os.path.join(wot_path, "mods")
+            mods_dir = None
+            for cand in (ver, str(game_version).strip()):
+                if cand and os.path.isdir(os.path.join(mods_root, cand)):
+                    mods_dir = os.path.join(mods_root, cand)
+                    break
+            if mods_dir is None:
+                mods_dir = os.path.join(mods_root, ver)
             os.makedirs(mods_dir, exist_ok=True)
             dst = os.path.join(mods_dir, "sm_tactics.wotmod")
             import shutil
@@ -563,6 +580,25 @@ class MapManager:
             print(f"[MAP_MGR] Installed sm_tactics.wotmod -> {mods_dir}")
         except Exception as e:
             print(f"[MAP_MGR] Mod install error: {e}")
+
+    def _uninstall_tactics_mod(self, wot_path):
+        """Remove our sm_tactics.wotmod from every mods/<ver>/ folder (exact name only, other mods untouched)."""
+        if not wot_path:
+            return
+        mods_root = os.path.join(wot_path, "mods")
+        if not os.path.isdir(mods_root):
+            return
+        try:
+            for entry in os.listdir(mods_root):
+                dst = os.path.join(mods_root, entry, "sm_tactics.wotmod")
+                if os.path.isfile(dst):
+                    try:
+                        os.remove(dst)
+                        print(f"[MAP_MGR] Removed sm_tactics.wotmod -> {os.path.dirname(dst)}")
+                    except Exception as e:
+                        print(f"[MAP_MGR] Mod removal error ({dst}): {e}")
+        except Exception as e:
+            print(f"[MAP_MGR] Mod sweep error: {e}")
 
     def run_map_updater(self):
         if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
