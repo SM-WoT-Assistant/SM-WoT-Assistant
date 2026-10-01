@@ -47,7 +47,8 @@ LINKAGE = 'sm.wo-tactics'
 SCHEME_FILE = os.path.join(
     os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'selected_scheme.json')
 
-DEBUG = True  # attach/ping logs + green frame on the minimap (#1463)
+DEBUG = False  # False after live verification (#1463): no green debug frame
+               # on the minimap; init/scheme/attach logs stay unconditional
 
 MODE_ALWAYS = 0
 MODE_SHOW_ON_ALT = 1

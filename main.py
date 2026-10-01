@@ -430,6 +430,10 @@ class WotAssistantHQ:
         self._po_win.bind("<KeyPress-Alt_R>", self.painter._on_alt_press, add="+")
         self._po_win.bind("<KeyRelease-Alt_L>", self.painter._on_alt_release, add="+")
         self._po_win.bind("<KeyRelease-Alt_R>", self.painter._on_alt_release, add="+")
+        # Re-sync SIZE on every (re)show: <Configure> does not fire when only
+        # visibility changes, so the overlay could stay at the creation
+        # default (0,0) 378x265 all session (render_dbg 01.10.2026).
+        self._po_win.bind("<Map>", lambda e: self.root.after(0, self._sync_po_pos), add="+")
         self.canvas.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Configure>", self._sync_po_pos, "+")
         self.root.bind("<Unmap>", self._on_root_hide, "+")
@@ -444,17 +448,31 @@ class WotAssistantHQ:
             return
         if self._po_win.state() == "withdrawn":
             return
-        cx = self.canvas.winfo_rootx()
-        cy = self.canvas.winfo_rooty()
-        if cx <= 0 or cy <= 0:
-            return
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
-        if cw > 50 and ch > 50:
-            try:
+        # The overlay MUST mirror the map widget size on every sync (single
+        # source of truth). Before 01.10.2026 any guard skip (withdrawn,
+        # cx<=0 at startup, bare except:pass) left the overlay at its
+        # creation default (0,0) 378x265 for the whole session while the map
+        # was 880-class - schemes shrank into the top-left corner
+        # (render_dbg.txt evidence).
+        try:
+            canvas = self.canvas
+            cw = canvas.winfo_width()
+            ch = canvas.winfo_height()
+            cx = canvas.winfo_rootx()
+            cy = canvas.winfo_rooty()
+            if cw <= 50 or ch <= 50:
+                return
+            if cx < 0 or cy < 0:
+                # Negative root is legal for offscreen windows; still fix the
+                # SIZE, keep the current position part.
+                import re as _re
+                m = _re.search(r'[+-]\d+[+-]\d+$', self._po_win.geometry())
+                suffix = m.group(0) if m else '+0+0'
+                self._po_win.geometry(f"{cw}x{ch}{suffix}")
+            else:
                 self._po_win.geometry(f"{cw}x{ch}+{cx}+{cy}")
-            except Exception:
-                pass
+        except Exception:
+            pass
 
     def _lift_overlay(self):
         if self._hidden_by_f10:
