@@ -551,7 +551,9 @@ package com.sm.tactics
             }
             var ux:Number = dx / d;
             var uy:Number = dy / d;
-            drawArrowShape(x2, y2, ux, uy, col, lw);
+            // painter: short line -> solid tail = whole segment (d), else alen
+            var alen:Number = 16.0 * (lw / 3.0);
+            drawArrowShape(x2, y2, ux, uy, col, lw, (d > alen) ? alen : d);
         }
 
         private function dirArrow(tx:Number, ty:Number, bx:Number, by:Number,
@@ -565,24 +567,31 @@ package com.sm.tactics
             {
                 return;
             }
-            drawArrowShape(tx, ty, dx / d, dy / d, col, lw);
+            var alen:Number = 16.0 * (lw / 3.0);
+            drawArrowShape(tx, ty, dx / d, dy / d, col, lw, (d > alen) ? alen : d);
         }
 
         private function drawArrowShape(tipx:Number, tipy:Number, ux:Number, uy:Number,
-                                        col:uint, lw:Number):void
+                                        col:uint, lw:Number, tailLen:Number):void
         {
-            // arrowshape (2.2lw, 2.6lw, 0.9lw) - painter #2020
-            var alen:Number = 2.2 * lw;
-            var halfW:Number = 1.3 * lw;
-            var notch:Number = 0.9 * lw;
+            // SAME shape as the desktop painter._arrow_shape (01.10.2026):
+            // Tk (16, 20, 6) * k with k = lw/3 - strictly linear in lw so the
+            // head shrinks with the element scale (desktop floor removed the
+            // same day - screenshot 380: 16x20 head over a 2px line).
+            var k:Number = lw / 3.0;
+            var alen:Number = 16.0 * k;      // head length (solid tail too)
+            var halfW:Number = 10.0 * k;     // (20.0 * k) / 2
+            var notch:Number = 6.0 * k;
             var pxn:Number = -uy;
             var pyn:Number = ux;
+            var tailx:Number = tipx - ux * tailLen;
+            var taily:Number = tipy - uy * tailLen;
             var basecx:Number = tipx - ux * alen;
             var basecy:Number = tipy - uy * alen;
             var notchx:Number = tipx - ux * (alen - notch);
             var notchy:Number = tipy - uy * (alen - notch);
             _layer.graphics.lineStyle(lw, col, 1);
-            _layer.graphics.moveTo(basecx, basecy);
+            _layer.graphics.moveTo(tailx, taily);
             _layer.graphics.lineTo(tipx, tipy);
             _layer.graphics.beginFill(col, 1);
             _layer.graphics.moveTo(tipx, tipy);
