@@ -64,6 +64,21 @@ def _dev_pid_cleanup():
     except Exception:
         pass
 
+
+def _win_dbg(msg):
+    """[WIN] battle-hide diagnostics -> file: the desktop terminal is not
+    readable for the assistant, %TEMP%/opencode/win_dbg.txt is (03.10.2026)."""
+    try:
+        import time as _t
+        path = os.path.join(os.environ.get('TEMP', ''), 'opencode', 'win_dbg.txt')
+        _dir = os.path.dirname(path)
+        if not os.path.isdir(_dir):
+            os.makedirs(_dir)
+        with open(path, 'a') as _f:
+            _f.write('[WIN %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
+    except Exception:
+        pass
+
 class WotAssistantHQ:
     def __init__(self, root, splash_geometry=None):
         self.root = root
@@ -874,23 +889,34 @@ class WotAssistantHQ:
         rule is "either the overlay or the minimap mod, never both"
         (01.10.2026). Skipped when the window is already in the tray (F10)."""
         if self._hidden_by_f10 or self._hidden_by_battle:
+            _win_dbg('hide skipped (f10=%s already=%s)'
+                     % (self._hidden_by_f10, self._hidden_by_battle))
             return
         try:
             self.root.withdraw()
+            if hasattr(self, '_po_win') and self._po_win.winfo_exists():
+                self._po_win.withdraw()
             self._hidden_by_battle = True
-        except Exception:
-            pass
+            _win_dbg('hide OK (use_mod=%s)' % bool(self._use_mod_var.get()))
+        except Exception as _e:
+            _win_dbg('hide FAILED: %r' % (_e,))
 
     def _battle_show_window(self):
         if not self._hidden_by_battle:
+            _win_dbg('show skipped (not hidden)')
             return
         self._hidden_by_battle = False
         if self._hidden_by_f10:
+            _win_dbg('show -> stays in tray (f10)')
             return  # the user sent it to the tray - keep it there
         try:
             self.root.deiconify()
-        except Exception:
-            pass
+            if (self.active_view == "maps" and hasattr(self, '_po_win')
+                    and self._po_win.winfo_exists()):
+                self._po_win.deiconify()
+            _win_dbg('show OK')
+        except Exception as _e:
+            _win_dbg('show FAILED: %r' % (_e,))
 
     def toggle_editor(self):
         if self.dialog_open: return
@@ -1203,10 +1229,15 @@ class WotAssistantHQ:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
-        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+        else:
+            _win_dbg('show_view: main window restore BLOCKED (battle)')
+        if (self.active_view == "maps" and not self._hidden_by_battle
+                and hasattr(self, '_po_win') and self._po_win.winfo_exists()):
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
+        elif self._hidden_by_battle and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            _win_dbg('show_view: _po_win restore BLOCKED (battle)')
 
     def _battle_restore_from_tray(self):
         """Старт бою з трею: показуємо вікно редагування з картою бою незалежно

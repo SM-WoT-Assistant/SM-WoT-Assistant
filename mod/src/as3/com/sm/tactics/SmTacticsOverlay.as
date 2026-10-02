@@ -467,13 +467,19 @@ package com.sm.tactics
             {
                 var n:int = (_elements != null) ? int(_elements.length) : 0;
                 var firstStr:String = "";
-                if (n > 0 && _elements[0] != null)
+                if (n > 0 && _elements != null)
                 {
-                    var c:* = _elements[0].coords;
-                    if (c is Array && Array(c).length >= 2)
+                    // first element that HAS coords (element[0] may lack them
+                    // - rendered fine but left first= empty in the log)
+                    for (var i:int = 0; i < n; i++)
                     {
-                        var p:Array = px(Number(Array(c)[0]), Number(Array(c)[1]));
-                        firstStr = int(p[0]) + "," + int(p[1]);
+                        var cc:* = (_elements[i] != null) ? _elements[i].coords : null;
+                        if (cc is Array && Array(cc).length >= 2)
+                        {
+                            var pp:Array = px(Number(Array(cc)[0]), Number(Array(cc)[1]));
+                            firstStr = int(pp[0]) + "," + int(pp[1]);
+                            break;
+                        }
                     }
                 }
                 var hasLayer:int = (_layer != null && _layer.parent != null) ? 1 : 0;
