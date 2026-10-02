@@ -1195,9 +1195,14 @@ class WotAssistantHQ:
         self._refresh_saved_schemes_list()
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
-        self.root.deiconify()
-        self.root.lift()
-        self.root.focus_force()
+        # Battle with mod ON: the window was withdrawn at battle start and
+        # safe_battle_sync may re-enter show_view afterwards - restoring it
+        # here would put the app back over the game (and steal focus with
+        # focus_force). Only _battle_show_window may bring it back.
+        if not self._hidden_by_battle:
+            self.root.deiconify()
+            self.root.lift()
+            self.root.focus_force()
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.deiconify()
             self._sync_po_pos()

@@ -93,13 +93,16 @@ class SmTacticsOverlay(View):
         try:
             self.as_setDebug(DEBUG)
             self.as_register()
-            self.as_setElements(json.dumps(elements))
+            status = self.as_setElements(json.dumps(elements))
+            LOG.info('%s setElements=%s', TAG, status)
+            # Visibility BEFORE diagnostics: a failing debug call must never
+            # abort the layer becoming visible (02.10.2026 lesson).
+            _apply_visibility()
             LOG.info('%s attach=%r ping=%r', TAG,
                      self.flashObject.as_attachInfo(),
                      self.flashObject.as_ping())
             LOG.info('%s render-info %s', TAG,
                      self.flashObject.as_getDebugInfo())
-            _apply_visibility()
 
             def _recheck():
                 v = _g.get('view')
@@ -122,7 +125,11 @@ class SmTacticsOverlay(View):
         self.flashObject.as_unregister()
 
     def as_setElements(self, payload):
-        self.flashObject.as_setElements(payload)
+        # Returns a status string from the SWF ("ok n=N" / "parseErr: ...")
+        # so the python log can see exactly what happened (JSON in the client
+        # stopped working after the 2.4.0.2 update - the SWF now parses the
+        # payload with its own reader).
+        return self.flashObject.as_setElements(payload)
 
     def as_setVisible(self, on):
         self.flashObject.as_setVisible(bool(on))

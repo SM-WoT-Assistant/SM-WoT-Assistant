@@ -183,18 +183,258 @@ package com.sm.tactics
             unsetup();
         }
 
-        public function as_setElements(jsonStr:String):void
+        // ---------------- payload reader ----------------
+        // The client's JSON global stopped working after the 2.4.0.2 update
+        // (JSON.parse silently emptied the elements, JSON.stringify threw and
+        // aborted the python call). No working community mod uses JSON in AS3
+        // on this client - so we parse our own payload shape with a plain
+        // reader: array of flat objects (string/number/array/bool/null).
+
+        private var _psrc:String = "";
+        private var _ppos:int = 0;
+
+        private function _skipWs():void
+        {
+            while (_ppos < _psrc.length)
+            {
+                var c:String = _psrc.charAt(_ppos);
+                if (c == " " || c == "\t" || c == "\n" || c == "\r")
+                {
+                    _ppos++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+        }
+
+        private function _expectWord(word:String):void
+        {
+            if (_psrc.substr(_ppos, word.length) != word)
+            {
+                throw new Error("kw@" + _ppos);
+            }
+            _ppos += word.length;
+        }
+
+        private function _parseValue():*
+        {
+            _skipWs();
+            var c:String = _psrc.charAt(_ppos);
+            if (c == "[")
+            {
+                return _parseArray();
+            }
+            if (c == "{")
+            {
+                return _parseObject();
+            }
+            if (c == '"')
+            {
+                return _parseString();
+            }
+            if (c == "t")
+            {
+                _expectWord("true");
+                return true;
+            }
+            if (c == "f")
+            {
+                _expectWord("false");
+                return false;
+            }
+            if (c == "n")
+            {
+                _expectWord("null");
+                return null;
+            }
+            return _parseNumber();
+        }
+
+        private function _parseArray():Array
+        {
+            var out:Array = [];
+            _ppos++; // [
+            _skipWs();
+            if (_psrc.charAt(_ppos) == "]")
+            {
+                _ppos++;
+                return out;
+            }
+            while (true)
+            {
+                out.push(_parseValue());
+                _skipWs();
+                var c:String = _psrc.charAt(_ppos);
+                if (c == ",")
+                {
+                    _ppos++;
+                    continue;
+                }
+                if (c == "]")
+                {
+                    _ppos++;
+                    return out;
+                }
+                throw new Error("array@" + _ppos);
+            }
+            return out; // unreachable - ASC requires an exit path
+        }
+
+        private function _parseObject():Object
+        {
+            var out:Object = {};
+            _ppos++; // {
+            _skipWs();
+            if (_psrc.charAt(_ppos) == "}")
+            {
+                _ppos++;
+                return out;
+            }
+            while (true)
+            {
+                _skipWs();
+                if (_psrc.charAt(_ppos) != '"')
+                {
+                    throw new Error("key@" + _ppos);
+                }
+                var k:String = _parseString();
+                _skipWs();
+                if (_psrc.charAt(_ppos) != ":")
+                {
+                    throw new Error("colon@" + _ppos);
+                }
+                _ppos++;
+                out[k] = _parseValue();
+                _skipWs();
+                var c:String = _psrc.charAt(_ppos);
+                if (c == ",")
+                {
+                    _ppos++;
+                    continue;
+                }
+                if (c == "}")
+                {
+                    _ppos++;
+                    return out;
+                }
+                throw new Error("object@" + _ppos);
+            }
+            return out; // unreachable - ASC requires an exit path
+        }
+
+        private function _parseString():String
+        {
+            _ppos++; // opening quote
+            var sb:String = "";
+            while (_ppos < _psrc.length)
+            {
+                var c:String = _psrc.charAt(_ppos);
+                if (c == '"')
+                {
+                    _ppos++;
+                    return sb;
+                }
+                if (c == "\\")
+                {
+                    _ppos++;
+                    var e:String = _psrc.charAt(_ppos);
+                    if (e == "u")
+                    {
+                        sb += String.fromCharCode(parseInt(_psrc.substr(_ppos + 1, 4), 16));
+                        _ppos += 4;
+                    }
+                    else if (e == "n")
+                    {
+                        sb += "\n";
+                    }
+                    else if (e == "t")
+                    {
+                        sb += "\t";
+                    }
+                    else if (e == "r")
+                    {
+                        sb += "\r";
+                    }
+                    else if (e == "b")
+                    {
+                        sb += "\b";
+                    }
+                    else if (e == "f")
+                    {
+                        sb += "\f";
+                    }
+                    else
+                    {
+                        sb += e; // ", \, /
+                    }
+                    _ppos++;
+                }
+                else
+                {
+                    sb += c;
+                    _ppos++;
+                }
+            }
+            throw new Error("string: unterminated");
+        }
+
+        private function _parseNumber():Number
+        {
+            var start:int = _ppos;
+            if (_psrc.charAt(_ppos) == "-")
+            {
+                _ppos++;
+            }
+            while (_ppos < _psrc.length)
+            {
+                var c:String = _psrc.charAt(_ppos);
+                if ((c >= "0" && c <= "9") || c == "." || c == "e" || c == "E" || c == "+" || c == "-")
+                {
+                    _ppos++;
+                }
+                else
+                {
+                    break;
+                }
+            }
+            if (_ppos == start)
+            {
+                throw new Error("number@" + start);
+            }
+            return Number(_psrc.substring(start, _ppos));
+        }
+
+        private function _parseJson(src:String):*
+        {
+            _psrc = src;
+            _ppos = 0;
+            var v:* = _parseValue();
+            _skipWs();
+            if (_ppos < _psrc.length)
+            {
+                throw new Error("trailing@" + _ppos);
+            }
+            return v;
+        }
+
+        public function as_setElements(jsonStr:String):String
         {
             try
             {
-                var parsed:* = JSON.parse(jsonStr);
+                var parsed:* = _parseJson(jsonStr);
                 _elements = parsed is Array ? parsed as Array : [];
+                redraw();
+                return "ok n=" + _elements.length;
             }
             catch (e:*)
             {
                 _elements = [];
+                redraw();
+                return "parseErr: " + e;
             }
-            redraw();
+            return "parseErr: unreachable"; // ASC requires an exit path
         }
 
         public function as_setVisible(on:Boolean):void
@@ -218,26 +458,43 @@ package com.sm.tactics
         // Render-side diagnostics for the python log: how many elements
         // actually reached the SWF, attach state, and where the first
         // element sits in minimap-local pixels (vs flags.width size).
+        // Never throws: a failing diagnostic must not abort the python flow
+        // (02.10.2026 - JSON.stringify aborted register_and_push before
+        // visibility was applied).
         public function as_getDebugInfo():String
         {
-            var n:int = _elements ? int(_elements.length) : 0;
-            var first:Array = [];
-            if (n > 0 && _elements[0] != null && _elements[0].coords != null)
+            try
             {
-                var c:Array = _elements[0].coords as Array;
-                if (c != null && c.length >= 2)
+                var n:int = (_elements != null) ? int(_elements.length) : 0;
+                var firstStr:String = "";
+                if (n > 0 && _elements[0] != null)
                 {
-                    var p:Array = px(Number(c[0]), Number(c[1]));
-                    first = [int(p[0]), int(p[1])];
+                    var c:* = _elements[0].coords;
+                    if (c is Array && Array(c).length >= 2)
+                    {
+                        var p:Array = px(Number(Array(c)[0]), Number(Array(c)[1]));
+                        firstStr = int(p[0]) + "," + int(p[1]);
+                    }
                 }
+                var hasLayer:int = (_layer != null && _layer.parent != null) ? 1 : 0;
+                var childIdx:int = -1;
+                if (hasLayer == 1)
+                {
+                    childIdx = int(_layer.parent.getChildIndex(_layer));
+                }
+                return "n=" + n + " size=" + int(_size) +
+                    " attached=" + (_attached ? 1 : 0) +
+                    " reg=" + (_registered ? 1 : 0) +
+                    " branch=" + _attachBranch +
+                    " vis=" + (visible ? 1 : 0) + "/" + (_visibleOn ? 1 : 0) +
+                    " layer=" + hasLayer + " idx=" + childIdx +
+                    " first=" + firstStr;
             }
-            var hasLayer:int = (_layer != null && _layer.parent != null) ? 1 : 0;
-            var childIdx:int = hasLayer ? int(_layer.parent.getChildIndex(_layer)) : -1;
-            return JSON.stringify({
-                n: n, size: int(_size), attached: _attached ? 1 : 0,
-                registered: _registered ? 1 : 0, branch: _attachBranch,
-                visibleOn: _visibleOn ? 1 : 0, hasLayer: hasLayer,
-                childIdx: childIdx, first: first});
+            catch (e:*)
+            {
+                return "dbgErr: " + e;
+            }
+            return "dbgErr: unreachable"; // ASC requires an exit path
         }
 
         public function as_attachInfo():String
