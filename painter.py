@@ -233,8 +233,9 @@ class MapPainter:
         # виглядає «непрацюючою» (28.08.2026); повторні пасти каскадуються
         # (кожна наступна +20px від попередньої).
         try:
-            cw = self.canvas.winfo_width() or 800
-            ch = self.canvas.winfo_height() or 600
+            _, _, cw, ch = self._img_rect()
+            cw = max(int(cw), 1)
+            ch = max(int(ch), 1)
             off = getattr(self, "_paste_count", 0) + 1
             self._paste_count = off
             dx = 20.0 * off / max(cw, 1)
@@ -625,8 +626,7 @@ class MapPainter:
             # кнопкою DRAW (стан інструмента міг пережити закриття раніше).
             return
         
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
+        org_x, org_y, cw, ch = self._img_rect()
         if cw < 10 or ch < 10: return
 
         self.start_x = event.x
@@ -650,7 +650,8 @@ class MapPainter:
                     if obj["type"] == self.active_tool and self.is_visible(obj):
                         coords = obj["coords"]
                         if len(coords) >= 4:
-                            ox, oy = coords[0]*cw, coords[1]*ch
+                            # image-space px -> canvas px (letterbox origin)
+                            ox, oy = org_x + coords[0]*cw, org_y + coords[1]*ch
                             dist = math.hypot(ox - event.x, oy - event.y)
                             if dist < min_dist:
                                 min_dist = dist
@@ -703,8 +704,7 @@ class MapPainter:
         if not objects:
             return -1, "object"
 
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
+        org_x, org_y, cw, ch = self._img_rect()
         if cw < 10 or ch < 10:
             return -1, "object"
 
@@ -713,12 +713,14 @@ class MapPainter:
         # min(cw,ch) — на асиметричному канвасі горизонтальний радіус
         # виростав до 18*cw/ch (~24px), тож «поле вибору» було набагато
         # більшим за сам елемент і сусідні елементи не можна було розділити.
+        # Клік переводиться у ПРОСТІР ЗОБРАЖЕННЯ (letterbox rect) — там живуть
+        # координати елементів (фікс 01.10.2026).
         TH_MARKER = 14   # marker: коло r≈12px
         TH_SEGMENT = 8   # arrow/brush: лінія/сегмент
         TH_TEXT = 10     # text/POI-іконка
         TH_TIP = 10      # marker_tip / marker_text (пріоритетний хіт)
 
-        click_x, click_y = float(event_x), float(event_y)
+        click_x, click_y = float(event_x) - org_x, float(event_y) - org_y
         closest_idx = -1
         closest_kind = "object"
         min_dist = float('inf')
@@ -855,11 +857,11 @@ class MapPainter:
             self.move_drag_active = False
             return
 
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
+        org_x, org_y, cw, ch = self._img_rect()
         if cw < 10 or ch < 10:
             return
 
+        # delta normalized over the IMAGE (stored coords are image fractions)
         dx = (event.x - self.move_drag["start_event"][0]) / cw
         dy = (event.y - self.move_drag["start_event"][1]) / ch
         obj = objects[idx]
@@ -880,6 +882,8 @@ class MapPainter:
             orig_tc = self.move_drag.get("original_text_coords", [])
             if not orig_tc or len(orig_tc) < 2:
                 tx, ty = self._get_marker_text_pos(obj, cw, ch)
+                if tx is None or ty is None:
+                    tx, ty = 0.0, 0.0
                 orig_tc = [tx / cw, ty / ch]
             obj["text_coords"] = [
                 min(max(orig_tc[0] + dx, 0.0), 1.0),
@@ -971,8 +975,7 @@ class MapPainter:
         if not self.active_tool or not self.app.current_map_eng or self.app.mode != "edit": return
         if not self.temp_item: return
             
-        cw = self.canvas.winfo_width()
-        ch = self.canvas.winfo_height()
+        org_x, org_y, cw, ch = self._img_rect()
         if cw < 10 or ch < 10: return
         
         rx, ry = getattr(self, "_raw_press", (self.start_x, self.start_y))
@@ -994,8 +997,9 @@ class MapPainter:
                 self.temp_item = None
                 return
         
-        px1, py1 = self.start_x / cw, self.start_y / ch
-        px2, py2 = event.x / cw, event.y / ch
+        # canvas px -> image-space normalized (letterbox origin + image size)
+        px1, py1 = (self.start_x - org_x) / cw, (self.start_y - org_y) / ch
+        px2, py2 = (event.x - org_x) / cw, (event.y - org_y) / ch
 
         new_obj = {
             "type": self.active_tool,
@@ -1008,7 +1012,8 @@ class MapPainter:
             "_source": getattr(self.app, "active_group_id", "public") or "public",
         }
         if self.active_tool == "brush":
-            norm_points = [(x / cw, y / ch) for x, y in self._brush_points]
+            norm_points = [((x - org_x) / cw, (y - org_y) / ch)
+                            for x, y in self._brush_points]
             flat = [coord for p in norm_points for coord in p]
             new_obj["coords"] = flat
             new_obj["arrow_start"] = False
@@ -1311,7 +1316,7 @@ class MapPainter:
                                         width=lw, tags=("temp_draw", "temp_line"))
         self.temp_item = "temp_line"
 
-    def _render_elements(self, canvas, elements, cw, ch, offset_x=0, offset_y=0, img_w=None, img_h=None, screen_scale=1.0):
+    def _render_elements(self, canvas, elements, cw, ch, offset_x=0.0, offset_y=0.0, img_w=None, img_h=None, screen_scale=1.0):
         """Render elements on a given canvas. No visibility filtering — renders all.
         offset_x/offset_y: image offset within canvas (for preview).
         img_w/img_h: if set, use as reference dimensions instead of cw/ch."""
@@ -1492,6 +1497,22 @@ class MapPainter:
                     ty = y + int(15 * sc) if poi_data else y
                     canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
 
+    def _img_rect(self):
+        """(org_x, org_y, iw, ih) - the map image rect in canvas coords.
+
+        map_renderer may letterbox the image inside a non-square canvas
+        (show_main_splash stores app._map_img_rect). Schemes are normalized
+        over the IMAGE, so both render and click->coords math must use this
+        rect - not the raw canvas (01.10.2026: elements leaked into the
+        black letterbox margins)."""
+        r = getattr(self.app, "_map_img_rect", None)
+        if r is None:
+            src = getattr(self.app, "canvas", None)
+            if src is None or not src.winfo_exists():
+                src = self.canvas
+            return 0.0, 0.0, float(src.winfo_width()), float(src.winfo_height())
+        return r
+
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
         # Взаємовиключність мод/оверлей діє ТІЛЬКИ в бойовому контексті
@@ -1506,16 +1527,9 @@ class MapPainter:
             return
         map_id = self.app.current_map_eng
 
-        if cw is None or ch is None:
-            # Single source of truth for sizes = the MAP widget (app.canvas).
-            # self.canvas is the overlay _po_canvas - it fed the overlay's own
-            # (possibly stale/stuck, e.g. 378x265) size into coordinates while
-            # map_renderer passed app.w/app.h (880) - two scales in one session
-            # (render_dbg 01.10.2026).
-            map_canvas = getattr(self.app, "canvas", None)
-            src = map_canvas if (map_canvas is not None and map_canvas.winfo_exists()) else self.canvas
-            cw = src.winfo_width()
-            ch = src.winfo_height()
+        # Scheme space = the map image rect (map_renderer may letterbox the
+        # image inside a non-square canvas); caller dims are informational.
+        org_x, org_y, cw, ch = self._img_rect()
         if cw < 10 or ch < 10: return
 
         self.canvas.delete("painter_obj")
@@ -1543,7 +1557,9 @@ class MapPainter:
             return
 
         screen_scale = getattr(self.app, '_get_drawing_scale', lambda: 1.0)()
-        self._render_elements(self.canvas, all_visible, cw, ch, screen_scale=screen_scale)
+        self._render_elements(self.canvas, all_visible, cw, ch,
+                              offset_x=org_x, offset_y=org_y,
+                              img_w=cw, img_h=ch, screen_scale=screen_scale)
 
         if self._select_all:
             sel_sc = min(cw, ch) / 800.0
@@ -1555,19 +1571,19 @@ class MapPainter:
                          obj.get("x2", obj.get("x1", 0)), obj.get("y2", obj.get("y1", 0))]
                 if obj["type"] in ("marker", "arrow"):
                     if len(c) < 4: continue
-                    x1 = c[0]*cw; y1 = c[1]*ch; x2 = c[2]*cw; y2 = c[3]*ch
+                    x1 = c[0]*cw + org_x; y1 = c[1]*ch + org_y; x2 = c[2]*cw + org_x; y2 = c[3]*ch + org_y
                     l = min(x1, x2) - margin; r = max(x1, x2) + margin
                     t = min(y1, y2) - margin; b = max(y1, y2) + margin
                 elif obj["type"] == "brush":
                     if len(c) < 4: continue
-                    xs = [c[i]*cw for i in range(0, len(c), 2)]
-                    ys = [c[i+1]*ch for i in range(0, len(c), 2)]
+                    xs = [c[i]*cw + org_x for i in range(0, len(c), 2)]
+                    ys = [c[i+1]*ch + org_y for i in range(0, len(c), 2)]
                     l = min(xs) - margin; r = max(xs) + margin
                     t = min(ys) - margin; b = max(ys) + margin
                 elif obj["type"] == "text":
                     if len(c) < 2: continue
-                    l = c[0]*cw - 30*margin; r = c[0]*cw + 30*margin
-                    t = c[1]*ch - 30*margin; b = c[1]*ch + 30*margin
+                    l = c[0]*cw + org_x - 30*margin; r = c[0]*cw + org_x + 30*margin
+                    t = c[1]*ch + org_y - 30*margin; b = c[1]*ch + org_y + 30*margin
                 else:
                     continue
                 self.canvas.create_rectangle(l, t, r, b, outline="yellow", dash=(4, 4), width=max(1, int(2*sel_sc)), tags="painter_obj")

@@ -274,6 +274,7 @@ class MapRenderer:
     def show_main_splash(self, message=None):
         app = self.app
         app.canvas.delete("map")
+        app._map_img_rect = None  # image rect in canvas coords; schemes map onto IT
         app.root.update_idletasks()
         cw, ch = app.canvas.winfo_width(), app.canvas.winfo_height()
         if cw < 10:
@@ -296,10 +297,17 @@ class MapRenderer:
                         if cw > ch:
                             map_x = border + (cw - 2 * border - size) / 2
                         app.canvas.create_image(map_x + size // 2, map_y + size // 2, image=app.current_tk_map, tags="map")
+                        app._map_img_rect = (map_x, map_y, size, size)
                     else:
                         app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map, tags="map")
+                        w = app.current_tk_map.width()
+                        h = app.current_tk_map.height()
+                        app._map_img_rect = (cw / 2.0 - w / 2.0, ch / 2.0 - h / 2.0, w, h)
                 else:
                     app.canvas.create_image(cw // 2, ch // 2, image=app.current_tk_map, tags="map")
+                    w = app.current_tk_map.width()
+                    h = app.current_tk_map.height()
+                    app._map_img_rect = (cw / 2.0 - w / 2.0, ch / 2.0 - h / 2.0, w, h)
                 map_drawn = True
                 
                 self.draw_frame(cw, ch)
