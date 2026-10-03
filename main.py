@@ -79,6 +79,21 @@ def _win_dbg(msg):
     except Exception:
         pass
 
+
+def _write_dbg(msg):
+    """[WRITE] selected_scheme.json write facts -> file (03.10.2026: battles
+    got scheme=None while the combobox visibly showed a scheme)."""
+    try:
+        import time as _t
+        path = os.path.join(os.environ.get('TEMP', ''), 'opencode', 'write_dbg.txt')
+        _dir = os.path.dirname(path)
+        if not os.path.isdir(_dir):
+            os.makedirs(_dir)
+        with open(path, 'a') as _f:
+            _f.write('[WRITE %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
+    except Exception:
+        pass
+
 class WotAssistantHQ:
     def __init__(self, root, splash_geometry=None):
         self.root = root
@@ -888,7 +903,7 @@ class WotAssistantHQ:
 
         self._last_mode_hotkey_ts = 0
 
-    def _battle_hide_window(self):
+    def _battle_hide_window(self, source='?'):
         """Mod ON: the app must not appear over the battle at all - the user
         rule is "either the overlay or the minimap mod, never both"
         (01.10.2026). Skipped when the window is already in the tray (F10)."""
@@ -901,26 +916,26 @@ class WotAssistantHQ:
             if hasattr(self, '_po_win') and self._po_win.winfo_exists():
                 self._po_win.withdraw()
             self._hidden_by_battle = True
-            _win_dbg('hide OK (use_mod=%s)' % bool(self._use_mod_var.get()))
+            _win_dbg('hide OK src=%s (use_mod=%s)' % (source, bool(self._use_mod_var.get())))
         except Exception as _e:
-            _win_dbg('hide FAILED: %r' % (_e,))
+            _win_dbg('hide FAILED src=%s: %r' % (source, _e))
 
-    def _battle_show_window(self):
+    def _battle_show_window(self, source='?'):
         if not self._hidden_by_battle:
-            _win_dbg('show skipped (not hidden)')
+            _win_dbg('show skipped src=%s (not hidden)' % source)
             return
         self._hidden_by_battle = False
         if self._hidden_by_f10:
-            _win_dbg('show -> stays in tray (f10)')
+            _win_dbg('show src=%s -> stays in tray (f10)' % source)
             return  # the user sent it to the tray - keep it there
         try:
             self.root.deiconify()
             if (self.active_view == "maps" and hasattr(self, '_po_win')
                     and self._po_win.winfo_exists()):
                 self._po_win.deiconify()
-            _win_dbg('show OK')
+            _win_dbg('show OK src=%s' % source)
         except Exception as _e:
-            _win_dbg('show FAILED: %r' % (_e,))
+            _win_dbg('show FAILED src=%s: %r' % (source, _e))
 
     def _overlay_display_allowed(self):
         """Mod ON -> nothing of the app may stand over the game in NORM mode
@@ -933,7 +948,7 @@ class WotAssistantHQ:
     def toggle_editor(self):
         if self.dialog_open: return
         # Tab explicitly asks for the editor: show a battle-hidden window back
-        self._battle_show_window()
+        self._battle_show_window('toggle_tab')
 
         if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
             msg = self.t('ui', 'status_auto_mode_unavailable')
@@ -1056,7 +1071,7 @@ class WotAssistantHQ:
         # window is turned OFF (вимикання, user rule 03.10.2026). Tab back to
         # edit shows it again via _battle_show_window.
         if self.mode == "norm" and not self._overlay_display_allowed():
-            self._battle_hide_window()
+            self._battle_hide_window('toggle_norm')
         self.root.attributes("-alpha", self.alpha)
         self.refresh_mode_indicator()
         self.root.after(0, self._adjust_for_canvas)
@@ -1632,7 +1647,7 @@ class WotAssistantHQ:
             # scheme on the minimap (user sequence 03.10.2026). Mode stays
             # "edit"; Tab brings the editor back on demand.
             if not self._hidden_by_f10:
-                self.root.after(150, self._battle_hide_window)
+                self.root.after(150, lambda: self._battle_hide_window('countdown'))
             return
         if self.mode != "norm":
             self.root.after(100, self.toggle_editor)
@@ -2303,6 +2318,8 @@ class WotAssistantHQ:
         try:
             sel = self.saved_schemes_var.get()
             if not sel or not hasattr(self, '_saved_schemes_map'):
+                _write_dbg('None: sel=%r has_map=%s' % (
+                    sel, hasattr(self, '_saved_schemes_map')))
                 self._write_selected_scheme(None)
                 return
             keys = getattr(self, '_saved_schemes_keys', [])
@@ -2313,11 +2330,15 @@ class WotAssistantHQ:
                     idx = i
                     break
             if idx is None or idx >= len(keys):
+                _write_dbg('None: idx mismatch sel=%r values=%d keys=%d map=%s' % (
+                    sel, len(display_texts), len(keys),
+                    getattr(self, 'current_map_eng', None)))
                 self._write_selected_scheme(None)
                 return
             key = keys[idx]
             scheme_info = self._saved_schemes_map.get(key, {})
             if not scheme_info or scheme_info.get("_separator"):
+                _write_dbg('None: empty/separator key=%r sel=%r' % (key, sel))
                 self._write_selected_scheme(None)
                 return
             drawing_id = scheme_info.get('drawing_id', '')
@@ -2325,6 +2346,9 @@ class WotAssistantHQ:
             result = tactics_manager.load_scheme_from_db(config.SCHEMES_FILE, drawing_id)
             if result:
                 map_id, elements = result
+                _write_dbg('OK: %r map=%s mode=%s n=%d' % (
+                    scheme_info.get('scheme_name', ''), map_id,
+                    scheme_info.get('battle_mode', ''), len(elements)))
                 self._write_selected_scheme({
                     "drawing_id": drawing_id,
                     "map_id": map_id,
@@ -2333,8 +2357,10 @@ class WotAssistantHQ:
                     "elements": elements,
                 })
             else:
+                _write_dbg('None: load_scheme failed key=%r id=%r' % (key, drawing_id))
                 self._write_selected_scheme(None)
-        except Exception:
+        except Exception as _e:
+            _write_dbg('None: EXC %r' % (_e,))
             self._write_selected_scheme(None)
 
     def _toggle_select_all(self):
@@ -2445,7 +2471,7 @@ class WotAssistantHQ:
         def _redraw_after_battle():
             if hasattr(self, 'painter'):
                 self.painter.redraw()
-            self._battle_show_window()
+            self._battle_show_window('battle_end')
         self.root.after(0, _redraw_after_battle)
 
         if self._restored_by_battle:
