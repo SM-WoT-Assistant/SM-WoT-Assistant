@@ -940,6 +940,14 @@ package com.sm.tactics
         {
             var tf:TextField = new TextField();
             tf.autoSize = TextFieldAutoSize.LEFT;
+            if (font != "Arial")
+            {
+                // Icon fonts must go through the EMBEDDED path: GFx does not
+                // enumerate arbitrary installed Windows fonts, so the device
+                // lookup silently fell back to raw ASCII (minimap showed
+                // '-'/';'/'. instead of XVMSymbol icons - 04.10.2026).
+                tf.embedFonts = true;
+            }
             tf.defaultTextFormat = new TextFormat(font, size, 0xFFFFFF);
             tf.text = text;
             return tf.textWidth;
@@ -956,6 +964,10 @@ package com.sm.tactics
             tf.autoSize = TextFieldAutoSize.LEFT;
             tf.selectable = false;
             tf.mouseEnabled = false;
+            if (font != "Arial")
+            {
+                tf.embedFonts = true;   // see measure(): embedded icon fonts
+            }
             tf.defaultTextFormat = new TextFormat(font, size, color, bold);
             tf.text = text;
             tf.x = cx - tf.textWidth / 2;
