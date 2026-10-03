@@ -513,6 +513,8 @@ class WotAssistantHQ:
                 return
             if not self.current_map_eng:
                 return
+            if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
+                return
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
@@ -1062,7 +1064,8 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.withdraw()
             self.root.update_idletasks()
-            self._po_win.deiconify()
+            if not self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
+                self._po_win.deiconify()
             self._sync_po_pos()
             self.painter.redraw()
 
@@ -1388,7 +1391,8 @@ class WotAssistantHQ:
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
-        if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10:
+        if (self.active_view == "maps" and not self._hidden_by_battle
+                and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10):
             if self._po_win.state() == "withdrawn":
                 self._po_win.deiconify()
                 self._sync_po_pos()
@@ -1421,6 +1425,8 @@ class WotAssistantHQ:
         if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
             return
         if self._po_win.state() != "withdrawn":
+            return
+        if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
             return
         self.root.update_idletasks()
         self._po_win.deiconify()
