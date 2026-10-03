@@ -837,20 +837,40 @@ class DrawingPalette(tk.Toplevel):
             self._auto_save_if_matches_existing()
             self._autosave_current_scheme()
 
+    def _as_dbg(self, msg):
+        """[AS] autosave diagnostics -> file (03.10.2026: no scheme save hit
+        the DB since 26.09 - every silent early-return gets a fact line)."""
+        try:
+            import time as _t
+            p = os.path.join(os.environ.get('TEMP', ''), 'opencode',
+                             'autosave_dbg.txt')
+            _d = os.path.dirname(p)
+            if not os.path.isdir(_d):
+                os.makedirs(_d)
+            with open(p, 'a') as _f:
+                _f.write('[AS %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
+        except Exception:
+            pass
+
     def _autosave_current_scheme(self):
         """Auto-save current map's drawings to the active scheme (_editing_scheme)."""
         es = getattr(self.app, '_editing_scheme', None)
         if not es or not es.get('name'):
+            self._as_dbg('skip: es=%s' % ('None' if not es else 'no-name'))
             return
         if es.get('is_base') and not getattr(self.app, '_admin_present', False):
+            self._as_dbg('skip: base-scheme guard (name=%r)' % es.get('name'))
             return
         map_id = getattr(self.app, "current_map_eng", None)
         if not map_id:
+            self._as_dbg('skip: no current_map_eng (es=%r)' % es.get('name'))
             return
         if es.get('map_id') and es.get('map_id') != map_id:
+            self._as_dbg('skip: es.map=%r != canvas.map=%r' % (es.get('map_id'), map_id))
             return
         current = self.painter.drawings.get(map_id, [])
         if not current:
+            self._as_dbg('skip: empty canvas (map=%r es=%r)' % (map_id, es.get('name')))
             return
         import tactics_manager
         import config
@@ -862,6 +882,8 @@ class DrawingPalette(tk.Toplevel):
             scheme_name=es.get('name', ''),
             description=es.get('desc', ''),
             source='local')
+        self._as_dbg('OK: %r map=%s mode=%s n=%d' % (
+            es.get('name'), map_id, self.app.scheme_save_mode(), len(current)))
         self._status_lbl.config(text="Auto-saved: %s" % es.get('name'), bg="#1a3322")
         self.app._refresh_saved_schemes_list()
         if es.get('is_base') and getattr(self.app, '_admin_present', False):
