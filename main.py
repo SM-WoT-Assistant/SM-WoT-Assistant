@@ -515,6 +515,8 @@ class WotAssistantHQ:
                 return
             if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
                 return
+            if not self._overlay_display_allowed():  # mod ON + norm: never over the game
+                return
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
@@ -920,6 +922,14 @@ class WotAssistantHQ:
         except Exception as _e:
             _win_dbg('show FAILED: %r' % (_e,))
 
+    def _overlay_display_allowed(self):
+        """Mod ON -> nothing of the app may stand over the game in NORM mode
+        (hangar/battle): schemes are drawn by the mod on the minimap only.
+        The editor (edit mode) always shows. Mod OFF -> legacy overlay."""
+        if self._use_mod_var.get() and self.mode != "edit":
+            return False
+        return True
+
     def toggle_editor(self):
         if self.dialog_open: return
         # Tab explicitly asks for the editor: show a battle-hidden window back
@@ -1042,6 +1052,11 @@ class WotAssistantHQ:
         if self.mode == "edit":
             self.settings[f"{prefix}cx"] = int(px) + self.w // 2
             self.settings[f"{prefix}cy"] = int(py) + self.h // 2
+        # Mod ON + norm: instead of showing the overlay over the game the
+        # window is turned OFF (вимикання, user rule 03.10.2026). Tab back to
+        # edit shows it again via _battle_show_window.
+        if self.mode == "norm" and not self._overlay_display_allowed():
+            self._battle_hide_window()
         self.root.attributes("-alpha", self.alpha)
         self.refresh_mode_indicator()
         self.root.after(0, self._adjust_for_canvas)
@@ -1064,7 +1079,7 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.withdraw()
             self.root.update_idletasks()
-            if not self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
+            if not self._hidden_by_battle and self._overlay_display_allowed():
                 self._po_win.deiconify()
             self._sync_po_pos()
             self.painter.redraw()
@@ -1228,19 +1243,23 @@ class WotAssistantHQ:
         # safe_battle_sync may re-enter show_view afterwards - restoring it
         # here would put the app back over the game (and steal focus with
         # focus_force). Only _battle_show_window may bring it back.
-        if not self._hidden_by_battle:
+        if not self._hidden_by_battle and self._overlay_display_allowed():
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
         else:
-            _win_dbg('show_view: main window restore BLOCKED (battle)')
+            _win_dbg('show_view: main BLOCKED (battle=%s overlay_allowed=%s)'
+                     % (self._hidden_by_battle, self._overlay_display_allowed()))
         if (self.active_view == "maps" and not self._hidden_by_battle
+                and self._overlay_display_allowed()
                 and hasattr(self, '_po_win') and self._po_win.winfo_exists()):
             self._po_win.deiconify()
             self._sync_po_pos()
             self._po_win.lift()
-        elif self._hidden_by_battle and hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            _win_dbg('show_view: _po_win restore BLOCKED (battle)')
+        elif (self._hidden_by_battle or not self._overlay_display_allowed()) \
+                and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            _win_dbg('show_view: _po_win BLOCKED (battle=%s overlay_allowed=%s)'
+                     % (self._hidden_by_battle, self._overlay_display_allowed()))
 
     def _battle_restore_from_tray(self):
         """Старт бою з трею: показуємо вікно редагування з картою бою незалежно
@@ -1392,6 +1411,7 @@ class WotAssistantHQ:
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
         if (self.active_view == "maps" and not self._hidden_by_battle
+                and self._overlay_display_allowed()
                 and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10):
             if self._po_win.state() == "withdrawn":
                 self._po_win.deiconify()
@@ -1427,6 +1447,8 @@ class WotAssistantHQ:
         if self._po_win.state() != "withdrawn":
             return
         if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
+            return
+        if not self._overlay_display_allowed():  # mod ON + norm: never over the game
             return
         self.root.update_idletasks()
         self._po_win.deiconify()
@@ -1604,6 +1626,14 @@ class WotAssistantHQ:
         if self._hidden_by_f10 and self._unhide_on_battle_var.get():
             self._restored_by_battle = True
             self.root.after(0, self._restore_from_tray)
+        if self._use_mod_var.get():
+            # Mod ON: instead of switching to the battle overlay (norm) the
+            # window is turned OFF right before the battle - the mod draws the
+            # scheme on the minimap (user sequence 03.10.2026). Mode stays
+            # "edit"; Tab brings the editor back on demand.
+            if not self._hidden_by_f10:
+                self.root.after(150, self._battle_hide_window)
+            return
         if self.mode != "norm":
             self.root.after(100, self.toggle_editor)
         else:
@@ -2382,13 +2412,11 @@ class WotAssistantHQ:
                     pass
                 self._battle_edit_return = None
 
-            # Mod ON -> the app must not appear over the battle at all
-            # ("either overlay or minimap mod, never both" - user rule).
-            _use_mod_now = bool(self._use_mod_var.get())
-            if _use_mod_now:
-                self._battle_hide_window()
-            if (not _use_mod_now and self._unhide_on_battle_var.get()
-                    and self._hidden_by_f10):
+            # Battle start: show the EDITOR from the tray EVEN with the mod ON
+            # (user sequence: tray -> editor window -> OFF right before the
+            # battle (countdown) -> the mod draws the scheme on the minimap;
+            # 03.10.2026). The countdown handler does the turning off.
+            if self._unhide_on_battle_var.get() and self._hidden_by_f10:
                 self._restored_by_battle = True
                 self._battle_restore_from_tray()
 
