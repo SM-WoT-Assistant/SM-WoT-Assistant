@@ -162,6 +162,10 @@ class MapPainter:
                 changed += 1
         if changed:
             self.save_drawings()
+            # Scale must reach saved_schemes (the mod reads the scheme at
+            # battle start, not the canvas) - otherwise the minimap keeps
+            # the old size (user report 03.10.2026).
+            self._autosave_active_scheme()
             self.redraw()
 
     def toggle_select_all(self):
@@ -544,6 +548,10 @@ class MapPainter:
             coords[2] = mx + dx * (new_scale / scale)
             coords[3] = my + dy * (new_scale / scale)
         self.save_drawings()
+        # Ctrl+resize must reach saved_schemes too: the mod reads the scheme
+        # at battle start (not the canvas) - without this the minimap kept
+        # the old element size (user report 03.10.2026).
+        self._autosave_active_scheme()
         self.redraw()
 
     def on_press(self, event):
