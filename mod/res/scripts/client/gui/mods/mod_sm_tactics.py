@@ -47,8 +47,8 @@ LINKAGE = 'sm.wo-tactics'
 SCHEME_FILE = os.path.join(
     os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'selected_scheme.json')
 
-DEBUG = False  # False after live verification (#1463): no green debug frame
-               # on the minimap; init/scheme/attach logs stay unconditional
+DEBUG = False  # calibration closed 05.10.2026: frame is on the grid +/-1px
+               # (lattice V16/H17 vs frame 16/17); init/scheme/attach logs stay
 
 MODE_ALWAYS = 0
 MODE_SHOW_ON_ALT = 1

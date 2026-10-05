@@ -74,7 +74,7 @@ def _win_dbg(msg):
         _dir = os.path.dirname(path)
         if not os.path.isdir(_dir):
             os.makedirs(_dir)
-        with open(path, 'a') as _f:
+        with open(path, 'a', encoding='utf-8') as _f:
             _f.write('[WIN %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
     except Exception:
         pass
@@ -89,7 +89,7 @@ def _write_dbg(msg):
         _dir = os.path.dirname(path)
         if not os.path.isdir(_dir):
             os.makedirs(_dir)
-        with open(path, 'a') as _f:
+        with open(path, 'a', encoding='utf-8') as _f:
             _f.write('[WRITE %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
     except Exception:
         pass
@@ -2317,28 +2317,41 @@ class WotAssistantHQ:
         """Write current combobox selection to selected_scheme.json (called at battle start)."""
         try:
             sel = self.saved_schemes_var.get()
-            if not sel or not hasattr(self, '_saved_schemes_map'):
-                _write_dbg('None: sel=%r has_map=%s' % (
-                    sel, hasattr(self, '_saved_schemes_map')))
-                self._write_selected_scheme(None)
-                return
-            keys = getattr(self, '_saved_schemes_keys', [])
-            display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
-            idx = None
-            for i, dt in enumerate(display_texts):
-                if dt == sel:
-                    idx = i
-                    break
-            if idx is None or idx >= len(keys):
-                _write_dbg('None: idx mismatch sel=%r values=%d keys=%d map=%s' % (
-                    sel, len(display_texts), len(keys),
-                    getattr(self, 'current_map_eng', None)))
-                self._write_selected_scheme(None)
-                return
-            key = keys[idx]
-            scheme_info = self._saved_schemes_map.get(key, {})
-            if not scheme_info or scheme_info.get("_separator"):
-                _write_dbg('None: empty/separator key=%r sel=%r' % (key, sel))
+            scheme_info = None
+            if sel and hasattr(self, '_saved_schemes_map'):
+                keys = getattr(self, '_saved_schemes_keys', [])
+                display_texts = list(self.saved_schemes_cb['values']) if self.saved_schemes_cb['values'] else []
+                idx = None
+                for i, dt in enumerate(display_texts):
+                    if dt == sel:
+                        idx = i
+                        break
+                if idx is not None and idx < len(keys):
+                    candidate = self._saved_schemes_map.get(keys[idx], {})
+                    if candidate and not candidate.get("_separator"):
+                        scheme_info = candidate
+                else:
+                    _write_dbg('idx mismatch sel=%r values=%d keys=%d map=%s -> last_selected' % (
+                        sel, len(display_texts), len(keys),
+                        getattr(self, 'current_map_eng', None)))
+            else:
+                _write_dbg('sel=%r empty/no-map -> last_selected' % (sel,))
+            # Random battle map with no scheme of its own (map-filtered list
+            # empty) or combobox not refreshed yet: fall back to the LAST
+            # CHOSEN scheme - user protocol: "select any scheme, the map
+            # does not matter" (05.10.2026: Karelia battle wrote None).
+            if scheme_info is None:
+                last = self.settings.get("last_selected_scheme", "")
+                if last and hasattr(self, '_saved_schemes_map'):
+                    for info in self._saved_schemes_map.values():
+                        if (isinstance(info, dict) and not info.get("_separator")
+                                and info.get('scheme_name') == last):
+                            scheme_info = info
+                            _write_dbg('fallback: last_selected=%r' % (last,))
+                            break
+            if scheme_info is None:
+                _write_dbg('None: no scheme found sel=%r last=%r' % (
+                    sel, self.settings.get("last_selected_scheme", "")))
                 self._write_selected_scheme(None)
                 return
             drawing_id = scheme_info.get('drawing_id', '')
@@ -2357,7 +2370,8 @@ class WotAssistantHQ:
                     "elements": elements,
                 })
             else:
-                _write_dbg('None: load_scheme failed key=%r id=%r' % (key, drawing_id))
+                _write_dbg('None: load_scheme failed key=%r id=%r' % (
+                    scheme_info.get('scheme_name', ''), drawing_id))
                 self._write_selected_scheme(None)
         except Exception as _e:
             _write_dbg('None: EXC %r' % (_e,))

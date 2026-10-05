@@ -1489,16 +1489,15 @@ class MapPainter:
                         total_w += w
 
                     curr_x = x - total_w / 2
-                    poi_oy = int(24 * sc)
                     for it in items:
                         cx = curr_x + it["w"] / 2
                         if it.get("tree"):
-                            canvas.create_text(cx, y-poi_oy, text=chr(0xF18C),
+                            canvas.create_text(cx, y, text=chr(0xF18C),
                                                 font=("FontAwesome", it["sz"]), fill=c,
                                                 tags="painter_obj")
                         else:
-                            canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]), fill="black", tags=("painter_obj", "xvm_bg"))
-                            canvas.create_text(cx, y-poi_oy, text=chr(it["code"]), font=("XVMSymbol", it["sz"]-max(2, int(4*sc))), fill=c, tags=("painter_obj", "xvm_fg"))
+                            canvas.create_text(cx, y, text=chr(it["code"]), font=("XVMSymbol", it["sz"]), fill="black", tags=("painter_obj", "xvm_bg"))
+                            canvas.create_text(cx, y, text=chr(it["code"]), font=("XVMSymbol", it["sz"]-max(2, int(4*sc))), fill=c, tags=("painter_obj", "xvm_fg"))
                         curr_x += it["w"]
 
                 if obj.get("text"):

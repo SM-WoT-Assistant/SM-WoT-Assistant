@@ -847,7 +847,7 @@ class DrawingPalette(tk.Toplevel):
             _d = os.path.dirname(p)
             if not os.path.isdir(_d):
                 os.makedirs(_d)
-            with open(p, 'a') as _f:
+            with open(p, 'a', encoding='utf-8') as _f:
                 _f.write('[AS %s] %s\n' % (_t.strftime('%H:%M:%S'), msg))
         except Exception:
             pass

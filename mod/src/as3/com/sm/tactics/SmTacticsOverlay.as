@@ -48,6 +48,8 @@ package com.sm.tactics
         private var _attached:Boolean = false;
         private var _attachBranch:String = "pending";
         private var _debug:Boolean = false;
+        private var _mm:* = null;
+        private var _mode:String = "entries";
         private var _visibleOn:Boolean = true;
 
         private static const FA_TREE:String = String.fromCharCode(0xF18C);
@@ -123,11 +125,46 @@ package com.sm.tactics
             if (page.minimap is Minimap)
             {
                 var mm:Minimap = page.minimap as Minimap;
-                var idx:int = mm.entriesContainer.getChildIndex(mm.entriesContainer.flags);
-                mm.entriesContainer.addChildAt(_dbg, idx + 1);
-                mm.entriesContainer.addChildAt(_layer, idx + 2);
-                _size = mm.entriesContainer.flags.width;
-                _attachBranch = "minimap";
+                // _size = width of the WIDEST sprite child = the map/grid box in
+                // entriesContainer-local units, measured BEFORE our layers attach
+                // (empty layers have width 0 and cannot win). flags.width=210 is
+                // the inner marker box (16px narrower than the grid), currentWidth
+                // lives in another space - calibration 05.10.2026 proved both wrong
+                // (455px box inside the 490px game grid, corners +17px inset).
+                // Diagnostics (05.10.2026): full children inventory - names and
+                // sizes - so the grid child can be identified by FACT, not guess.
+                var best:DisplayObject = null;
+                var kids:String = "";
+                for (var ci:int = 0; ci < mm.entriesContainer.numChildren; ci++)
+                {
+                    var child:DisplayObject = mm.entriesContainer.getChildAt(ci);
+                    if (kids.length > 0)
+                        kids += "|";
+                    kids += child.name + ":" + Math.round(child.width) + "x" + Math.round(child.height);
+                    if (child is Sprite && (best == null || child.width > best.width))
+                        best = child;
+                }
+                // entriesContainer = MARKER space only (kids inventory 05.10.2026:
+                // flags/points/icons/... all 210x210 + personal strip - NO grid).
+                // The map+grid holder is the "background" instance; its bounds in
+                // Minimap-local space = the GRID RECT exactly (space-agnostic:
+                // getBounds works whatever coordinate system it uses).
+                _mm = mm;
+                var gridRef:DisplayObject = mm["background"] as DisplayObject;
+                if (gridRef != null)
+                {
+                    _mode = "grid";
+                    _relayout(kids);
+                }
+                else
+                {
+                    var idx:int = mm.entriesContainer.getChildIndex(mm.entriesContainer.flags);
+                    mm.entriesContainer.addChildAt(_dbg, idx + 1);
+                    mm.entriesContainer.addChildAt(_layer, idx + 2);
+                    _mode = "entries";
+                    _size = Number(mm.entriesContainer.flags.width);
+                    _attachBranch = "fallback210;w=" + _size + ";kids=" + kids;
+                }
             }
             else if (page.minimap is EpicMinimap)
             {
@@ -170,6 +207,33 @@ package com.sm.tactics
         }
 
         // ---------------- python -> AS3 API ----------------
+
+        // Re-run on EVERY element push: the game repositions/finishes the map
+        // widget AFTER populate (live evidence05.10.2026: frame corner stuck at
+        // screen 250,257 over the sky; layer=1 = attached before game children
+        // existed, so later game layers covered us). Fresh bounds + re-append
+        // to the TOP of the parent keeps us aligned and visible.
+        private function _relayout(kids:String):void
+        {
+            // Host = background's PARENT: bounds and our layer then live in the
+            // SAME coordinate space by construction (no Point/pixelBounds - both
+            // unavailable in this toolchain; and addChild to OUR view was the bug
+            // that stuck the frame at screen 250,257, 05.10.2026).
+            if (_mm == null) return;
+            var gridRef:DisplayObject = _mm["background"] as DisplayObject;
+            if (gridRef == null || gridRef.parent == null) return;
+            var host:* = gridRef.parent;
+            var r:* = gridRef.getBounds(host);
+            _size = r.width;
+            host.addChild(_dbg);
+            host.addChild(_layer); // same parent = aligned; re-append = top of z
+            _layer.x = _dbg.x = r.x;
+            _layer.y = _dbg.y = r.y;
+            _attachBranch = _mode + ";w=" + Math.round(_size * 10) / 10
+                + ";r=" + Math.round(r.x) + "," + Math.round(r.y)
+                + "," + Math.round(r.height)
+                + (kids != null ? ";kids=" + kids : "");
+        }
 
         public function as_register():void
         {
@@ -423,6 +487,7 @@ package com.sm.tactics
         {
             try
             {
+                if (_mode == "grid") _relayout(null);
                 var parsed:* = _parseJson(jsonStr);
                 _elements = parsed is Array ? parsed as Array : [];
                 redraw();
@@ -541,6 +606,7 @@ package com.sm.tactics
                 _dbg.graphics.lineTo(_size / 2 + 10, _size / 2);
                 _dbg.graphics.moveTo(_size / 2, _size / 2 - 10);
                 _dbg.graphics.lineTo(_size / 2, _size / 2 + 10);
+                _drawCalib();
             }
 
             if (_elements == null || _elements.length == 0)
@@ -718,7 +784,7 @@ package com.sm.tactics
                 var arr:Array = poiData as Array;
                 if (arr.length > 0)
                 {
-                    drawPoiRow(arr, anchor[0], anchor[1] - 24 * sc, poiBase, ttSz, col, sc);
+                    drawPoiRow(arr, anchor[0], anchor[1], poiBase, ttSz, col, sc); // no lift: glyph centered on the stored point
                 }
                 if (obj.text)
                 {
@@ -951,6 +1017,32 @@ package com.sm.tactics
             tf.defaultTextFormat = new TextFormat(font, size, 0xFFFFFF);
             tf.text = text;
             return tf.textWidth;
+        }
+
+        // Calibration crosses (debug cycle 05.10.2026): magenta = stored
+        // anchor of the E4 square, yellow = base1 data, cyan = corners.
+        // Measuring them against the game grid on ONE screenshot gives the
+        // exact px() offset to bake in as _CAL_X/_CAL_Y (removed with debug).
+        private function _drawCalib():void
+        {
+            _cross(0.358, 0.528, 0xFF00FF, 16);   // square anchor (data)
+            _cross(0.534, 0.084, 0xFFFF00, 16);   // base1 data
+            _cross(0.0, 0.0, 0x00FFFF, 14);       // corners
+            _cross(1.0, 0.0, 0x00FFFF, 14);
+            _cross(0.0, 1.0, 0x00FFFF, 14);
+            _cross(1.0, 1.0, 0x00FFFF, 14);
+        }
+
+        private function _cross(nx:Number, ny:Number, color:uint, arm:int):void
+        {
+            var p:Array = px(nx, ny);
+            var x:Number = Number(p[0]);
+            var y:Number = Number(p[1]);
+            _dbg.graphics.lineStyle(2, color, 0.95);
+            _dbg.graphics.moveTo(x - arm, y);
+            _dbg.graphics.lineTo(x + arm, y);
+            _dbg.graphics.moveTo(x, y - arm);
+            _dbg.graphics.lineTo(x, y + arm);
         }
 
         private function label(text:String, font:String, size:int, color:uint,
