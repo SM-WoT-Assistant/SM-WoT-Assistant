@@ -61,6 +61,7 @@ _g = {
     'elements': None,
     'scheme_name': None,
     'mode': MODE_ALWAYS,
+    'elemScale': 100,   # ModsSettingsAPI slider, percent
     'alt': False,
     'listeners': False,
     'keys': None,
@@ -94,6 +95,7 @@ class SmTacticsOverlay(View):
             self.as_setDebug(DEBUG)
             self.as_register()
             status = self.as_setElements(json.dumps(elements))
+            self.as_setUserScale(_g['elemScale'] / 100.0)
             LOG.info('%s setElements=%s', TAG, status)
             # Visibility BEFORE diagnostics: a failing debug call must never
             # abort the layer becoming visible (02.10.2026 lesson).
@@ -136,6 +138,9 @@ class SmTacticsOverlay(View):
 
     def as_setDebug(self, on):
         self.flashObject.as_setDebug(bool(on))
+
+    def as_setUserScale(self, v):
+        self.flashObject.as_setUserScale(v)
 
 
 # ---------------- view framework setup (wotstat pattern) ----------------
@@ -274,7 +279,7 @@ def _apply_visibility():
 
 def _settings_template(templates):
     return {
-        'modDisplayName': 'SM Tactics: scheme on minimap',
+        'modDisplayName': 'MAPS Assistant',
         'enabled': True,
         'column1': [
             templates.createDropdown(
@@ -285,6 +290,12 @@ def _settings_template(templates):
                          'Show on Alt - appears while Alt is held. '
                          'Hide on Alt - hides while Alt is held.{/BODY}'),
                 width=200),
+            templates.createSlider(
+                'Element size', 'elemScale', 100, 50, 200, 5,
+                tooltip=('{HEADER}Scheme element size{/HEADER}{BODY}'
+                         'Uniform size factor for all scheme elements'
+                         ' on the minimap: 50%..200%, step 5. Positions stay unchanged.{/BODY}'),
+                width=200),
         ],
     }
 
@@ -294,8 +305,13 @@ def _on_settings_changed(linkage, new_settings):
         return
     try:
         _g['mode'] = int(new_settings.get('displayMode', MODE_ALWAYS))
+        _g['elemScale'] = int(new_settings.get('elemScale', 100))
         _apply_visibility()
-        LOG.info('%s settings: mode=%d', TAG, _g['mode'])
+        view = _g.get('view')
+        if view is not None:
+            view.as_setUserScale(_g['elemScale'] / 100.0)   # live apply
+        LOG.info('%s settings: mode=%d elemScale=%d%%', TAG,
+                 _g['mode'], _g['elemScale'])
     except Exception:
         LOG.warning('%s settings change:\n%s', TAG, traceback.format_exc())
 
@@ -315,13 +331,15 @@ def _load_settings():
         saved = g_modsSettingsApi.getModSettings(LINKAGE, template)
         if saved:
             _g['mode'] = int(saved.get('displayMode', MODE_ALWAYS))
+            _g['elemScale'] = int(saved.get('elemScale', 100))
             g_modsSettingsApi.registerCallback(
                 LINKAGE, _on_settings_changed, _on_settings_button)
         else:
             st = g_modsSettingsApi.setModTemplate(
                 LINKAGE, template, _on_settings_changed, _on_settings_button)
             _g['mode'] = int(st.get('displayMode', MODE_ALWAYS))
-        LOG.info('%s settings registered (mode=%d)', TAG, _g['mode'])
+            _g['elemScale'] = int(st.get('elemScale', 100))
+        LOG.info('%s settings registered (mode=%d elemScale=%d%%)', TAG, _g['mode'], _g['elemScale'])
     except Exception:
         LOG.warning('%s settings registration:\n%s', TAG, traceback.format_exc())
 

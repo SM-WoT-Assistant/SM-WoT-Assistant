@@ -6,6 +6,7 @@ package com.sm.tactics
     import flash.text.TextFieldAutoSize;
     import flash.text.TextFormat;
     import flash.text.Font;
+    import flash.events.Event;
 
     import net.wg.infrastructure.base.AbstractView;
     import net.wg.data.constants.generated.LAYER_NAMES;
@@ -51,6 +52,14 @@ package com.sm.tactics
         private var _mm:* = null;
         private var _mode:String = "entries";
         private var _visibleOn:Boolean = true;
+        private var _host:* = null;
+        private var _gridRef:DisplayObject = null;
+        private var _rx:Number = 0;
+        private var _ry:Number = 0;
+        private var _rw:Number = 0;
+        private var _rh:Number = 0;
+        private var _watchOn:Boolean = false;
+        private var _userScale:Number = 1;   // settings slider 50..200%
 
         private static const FA_TREE:String = String.fromCharCode(0xF18C);
         private static const XVM_SCALE:Object = {
@@ -225,6 +234,9 @@ package com.sm.tactics
             var host:* = gridRef.parent;
             var r:* = gridRef.getBounds(host);
             _size = r.width;
+            _host = host;
+            _gridRef = gridRef;
+            _rx = r.x; _ry = r.y; _rw = r.width; _rh = r.height;
             host.addChild(_dbg);
             host.addChild(_layer); // same parent = aligned; re-append = top of z
             _layer.x = _dbg.x = r.x;
@@ -239,12 +251,38 @@ package com.sm.tactics
         {
             _registered = true;
             setup();
+            // Live minimap resize: the game re-lays the background out
+            // LOCALLY (no ancestor scale), so the cached rect goes stale
+            // and the scheme stops following the map (06.10.2026).
+            if (!_watchOn)
+            {
+                addEventListener(Event.ENTER_FRAME, _onFrame);
+                _watchOn = true;
+            }
+        }
+
+        private function _onFrame(e:Event):void
+        {
+            if (!_registered || _mode != "grid" || _host == null || _gridRef == null)
+                return;
+            var r:* = _gridRef.getBounds(_host);
+            if (Math.abs(r.x - _rx) > 0.5 || Math.abs(r.y - _ry) > 0.5
+                || Math.abs(r.width - _rw) > 0.5 || Math.abs(r.height - _rh) > 0.5)
+            {
+                _relayout(null);
+                redraw();
+            }
         }
 
         public function as_unregister():void
         {
             _registered = false;
             unsetup();
+            if (_watchOn)
+            {
+                removeEventListener(Event.ENTER_FRAME, _onFrame);
+                _watchOn = false;
+            }
         }
 
         // ---------------- payload reader ----------------
@@ -509,6 +547,18 @@ package com.sm.tactics
             _dbg.visible = on;
         }
 
+        // ModsSettingsAPI slider: uniform size factor for ALL element
+        // sizes (positions stay at stored coords; only sizes scale).
+        public function as_setUserScale(v:Number):void
+        {
+            var s:Number = Number(v);
+            if (s > 0.1 && s < 4.0)
+            {
+                _userScale = s;
+                redraw();
+            }
+        }
+
         public function as_setDebug(on:Boolean):void
         {
             _debug = on;
@@ -614,7 +664,7 @@ package com.sm.tactics
                 return;
             }
 
-            var sc:Number = Math.min(_size, _size) / 800.0;
+            var sc:Number = Math.min(_size, _size) / 800.0 * _userScale;
             for (var i:int = 0; i < _elements.length; i++)
             {
                 try
