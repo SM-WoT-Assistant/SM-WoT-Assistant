@@ -2350,9 +2350,8 @@ class WotAssistantHQ:
                             _write_dbg('fallback: last_selected=%r' % (last,))
                             break
             if scheme_info is None:
-                _write_dbg('None: no scheme found sel=%r last=%r' % (
+                _write_dbg('None: no scheme found sel=%r last=%r -> kept existing file' % (
                     sel, self.settings.get("last_selected_scheme", "")))
-                self._write_selected_scheme(None)
                 return
             drawing_id = scheme_info.get('drawing_id', '')
             import tactics_manager
@@ -2370,12 +2369,10 @@ class WotAssistantHQ:
                     "elements": elements,
                 })
             else:
-                _write_dbg('None: load_scheme failed key=%r id=%r' % (
-                    scheme_info.get('scheme_name', ''), drawing_id))
-                self._write_selected_scheme(None)
+                _write_dbg('kept existing file (load_scheme failed id=%r)' % (
+                    drawing_id,))
         except Exception as _e:
-            _write_dbg('None: EXC %r' % (_e,))
-            self._write_selected_scheme(None)
+            _write_dbg('kept existing file (EXC %r)' % (_e,))
 
     def _toggle_select_all(self):
         if self.active_view != "maps":
@@ -2476,7 +2473,9 @@ class WotAssistantHQ:
 
     def on_battle_ended(self):
         self.save_settings()
-        self._write_selected_scheme(None)
+        # NOT cleared: selected_scheme.json persists as "last chosen" so the
+        # mod works without the app running (07.10.2026); a fresh desktop
+        # run overwrites it at the next battle start.
         # Raw id бою більше не актуальний — малювання повертається на current_map_eng
         self.battle_map_data_id = None
         # Гейт вимикається разом з battle_map_data_id → показ схем треба

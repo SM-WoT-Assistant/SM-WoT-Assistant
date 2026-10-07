@@ -46,6 +46,10 @@ SWF_NAME = 'SmTacticsOverlay.swf'
 LINKAGE = 'sm.wo-tactics'
 SCHEME_FILE = os.path.join(
     os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'selected_scheme.json')
+# the program's full scheme store (same folder) - read directly so the mod
+# works without the app running (07.10.2026)
+SAVED_SCHEMES_FILE = os.path.join(
+    os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'saved_schemes.json')
 
 DEBUG = False  # calibration closed 05.10.2026: frame is on the grid +/-1px
                # (lattice V16/H17 vs frame 16/17); init/scheme/attach logs stay
@@ -168,6 +172,10 @@ def on_component_registered(event):
         return
     _g['should_register'] = True
     name, elements = _read_scheme()
+    if not elements:
+        # selected_scheme.json empty (program not running) -> direct store
+        # read; async with retries (player entity may not be ready yet)
+        _start_fallback()
     _g['scheme_name'] = name
     _g['elements'] = elements
     LOG.info('%s minimap registered (scheme=%r, elements=%s)', TAG, name,
@@ -221,6 +229,195 @@ def _read_scheme():
     except Exception:
         LOG.error('%s scheme read failed:\n%s', TAG, traceback.format_exc())
         return None, None
+
+
+# arena gameplay/arenaType id -> scheme battle_mode string (same table the
+# desktop uses in main.py mode_map: ctf->Standard, domination->Encounter...)
+_ARENA_TYPE_MODE = {
+    1: 'Standard', 2: 'Encounter', 3: 'Storm',
+    4: 'Onslaught', 5: 'OnslaughtLight',
+    30: 'Onslaught', 33: 'Onslaught', 34: 'Onslaught', 35: 'OnslaughtLight',
+}
+
+
+def _ui_mode_for_arena(at):
+    """Best-effort scheme battle_mode for the current arena; None = unknown."""
+    try:
+        if isinstance(at, (int, float)):
+            return _ARENA_TYPE_MODE.get(int(at))
+        gp = getattr(at, 'gameplays', None)
+        if gp:
+            try:
+                return _ARENA_TYPE_MODE.get(int(gp[0]))
+            except Exception:
+                pass
+        return None
+    except Exception:
+        return None
+
+
+def _arena_geometry():
+    """(geometry, arena_type, detail) of the current battle.
+    The avatar often appears AFTER the minimap registers (logs06.10-07.10:
+    'no arena geometry') -> caller retries. Correct accessors (verified via
+    py2.7 disassembly of avatar_getter.pyc): getArena(avatar) and
+    getArenaInfo(avatar) TAKE the avatar argument - calling them without it
+    raised TypeError which our silent except was hiding."""
+    g = None
+    via = None
+    at = None
+    try:
+        avatar = BigWorld.player()
+    except Exception:
+        avatar = None
+    if avatar is None:
+        return None, None, 'player=None'
+    if not g:
+        try:
+            g = getattr(avatar, 'geometryName', None)
+            if g:
+                via = 'avatar'
+        except Exception:
+            pass
+    if not g:
+        try:
+            from gui.battle_control import avatar_getter
+            arena = avatar_getter.getArena(avatar)
+            if arena is not None:
+                g = getattr(arena, 'geometryName', None)
+                if g:
+                    via = 'arena'
+        except Exception:
+            pass
+    if not g:
+        try:
+            from gui.battle_control import avatar_getter
+            info = avatar_getter.getArenaInfo(avatar)
+            if info is not None:
+                cand_g = None
+                if isinstance(info, dict):
+                    cand_g = info.get('geometryName') or info.get('geometry')
+                if not cand_g:
+                    cand_g = getattr(info, 'geometryName', None) or getattr(info, 'geometry', None)
+                if cand_g:
+                    g = cand_g
+                    via = 'info'
+        except Exception:
+            pass
+    at = getattr(avatar, 'arenaType', None)
+    detail = 'via=%s g=%r at=%r' % (via, g, at)
+    return (str(g) if g else None), at, detail
+
+
+def _start_fallback():
+    """Resolve scheme without the program running (direct store read);
+    retries while the player entity is still loading (07.10.2026)."""
+    _g['warned'] = False
+    _fallback_attempt(15)
+
+
+def _fallback_attempt(tries_left):
+    geom, at, detail = _arena_geometry()
+    LOG.info('%s geo try(%d): %s', TAG, tries_left, detail)
+    if not geom:
+        if tries_left > 0:
+            BigWorld.callback(1.0, lambda: _fallback_attempt(tries_left - 1))
+        else:
+            _resolve_degraded()
+        return
+    _resolve_and_store(geom, at)
+
+
+def _adopt(src, pick):
+    _g['scheme_name'] = pick.get('scheme_name')
+    _g['elements'] = pick.get('elements') or []
+    LOG.info('%s fallback -> %s scheme=%r n=%d', TAG, src,
+             _g['scheme_name'], len(_g['elements']))
+    if _g.get('should_register'):
+        view = _g['view']
+        if view is not None:
+            view.register_and_push()
+
+
+def _fresh(s):
+    return s.get('updated_at') or s.get('saved_at') or ''
+
+
+def _load_store():
+    if not os.path.isfile(SAVED_SCHEMES_FILE):
+        return []
+    with open(SAVED_SCHEMES_FILE, 'r') as fh:
+        db = json.load(fh)
+    return [s for s in (db or {}).values()
+            if isinstance(s, dict) and not s.get('_separator')
+            and (s.get('elements') or [])]
+
+
+def _warn_no_scheme_once():
+    if _g.get('warned'):
+        return
+    _g['warned'] = True
+    LOG.warning('%s NO SCHEME for this battle (user must be told)', TAG)
+    try:
+        from gui.SystemMessages import pushMessage, SM_TYPE
+        pushMessage('SM Tactics: no scheme for this map/mode', SM_TYPE.Warning)
+    except Exception:
+        LOG.warning('%s toast failed:\n%s', TAG, traceback.format_exc())
+
+
+def _resolve_and_store(geom, at):
+    """Per the user spec (07.10): star = explicit user marker (any scheme);
+    a base Standard scheme exists PER MAP and is the default; other battle
+    modes without a single scheme -> warn the user once."""
+    mode = _ui_mode_for_arena(at) or 'Standard'
+    try:
+        all_s = _load_store()
+        # 1) user star - any scheme, any map/mode
+        starred = [s for s in all_s if s.get('is_default')]
+        if starred:
+            _adopt('star', sorted(starred, key=_fresh)[-1])
+            return
+        # 2) map match
+        cand = [s for s in all_s
+                if s.get('map_id') == geom
+                or (len(s.get('map_id', '')) > len(geom)
+                    and s.get('map_id', '').endswith('_' + geom))]
+        mode_match = [s for s in cand if s.get('battle_mode') == mode]
+        if mode_match:
+            _adopt('map-base', sorted(mode_match, key=_fresh)[-1])
+            return
+        if mode != 'Standard':
+            # other battle mode without a single scheme -> tell the user
+            LOG.info('%s arena=%r mode=%r -> no scheme for this mode (warn)',
+                     TAG, geom, mode)
+            _warn_no_scheme_once()
+            return
+        # 3) standard mode, per-map base not made yet -> global standard base
+        base = [s for s in all_s if s.get('battle_mode') == 'Standard']
+        if base:
+            _adopt('base-any', sorted(base, key=_fresh)[-1])
+            return
+        LOG.info('%s arena=%r -> store empty', TAG, geom)
+    except Exception:
+        LOG.error('%s store fallback failed:\n%s', TAG, traceback.format_exc())
+
+
+def _resolve_degraded():
+    """Geometry never resolved (training/topography): best global choice,
+    no per-map logic, no warning (the map itself is unknown)."""
+    try:
+        all_s = _load_store()
+        starred = [s for s in all_s if s.get('is_default')]
+        if starred:
+            _adopt('star-any-map', sorted(starred, key=_fresh)[-1])
+            return
+        base = [s for s in all_s if s.get('battle_mode') == 'Standard'] or all_s
+        if base:
+            _adopt('geo-unknown-base', sorted(base, key=_fresh)[-1])
+            return
+        LOG.info('%s geo unknown and store empty', TAG)
+    except Exception:
+        LOG.error('%s degraded fallback failed:\n%s', TAG, traceback.format_exc())
 
 
 # ---------------- visibility (Alt modes) ----------------
