@@ -10,7 +10,9 @@
 - `selected_scheme.json` = «останнє підтверджене вибирання»: стирання в `on_battle_ended` прибрано, усі гілки невдач бойового запису — `kept existing` (0 стирань);
 - фолбек-ланцюг (семантика користувача): **явний вибір → ★ (будь-яка схема, ручний маркер, без авто-призначення ★) → свіжа `Standard`-схема ЦІЄЇ мапи (`map-base`) → не-стандартний режим без схем → одноразовий тост `SM Tactics: no scheme for this map/mode` через `gui.SystemMessages.pushMessage/SM_TYPE.Warning` → `base-any` (глобальна Standard, поки бази робляться) → деградація `geo-unknown-base/star-any-map`**;
 - правильні виклики `getArena(avatar)/getArenaInfo(avatar)` + поджерельні `geo try(N): via=… g=… at=…` логи (ретрай ×15).
-**Верифікація (живий бій 07.10, desktop закритий):** `fallback -> star-any-map scheme='Mines [Standard]' n=60` → `setElements=ok n=60` → `attach='grid;w=490' ping='ok'` → `vis=1/1` — **схема на мінімапі без програми** ✓.
+- **Geo живе (08.10):** `via=arena.arenaType g=38_mannerheim_line at=<ArenaType>` — правильний ланцюг `avatar.arena` / `avatar_getter.getArena(avatar)` (діагностика `Avatar.pyc`: прямих `avatar.geometryName` НЕМАЄ — лішь `arena.arenaType.geometryName`); прибрано затирання `at=None` у хвості функції.
+- **Коль call-site (08.10):** після вдалого фолбеку локальні `None` більше НЕ затирають `_g` (живий лог: `minimap registered (scheme=Mines [Standard], elements=60)` + `vis=1/1`, без `no scheme`), подвійна реєстрація лишилась безпечним повторним push.
+- **Верифікація (живий бій 07.10, desktop закритий):** `fallback -> star-any-map scheme='Mines [Standard]' n=60` → `setElements=ok n=60` → `attach='grid;w=490' ping='ok'` → `vis=1/1` — **схема на мінімапі без програми** ✓.
 **Статус чесно:** у тестових режимах користувача `geo try(0..15): via=None g=None at=None` (атрибути порожні навіть з правильними викликами) → поки працює гілка ★/деградації; пер-мапна `map-base` і тост-попередження чекають діагностики `Avatar.pyc` (наступний крок).
 
 ---
