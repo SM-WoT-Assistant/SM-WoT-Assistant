@@ -172,12 +172,17 @@ def on_component_registered(event):
         return
     _g['should_register'] = True
     name, elements = _read_scheme()
-    if not elements:
+    if elements:
+        _g['scheme_name'] = name
+        _g['elements'] = elements
+    else:
         # selected_scheme.json empty (program not running) -> direct store
-        # read; async with retries (player entity may not be ready yet)
+        # read; async with retries (player entity may not be ready yet).
+        # _start_fallback fills _g itself - afterwards read it BACK instead
+        # of overwriting with the failed locals (live clobber bug, 08.10).
         _start_fallback()
-    _g['scheme_name'] = name
-    _g['elements'] = elements
+        name = _g.get('scheme_name')
+        elements = _g['elements']
     LOG.info('%s minimap registered (scheme=%r, elements=%s)', TAG, name,
              len(elements) if elements else 0)
     view = _g['view']
@@ -272,6 +277,31 @@ def _arena_geometry():
         avatar = None
     if avatar is None:
         return None, None, 'player=None'
+    # Real access pattern (Avatar.pyc disassembly, 07.10): the entity exposes
+    # ONLY the chain arena.arenaType.geometryName - direct avatar.geometryName /
+    # avatar.arenaType do NOT exist (that is why every getattr(..., None) in the
+    # live 'geo try' logs returned None).
+    try:
+        arena = getattr(avatar, 'arena', None)
+        if arena is None:
+            from gui.battle_control import avatar_getter
+            arena = avatar_getter.getArena(avatar)
+        if arena is not None:
+            at_obj = getattr(arena, 'arenaType', None)
+            if at_obj is None and hasattr(arena, 'getArenaType'):
+                try:
+                    at_obj = arena.getArenaType()
+                except Exception:
+                    at_obj = None
+            if at_obj is None:
+                at_obj = getattr(arena, 'arenaInfo', None)
+            if at_obj is not None:
+                g = getattr(at_obj, 'geometryName', None)
+                if g:
+                    via = 'arena.arenaType'
+                    at = at_obj
+    except Exception:
+        pass
     if not g:
         try:
             g = getattr(avatar, 'geometryName', None)
@@ -279,32 +309,6 @@ def _arena_geometry():
                 via = 'avatar'
         except Exception:
             pass
-    if not g:
-        try:
-            from gui.battle_control import avatar_getter
-            arena = avatar_getter.getArena(avatar)
-            if arena is not None:
-                g = getattr(arena, 'geometryName', None)
-                if g:
-                    via = 'arena'
-        except Exception:
-            pass
-    if not g:
-        try:
-            from gui.battle_control import avatar_getter
-            info = avatar_getter.getArenaInfo(avatar)
-            if info is not None:
-                cand_g = None
-                if isinstance(info, dict):
-                    cand_g = info.get('geometryName') or info.get('geometry')
-                if not cand_g:
-                    cand_g = getattr(info, 'geometryName', None) or getattr(info, 'geometry', None)
-                if cand_g:
-                    g = cand_g
-                    via = 'info'
-        except Exception:
-            pass
-    at = getattr(avatar, 'arenaType', None)
     detail = 'via=%s g=%r at=%r' % (via, g, at)
     return (str(g) if g else None), at, detail
 
