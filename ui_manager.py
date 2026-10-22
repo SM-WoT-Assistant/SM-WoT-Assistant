@@ -443,12 +443,11 @@ class UIManager:
         chk_close_game = make_chk(self.app.t('ui', 'close_with_game'), self.app._close_with_game_var)
 
         def _on_launch_on_game_start():
-            enabled = self.app._launch_on_game_start_var.get()
-            self.app._set_windows_startup(enabled)
-            if enabled:
-                self.app._ensure_tray_watcher_running()
-            else:
-                self.app._stop_tray_watcher()
+            # План А (16.10.2026): tray_watcher завжди в автозапуску (mod-sync +
+            # close_with_game); чекбокс лише зберігає налаштування — гейт
+            # запуску програми всередині watcher'а (_launch_if_enabled). Реєстр
+            # HKCU\Run більше НЕ видаляється при знятті чекбокса.
+            self.app._ensure_tray_watcher_running()
             self.app.save_settings()
 
         chk_launch_game.configure(command=_on_launch_on_game_start)

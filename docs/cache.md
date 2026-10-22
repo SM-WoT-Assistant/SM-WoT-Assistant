@@ -36,3 +36,30 @@
 
 ## mo_maps cache fix + ration source fix (02.08.2026)
 Повна секція — у docs/admin.md (mo_maps cache fix + ration source fix). Коротко: generate_mo_maps викликається з language_module.setup() з src=_lang_module (не lm) — у кеш-гілці lm.dictionaries порожній, інакше мапи обнуляться на кожному старті (#1451). Раніон-джерело: _cons_rev_map() реверс ai_engine.AI_CONS_MAP (#1486).
+
+---
+
+## Power-loss захист запису — safe_io.py (22.10.2026)
+
+**Інцидент (22.10.2026):** раптове вимкнення ПК обнулило `%APPDATA%/SM WoT Assistant/map_drawings.json`
+(1 017 517 байт = 100% нулів): звичайний `open(path, "w")` без fsync під час живого вимкнення фіксує
+розмір файлу, але не дані. Наступний `load_json` мовчки повертав `{}` — клас тихої втрати (41 → 6 мап,
+самовідновлення тільки через ручний вибір схеми). `saved_schemes.json` вцілів (окремий файл, запис
+завершився до збою).
+
+**Правила (з 22.10.2026):**
+1. **Запис** користувацьких JSON — ТІЛЬКИ `safe_io.write_json(path, data, indent=...)`:
+   `*.tmp → flush+fsync → os.replace` (обрив живлення б'є по `.tmp`, оригінал лишається цілим).
+   Прямий `open(path, "w")` для файлів user-data заборонений.
+2. **Читання з самозагоєнням** — `safe_io.read_json(path, default)` (крізь `data_manager.load_json`
+   і `tactics_manager._load_db`): пошкодження (garbage / порожній / нульовий файл) → доказ
+   `*.corrupt-<ts>` (НЕ знищувати) → відновлення з `*.bak` → інакше default + `report_fallback`
+   (канал #1889, admin.html Errors). Файли поза `config.USER_DATA_DIR` (бандл) — без змін,
+   стара поведінка.
+3. **Ротація `.bak`** — один раз на сесію на файл, тільки з валідного стану = «останній робочий».
+   Завжди є джерело для відновлення.
+4. **Підключено:** `data_manager.load_json/save_json`, `tactics_manager._load_db/_save_db`,
+   `locale_manager.save_locales`, запис settings у `language_module.setup()`. Нові user-data
+   записи — через `safe_io`, не дублювати атомарність вручну.
+5. **Харнесс:** `_archive/scripts/harness_safe_io_2026_10_22.py` — 52/0 (ast ×6, атомарність,
+   гілки відновлення, Е2Е автозавантаження схеми).

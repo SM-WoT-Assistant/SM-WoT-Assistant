@@ -2,12 +2,42 @@ import os
 import json
 import re
 import threading
+import ctypes
 import config
 
 try:
     import map_extractor
 except ImportError:
     map_extractor = None
+
+
+def _is_wot_running():
+    """Перевіряє чи запущений WorldOfTanks.exe (ctypes Toolhelp32Snapshot)."""
+    try:
+        kernel32 = ctypes.windll.kernel32
+        TH32CS_SNAPPROCESS = 0x00000002
+        PE_SIZE = 568 if ctypes.sizeof(ctypes.c_void_p) == 8 else 556
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == -1:
+            return False
+        try:
+            pe = (ctypes.c_byte * PE_SIZE)()
+            ctypes.memset(pe, 0, PE_SIZE)
+            ctypes.memmove(pe, ctypes.byref(ctypes.c_ulong(PE_SIZE)), 4)
+            if not kernel32.Process32FirstW(snapshot, ctypes.byref(pe)):
+                return False
+            while True:
+                exe_buf = ctypes.create_unicode_buffer(260)
+                ctypes.memmove(exe_buf, ctypes.byref(pe, 44), 260 * 2)
+                if exe_buf.value and "WorldOfTanks.exe" in exe_buf.value:
+                    return True
+                if not kernel32.Process32NextW(snapshot, ctypes.byref(pe)):
+                    break
+            return False
+        finally:
+            kernel32.CloseHandle(snapshot)
+    except Exception:
+        return False
 
 # Мапи-евенти/варіанти/старі мапи яких НЕМАЄ на сайті тактік
 _EVENT_MAP_IDS = {
@@ -34,6 +64,7 @@ class MapManager:
         self._unavailable_maps = set(self._load_unavailable())
         self._tactic_sync_needed = False
         self._pending_tactic_path = os.path.join(config.USER_DATA_DIR, "pending_tactic_maps.json")
+        self._mod_restart_warned = False
 
     def _load_unavailable(self):
         try:
@@ -185,6 +216,10 @@ class MapManager:
                 version_changed = real_version_changed
                 if version_changed:
                     print(f"[MAP_MGR] Game version changed: {saved_v} → {current_v}")
+                    # Раннє встановлення мода — до екстракції (секунди, не хвилини):
+                    # після оновлення клієнта нова папка mods/<ver>/ отримує
+                    # sm_tactics.wotmod одразу, а не після повного пайплайну.
+                    self.apply_mod_mode()
                 elif not version_changed:
                     try:
                         if ext.has_changed():
@@ -540,7 +575,15 @@ class MapManager:
             pass
 
     def apply_mod_mode(self):
-        """Install sm_tactics.wotmod if use_mod enabled; remove it from every mods/<ver>/ when disabled."""
+        """Install sm_tactics.wotmod if use_mod enabled; remove it from every mods/<ver>/ when disabled.
+
+        Версія гри читається з version.xml на диску (fallback — settings.game_version),
+        щоб папка mods/<ver>/ була актуальною навіть до оновлення settings після
+        екстракції. Після встановлення наш застарілий wotmod прибирається з інших
+        версійних папок. Якщо гра запущена і файл щойно (ре)встановлено — показується
+        одноразове за сесію не-модальне вікно «перезапусти гру» (моди вантажаться
+        тільки при старті гри; Aslain-модпак стирає mods/* при перевстановленні).
+        """
         try:
             use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
         except Exception:
@@ -566,13 +609,9 @@ class MapManager:
             print("[MAP_MGR] sm_tactics.wotmod not found, skipping install")
             return
         try:
-            game_version = self.app.settings.get("game_version", "")
+            game_version = self._resolve_game_version()
             if not wot_path or not game_version:
                 return
-            # Сира версія з version.xml (« v.2.4.0.1 #952 ») має пробіли по
-            # краях: makedirs «створює» таку папку (Win32 тимчасово обрізає
-            # пробіл), але shutil.copy2 падає з [WinError 3] на компоненті з
-            # кінцевим пробілом — встановлення мовчки не відбувалося.
             # Нормалізуємо до 4-частинної версії та ПРЕФЕРУЄМО наявну папку
             # версії на диску (лагідний монтаж гри mods/<ver>/).
             m = re.search(r"\d+\.\d+\.\d+\.\d+", game_version)
@@ -587,11 +626,109 @@ class MapManager:
                 mods_dir = os.path.join(mods_root, ver)
             os.makedirs(mods_dir, exist_ok=True)
             dst = os.path.join(mods_dir, "sm_tactics.wotmod")
+            was_missing = not os.path.isfile(dst)
             import shutil
             shutil.copy2(wotmod_src, dst)
             print(f"[MAP_MGR] Installed sm_tactics.wotmod -> {mods_dir}")
+            self._cleanup_other_version_wotmods(mods_root, os.path.basename(mods_dir))
+            # Гра вже працює і файл щойно (ре)встановлено → моди вантажились
+            # без нього; повідомити користувача (не-модально, 1 раз за сесію)
+            if was_missing and _is_wot_running() and not self._mod_restart_warned:
+                self._mod_restart_warned = True
+                self.app.safe_execute(self._show_mod_restart_notice)
         except Exception as e:
             print(f"[MAP_MGR] Mod install error: {e}")
+
+    def _resolve_game_version(self):
+        """Актуальна версія гри: version.xml на диску (свіже читання),
+        fallback — settings.game_version. Використовує app.settings wot_path
+        (той самий, що й решта застосунку), без MapExtractor — щоб не
+        змішувати джерела wot_path."""
+        v = None
+        wot_path = self.app.settings.get("wot_path", "")
+        if wot_path:
+            v_path = os.path.join(wot_path, "version.xml")
+            if os.path.exists(v_path):
+                try:
+                    import xml.etree.ElementTree as ET
+                    v = ET.parse(v_path).getroot().findtext("version")
+                except Exception:
+                    v = None
+        if not v:
+            v = str(self.app.settings.get("game_version", "") or "")
+        return v
+
+    def _cleanup_other_version_wotmods(self, mods_root, keep_dir_name):
+        """Прибрати наш sm_tactics.wotmod з усіх версійних папок, крім поточної.
+
+        Точне ім'я файлу (без wildcard — #1492). Не чіпаємо configs/ та інші моди.
+        """
+        try:
+            for entry in os.listdir(mods_root):
+                if entry == keep_dir_name:
+                    continue
+                p = os.path.join(mods_root, entry, "sm_tactics.wotmod")
+                if os.path.isfile(p):
+                    try:
+                        os.remove(p)
+                        print(f"[MAP_MGR] Removed stale wotmod from old version: {p}")
+                    except Exception as e:
+                        print(f"[MAP_MGR] Failed to remove stale wotmod {p}: {e}")
+        except Exception as e:
+            print(f"[MAP_MGR] Old-version wotmod cleanup error: {e}")
+
+    def _show_mod_restart_notice(self):
+        """Не-модальне вікно: гра запущена — перезапустіть гру для підвантаження мода.
+
+        Без grab_set/wait_window — не блокує роботу застосунку (#1993: діалоги з
+        Toplevel мають parent=self.app.root; тут Toplevel не потрібен, бо це нове
+        верхнє вікно від root).
+        """
+        try:
+            import tkinter as tk
+            import dialog_utils
+            title = self.app.t('ui', 'mod_restart_game_title')
+            msg = self.app.t('ui', 'mod_restart_game_msg')
+            dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, title)
+            dialog_utils._DragHelper(dlg, hdr)
+            tk.Label(dlg, text=msg, bg="#222", fg="#ffaa00",
+                     font=("Arial", 9), wraplength=400, justify="left").pack(padx=20, pady=(14, 12))
+            tk.Button(dlg, text="OK", bg="#446644", fg="#cfc", bd=0,
+                      font=("Arial", 9, "bold"), padx=20, pady=4,
+                      command=dlg.destroy).pack(pady=(0, 12))
+            dialog_utils._center_on_root(dlg, self.app.root)
+        except Exception as e:
+            print(f"[MAP_MGR] Restart notice error: {e}")
+
+    def ensure_mod_installed(self):
+        """Періодична самоперевірка (5 хв): use_mod увімкнено + файл відсутній/порожній → перевстановити."""
+        try:
+            use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
+        except Exception:
+            return
+        if not use_mod:
+            return
+        wot_path = self.app.settings.get("wot_path", "")
+        if not wot_path:
+            return
+        game_version = self._resolve_game_version()
+        if not game_version:
+            return
+        m = re.search(r"\d+\.\d+\.\d+\.\d+", game_version)
+        ver = m.group(0) if m else str(game_version).strip()
+        mods_root = os.path.join(wot_path, "mods")
+        mods_dir = None
+        for cand in (ver, str(game_version).strip()):
+            if cand and os.path.isdir(os.path.join(mods_root, cand)):
+                mods_dir = os.path.join(mods_root, cand)
+                break
+        if mods_dir is None:
+            mods_dir = os.path.join(mods_root, ver)
+        dst = os.path.join(mods_dir, "sm_tactics.wotmod")
+        if os.path.isfile(dst) and os.path.getsize(dst) > 0:
+            return
+        print("[MAP_MGR] sm_tactics.wotmod missing — reinstalling (integrity check)")
+        self.apply_mod_mode()
 
     def _uninstall_tactics_mod(self, wot_path):
         """Remove our sm_tactics.wotmod from every mods/<ver>/ folder (exact name only, other mods untouched)."""

@@ -354,12 +354,12 @@ def setup(wot_path, settings, save_callback):
         print(f"[LANG SETUP] exported locale/{lang}.json")
         regenerate_game_entities(lm)
         settings["language"] = lang
-        try:
-            with open(config.SETTINGS_FILE, "w", encoding="utf-8") as f:
-                json.dump(settings, f, indent=4, ensure_ascii=False)
+        # safe_io: атомарний запис settings — обрив живлення не обнуляє їх
+        import safe_io
+        if safe_io.write_json(config.SETTINGS_FILE, settings, indent=4):
             print(f"[LANG SETUP] settings saved, language={lang}")
-        except Exception as e:
-            print(f"[LANG SETUP] settings save error: {e}")
+        else:
+            print(f"[LANG SETUP] settings save error: {config.SETTINGS_FILE}")
         reset_lang_module()
         try:
             import firebase_reporter

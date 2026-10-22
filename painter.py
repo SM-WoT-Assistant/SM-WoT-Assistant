@@ -55,6 +55,10 @@ class MapPainter:
         self._hidden_download_schemes = set()  # {scheme_id} — схеми приховані в Download діалозі
         self._thickness = int(self.app.settings.get("draw_thickness", 3))
         self._select_all = False
+        # Shift-множинне виділення: індекси drawings[map_id]. Операції
+        # (рух/делет) застосовуються до всієї множини одним undo-записом.
+        # Індикатор — підсвітка кнопок типів у палітрі + рядок стану (#A).
+        self._multi_sel = set()
         self._clipboard_obj = None
         self._press_candidate = None
         self._press_moved = False
@@ -171,6 +175,9 @@ class MapPainter:
     def toggle_select_all(self):
         self._select_all = not self._select_all
         if self._select_all:
+            # ALL = повний вибір множини; Shift-множина стає зайвою —
+            # прибираємо, щоб два виділення не конфліктували в палітрі.
+            self._clear_multi_sel(silent=True)
             palette = getattr(self.app, 'drawing_palette', None)
             if palette and palette.is_in_edit_mode():
                 palette.exit_edit_mode()
@@ -178,6 +185,64 @@ class MapPainter:
 
     def select_all_active(self):
         return self._select_all
+
+    # ------------------------------------------------------------------
+    # Shift-множинне виділення + груповий рух (12.10.2026, варіант A)
+    # ------------------------------------------------------------------
+    def multi_sel_active(self):
+        return bool(self._multi_sel)
+
+    def _notify_multi_changed(self):
+        palette = getattr(self.app, 'drawing_palette', None)
+        if palette and hasattr(palette, "update_multi_selection"):
+            palette.update_multi_selection()
+
+    def _toggle_multi_sel(self, idx):
+        """Shift+клік: додати/прибрати елемент з множини."""
+        if idx in self._multi_sel:
+            self._multi_sel.discard(idx)
+        else:
+            self._multi_sel.add(idx)
+        # Множинне виділення і одиночне — різні режими: входячи в множину,
+        # знімаємо одиночне, щоб палітра не показувала суперечливий стан.
+        if self._multi_sel:
+            palette = getattr(self.app, 'drawing_palette', None)
+            if palette and palette.is_in_edit_mode():
+                palette.exit_edit_mode()
+        self._notify_multi_changed()
+        self.redraw()
+
+    def _clear_multi_sel(self, silent=False):
+        if not self._multi_sel:
+            return
+        self._multi_sel = set()
+        if not silent:
+            self._notify_multi_changed()
+        self.redraw()
+
+    def _start_group_move(self, event, indices):
+        """Старт групового перетягування елементів за списком індексів."""
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+        group = []
+        for i in indices:
+            if 0 <= i < len(objects):
+                o = objects[i]
+                group.append((i, {
+                    "coords": list(o.get("coords", [])),
+                    "class_icon_coords": list(o.get("class_icon_coords", [])),
+                    "text_coords": list(o.get("text_coords", [])) if o.get("text_coords") else [],
+                    "had_norm": o.get("norm"),
+                }))
+        if not group:
+            return
+        self._press_candidate = {
+            "index": group[0][0],
+            "target_kind": "object",
+            "start_event": (event.x, event.y),
+            "group": group,
+        }
+        self._press_moved = False
 
     def _clipboard_focus_in_field(self):
         """Ctrl+C/V не перехоплюємо, коли фокус у текстовому віджеті — там
@@ -328,7 +393,20 @@ class MapPainter:
                 idx = drag.get("index", -1)
                 map_id = self.app.current_map_eng
                 objects = self.drawings.get(map_id, []) if map_id else []
-                if 0 <= idx < len(objects):
+                if drag.get("group"):
+                    # Груповий рух: відкочуємо координати КОЖНОГО учасника
+                    # (без history — точне відновлення, як одиночний cancel).
+                    for g_idx, g_orig in drag["group"]:
+                        if not (0 <= g_idx < len(objects)):
+                            continue
+                        g_obj = objects[g_idx]
+                        if g_orig["coords"]:
+                            g_obj["coords"] = list(g_orig["coords"])
+                        if g_orig["class_icon_coords"]:
+                            g_obj["class_icon_coords"] = list(g_orig["class_icon_coords"])
+                        if g_orig["text_coords"]:
+                            g_obj["text_coords"] = list(g_orig["text_coords"])
+                elif 0 <= idx < len(objects):
                     obj = objects[idx]
                     if drag.get("original_coords"):
                         obj["coords"] = list(drag["original_coords"])
@@ -336,7 +414,7 @@ class MapPainter:
                         obj["class_icon_coords"] = list(drag["original_class_icon_coords"])
                     if drag.get("original_text_coords"):
                         obj["text_coords"] = list(drag["original_text_coords"])
-                    self.save_drawings()
+                self.save_drawings()
             self._press_candidate = None
             self._press_moved = False
             self.move_drag = None
@@ -354,6 +432,11 @@ class MapPainter:
             return
         if self._select_all:
             self.toggle_select_all()
+            return
+        if self._multi_sel:
+            # Пріоритет Esc (#2012): cancel-drag → select-all → МНОЖИНА →
+            # exit_edit_mode. Інструмент не вимикається.
+            self._clear_multi_sel()
             return
         palette = getattr(self.app, 'drawing_palette', None)
         if palette:
@@ -383,7 +466,7 @@ class MapPainter:
         palette = getattr(self.app, 'drawing_palette', None)
         if not palette or palette.state() == 'withdrawn':
             return None
-        if not palette.is_in_edit_mode() and not self._select_all:
+        if not palette.is_in_edit_mode() and not self._select_all and not self._multi_sel:
             return None
         palette._delete_selected()
         return "break"
@@ -452,9 +535,12 @@ class MapPainter:
                     ("delete_all", map_id, [(i, o) for i, o in enumerate(old)]))
             self.drawings[map_id] = []
             self._editing_idx = -1
+            self._multi_sel = set()
             palette = getattr(self.app, 'drawing_palette', None)
             if palette:
                 palette.exit_edit_mode()
+                if hasattr(palette, "update_multi_selection"):
+                    palette.update_multi_selection()
             self.save_drawings()
             self.redraw()
 
@@ -481,6 +567,30 @@ class MapPainter:
                         obj["class_icon_coords"] = original["class_icon_coords"]
                     if original["text_coords"]:
                         obj["text_coords"] = original["text_coords"]
+                    if "had_norm" in original:
+                        if original["had_norm"]:
+                            obj["norm"] = original["had_norm"]
+                        else:
+                            obj.pop("norm", None)
+            elif kind == "move_group":
+                # Один запис на всю групу: відкочуємо координати + norm кожного.
+                _, map_id, entries = op
+                objs = self.drawings.get(map_id, [])
+                for g_idx, g_orig in entries:
+                    if not (0 <= g_idx < len(objs)):
+                        continue
+                    g_obj = objs[g_idx]
+                    if g_orig["coords"]:
+                        g_obj["coords"] = g_orig["coords"]
+                    if g_orig["class_icon_coords"]:
+                        g_obj["class_icon_coords"] = g_orig["class_icon_coords"]
+                    if g_orig["text_coords"]:
+                        g_obj["text_coords"] = g_orig["text_coords"]
+                    if "had_norm" in g_orig:
+                        if g_orig["had_norm"]:
+                            g_obj["norm"] = g_orig["had_norm"]
+                        else:
+                            g_obj.pop("norm", None)
             elif kind == "update":
                 _, map_id, idx, snapshot = op
                 objs = self.drawings.get(map_id, [])
@@ -496,6 +606,12 @@ class MapPainter:
                 _, map_id, entries = op
                 objs = self.drawings.setdefault(map_id, [])
                 # Зростаючий idx: відновлюємо зліва направо — позиції валідні.
+                for e_idx, e_obj in sorted(entries, key=lambda e: e[0]):
+                    objs.insert(max(0, min(e_idx, len(objs))), e_obj)
+            elif kind == "delete_multi":
+                # Видалення Shift-множини: відновлення зростаючим idx.
+                _, map_id, entries = op
+                objs = self.drawings.setdefault(map_id, [])
                 for e_idx, e_obj in sorted(entries, key=lambda e: e[0]):
                     objs.insert(max(0, min(e_idx, len(objs))), e_obj)
             elif kind == "create":
@@ -558,16 +674,28 @@ class MapPainter:
         if not self.app.current_map_eng or self.app.mode != "edit": return
         if event.state & 0x0004:
             return
+        palette = getattr(self.app, 'drawing_palette', None)
+        palette_visible = palette and palette.state() != 'withdrawn'
+        # Shift = 0x0001 (надійний біт на відміну від Alt 0x8, #2010).
+        shift_held = bool(event.state & 0x0001)
+
         if self._select_all:
-            palette = getattr(self.app, 'drawing_palette', None)
+            # ALL активний: клік по ЕЛЕМЕНТІ = груповий рух усіх видимих;
+            # клік по порожньому / при інструменті малювання = вимкнення ALL
+            # (як раніше, фікс 01.10.2026 не змінюється).
+            if palette_visible and self.active_tool not in ("marker", "arrow", "brush", "text"):
+                idx, _ = self._find_object_index_at(event.x, event.y)
+                if idx >= 0:
+                    map_id = self.app.current_map_eng
+                    objects = self.drawings.get(map_id, [])
+                    indices = [i for i, o in enumerate(objects) if self.is_visible(o)]
+                    self._start_group_move(event, indices)
+                    return
             self._select_all = False
             if palette:
                 palette._update_select_all_btn()
             self.redraw()
             return
-
-        palette = getattr(self.app, 'drawing_palette', None)
-        palette_visible = palette and palette.state() != 'withdrawn'
 
         # Alt = spring-loaded move (Етап 5): флаг від keysym-біндів
         # (<KeyPress-Alt_L>), НЕ від state-бітів — біт 0x8 на цій системі
@@ -603,6 +731,19 @@ class MapPainter:
             # потяг створює елемент навіть поверх існуючого. Рух елемента при
             # активному малюванні — через V/select або Alt (спек #2011/#2012).
             if idx >= 0 and self.active_tool not in ("marker", "arrow", "brush", "text"):
+                if shift_held:
+                    # Shift+клік = toggle у множині (варіант A: без рамок —
+                    # індикатор у палітрі). Одиночне виділення не чіпаємо.
+                    self._toggle_multi_sel(idx)
+                    return
+                if self._multi_sel and idx in self._multi_sel:
+                    # Клік по елементу з множини = груповий рух усієї множини.
+                    self._start_group_move(event, sorted(self._multi_sel))
+                    return
+                if self._multi_sel:
+                    # Клік по елементу ПОЗА множиною = одиночне виділення,
+                    # множина скидається.
+                    self._clear_multi_sel()
                 map_id = self.app.current_map_eng
                 obj = self.drawings[map_id][idx]
                 self._press_candidate = {
@@ -621,6 +762,13 @@ class MapPainter:
                 # доки не вибрано інший елемент / не знято).
                 return
             if not self.active_tool or self.active_tool == "select":
+                if self._multi_sel:
+                    # Клік по порожньому = зняти НЕ лише одиночне, а й
+                    # Shift-множину (спека: звичайний клік без Шіфту).
+                    self._clear_multi_sel()
+                    if palette.is_in_edit_mode():
+                        palette.exit_edit_mode()
+                    return
                 if palette.is_in_edit_mode():
                     # select (AI) та режим без інструмента: клік по порожньому = зняти виділення
                     palette.exit_edit_mode()
@@ -872,6 +1020,43 @@ class MapPainter:
         # delta normalized over the IMAGE (stored coords are image fractions)
         dx = (event.x - self.move_drag["start_event"][0]) / cw
         dy = (event.y - self.move_drag["start_event"][1]) / ch
+
+        # Груповий рух (ALL або Shift-множина): однакова дельта до кожного
+        # елемента; marker_tip/marker_text суб-цілі не застосовуються.
+        group = self.move_drag.get("group")
+        if group:
+            for g_idx, g_orig in group:
+                if not (0 <= g_idx < len(objects)):
+                    continue
+                g_obj = objects[g_idx]
+                g_coords = g_orig["coords"]
+                if g_obj.get("type") in ("marker", "arrow") and len(g_coords) >= 4:
+                    g_obj["coords"] = [
+                        min(max(g_coords[0] + dx, 0.0), 1.0),
+                        min(max(g_coords[1] + dy, 0.0), 1.0),
+                        min(max(g_coords[2] + dx, 0.0), 1.0),
+                        min(max(g_coords[3] + dy, 0.0), 1.0),
+                    ]
+                elif g_obj.get("type") == "brush" and len(g_coords) >= 4:
+                    g_new = []
+                    for j in range(0, len(g_coords), 2):
+                        g_new.append(min(max(g_coords[j] + dx, 0.0), 1.0))
+                        g_new.append(min(max(g_coords[j + 1] + dy, 0.0), 1.0))
+                    g_obj["coords"] = g_new
+                elif g_obj.get("type") == "text" and len(g_coords) >= 2:
+                    g_obj["coords"] = [
+                        min(max(g_coords[0] + dx, 0.0), 1.0),
+                        min(max(g_coords[1] + dy, 0.0), 1.0),
+                    ]
+                g_tc = g_orig.get("text_coords", [])
+                if g_tc and len(g_tc) >= 2:
+                    g_obj["text_coords"] = [
+                        min(max(g_tc[0] + dx, 0.0), 1.0),
+                        min(max(g_tc[1] + dy, 0.0), 1.0),
+                    ]
+            self.redraw()
+            return "break"
+
         obj = objects[idx]
         original = self.move_drag["original_coords"]
         target_kind = self.move_drag.get("target_kind", "object")
@@ -931,13 +1116,42 @@ class MapPainter:
         if not self.move_drag_active:
             return
         self.move_drag_active = False
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+
+        # Груповий рух: ОДИН undo-запис на всю групу + norm:"img" кожному
+        # елементу (після руху координати однозначно образ-просторові).
+        group = self.move_drag.get("group")
+        if group:
+            entries = []
+            for g_idx, g_orig in group:
+                if 0 <= g_idx < len(objects):
+                    objects[g_idx]["norm"] = "img"
+                    entries.append((g_idx, g_orig))
+            if entries:
+                self._undo_stack.append(("move_group", map_id, entries))
+            self.move_drag = None
+            self.save_drawings()
+            self._autosave_active_scheme()
+            return "break"
+
         idx = self.move_drag["index"]
+        # norm ще НЕ змінений (ставимо нижче) — це попереднє значення.
+        prev_norm = objects[idx].get("norm") if 0 <= idx < len(objects) else None
+        if 0 <= idx < len(objects):
+            # Рух = калібрування: після перетягування координати елемента
+            # відповідають його екранній позиції в поточному (образ-)
+            # просторі — фіксуємо маркером, щоб надалі не здвинувся.
+            objects[idx]["norm"] = "img"
         original = {
             "coords": self.move_drag.get("original_coords", []),
             "class_icon_coords": self.move_drag.get("original_class_icon_coords", []),
             "text_coords": self.move_drag.get("original_text_coords", []),
+            # norm теж відкочуємо: legacy-елемент після Ctrl+Z має лишитись
+            # legacy (canvas-простір), а не стати "img".
+            "had_norm": prev_norm,
         }
-        self._undo_stack.append(("move", self.app.current_map_eng, idx, original))
+        self._undo_stack.append(("move", map_id, idx, original))
         self.move_drag = None
         self.save_drawings()
         self._autosave_active_scheme()
@@ -1018,6 +1232,9 @@ class MapPainter:
             "color": "#00ff00" if self.active_tool == "text" else self.default_color,
             "thickness": self._thickness,
             "_source": getattr(self.app, "active_group_id", "public") or "public",
+            # Створення = образ-простір (letterbox-фікс 02.10.2026) — маркер
+            # щоб конверсії/аудити знали простір координат елемента.
+            "norm": "img",
         }
         if self.active_tool == "brush":
             norm_points = [((x - org_x) / cw, (y - org_y) / ch)
@@ -1155,8 +1372,46 @@ class MapPainter:
         self.drawings[map_id] = []
         self._editing_idx = -1
         self._select_all = False
+        self._multi_sel = set()
         if palette:
             palette._update_select_all_btn()
+            if hasattr(palette, "update_multi_selection"):
+                palette.update_multi_selection()
+        self.save_drawings()
+        self._autosave_active_scheme()
+        self.redraw()
+
+    def _delete_multi_sel(self):
+        """Видалити всі елементи Shift-множини: одне підтвердження,
+        один undo-запис."""
+        if not self.app.current_map_eng or not self._multi_sel:
+            return
+        map_id = self.app.current_map_eng
+        objects = self.drawings.get(map_id, [])
+        valid = sorted(i for i in self._multi_sel if 0 <= i < len(objects))
+        if not valid:
+            self._clear_multi_sel()
+            return
+        palette = getattr(self.app, 'drawing_palette', None)
+        n = len(valid)
+        if not self._confirm_delete(
+                f"{self.app.t('ui', 'select_all')} ({n})"):
+            return
+        self._undo_stack.append(
+            ("delete_multi", map_id, [(i, objects[i]) for i in valid]))
+        # Видалення у зворотному порядку, щоб попередні індекси не змістились.
+        for i in reversed(valid):
+            del objects[i]
+        # _editing_idx може вказувати на видалений/зміщений елемент.
+        if self._editing_idx in valid:
+            self._editing_idx = -1
+            if palette:
+                palette.exit_edit_mode()
+        elif self._editing_idx > valid[0]:
+            self._editing_idx -= sum(1 for i in valid if i < self._editing_idx)
+        self._multi_sel = set()
+        if palette and hasattr(palette, "update_multi_selection"):
+            palette.update_multi_selection()
         self.save_drawings()
         self._autosave_active_scheme()
         self.redraw()
@@ -1503,6 +1758,40 @@ class MapPainter:
                 if obj.get("text"):
                     ty = y + int(15 * sc) if poi_data else y
                     canvas.create_text(x, ty, text=obj["text"], fill=c, font=("Arial", tt_sz, "bold"), tags="painter_obj")
+
+    def migrate_legacy_coords(self):
+        """One-time conversion of pre-02.10 canvas-fraction drawings into the
+        image-rect space (commit 8085639). Idempotent via the norm marker.
+        Caller must ensure app._map_img_rect is valid (first render done).
+        Returns the number of converted elements across all maps."""
+        org_x, org_y, img_w, img_h = self._img_rect()
+        # _map_img_rect is in MAIN-canvas coords; prefer app.canvas, fall back
+        # to the painter canvas (overlay mirrors main size via _sync_po_pos).
+        src = getattr(self.app, "canvas", None) or self.canvas
+        if src is None or not src.winfo_exists():
+            return 0
+        cw = float(src.winfo_width())
+        ch = float(src.winfo_height())
+        if img_w < 10 or img_h < 10 or cw < 50 or ch < 50:
+            return 0
+        import tactics_manager
+        n = 0
+        for items in self.drawings.values():
+            if isinstance(items, list):
+                n += tactics_manager.migrate_legacy_elements(
+                    items, cw, ch, org_x, org_y, img_w, img_h)
+        if n:
+            # Rollback point before the first rewrite of the drawings file.
+            import shutil
+            bak = config.DRAWINGS_FILE + ".bak_pre_norm"
+            try:
+                if os.path.isfile(config.DRAWINGS_FILE) and not os.path.isfile(bak):
+                    shutil.copy2(config.DRAWINGS_FILE, bak)
+            except Exception as e:
+                print(f"[NORM] drawings backup failed ({e}) — NOT saving")
+                return 0
+            self.save_drawings()
+        return n
 
     def _img_rect(self):
         """(org_x, org_y, iw, ih) - the map image rect in canvas coords.

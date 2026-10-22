@@ -9,22 +9,18 @@ class DataManager:
         self.drawings_file = os.path.join(os.path.dirname(config.SETTINGS_FILE), "map_drawings.json")
 
     def load_json(self, file_path, default_data=None):
+        # safe_io: валідне читання + самозагоєння з .bak при пошкодженні
+        # (power-loss обнулення), доказ у *.corrupt-<ts>, звіт у error_reports
+        import safe_io
         if default_data is None:
             default_data = {}
-        if os.path.exists(file_path):
-            try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except (json.JSONDecodeError, IOError):
-                pass
-        return default_data
+        return safe_io.read_json(file_path, default_data)
 
     def save_json(self, file_path, data):
-        try:
-            with open(file_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=4, ensure_ascii=False)
-        except IOError as e:
-            print(f"[DATA] Error saving {file_path}: {e}")
+        # safe_io: атомарний запис (*.tmp + fsync + os.replace) — обрив
+        # живлення б'є по *.tmp, оригінал лишається цілим
+        import safe_io
+        return safe_io.write_json(file_path, data, indent=4)
 
     def load_drawings(self):
         return self.load_json(self.drawings_file)

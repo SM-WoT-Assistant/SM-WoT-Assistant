@@ -34,6 +34,7 @@ LOCALES_FILE = os.path.join(USER_DATA_DIR, "locales.json")
 
 DEFAULT_FILES = ["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]
 GROUP_CACHE_FILE = os.path.join(USER_DATA_DIR, "group_schemes_cache.json")
+MOD_ERROR_FLAG_FILE = os.path.join(USER_DATA_DIR, "mod_error_pending.json")
 SCHEMES_FILE = os.path.join(USER_DATA_DIR, "saved_schemes.json")
 SELECTED_SCHEME_FILE = os.path.join(USER_DATA_DIR, "selected_scheme.json")
 BASE_SCHEMES_FILE = os.path.join(BASE_DIR, "base_schemes.json")

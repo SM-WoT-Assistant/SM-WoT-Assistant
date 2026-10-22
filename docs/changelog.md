@@ -2,6 +2,177 @@
 
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
+
+
+## 22.10.2026
+
+- **ЗАХИСТ ВІД РАПТОВОГО ВИМКНЕННЯ ПК (power-loss) + фікс «перше відкриття мапи без схем».**
+  - **Інцидент:** `%APPDATA%/SM WoT Assistant/map_drawings.json` після збою живлення = 1 017 517 байт,
+    **100% нулів** (mtime 22.10 20:43); `saved_schemes.json` (20:42) цілий. Корінь: звичайний
+    `open(path, "w")` без fsync — живе вимкнення фіксує розмір файлу, але не дані; далі `load_json`
+    мовчки повертав `{}` → малюнки «зникали», наступний save добивав файл (41 → 6 мап).
+  - **`safe_io.py` (новий модуль):** `write_json` — атомарний запис `*.tmp → flush+fsync → os.replace`;
+    `read_json` — самозагоєння: пошкодження (garbage / порожній / нульовий) → доказ
+    `*.corrupt-<ts>` (не знищувати) → відновлення з `*.bak` → інакше default + `report_fallback`
+    (admin.html Errors, канал #1889). Ротація `*.bak` = один раз на сесію з валідного стану,
+    ТІЛЬКИ файли `config.USER_DATA_DIR` (бандл — без змін, стара поведінка).
+  - **Підключено (затверджений обсяг):** `data_manager.load_json/save_json` (settings, map_drawings
+    та всі виклики), `tactics_manager._load_db/_save_db` (saved_schemes), `locale_manager.save_locales`,
+    запис settings у `language_module.setup()`.
+  - **Симптом «при першому відкритті мап схем немає, після повторного вибору з'являються» (той самий
+    інцидент):** канва бралась із знищеного map_drawings, а автозавантаження схеми навмисно вимкнене
+    (варіант Б #2014 — авто-завантаження знищувало наявний вміст канви). Фікс:
+    `_maybe_autoload_displayed_scheme` (main.py) на **порожню** канву через `after(0)` викликає той самий
+    шлях ручного вибору `_on_saved_scheme_select` (на порожній канві діалоги «зберегти/скинути»
+    пропускаються, main.py:2016). Гарди `_autoload_scheme_if_blank`: канва заповнилась / es прив'язана /
+    вибір користувача змінився / мапа змінилась / `_scheme_switch_in_progress` → пропуск. Наявний вміст
+    НІКОЛИ не підміняється — #2014 недоторканий.
+  - **Середовище (діагностика логів):** помилки `map_manager.py:541` (`No module named 'selenium'`) та
+    `[SERVICE] Batch translate FAILED` давав НЕКОРЕКТНИЙ venv — після збою запуск ішов з `.venv`
+    (Python 3.14, selenium/deep_translator відсутні); канонічний `.venv-1` (3.12, як у `.vscode`) містить
+    обидва пакети. `build.py` вимагає 3.12 — запускати і збирати з `.venv-1`.
+  - **Перевірка (#1471):** харнесс `_archive/scripts/harness_safe_io_2026_10_22.py` **52/0** — ast ×6,
+    атомарний запис (невдалий запис не чіпає оригінал, stale `*.tmp` ігнорується), ротація `.bak`
+    (один раз), гілки відновлення (garbage / нульовий / без бекапа / бандл поза user-data), Е2Е через
+    AST-витягнуті з main.py методи: порожня канва → завантаження + es + save_drawings; 9 негативних
+    сценаріїв гардів. Старі малюнки з бекапа `bak_pre_wipe` (13.10) не відновлювались — користувач
+    підтвердив, що всі схеми цілі.
+
+## 17.10.2026
+
+- **СПОВІЩЕННЯ ПРО ПОМИЛКИ МОДА — фікси після першого запуску (false positive 02:00 + clobber).**
+  - `tray_watcher.py` + `log_reader.py` (сигнатури дзеркаляться, міняти разом): package-сигнатура вимагає
+    error-ключове слово — реальний УСПІШНИЙ рядок `Mod package '.../sm_tactics.wotmod' loaded` (16.10 16:49:54)
+    більше НЕ спрацьовує (був першим snippet у вікні → fake-балон о 02:00); ASL one-line
+    `failed to load mod_sm_tactics.pyc: ... ImportError` (реальні помилки 15.10) додано як окрему сигнатуру;
+    `.pyc`-рядки ASL лоадера більше НЕ озброюють вікно пари File→Error (тільки traceback
+    `File "...mod_sm_tactics.py"` з негативним lookahead `(?!c)`).
+  - **Staleness-гейт** (`_installed_mod_mtime` + `_error_is_fresh` / `_mod_error_stale`): game.log —
+    append-only без ротації (#2053), backward-вікно 2MB містить помилки старих білдів. Сповіщення ТІЛЬКИ якщо
+    таймстамп помилки новіший за mtime встановленого `mods/<ver>/sm_tactics.wotmod`; mod_mtime None → гасимо
+    (відсутність файлу окремо сповіщає B2). Реплей реального лога (18.8MB, 3 ImportErrors 15-16.10):
+    0 сповіщень (усі пригнічені як старі). LogWatcher отримав `wot_path=` (main.py) для гейту backward-скана.
+  - **`_sync_mod` guard (#clobber 16-17.10):** ніколи не затирати новіший dst старішим src за mtime —
+    вчора src із `_internal` (13.10, 297777B) затер зфіксований 16.10 білд (298906B) у `mods/2.4.1.0/`
+    лише за різницею розмірів. Екстрений ремонт: root копія (298906) → `_internal` + `mods/2.4.1.0/`,
+    hash-верифікація.
+  - Перевірка (#1471): харнесс `_archive/scripts/harness_mod_error_notify_2026_10_16.py` (v2) **69/0** —
+    package-loaded no-fire, ASL one-line fire, ASL-success no-arm, staleness unit (fresh/stale/no-ts/no-mod),
+    sync-guard (newer-dst-not-clobbered / older-synced / missing-copied), LogWatcher backward stale-suppressed
+    + fresh-fires, AST ×5. Реплей реального game.log з реальними settings: SUPPRESSED (correct).
+  - `tray_watcher.exe` перезібрано (7.9MB, 17.10 03:24) та встановлено (`%LOCALAPPDATA%\SM WoT Assistant\`).
+
+## Механiзм сповiщень про помилки мода: LogWatcher-детекцiя + watcher balloon + B2-доставка (16.10.2026)
+
+**Проблема:** поломка мода пiсля оновлення клiєнта (приклад: g_entitiesFactories, 2.4.1.0) лишалась повнiстю тихою — гра писала traceback у game.log, але нiхто не дивився. Iнший клас тихої поломки: файл мода взагалi не потрапив у mods/<версiя>/ (вiдсутнiсть файлу не лишає слiдiв у логу — пункт меню просто зникає).
+
+**Сигнатури (з реального game.log 16.10.2026, без вигадок):**
+- import-pair: `File "...mod_sm_tactics.py"` → протягом 4 наступних рядкiв keyword (Error/Exception/Traceback/failed/not found) — ловить двостроковий traceback (File-рядок сам не мiстить слiв Error);
+- `[SM Tactics] ... failed|not found|Error...` — власнi LOG.error мода (init failed, loadView failed, battle app not found...);
+- `Mod package ... sm_tactics ... load error` (#2025 клас).
+Навмисно НЕ ловить: логування успiху ([SM Tactics] ready/view registered/NO SCHEME) та помилки стороннiх модiв (Aslain тощо, #2041). Dedup: LogWatcher — по snippet (iдентичний раз, рiзнi окремо); watcher — один balloon за iгрову сесiю.
+
+**Два виконавцi без дублювання сповiщень (координацiя _notify_mod_error):**
+- Програма запущена → LogWatcher ловить наживо (live-цикл кожнi ~2с) → dark_messagebox + report_fallback(level=critical) + console (канал #1889) — watcher мовчить;
+- Програма НЕ запущена → tray_watcher сканує game.log раз на ~60с (iнкрементальний offset + 2MB backward-baseline + tail-рядки для цiлiсностi пар на межi чанкiв) → balloon (чистий ctypes Shell_NotifyIconW без iконки-бандлу, ~20с) + прапорець mod_error_pending.json (config.MOD_ERROR_FLAG_FILE) → програма при наступному стартi тихо репортить у Firebase i видаляє прапорець (без другого messagebox — balloon вже був).
+
+**Backward one-shot (#1890):** LogWatcher.start() синхронно сканує останнi 2MB на помилки мода ДО старту потоку (помилка могла бути записана до старту програми); бойовi подiї з цього вiкна НЕ реплеяться. on_mod_error призначається в main.py ПЕРЕД start() (iнакше backward-скан бачить None-колбек).
+
+**B2-доставка ( watcher, ~60с поки гра запущена):** use_mod=true + гра >3 х60s-циклiв + sm_tactics.wotmod вiдсутнiй у mods/<поточна версiя>/ → balloon "Мод не встановлено..." (або "файл вiдсутнiй в iнсталяцiї" якщо немає джерела) + flag-файл. Ловить клас 16.10.2026, коли file-вiдсутнiсть взагалi не видима у логу.
+
+**Файли:** tray_watcher.py (_match_mod_error, _scan_game_log, _show_balloon, _write_mod_error_flag, _notify_mod_error, _check_mod_delivery, main-loop), log_reader.py (_match_mod_error_text — свiдома дубляцiя для standalone-watcher, on_mod_error, backward one-shot, live-детекцiя), main.py (wiring перед start(), _on_mod_error, _process_mod_error_flag), config.py (MOD_ERROR_FLAG_FILE), translations.py (mod_error_title/mod_error_hint).
+
+**Верифiкацiя (#1471):** харнесс _archive/scripts/harness_mod_error_notify_2026_10_16.py — 48/0 (сигнатури x2-копiї, scan incremental/dedup/truncation/chunk-split, координацiя, B2, LogWatcher backward без реплею + live + dedup), AST x5; watcher EXE перезбiр (onefile 7.9MB) + встановлення у %LOCALAPPDATA%\SM WoT Assistant\ + запуск (2 PID = parent+child onefile).
+
+
+## Фікс мода для client 2.4.1.0: g_entitiesFactories видалено з API клієнта (пункт меню модів не змовився з’явитися), 16.10.2026
+
+**Коріь (доказано game.log 16:51:58):** mod_sm_tactics.py:35 rom gui.Scaleform.framework import g_entitiesFactories, ScopeTemplates, ViewSettings → ImportError: cannot import name g_entitiesFactories. Клієнт **2.4.1.0 видалив цю атрибут** (0 входжень у 12933 модулях scripts.pkg; на 2.4.0.2 працювало). Мод падав ЇОН ІМПОРТІ → init() не виконано → реєстрація ModsSettingsAPI не доходить → пункт меню модів відсутний. План А (папковий синк) працював бездона — це незалежна поломка всередини цього же оновлення (так саме полетів Aslain Script Loader).
+
+**Аудит імпортів (рядки 27-42):** тільки рядок 35 зламаний. Перевірено на scripts.pkg 2.4.1.0: ViewSettings/ScopeTemplates/ComponentSettings ✓ у framework/__init__, EVENT_BUS_SCOPE+g_eventBus ✓ у gui/shared/__init__, ServicesLocator+ppLoader ✓ personality, SFViewLoadParams ✓ loaders, BATTLE_VIEW_ALIASES+MINIMAP ✓ genConsts, IGuiLoader ✓ skeletons/gui/impl, InputHandler.g_instance.onKeyDown/onKeyUp ✓ ✓, helpers/dependency.pyc ✓.
+
+**Фікс (mod/res/scripts/client/gui/mods/mod_sm_tactics.py, 3 місця):**
+- рядок 35: без g_entitiesFactories (import ScopeTemplates, ViewSettings);
+- новий _entities_factory(): try старий шлях (rom gui.Scaleform.framework import g_entitiesFactories) → except ImportError → rom helpers import dependency + rom skeletons.gui.impl import IGuiLoader → dependency.instance(IGuiLoader).entitiesFactory (той самий шаблон як MIT OpenWG openwg_scaleform.get_entities_factory, який сьогодні вживає XVM на цьому клієнті);
+- _setup_view_framework: actory = _entities_factory() → actory.addSettings(...) (аргументи lias, clazz, swf, layer, None, scope — паралетр з поточною XVM).
+- setModTemplate/повна назва меню/init/fini/loadView — не чіпано.
+
+**uild_mod.py:** інкрементальний skip у 
+ebuild_swf() — якщо committed SWF новіший за AS3-джерело і шрифтів → вйосить байт-в-байт (проверено живим): Flex SDK лежить у %TEMP% і періодовно втратує файли (	hemes/Spark/spark.css зник між 13.10 і 16.10.2026) — py-only зміна мода не має залежати від тимчасового тулчайника; spark.css відновлено з apache/flex-sdk (raw) для майбутньих перезбоїв SWF.
+
+**Верифікація (#1471):** харнесс _archive/scripts/harness_mod_factory_2026_10_16.py **9/0** (ast.parse, compile, стара гілка старого клієнта, нова гілка 2.4.1 → DI-ланцюг, addSettings з 6 аргументами + 3 addListener + прапорець імпорту, grep: g_entitiesFactories лише всереди резолвера); py2.7 компіляція реальним Python 2.7 — magic 62211 (найсильніша перевірка py2-синтаксу); пакет: ZIP_STORED, 3 ентри, 291.9 KB; інстальовано в mods/2.4.1.0/ (SHA256 збіг, єдина копія, без застарілих папок). Живой-перевірка: запуск гри → прочитати game.log.
+
+
+## План А: mod-sync у tray_watcher + безумовний автозапуск спостерігача (мод завжди в актуальній папці гри), 16.10.2026
+
+**Контекст:** після патчу гри 2.4.1.0 мод зник — `mods/2.4.1.0/` порожня, файл лишився у `mods/2.4.0.2/` (гру видалила стару версійну папку). Корінь: `launch_on_game_start=false` → програма не запущена → `apply_mod_mode()` не виконувався; гірше — `main.py:195-199` при знятому чекбоксі ще й **видаляв** запис HKCU\Run, тож tray_watcher не існував узагалі (`close_with_game` теж був мертвий). Окремо: помилка Aslain Script Loader у грі — незалежний сторонній завантажувач з `res_mods/`, видалено окремо, зв'язку з нашим модом немає (#2041, #2027).
+
+**Зміни (4 файли):**
+- `tray_watcher.py`: `_sync_mod(settings)` у стандартному циклі (старт + кожні ~60s): `version.xml` → нормалізація версії регекстом + prefer-наявна-папка (як `map_manager`) → копіювання `sm_tactics.wotmod` (джерело: frozen — `_internal/sm_tactics.wotmod` біля exe, dev — project root) → `_cleanup_stale_wotmods()` прибирає НАШ файл з інших версійних папок (точне ім'я без wildcard #1492; `res_mods/` та сторонні моди не чіпаємо #2041). `use_mod=false` → прибрати наш файл з усіх папок. Джерела немає → no-op (без half-sync). Гейт запуску програми: `_launch_if_enabled(settings)` — ТІЛЬКИ за `launch_on_game_start`.
+- `main.py`: `__init__` завжди `_set_windows_startup(True)` + `_ensure_tray_watcher_running()` (більше не залежить від чекбокса — мод-синк + close_with_game тепер працюють завжди). Фікс `_ensure_tray_watcher_running`: `tasklist /fi` обрізає Image Name до 25 символів (`SM WoT Assistant Tray Wat`) → перевірка по `basename[:25]` (раніше повна назва ніколи не збігалась → кожен старт породжував дублікат, який вмирав на mutex 183).
+- `ui_manager.py`: `_on_launch_on_game_start` більше не чіпає реєстр — лише зберігає налаштування + ensure (видалення запису при знятті чекбокса прибрано).
+- `build.py: copy_data_files()` — бандлить `sm_tactics.wotmod` (джерело для `apply_mod_mode` і нового watcher-синку у frozen-білді); WARNING якщо файл не зібрано через `build_mod.py`.
+
+**Негайно на машині (16.10):** `sm_tactics.wotmod` скопійовано в `_internal` встановлення (бандл раніше не містив мод — причина, чому встановлена програма ніколи не ставила мод сама); новий watcher EXE перезібрано (`build_tray_watcher()`) та встановлено; запис HKCU\Run активний.
+
+**Верифікація (#1471):** харнесс `_archive/scripts/harness_tray_modsync_2026_10_16.py` **27/0** (копіювання, ідемпотентність, перехід версії, use_mod off/on, no-source no-op, порожні settings, fallback `game_version`, гейт запуску, джерело dev/frozen, нечитабельні папки); AST x4; smoke фікса ensure (old check=False → new=True); живий тест: `python main.py --tray` → HKCU\Run записано, watcher стартував, stderr порожній; **живий mod-sync: забрали мод з `mods/2.4.1.0/` → watcher відновив за 65с** (297777 байт, mtime джерела збережений). Тестові процеси після перевірки вбиті.
+
+## One-shot міграція legacy-координат схем (фікс зсуву ~10% + залежності від розміру вікна), 13.10.2026
+
+**Корінь (spread + resize-залежність):** той самий commit `8085639` (02.10.2026). Legacy-елементи (канвас-дроби) після letterbox-фіксу рендеряться як image-дроби → стиснення до центру (±15-20px), а піксельна помилка від ландшафту `|u_old - f|·img_size` **масштабується з вікном** — користувач бачив «повзучку» схеми при ресайзі редактора. Це той самий баг, друга симптоматика.
+
+**Фікс (один, на обидва симптоми):**
+- `tactics_manager.py`: чистий конвертер `migrate_legacy_elements()` — `u_new = (u_old·canvas − org)/img_size` (без клампу, точне відновлення намальованої позиції), norm-стемп `"img"`; `migrate_schemes_db()` — файловий рівень + бекап `saved_schemes.json.bak_pre_norm` перед першим перезаписом.
+- `painter.py: migrate_legacy_coords()` — конвертація in-memory drawings + бекап `map_drawings.json.bak_pre_norm` + `save_drawings()`.
+- `main.py: _maybe_migrate_legacy_norm()` — one-shot (прапорець `_norm_migrated`), виклик з `_finish_startup_overlay` + `map_renderer.show_main_splash` (потрібна валідна геометрія `_map_img_rect`).
+- Ідемпотентно: наявний `norm` → пропуск; другий прогін = no-op; бекап не перезаписується.
+- Мод: coords у `saved_schemes.json` після міграції = image-дроби = те, що AS3 множить на розмір мінімапи → лягає правильно.
+
+**Верифікація:** харнесс `_archive/scripts/harness_norm_migrate_2026_10_13.py` **30/0** (точність ±1e-9, ідемпотентність, letterbox, x1/y1, без клампу, бекапи, resize-інваріантність: до міграції offset>5px і масштабується, після = 0 на будь-якому розмірі); multi-sel харнесс 36/0; paint-fix харнесс 24/3 (3 FAIL = попередні, підтверджено git worktree на HEAD); AST x4; live-запуск на реальних даних: 539 drawings + 308 scheme elements мігровано, бекапи створені, stderr порожній.
+
+## 13.10.2026 — Повне очищення схем + контракт координат (впевненість на майбутнє)
+
+**Контекст:** після зсуву legacy-схем (коміт `8085639`) користувач вирішив перемалювати все
+з нуля. Система координат вже єдина (image-fraction 0..1 над квадратом `img_size`,
+`painter._img_rect()`; мод AS3 `px() = [nx·_size, ny·_size]` — той самий простір, калібровано ±1px).
+Зроблено повне очищення + зафіксовано контракт, щоб зсув не міг повторитись ніде.
+
+### Очищення (бекапи `.bak_pre_wipe`)
+- AppData: `saved_schemes.json`→{}, `map_drawings.json`→{}, `group_schemes_cache.json`→{}, `selected_scheme.json`→видалено
+- Root seed `map_drawings.json`→{} (нові встановлення стартують чистими)
+- RTDB: `schemes/`→PUT null (GET перевірено = null), `groups/{gid}/schemes`→null + `updated_at` bump
+- RTDB `base_schemes/` НЕ чіпав (користувач почистить сам)
+
+### Контракт координат
+- `docs/scheme-coords.md` — єдине джерело правди: image-fraction 0..1, top-left origin, y-down,
+  квадрат `img_size`; джерело геометрії — ТІЛЬКИ `painter._img_rect()`; norm:"img" обов'язковий;
+  таблиця всіх ланок (редактор/firebase/групи/імпорт-експорт/мод) без трансформацій coords.
+- `test_scheme_coords.py` (корінь) — постійний регресійний тест, запускати перед білдом:
+  round-trip save/load ≡; resize-інваріантність (4 розміри вікна); legacy-зсув існує до міграції
+  і зникає після; AS3-паритет формули; firebase/import pass-through без арифметики coords;
+  norm-стемпи; валідність JSON-магазинів. **14/0**.
+
+### Верифікація
+- `test_scheme_coords.py`: 14 passed / 0 failed
+- Live-запуск з порожніми магазинами: stderr 0 байт, без Traceback
+- RTDB GET `schemes/` = null
+
+## Схеми здвинулись вниз і вліво: захист координат `norm:"img"` + Shift-множина + груповий рух, 12.10.2026
+
+**Корінь причини (pixel-analysis скриншотів D:\\TMP):** коміт `8085639` (02.10.2026) змінив простір координат схем з канвас-дробів (`x/canvas_w`) на image-rect-дроби (`(x-org)/img_size`). Старі схеми (малюнні за рамкою `border ≈ int(20*min(cw,ch)/800)`) притягуются до центру мапи на ±15-20px (зміряно: Widepark +17px вниз / -19px вліво; Berlin ≈∓13px). У TACTIC це видно як подвоєні лінії (`map.webp` містится запечена схема). Дані Користувача МІШАНІ (додавав/переміщув елементи після 02.10) — автоматична міграція даних ВИМКНЕНА.
+
+**Фікс (forward-only, без міграції даних):**
+- `painter.py`: нові створенні і пересутутій елемент отримує `"norm":"img"`; завершення руху теж стамп (одиночний і груповий). **Перетягнувня legacy-елемента ВИПравляє це назавчи** (координати переписуются в image-простір). Ctrl+Z відкачує і norm (`had_norm` snapshot).
+- Shift+click = toggle у множині (`_multi_sel`); клік по елементу з множини = груповий рух всії множини; клік поза множиною = одиночне виділення + зняття множини; Shift+клік по порожньому = зняття множини.
+- ALL (Ctrl+A): клік по елементі = груповий рух усіх видимих; клік по порожньому = вимкнення ALL.
+- Undo: нові типи `move_group` (один запис на групу) і `delete_multi`; Del видаляє множину одним кроком.
+- Індикатор (варіант A): без рамок на canvas — кнопки типів усіх вибраних + рядок стану `Selected: N` (`status_selected_n`).
+- Мод без змін: `mod_sm_tactics.py:53` читає `saved_schemes.json` напряму, AS3 ігнорує зайві `norm` — мод отримує веб-нормалізовані координати та лягають на мінімапі правильно.
+
+**Верифікація:** AST x5 OK; ізольований harness `_archive/scripts/harness_multi_sel_2026_10_12.py` 36/0. Старий harness 24/3 — ті самі 3 FAIL на чистом HEAD (git worktree) — попередні, не від цьох змін.
+
+---
+
 ## Мод без запущеної програми: персистентний вибір + ланцюг fallback (★ → map-base → warn) , 07.10.2026
 
 **Симптом:** закритий desktop → бій → `scheme=None` → мінімап порожній; спроби «прямого читу» зазнавали `no arena geometry` дві доби.

@@ -19,8 +19,13 @@ CRITICAL constraints (verified against this game client, 30.09.2026):
 - Ship res/gui/flash/SmTacticsOverlay.swf alongside the pyc: a Scaleform
   View (community pattern wotstat/wotstat-positions) whose AS3 layer
   attaches INSIDE minimap.entriesContainer - no root anchoring, no z-stack.
-  Compiling it needs the WG SWC externals in mod/src/as3/libs (fetched
-  from the wotstat-positions repo on first build, gitignored).
+    Compiling it needs the WG SWC externals in mod/src/as3/libs (fetched
+    from the wotstat-positions repo on first build, gitignored).
+    Incremental skip: when the committed SWF is newer than the AS3 source
+    and both embed fonts, it is shipped byte-identical (no SDK needed) - the
+    Flex SDK lives in %TEMP% and periodically loses files (themes/Spark/
+    spark.css vanished between 13.10 and 16.10.2026), so a py-only mod
+    change must never depend on the temp toolchain.
 
 Toolchain: portable Python 2.7.18 at tools/python27 (auto-provisioned from
 python.org MSI via administrative extract - no system install, no admin);
@@ -170,6 +175,16 @@ def rebuild_swf():
     from mod/src/as3/libs via repeated -external-library-path+=.
     Without an SDK the committed SWF is shipped.
     """
+    # Incremental skip (see module docstring): committed SWF newer than the
+    # AS3 source + embed fonts -> ship it byte-identical, no SDK required.
+    inputs = [AS3_FILE] + FONTS
+    if os.path.isfile(SWF_SRC):
+        swf_mtime = os.path.getmtime(SWF_SRC)
+        if all(os.path.isfile(p) and os.path.getmtime(p) < swf_mtime
+               for p in inputs):
+            print('[BUILD] SWF up-to-date (newer than %d inputs): %s'
+                  % (len(inputs), SWF_SRC))
+            return True
     sdk = find_flex_sdk()
     if sdk is None:
         if os.path.isfile(SWF_SRC):

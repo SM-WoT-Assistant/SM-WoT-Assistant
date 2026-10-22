@@ -3,9 +3,109 @@ import time
 import threading
 import re
 
+# ── Сигнатури помилок sm_tactics у логу (16.10.2026; фікси 17.10) ─────────
+# Дзеркаляться у tray_watcher._match_mod_error (standalone onefile watcher
+# без імпортів з проєкту — логіка продубльована свідомо; міняти разом).
+# 17.10.2026: package-сигнатура вимагає error-ключове слово («Mod package ...
+# loaded» — успіх, був false positive); .pyc ASL лоадера НЕ озброює вікно пари;
+# ASL one-line «failed to load mod_sm_tactics.pyc: ... ImportError» окремо.
+_MOD_MENTION_FILE_RE = re.compile(r"mod_sm_tactics\.py(?!c)")
+_MOD_ONE_LINE_RE = re.compile(
+    r"(?:failed|Error|Exception|Traceback|not found)[^\r\n]*mod_sm_tactics"
+    r"|mod_sm_tactics[^\r\n]*(?:failed|Error|Exception|Traceback|not found)",
+    re.I)
+_MOD_TAG_ERR_RE = re.compile(r"\[SM Tactics\].*(failed|not found|Error|Exception|Traceback)", re.I)
+_MOD_KEYWORD_RE = re.compile(r"Error|Exception|Traceback|failed|not found", re.I)
+_MOD_PACKAGE_RE = re.compile(
+    r"(?:Mod package[^\r\n]*sm_tactics|sm_tactics[^\r\n]*Mod package)"
+    r"[^\r\n]*(?:error|failed|not loaded|not supported)",
+    re.I)
+_MOD_WINDOW = 4
+_TS_RE = re.compile(r"\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+
+
+def _installed_mod_mtime(wot_path):
+    """mtime встановленого mods/<ver>/sm_tactics.wotmod або None (staleness-гейт)."""
+    if not wot_path:
+        return None
+    mods_root = os.path.join(wot_path, "mods")
+    if not os.path.isdir(mods_root):
+        return None
+    vp = os.path.join(wot_path, "version.xml")
+    try:
+        with open(vp, "r", encoding="utf-8", errors="ignore") as f:
+            ver_text = f.read()
+    except OSError:
+        return None
+    m = re.search(r"(\d+\.\d+\.\d+\.\d+)", ver_text)
+    if not m:
+        return None
+    p = os.path.join(mods_root, m.group(1), "sm_tactics.wotmod")
+    try:
+        return os.path.getmtime(p) if os.path.isfile(p) else None
+    except OSError:
+        return None
+
+
+def _mod_error_stale(text, snippet, mod_mtime):
+    """True = сповіщати НЕ треба (помилка зі старого білда/сесії).
+
+    game.log append-only без ротації (#2053): backward-вікно містить помилки
+    минулих днів. Свіжі (зараз у бою) — ts > mtime мода — проходять.
+    mod_mtime None (мод не встановлено) → гасимо: відсутність файлу окремо
+    сповіщає B2-перевірка tray_watcher.
+    """
+    if mod_mtime is None or not snippet:
+        return True
+    pos = text.find(snippet)
+    search = text if pos < 0 else text[:pos + len(snippet)]
+    stamps = _TS_RE.findall(search)
+    if not stamps:
+        return False
+    try:
+        ts = time.mktime(time.strptime(stamps[-1], "%Y-%m-%d %H:%M:%S"))
+    except ValueError:
+        return False
+    return ts <= mod_mtime
+
+
+def _match_mod_error_text(text):
+    """Повертає snippet першої помилки sm_tactics у тексті логу або None.
+
+    Сигнатури (з реального game.log 15-16.10.2026):
+    - `Mod package ... sm_tactics ... error` (#2025 клас; «loaded» НЕ ловиться);
+    - one-line: `failed to load mod_sm_tactics.pyc: ... ImportError` (ASL лоадер);
+    - import-pair: `File "...mod_sm_tactics.py"` (не .pyc) → протягом 4 наступних
+      рядків keyword (Error/Exception/Traceback/failed/not found);
+    - `[SM Tactics] ... failed|not found|Error...` — власні LOG.error мода.
+    Навмисно НЕ ловить: логування успіху мода ([SM Tactics] ready, Mod package
+    loaded, ASL executed script), «NO SCHEME»-попередження, помилки сторонніх
+    модів (#2041).
+    """
+    window = 0
+    mention = ""
+    for line in text.splitlines():
+        if _MOD_PACKAGE_RE.search(line):
+            return line.strip()
+        if _MOD_ONE_LINE_RE.search(line):
+            return line.strip()
+        if _MOD_MENTION_FILE_RE.search(line):
+            window = _MOD_WINDOW
+            mention = line
+            continue
+        if window > 0:
+            if _MOD_KEYWORD_RE.search(line):
+                return (mention + " || " + line).strip()
+            window -= 1
+        if _MOD_TAG_ERR_RE.search(line):
+            return line.strip()
+    return None
+
+
 class LogWatcher:
-    def __init__(self, log_path, callback, hangar_callback=None, minimap_callback=None, countdown_callback=None, vehicle_callback=None):
+    def __init__(self, log_path, callback, hangar_callback=None, minimap_callback=None, countdown_callback=None, vehicle_callback=None, wot_path=""):
         self.log_path = log_path
+        self.wot_path = wot_path
         self.callback = callback
         self.hangar_callback = hangar_callback
         self.minimap_callback = minimap_callback
@@ -24,6 +124,10 @@ class LogWatcher:
         self._NOT_FOUND_THRESHOLD = 6
         self._log_error_fired = False
         self.on_log_error = None
+        self.on_mod_error = None
+        self._mod_fired_keys = set()   # dedup: ідентичний snippet — раз за сесію
+        self._mod_window = 0           # вікно пари File→Error у live-циклі
+        self._mod_mention = ""
 
         self.arena_re = re.compile(r"Loading space: spaces/(?P<map_id>\w+)")
         self.hangar_re = re.compile(r"Loading space: spaces/(?:hangar\w*|h\d+_\w+)")
@@ -42,6 +146,11 @@ class LogWatcher:
             print(f"[LOGWATCHER] Started with log_path={self.log_path}, size={self._last_size}")
         else:
             print(f"[LOGWATCHER] Started with log_path={self.log_path} (NOT FOUND)")
+        # Backward one-shot для помилок мода (#1890-патерн): лог-помилка могла
+        # бути записана ДО старту watcher. Виконується синхронно ДО потоку —
+        # on_mod_error має бути призначений викликачем ПЕРЕД start().
+        # Бойові події з цього вікна НЕ реплеяться (_last_size у кінці файлу).
+        self._scan_mod_errors_backward()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.thread.start()
 
@@ -58,6 +167,68 @@ class LogWatcher:
                 self.on_log_error(msg)
             except Exception as e:
                 print(f"[LOGWATCHER] on_log_error callback failed: {e}")
+
+    def _fire_mod_error(self, snippet):
+        text = str(snippet or "")[:500]
+        key = text[:200]
+        if key in self._mod_fired_keys:
+            return  # ідентична помилка вже сповіщалась (dedup)
+        self._mod_fired_keys.add(key)
+        print(f"[LOGWATCHER] MOD ERROR: {text}")
+        if self.on_mod_error:
+            try:
+                self.on_mod_error(text)
+            except Exception as e:
+                print(f"[LOGWATCHER] on_mod_error callback failed: {e}")
+
+    def _process_mod_error_line(self, line):
+        """Інкрементальна детекція sm_tactics-помилок у live-циклі.
+
+        Стан вікна пари File→Error зберігається між рядками
+        (self._mod_window/self._mod_mention); сигнатури — _MOD_*_RE.
+        Dedup (ідентичний snippet → раз) — у _fire_mod_error.
+        """
+        if _MOD_PACKAGE_RE.search(line):
+            self._fire_mod_error(line)
+            return
+        if _MOD_ONE_LINE_RE.search(line):
+            self._fire_mod_error(line)
+            return
+        if _MOD_MENTION_FILE_RE.search(line):
+            self._mod_window = _MOD_WINDOW
+            self._mod_mention = line
+            return
+        if self._mod_window > 0:
+            if _MOD_KEYWORD_RE.search(line):
+                self._fire_mod_error(self._mod_mention + " || " + line)
+                return
+            self._mod_window -= 1
+        if _MOD_TAG_ERR_RE.search(line):
+            self._fire_mod_error(line)
+
+    def _scan_mod_errors_backward(self):
+        """One-shot скан останніх 2MB логу на помилки мода при старті.
+
+        Стейтлесний (_match_mod_error_text); не чіпає battle-події.
+        """
+        try:
+            if not self.log_path or not os.path.exists(self.log_path):
+                return
+            size = os.path.getsize(self.log_path)
+            if size <= 0:
+                return
+            start = max(0, size - 2 * 1024 * 1024)
+            with open(self.log_path, "r", encoding="utf-8", errors="ignore") as f:
+                f.seek(start)
+                text = f.read()
+            snippet = _match_mod_error_text(text)
+            if snippet:
+                if _mod_error_stale(text, snippet, _installed_mod_mtime(self.wot_path)):
+                    print("[LOGWATCHER] mod error suppressed (stale, older than installed mod): %s" % snippet[:120])
+                    return
+                self._fire_mod_error(snippet)
+        except Exception as e:
+            print(f"[LOGWATCHER] _scan_mod_errors_backward error: {e}")
 
     def _run(self):
         while self.running:
@@ -89,6 +260,7 @@ class LogWatcher:
 
                         for line in lines:
                             clean_line = line.rstrip()
+                            self._process_mod_error_line(clean_line)
 
                             match_type = self.arena_type_re.search(line)
                             if match_type:

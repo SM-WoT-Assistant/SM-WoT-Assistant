@@ -13,9 +13,12 @@ wotstat/wotstat-positions (Minimap Overlay):
   exact format of the desktop app's scheme data) - no screen rect, no
   root anchoring, no z-stack handling.
 
-Data flow: the desktop app writes selected_scheme.json at battle start
-(main.py:_write_selected_scheme); this mod reads it when the minimap
-registers and pushes the elements to the SWF.
+Data flow (user spec09.10.2026 - schemes are self-sufficient): when the
+minimap appears (battle start) the mod resolves the battle map from
+arena.arenaType.geometryName and shows exactly one of: 1) the starred
+scheme (user's explicit choice); 2) the base scheme (is_base) for THIS
+map; 3) a warning that the map has no scheme. Tactic-section schemes are
+never shown. selected_scheme.json is NOT read.
 
 Client constraints (live-verified): Python 2.7 (pyc magic 62211);
 ModsSettingsAPI is an optional soft-dep; Alt visibility modes use
@@ -29,7 +32,7 @@ import traceback
 
 import BigWorld
 from gui import InputHandler
-from gui.Scaleform.framework import g_entitiesFactories, ScopeTemplates, ViewSettings
+from gui.Scaleform.framework import ScopeTemplates, ViewSettings
 from gui.Scaleform.framework.entities.View import View
 from gui.Scaleform.genConsts.BATTLE_VIEW_ALIASES import BATTLE_VIEW_ALIASES
 from gui.app_loader.settings import APP_NAME_SPACE
@@ -44,9 +47,7 @@ TAG = '[SM Tactics]'
 VIEW_ALIAS = 'SM_TACTICS_OVERLAY_VIEW'
 SWF_NAME = 'SmTacticsOverlay.swf'
 LINKAGE = 'sm.wo-tactics'
-SCHEME_FILE = os.path.join(
-    os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'selected_scheme.json')
-# the program's full scheme store (same folder) - read directly so the mod
+# the program's full scheme store# the program's full scheme store (same folder) - read directly so the mod
 # works without the app running (07.10.2026)
 SAVED_SCHEMES_FILE = os.path.join(
     os.environ.get('APPDATA', ''), 'SM WoT Assistant', 'saved_schemes.json')
@@ -77,11 +78,12 @@ class SmTacticsOverlay(View):
 
     def _populate(self):
         super(SmTacticsOverlay, self)._populate()
+        _push_warn_if_ready()  # battle HUD is ready -> flush pending toast
         _g['view'] = self
         LOG.info('%s view populated (scheme=%r, elements=%s)', TAG,
                  _g['scheme_name'],
                  len(_g['elements']) if _g['elements'] else 0)
-        if _g['should_register']:
+        if _g['should_register'] and not _g.get('resolving'):
             self.register_and_push()
 
     def _destroy(self):
@@ -146,6 +148,16 @@ class SmTacticsOverlay(View):
     def as_setUserScale(self, v):
         self.flashObject.as_setUserScale(v)
 
+    def as_showWarning(self, text):
+        # View base class does NOT auto-forward unknown as_* attributes to
+        # flashObject (AttributeError 'SmTacticsOverlay' object has no
+        # attribute 'as_showWarning' in game.log 12.10.2026) - every as_*
+        # callable from python needs an explicit wrapper like this one.
+        self.flashObject.as_showWarning(str(text))
+
+    def as_hideWarning(self):
+        self.flashObject.as_hideWarning()
+
 
 # ---------------- view framework setup (wotstat pattern) ----------------
 
@@ -170,24 +182,10 @@ def on_app_initialized(event):
 def on_component_registered(event):
     if event.alias != BATTLE_VIEW_ALIASES.MINIMAP:
         return
+    # battle start moment: the minimap has just appeared (user spec): the
+    # mod must pin the map of THIS battle and pick star -> base -> warn
     _g['should_register'] = True
-    name, elements = _read_scheme()
-    if elements:
-        _g['scheme_name'] = name
-        _g['elements'] = elements
-    else:
-        # selected_scheme.json empty (program not running) -> direct store
-        # read; async with retries (player entity may not be ready yet).
-        # _start_fallback fills _g itself - afterwards read it BACK instead
-        # of overwriting with the failed locals (live clobber bug, 08.10).
-        _start_fallback()
-        name = _g.get('scheme_name')
-        elements = _g['elements']
-    LOG.info('%s minimap registered (scheme=%r, elements=%s)', TAG, name,
-             len(elements) if elements else 0)
-    view = _g['view']
-    if view is not None:
-        view.register_and_push()
+    _start_battle_resolution()
 
 
 def on_component_unregistered(event):
@@ -202,8 +200,30 @@ def on_component_unregistered(event):
             LOG.warning('%s unregister failed:\n%s', TAG, traceback.format_exc())
 
 
+def _entities_factory():
+    """Scaleform entities factory.
+
+    Client < 2.4.1 (e.g. 2.4.0.2): gui.Scaleform.framework.g_entitiesFactories.
+    Client 2.4.1.0: that module attribute was REMOVED (0 occurrences in
+    scripts.pkg) - importing it raises ImportError at module import and the
+    whole mod dies before init(), so the ModsSettingsAPI menu entry never
+    appears. The new access path is dependency.instance(IGuiLoader)
+    (helpers.dependency + skeletons.gui.impl.IGuiLoader) -> .entitiesFactory
+    (GuiLoader.entitiesFactory property). Same shim as the MIT OpenWG
+    openwg_scaleform.get_entities_factory, consumed today by XVM on 2.4.1.0.
+    """
+    try:
+        from gui.Scaleform.framework import g_entitiesFactories
+        return g_entitiesFactories
+    except ImportError:
+        from helpers import dependency
+        from skeletons.gui.impl import IGuiLoader
+        return dependency.instance(IGuiLoader).entitiesFactory
+
+
 def _setup_view_framework():
-    g_entitiesFactories.addSettings(ViewSettings(
+    factory = _entities_factory()
+    factory.addSettings(ViewSettings(
         VIEW_ALIAS, SmTacticsOverlay, SWF_NAME,
         WindowLayer.WINDOW, None, ScopeTemplates.GLOBAL_SCOPE))
     g_eventBus.addListener(events.AppLifeCycleEvent.INITIALIZED,
@@ -216,71 +236,22 @@ def _setup_view_framework():
     LOG.info('%s view registered (alias=%s, swf=%s)', TAG, VIEW_ALIAS, SWF_NAME)
 
 
-# ---------------- scheme data ----------------
-
-def _read_scheme():
-    try:
-        if not os.path.isfile(SCHEME_FILE):
-            return None, None
-        with open(SCHEME_FILE, 'r') as fh:
-            raw = fh.read()
-        if not raw.strip() or raw.strip() == 'null':
-            return None, None
-        data = json.loads(raw)
-        elements = data.get('elements') if isinstance(data, dict) else None
-        if not elements:
-            return None, None
-        return data.get('scheme_name'), elements
-    except Exception:
-        LOG.error('%s scheme read failed:\n%s', TAG, traceback.format_exc())
-        return None, None
+# ---------------- battle resolution (star -> base -> warn) ----------------
 
 
-# arena gameplay/arenaType id -> scheme battle_mode string (same table the
-# desktop uses in main.py mode_map: ctf->Standard, domination->Encounter...)
-_ARENA_TYPE_MODE = {
-    1: 'Standard', 2: 'Encounter', 3: 'Storm',
-    4: 'Onslaught', 5: 'OnslaughtLight',
-    30: 'Onslaught', 33: 'Onslaught', 34: 'Onslaught', 35: 'OnslaughtLight',
-}
-
-
-def _ui_mode_for_arena(at):
-    """Best-effort scheme battle_mode for the current arena; None = unknown."""
-    try:
-        if isinstance(at, (int, float)):
-            return _ARENA_TYPE_MODE.get(int(at))
-        gp = getattr(at, 'gameplays', None)
-        if gp:
-            try:
-                return _ARENA_TYPE_MODE.get(int(gp[0]))
-            except Exception:
-                pass
-        return None
-    except Exception:
-        return None
-
-
-def _arena_geometry():
-    """(geometry, arena_type, detail) of the current battle.
-    The avatar often appears AFTER the minimap registers (logs06.10-07.10:
-    'no arena geometry') -> caller retries. Correct accessors (verified via
-    py2.7 disassembly of avatar_getter.pyc): getArena(avatar) and
-    getArenaInfo(avatar) TAKE the avatar argument - calling them without it
-    raised TypeError which our silent except was hiding."""
-    g = None
-    via = None
-    at = None
+def _battle_geometry():
+    """Current battle map id; None while the avatar/arena is not ready
+    (the avatar usually appears after the minimap registers - retries).
+    Access pattern (Avatar.pyc disasm07.10 + live geo 08.10):
+    arena.arenaType.geometryName, fallback avatar.geometryName."""
     try:
         avatar = BigWorld.player()
     except Exception:
         avatar = None
     if avatar is None:
-        return None, None, 'player=None'
-    # Real access pattern (Avatar.pyc disassembly, 07.10): the entity exposes
-    # ONLY the chain arena.arenaType.geometryName - direct avatar.geometryName /
-    # avatar.arenaType do NOT exist (that is why every getattr(..., None) in the
-    # live 'geo try' logs returned None).
+        return None, 'player=None'
+    g = None
+    via = None
     try:
         arena = getattr(avatar, 'arena', None)
         if arena is None:
@@ -299,9 +270,8 @@ def _arena_geometry():
                 g = getattr(at_obj, 'geometryName', None)
                 if g:
                     via = 'arena.arenaType'
-                    at = at_obj
     except Exception:
-        pass
+        via = 'exc'
     if not g:
         try:
             g = getattr(avatar, 'geometryName', None)
@@ -309,27 +279,80 @@ def _arena_geometry():
                 via = 'avatar'
         except Exception:
             pass
-    detail = 'via=%s g=%r at=%r' % (via, g, at)
-    return (str(g) if g else None), at, detail
+    return (str(g) if g else None), via
 
 
-def _start_fallback():
-    """Resolve scheme without the program running (direct store read);
-    retries while the player entity is still loading (07.10.2026)."""
-    _g['warned'] = False
-    _fallback_attempt(15)
+def _map_matches(map_id, geom):
+    """'06_ensk' vs 'ensk', full-id geometry vs full map_id (both forms
+    seen live08.10)."""
+    if not map_id or not geom:
+        return False
+    return (map_id == geom or map_id.endswith('_' + geom)
+            or geom.endswith('_' + map_id))
 
 
-def _fallback_attempt(tries_left):
-    geom, at, detail = _arena_geometry()
-    LOG.info('%s geo try(%d): %s', TAG, tries_left, detail)
+def _pick_scheme(geom):
+    """The scheme shown on the minimap (user spec09.10.2026):
+starred FOR THIS MAP -> base (is_base) for this map -> None
+(the caller warns). Tactic-section schemes are never shown."""
+    all_s = _load_store()
+    schemes = [s for s in all_s if s.get('section') != 'tactic']
+    # star is PER-MAP too: a scheme must correspond to the battle map
+    starred = [s for s in schemes
+            if s.get('is_default') and _map_matches(s.get('map_id', ''), geom)]
+    if starred:
+        return sorted(starred, key=_fresh)[-1], 'star'
+    base = [s for s in schemes
+            if s.get('is_base') and _map_matches(s.get('map_id', ''), geom)]
+    if base:
+        return sorted(base, key=_fresh)[-1], 'base'
+    # user spec 11.10: a map that HAS schemes must show its OWN freshest
+    # scheme (not a warning) - warn only for maps without ANY scheme
+    fresh = [x for x in schemes
+             if _map_matches(x.get('map_id', ''), geom)]
+    if fresh:
+        return sorted(fresh, key=_fresh)[-1], 'map-fresh'
+    return None, 'none'
+
+
+def _resolve_attempt(tries_left):
+    geom, via = _battle_geometry()
+    LOG.info('%s geo: %r via=%s (%d tries left)', TAG, geom, via, tries_left)
     if not geom:
         if tries_left > 0:
-            BigWorld.callback(1.0, lambda: _fallback_attempt(tries_left - 1))
+            BigWorld.callback(1.0, lambda: _resolve_attempt(tries_left - 1))
         else:
-            _resolve_degraded()
+            LOG.info('%s geometry unknown -> warn', TAG)
+            _g['resolving'] = False
+            _warn_no_scheme_once()
         return
-    _resolve_and_store(geom, at)
+    try:
+        pick, how = _pick_scheme(geom)
+    except Exception:
+        LOG.error('%s pick failed:\n%s', TAG, traceback.format_exc())
+        _g['resolving'] = False
+        _warn_no_scheme_once()
+        return
+    _g['resolving'] = False
+    if pick is None:
+        LOG.info('%s map=%r -> NO SCHEME (warn)', TAG, geom)
+        _warn_no_scheme_once()
+        return
+    _adopt(how, pick)
+
+
+def _start_battle_resolution():
+    _g['warned'] = False
+    _g['pending_warn'] = False
+    _g['warned_shown'] = False
+    _g['resolving'] = True
+    # state clear: the PREVIOUS battle's scheme must never leak onto
+    # this map (live11.10: stale Mines n=60 pushed on a no-scheme map
+    # right after the correct 'NO SCHEME' decision)
+    _g['scheme_name'] = None
+    _g['elements'] = None
+    LOG.info('[SM Tactics] battle state cleared')
+    _resolve_attempt(15)
 
 
 def _adopt(src, pick):
@@ -358,70 +381,37 @@ def _load_store():
 
 
 def _warn_no_scheme_once():
+    LOG.info('%s WARN-ENTRY warned=%r pend=%r shown=%r', TAG,
+             _g.get('warned'), _g.get('pending_warn'),
+             _g.get('warned_shown'))
+    """Deferred toast: pushed when the battle view is ready.
+    A toast fired while the loading screen is up is swallowed by the
+    UI (live evidence09.10: resolve at14:55:56, view populated only
+    at14:55:58, no toast visible)."""
     if _g.get('warned'):
         return
     _g['warned'] = True
-    LOG.warning('%s NO SCHEME for this battle (user must be told)', TAG)
+    _g['pending_warn'] = True
+    # do NOT push here: at this moment the battle HUD is still loading
+    # and the system-messages layer swallows the toast (live09-10.10:
+    # push accepted 1s before 'view populated' -> never shown).
+    BigWorld.callback(6.0, _push_warn_if_ready)  # safety retry
+
+def _push_warn_if_ready():
+    if not _g.get("pending_warn") or _g.get("warned_shown"):
+        return
+    view = _g.get("view")
+    if view is None:
+        LOG.info("[SM Tactics] warning deferred: view not ready")
+        return
+    _g["pending_warn"] = False
+    _g["warned_shown"] = True
+    LOG.warning("[SM Tactics] NO SCHEME for this battle -> overlay warning")
     try:
-        from gui.SystemMessages import pushMessage, SM_TYPE
-        pushMessage('SM Tactics: no scheme for this map/mode', SM_TYPE.Warning)
+        view.as_showWarning("No scheme for this map/mode")
+        LOG.info("[SM Tactics] warning shown on overlay")
     except Exception:
-        LOG.warning('%s toast failed:\n%s', TAG, traceback.format_exc())
-
-
-def _resolve_and_store(geom, at):
-    """Per the user spec (07.10): star = explicit user marker (any scheme);
-    a base Standard scheme exists PER MAP and is the default; other battle
-    modes without a single scheme -> warn the user once."""
-    mode = _ui_mode_for_arena(at) or 'Standard'
-    try:
-        all_s = _load_store()
-        # 1) user star - any scheme, any map/mode
-        starred = [s for s in all_s if s.get('is_default')]
-        if starred:
-            _adopt('star', sorted(starred, key=_fresh)[-1])
-            return
-        # 2) map match
-        cand = [s for s in all_s
-                if s.get('map_id') == geom
-                or (len(s.get('map_id', '')) > len(geom)
-                    and s.get('map_id', '').endswith('_' + geom))]
-        mode_match = [s for s in cand if s.get('battle_mode') == mode]
-        if mode_match:
-            _adopt('map-base', sorted(mode_match, key=_fresh)[-1])
-            return
-        if mode != 'Standard':
-            # other battle mode without a single scheme -> tell the user
-            LOG.info('%s arena=%r mode=%r -> no scheme for this mode (warn)',
-                     TAG, geom, mode)
-            _warn_no_scheme_once()
-            return
-        # 3) standard mode, per-map base not made yet -> global standard base
-        base = [s for s in all_s if s.get('battle_mode') == 'Standard']
-        if base:
-            _adopt('base-any', sorted(base, key=_fresh)[-1])
-            return
-        LOG.info('%s arena=%r -> store empty', TAG, geom)
-    except Exception:
-        LOG.error('%s store fallback failed:\n%s', TAG, traceback.format_exc())
-
-
-def _resolve_degraded():
-    """Geometry never resolved (training/topography): best global choice,
-    no per-map logic, no warning (the map itself is unknown)."""
-    try:
-        all_s = _load_store()
-        starred = [s for s in all_s if s.get('is_default')]
-        if starred:
-            _adopt('star-any-map', sorted(starred, key=_fresh)[-1])
-            return
-        base = [s for s in all_s if s.get('battle_mode') == 'Standard'] or all_s
-        if base:
-            _adopt('geo-unknown-base', sorted(base, key=_fresh)[-1])
-            return
-        LOG.info('%s geo unknown and store empty', TAG)
-    except Exception:
-        LOG.error('%s degraded fallback failed:\n%s', TAG, traceback.format_exc())
+        LOG.warning("[SM Tactics] warning failed:\n%s" % traceback.format_exc())
 
 
 # ---------------- visibility (Alt modes) ----------------
@@ -480,7 +470,7 @@ def _apply_visibility():
 
 def _settings_template(templates):
     return {
-        'modDisplayName': 'MAPS Assistant',
+        'modDisplayName': 'SM WoT Assistant: scheme on minimap',
         'enabled': True,
         'column1': [
             templates.createDropdown(
@@ -529,17 +519,15 @@ def _load_settings():
         return
     try:
         template = _settings_template(templates)
-        saved = g_modsSettingsApi.getModSettings(LINKAGE, template)
-        if saved:
-            _g['mode'] = int(saved.get('displayMode', MODE_ALWAYS))
-            _g['elemScale'] = int(saved.get('elemScale', 100))
-            g_modsSettingsApi.registerCallback(
-                LINKAGE, _on_settings_changed, _on_settings_button)
-        else:
-            st = g_modsSettingsApi.setModTemplate(
-                LINKAGE, template, _on_settings_changed, _on_settings_button)
-            _g['mode'] = int(st.get('displayMode', MODE_ALWAYS))
-            _g['elemScale'] = int(st.get('elemScale', 100))
+        # Always re-register the template (standard ModsSettingsAPI pattern):
+        # setModTemplate updates the cached template in the API state file
+        # (modDisplayName etc.) and merges saved user settings via
+        # compareTemplates. The old if-saved branch never re-registered, so
+        # the hangar kept showing the stale first-registration name.
+        st = g_modsSettingsApi.setModTemplate(
+            LINKAGE, template, _on_settings_changed, _on_settings_button)
+        _g['mode'] = int(st.get('displayMode', MODE_ALWAYS))
+        _g['elemScale'] = int(st.get('elemScale', 100))
         LOG.info('%s settings registered (mode=%d elemScale=%d%%)', TAG, _g['mode'], _g['elemScale'])
     except Exception:
         LOG.warning('%s settings registration:\n%s', TAG, traceback.format_exc())

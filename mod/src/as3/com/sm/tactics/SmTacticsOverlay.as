@@ -7,6 +7,8 @@ package com.sm.tactics
     import flash.text.TextFormat;
     import flash.text.Font;
     import flash.events.Event;
+    import flash.filters.GlowFilter;
+    import flash.utils.setTimeout;
 
     import net.wg.infrastructure.base.AbstractView;
     import net.wg.data.constants.generated.LAYER_NAMES;
@@ -237,8 +239,33 @@ package com.sm.tactics
             _host = host;
             _gridRef = gridRef;
             _rx = r.x; _ry = r.y; _rw = r.width; _rh = r.height;
-            host.addChild(_dbg);
-            host.addChild(_layer); // same parent = aligned; re-append = top of z
+            // Z-order: above the map image (background) but BELOW the tank
+            // markers (entriesContainer children - flags/points/icons).
+            // The old addChild(_layer) put us on TOP of the tank markers;
+            // user asked for the scheme UNDER them (13.10.2026). Detach
+            // first so getChildIndex(entriesContainer) sees a clean list,
+            // then insert right before entriesContainer. Fallback: old
+            // top-of-z when entriesContainer is not our sibling.
+            if (_dbg.parent != null)
+            {
+                _dbg.parent.removeChild(_dbg);
+            }
+            if (_layer.parent != null)
+            {
+                _layer.parent.removeChild(_layer);
+            }
+            var ent:DisplayObject = _mm.entriesContainer as DisplayObject;
+            if (ent != null && ent.parent == host)
+            {
+                var entIdx:int = host.getChildIndex(ent);
+                host.addChildAt(_dbg, entIdx);
+                host.addChildAt(_layer, entIdx + 1); // under markers, over map
+            }
+            else
+            {
+                host.addChild(_dbg);
+                host.addChild(_layer); // fallback: top of z (old behavior)
+            }
             _layer.x = _dbg.x = r.x;
             _layer.y = _dbg.y = r.y;
             _attachBranch = _mode + ";w=" + Math.round(_size * 10) / 10
@@ -549,6 +576,122 @@ package com.sm.tactics
 
         // ModsSettingsAPI slider: uniform size factor for ALL element
         // sizes (positions stay at stored coords; only sizes scale).
+        // Battle warning badge: the client service-channel toasts are not
+        // rendered in battle (SystemMessagesInterface -> serviceChannel),
+        // so the "no scheme" warning is drawn on OUR layer (proven visible).
+        private var _warnTf:TextField = null;
+        private var _warnBlinkCount:int = 0;
+
+        public function as_showWarning(text:String):void
+        {
+            as_hideWarning();
+            // No-scheme battles never call as_register (python returns early
+            // when elements are empty), so _dbg was never attached and _size
+            // was never measured - drawing below would land on an orphan
+            // 1px-default sprite with no parent on stage and be invisible
+            // (user report 12.10.2026: "no warning" although the call
+            // succeeded - game.log "warning shown on overlay"). Self-attach
+            // on demand: the battle HUD + minimap are up by the time the
+            // deferred (+6s) warning fires.
+            if (!_attached)
+            {
+                _registered = true;
+                setup(); // attaches _dbg to the minimap host AND measures _size
+                // setup() ends with a legacy -size/2 recentering (lines 194-195)
+                // designed for the entries-fallback mode; in grid mode it
+                // overrides the correct r.x/r.y that _relayout() just set.
+                // The ENTER_FRAME watcher normally re-runs _relayout() and
+                // fixes this for scheme rendering, but this warning path never
+                // starts the watcher - so re-apply the grid position here
+                // (user report 12.10.2026: text stuck at the top-left corner).
+                // In entries mode _relayout() early-returns (no background) -
+                // position stays as setup() left it, no harm.
+                _relayout(null);
+            }
+            if (!_attached)
+            {
+                // Fallback: no battle page/minimap found - attach to the
+                // views container so the warning is at least visible.
+                var container:MainViewContainer = App.containerMgr.getContainer(
+                    LAYER_NAMES.LAYER_ORDER.indexOf(LAYER_NAMES.VIEWS)) as MainViewContainer;
+                if (container != null)
+                {
+                    _size = 455; // known grid size (calibration 05.10.2026)
+                    container.addChild(_dbg);
+                    _dbg.x = (container.width - _size) * 0.5;
+                    _dbg.y = 20;
+                    _attached = true; // unsetup() cleans via parent null-checks
+                }
+            }
+            if (!_attached)
+            {
+                return; // nowhere to draw - give up silently
+            }
+            // Centered text on the minimap, no background rect, font scaled
+            // with the measured grid size (user request 12.10.2026).
+            // _dbg origin = top-left of the grid rect, so the minimap centre
+            // in local coords is (_size/2, _size/2). In this runtime
+            // autoSize=CENTER does NOT make x the centre (text started at
+            // the centre and grew rightward - user report "horizontally on
+            // the right"), so BOTH axes are centred manually AFTER text is
+            // assigned (width/height become known only then).
+            var cx:Number = _size * 0.5;
+            var fs:int = int(Math.max(12, Math.min(28, Math.round(_size * 0.05))));
+            _warnTf = new TextField();
+            _warnTf.autoSize = TextFieldAutoSize.CENTER;
+            _warnTf.selectable = false;
+            _warnTf.mouseEnabled = false;
+            _warnTf.defaultTextFormat = new TextFormat("Arial", fs, 0xCC3300, false);
+            // Thin white outline: GlowFilter with tiny blur reads as a crisp
+            // stroke around the glyphs; strength tuned per user feedback.
+            _warnTf.filters = [new GlowFilter(0xFFFFFF, 1.0, 1, 1, 3, 1, false)];
+            _warnTf.text = text;
+            _warnTf.x = cx - _warnTf.width * 0.5;
+            _warnTf.y = _size * 0.5 - _warnTf.height * 0.5;
+            _dbg.addChild(_warnTf);
+            // Show solid for 10s, then blink for 3s (12 steps x 250ms), then
+            // hide (user request 12.10.2026).
+            setTimeout(_warnBlinkStart, 10000);
+        }
+
+        private function _warnBlinkStart():void
+        {
+            if (_warnTf == null)
+            {
+                return; // already hidden (early as_hideWarning)
+            }
+            _warnBlinkCount = 0;
+            _warnBlinkStep();
+        }
+
+        private function _warnBlinkStep():void
+        {
+            if (_warnTf == null)
+            {
+                return; // hidden mid-blink (new scheme loaded / battle ended)
+            }
+            _warnTf.alpha = (_warnBlinkCount % 2 == 0) ? 0.15 : 1.0;
+            _warnBlinkCount++;
+            if (_warnBlinkCount >= 12)
+            {
+                _autoHideWarning();
+                return;
+            }
+            setTimeout(_warnBlinkStep, 250);
+        }
+
+        private function _autoHideWarning():void
+        {
+            as_hideWarning();
+        }
+
+        public function as_hideWarning():void
+        {
+            if (_warnTf != null && _warnTf.parent != null)
+                _warnTf.parent.removeChild(_warnTf);
+            _warnTf = null;
+        }
+
         public function as_setUserScale(v:Number):void
         {
             var s:Number = Number(v);
@@ -699,9 +842,14 @@ package com.sm.tactics
             }
             var objSc:Number = num(obj.scale, 1.0);
             var scEff:Number = sc * objSc;
+            // No max(1,...) floor on lw: at minimap scale the floor pinned lw=1
+            // so thin elements kept a fixed 16x20 arrowhead instead of shrinking
+            // with the element (same bug class as desktop #2020 - floor removed
+            // there 01.10.2026). Head constants below are the minimap-tuned
+            // (11,14,4) vs desktop (16,20,6) - see drawArrowShape.
             var r12:Number = Math.max(3, 12 * scEff);
             var r4:Number = Math.max(2, 4 * scEff);
-            var lw:Number = Math.max(1, num(obj.thickness, 3) * scEff);
+            var lw:Number = num(obj.thickness, 3) * scEff;
             var mtSz:int = Math.max(6, int(9 * scEff));
             var poiBase:int = Math.max(12, int(48 * scEff));
             var ttSz:int = Math.max(6, int(10 * scEff));
@@ -901,10 +1049,19 @@ package com.sm.tactics
                     posInSeg += step;
                     var tx:Number = x1 + (x2 - x1) * (posInSeg / seg);
                     var ty:Number = y1 + (y2 - y1) * (posInSeg / seg);
-                    run.push(tx, ty);
-                    if (phaseOn && run.length >= 4)
+                    // Accumulate ONLY during the ON phase. AS3 arrays are by
+                    // reference: an unconditional run.push here extended the
+                    // array already stored in runs during the OFF phase, so
+                    // every dash absorbed its following gap (on+off) and the
+                    // rendered line came out solid (user report 12.10.2026;
+                    // Python-port test: 300px line -> 32 runs of 9.4px = on+off).
+                    if (phaseOn)
                     {
-                        runs.push(run);
+                        run.push(tx, ty);
+                        if (run.length >= 4)
+                        {
+                            runs.push(run);
+                        }
                     }
                     phaseOn = !phaseOn;
                     acc = 0;
@@ -930,7 +1087,12 @@ package com.sm.tactics
 
         private function dashedLine(pts:Array, col:uint, lw:Number):void
         {
-            var runs:Array = dashRuns(pts, 2.6 * lw, 1.5 * lw);
+            // Absolute dash minimums: at minimap scale lw shrinks to ~1px and
+            // 2.6*lw/1.5*lw segments (2.8/1.6px) blur into a solid line under
+            // Flash AA - the user saw solid lines (11.10.2026). Floor the
+            // segment lengths so dashes stay visible; at desktop-scale lw>=3
+            // the floors do not change the 2.6/1.5 proportions.
+            var runs:Array = dashRuns(pts, Math.max(4.0, 2.6 * lw), Math.max(2.5, 1.5 * lw));
             for (var i:int = 0; i < runs.length; i++)
             {
                 var r:Array = runs[i];
@@ -955,8 +1117,11 @@ package com.sm.tactics
             }
             var ux:Number = dx / d;
             var uy:Number = dy / d;
-            // painter: short line -> solid tail = whole segment (d), else alen
-            var alen:Number = 16.0 * (lw / 3.0);
+            // painter: short line -> solid tail = whole segment (d), else alen.
+            // Minimap-tuned head (11,14,4): the desktop (16,20,6) head at
+            // minimap scale (~1px lw) rendered a 5.7x7px triangle that
+            // visually dominated the thin tail (11.10.2026 user report).
+            var alen:Number = 11.0 * (lw / 3.0);
             drawArrowShape(x2, y2, ux, uy, col, lw, (d > alen) ? alen : d);
         }
 
@@ -971,21 +1136,22 @@ package com.sm.tactics
             {
                 return;
             }
-            var alen:Number = 16.0 * (lw / 3.0);
+            var alen:Number = 11.0 * (lw / 3.0);
             drawArrowShape(tx, ty, dx / d, dy / d, col, lw, (d > alen) ? alen : d);
         }
 
         private function drawArrowShape(tipx:Number, tipy:Number, ux:Number, uy:Number,
                                         col:uint, lw:Number, tailLen:Number):void
         {
-            // SAME shape as the desktop painter._arrow_shape (01.10.2026):
-            // Tk (16, 20, 6) * k with k = lw/3 - strictly linear in lw so the
-            // head shrinks with the element scale (desktop floor removed the
-            // same day - screenshot 380: 16x20 head over a 2px line).
+            // Minimap-tuned head (11,14,4)*k — smaller than the desktop
+            // painter (16,20,6)*k so the head stays proportional to the thin
+            // minimap line (user report 11.10.2026: heads disproportionately
+            // large). k = lw/3 — strictly linear so the head shrinks with
+            // the element (desktop floor removed 01.10.2026 - screenshot 380).
             var k:Number = lw / 3.0;
-            var alen:Number = 16.0 * k;      // head length (solid tail too)
-            var halfW:Number = 10.0 * k;     // (20.0 * k) / 2
-            var notch:Number = 6.0 * k;
+            var alen:Number = 11.0 * k;      // head length (solid tail too)
+            var halfW:Number = 7.0 * k;      // (14.0 * k) / 2
+            var notch:Number = 4.0 * k;
             var pxn:Number = -uy;
             var pyn:Number = ux;
             var tailx:Number = tipx - ux * tailLen;

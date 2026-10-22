@@ -41,6 +41,10 @@ class DrawingPalette(tk.Toplevel):
         self._active_tool_code = None
         self._sel_code = None
         self._sel_poi = None  # оригінальний poi виділеного text-об'єкта
+        # Shift-множина (12.10.2026): типи вибраних елементів для підсвітки
+        # кнопок + збережений текст рядка стану (повертається при знятті).
+        self._multi_types = set()
+        self._multi_status_saved = None
 
         self.class_vars = {
             "LT": tk.BooleanVar(value=False),
@@ -707,6 +711,47 @@ class DrawingPalette(tk.Toplevel):
         self._sel_code = code
         self._update_toolbar_buttons()
 
+    def update_multi_selection(self):
+        """Індикатор Shift-множини (варіант A, 12.10.2026): без рамок на
+        canvas — підсвітка кнопок типів усіх вибраних елементів + рядок
+        стану «Selected: N»."""
+        p = self.painter
+        codes = set()
+        map_id = getattr(self.app, "current_map_eng", None)
+        objects = p.drawings.get(map_id, []) if map_id else []
+        for i in getattr(p, "_multi_sel", set()):
+            if 0 <= i < len(objects):
+                t = objects[i].get("type")
+                if t:
+                    codes.add(t)
+        self._multi_types = codes
+        if codes:
+            # Вибрано декілька — одиночний індикатор не актуальний.
+            self._sel_code = None
+        self._update_toolbar_buttons()
+        status = getattr(self.app, "status_label", None)
+        if status is not None:
+            if codes:
+                # Запам'ятовуємо текст, щоб повернути його при знятті вибору
+                # (базовий статус — індикатор режиму з refresh_mode_indicator).
+                if self._multi_status_saved is None:
+                    try:
+                        self._multi_status_saved = (
+                            status.cget("text"), status.cget("bg"))
+                    except Exception:
+                        self._multi_status_saved = None
+                status.config(
+                    text=self.app.t('ui', 'status_selected_n').format(
+                        n=len(p._multi_sel)),
+                    bg="#33301a")
+            elif self._multi_status_saved is not None:
+                try:
+                    status.config(text=self._multi_status_saved[0],
+                                  bg=self._multi_status_saved[1] or "#1a1a1a")
+                except Exception:
+                    pass
+                self._multi_status_saved = None
+
     def _update_toolbar_buttons(self):
         active_bg = "#ffaa00"
         active_fg = "black"
@@ -721,7 +766,10 @@ class DrawingPalette(tk.Toplevel):
         light_codes = ("select", "move")
         for code, btn in self._toolbar_buttons.items():
             is_active = (code == self._active_tool_code)
-            is_sel = (not is_active) and (code == self._sel_code)
+            # Множинне виділення: кожен тип, що зустрічається у виборі,
+            # підсвічується темно-помаранчевим (#6b4400) — варіант A.
+            is_sel = (not is_active) and (
+                code == self._sel_code or code in getattr(self, "_multi_types", set()))
             light = code in light_codes
             if is_active:
                 bg, fg = active_bg, active_fg
@@ -881,7 +929,7 @@ class DrawingPalette(tk.Toplevel):
             self.painter.drawings,
             scheme_name=es.get('name', ''),
             description=es.get('desc', ''),
-            source='local')
+            source='local', section='tactic' if getattr(self.app, 'active_view', 'maps') == 'tactic' else 'maps')
         self._as_dbg('OK: %r map=%s mode=%s n=%d' % (
             es.get('name'), map_id, self.app.scheme_save_mode(), len(current)))
         self._status_lbl.config(text="Auto-saved: %s" % es.get('name'), bg="#1a3322")
@@ -924,7 +972,7 @@ class DrawingPalette(tk.Toplevel):
                 ok, _ = tactics_manager.save_scheme_to_db(
                     config.SCHEMES_FILE, map_id, s.get("map_name", map_id), mode,
                     self.painter.drawings, scheme_name=s.get("scheme_name", ""),
-                    description=s.get("description", ""), source=s.get("source", "local"))
+                    description=s.get("description", ""), source=s.get("source", "local"), section='tactic' if getattr(self.app, 'active_view', 'maps') == 'tactic' else 'maps')
                 if ok:
                     self._status_lbl.config(text="Auto-saved", bg="#1a3322")
                 break
@@ -947,6 +995,11 @@ class DrawingPalette(tk.Toplevel):
                            relief="sunken" if is_active else "raised")
 
     def _delete_selected(self):
+        if self.painter.multi_sel_active():
+            # Shift-множина має пріоритет над одиночним виділенням:
+            # видаляється вся множина одним undo-записом.
+            self.painter._delete_multi_sel()
+            return
         if self.painter.select_all_active():
             self.painter._delete_all_selected()
             return
@@ -1217,7 +1270,7 @@ class DrawingPalette(tk.Toplevel):
 
         ok, result_text = tactics_manager.save_scheme_to_db(
             config.SCHEMES_FILE, map_id, map_name, mode, drawings,
-            scheme_name=scheme_name, description=description)
+            scheme_name=scheme_name, description=description, section='tactic' if getattr(self.app, 'active_view', 'maps') == 'tactic' else 'maps')
         if ok:
             self.app.status_label.config(text=f"Saved: {scheme_name}", bg="#1a3322")
             if hasattr(self.app, '_refresh_saved_schemes_list'):
@@ -1882,7 +1935,7 @@ class DrawingPalette(tk.Toplevel):
                 config.SCHEMES_FILE, map_id, map_name, mode,
                 self.app.painter.drawings,
                 scheme_name=name, description=desc_var.get().strip(),
-                source='local')
+                source='local', section='tactic' if getattr(self.app, 'active_view', 'maps') == 'tactic' else 'maps')
             self.app._editing_scheme = {
                 "name": name, "desc": desc_var.get().strip(),
                 "map_id": map_id, "is_base": False,

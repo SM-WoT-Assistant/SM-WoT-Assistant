@@ -363,3 +363,8 @@ class MapRenderer:
             
         if hasattr(app, 'painter'):
             app.painter.redraw(cw, ch)
+        # One-shot legacy-coord migration: runs here because _map_img_rect
+        # is valid only after a real map render (flag-guarded, no-op after
+        # the first success — see main.py:_maybe_migrate_legacy_norm).
+        if hasattr(app, '_maybe_migrate_legacy_norm'):
+            app._maybe_migrate_legacy_norm()

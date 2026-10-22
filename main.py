@@ -191,12 +191,13 @@ class WotAssistantHQ:
         self._use_overlay_var = tk.BooleanVar(value=not self.settings.get("use_mod", False))
 
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
-        # замінився на tray_watcher.exe після оновлення
-        if self._launch_on_game_start_var.get():
-            self._set_windows_startup(True)
-            self._ensure_tray_watcher_running()
-        else:
-            self._set_windows_startup(False)
+        # замінився на tray_watcher.exe після оновлення.
+        # План А (16.10.2026): tray_watcher реєструється/запускається ЗАВЖДИ —
+        # він тримає мод у mods/<поточна версія>/ після патчів гри та виконує
+        # close_with_game. launch_on_game_start гейтить ЛИШЕ запуск основної
+        # програми при старті гри (сам watcher читає settings: _launch_if_enabled).
+        self._set_windows_startup(True)
+        self._ensure_tray_watcher_running()
         
         # Записати PID файл для tray_watcher (тільки dev mode, не frozen)
         _write_dev_pid()
@@ -282,7 +283,13 @@ class WotAssistantHQ:
             self.on_minimap_appeared,
             self.on_battle_countdown_started,
             self.on_vehicle_detected,
+            # 17.10: staleness-гейт backward-скана помилок мода — game.log
+            # append-only, у вікні лежать помилки старих білдів (#2053).
+            wot_path=self.settings.get("wot_path", ""),
         )
+        # on_mod_error ДО start(): backward one-shot скан виконується
+        # синхронно всередині start() і одразу може firing-нути callback.
+        self.log_watcher.on_mod_error = self._on_mod_error
         self.log_watcher.start()
         self.log_watcher.on_log_error = self._on_log_error
 
@@ -292,6 +299,9 @@ class WotAssistantHQ:
 
         firebase_reporter.setup_global_excepthook(self)
         firebase_reporter.ping_version_async(self)
+        # Прапорець від tray_watcher: помилка мода, помічена поки програма
+        # не запущена (16.10.2026) — тихий Firebase-репорт + видалення.
+        self._process_mod_error_flag()
 
         if self._start_to_tray:
             self._start_startup_checks()
@@ -672,9 +682,14 @@ class WotAssistantHQ:
             capture_output=True, text=True, timeout=5,
             creationflags=0x08000000,
         )
-        if os.path.basename(tray).lower() not in result.stdout.lower():
+        # tasklist обрізає Image Name до 25 символів ("SM WoT Assistant Tray Wat")
+        # → перевіряємо перші 25 символів basename, інакше кожен старт при
+        # запущеному watcher'і породжує дублікат, що миттю вмирає на mutex 183.
+        if os.path.basename(tray)[:25].lower() not in result.stdout.lower():
             subprocess.Popen([tray], creationflags=0x08000000)
             print(f"[INIT] Tray watcher started: {tray}")
+        else:
+            print(f"[INIT] Tray watcher already running: {tray}")
 
     def _stop_tray_watcher(self):
         import subprocess
@@ -1422,6 +1437,9 @@ class WotAssistantHQ:
             if hasattr(self, 'painter'):
                 self.painter._undo_stack.clear()
                 self.painter._editing_idx = -1
+                self.painter._multi_sel = set()
+                if hasattr(self, 'drawing_palette'):
+                    self.drawing_palette.update_multi_selection()
         if hasattr(self, 'drawing_palette'):
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
@@ -1542,6 +1560,17 @@ class WotAssistantHQ:
             self.map_mgr.apply_mod_mode()
         if hasattr(self, 'painter'):
             self.painter.redraw()
+
+    def _mod_integrity_check(self):
+        """Періодична перевірка (5 хв): use_mod увімкнено + sm_tactics.wotmod
+        відсутній у поточній версії → перевстановити (Aslain-модпак стирає
+        mods/* при перевстановленні — самовідновлення без перезапуску застосунку)."""
+        try:
+            if hasattr(self, 'map_mgr'):
+                self.map_mgr.ensure_mod_installed()
+        except Exception as e:
+            print(f"[ШТАБ] Mod integrity check error: {e}")
+        self.root.after(300000, self._mod_integrity_check)
 
     def set_painter_tool(self, tool):
         if hasattr(self, 'drawing_palette'):
@@ -1835,6 +1864,15 @@ class WotAssistantHQ:
                 # точний) — es НЕ прив'язуємо: це новий/чужий вміст, автосейв
                 # у схему знищив би її оригінал. При закритті палітри
                 # `_has_unsaved_drawings` запропонує зберегти — правильний захист.
+                # 22.10.2026 — виняток: канва ПОРОЖНЯ (нема чого знищувати).
+                # Після power-loss обнулення map_drawings.json перше відкриття
+                # мапи лишалося без схеми (варіант Б ніколи не завантажує вміст),
+                # і єдиним шляхом був ручний вибір у комбобоксі. На порожній
+                # канві завантаження безпечне — див. _autoload_scheme_if_blank.
+                if (scheme.get('map_id') == getattr(self, 'current_map_eng', '')
+                        and not self.painter.drawings.get(scheme.get('map_id', ''))):
+                    self.root.after(0, self._autoload_scheme_if_blank, sel,
+                                    scheme.get('map_id', ''))
                 return
         else:
             switched = False
@@ -1859,6 +1897,29 @@ class WotAssistantHQ:
             if target in display_texts_now:
                 self.saved_schemes_var.set(target)
                 self._last_valid_scheme_display = target
+
+    def _autoload_scheme_if_blank(self, sel, map_id):
+        """22.10.2026: безпечне авто-завантаження відображуваної схеми.
+
+        Викликається через after(0) з _maybe_autoload_displayed_scheme лише
+        тоді, коли на момент планування канва мапи була порожня. Тут повторні
+        гарди перед завантаженням: варіант Б (#2014) забороняє підміну
+        НАЯВНОГО вмісту канви — тому завантаження можливе ТІЛЬКИ поки канва
+        порожня, es не прив'язана і вибір користувача не змінився. Саме
+        цей шлях виконує ручний вибір у комбобоксі: на порожній канві
+        _on_saved_scheme_select_impl (main.py:2016) пропускає діалоги
+        «зберегти/скинути» і чисто завантажує схему."""
+        if getattr(self, '_scheme_switch_in_progress', False):
+            return
+        if self.saved_schemes_var.get() != sel:
+            return  # користувач вибір уже змінив — вирішує ручний шлях
+        if getattr(self, '_editing_scheme', None) is not None:
+            return  # es уже прив'язана — не ліземо
+        if getattr(self, 'current_map_eng', '') != map_id:
+            return  # мапа змінилась
+        if self.painter.drawings.get(map_id):
+            return  # канва більше не порожня — нічого не завантажуємо
+        self._on_saved_scheme_select()
 
     def _canvas_matches_scheme(self, scheme):
         """Чи належить вміст canvas саме цій схемі (Етап 3, варіант A).
@@ -2001,7 +2062,7 @@ class WotAssistantHQ:
                         self.scheme_save_mode(),
                         self.painter.drawings,
                         scheme_name=es['name'], description=es.get('desc', ''),
-                        source="local")
+                        source="local", section='tactic' if self.active_view == 'tactic' else 'maps')
                     self.root.after(0, self._refresh_saved_schemes_list)
             else:
                 existing_schemes = tactics_manager.list_schemes_from_db(
@@ -2024,7 +2085,7 @@ class WotAssistantHQ:
                             config.SCHEMES_FILE, current_map,
                             config.MAP_NAMES_EN.get(current_map, current_map),
                             self.selected_battle_mode.get(),
-                            self.painter.drawings, source="local")
+                            self.painter.drawings, source="local", section='tactic' if self.active_view == 'tactic' else 'maps')
                         self.root.after(0, self._refresh_saved_schemes_list)
                 else:
                     # Етап 3 (27.09.2026): canvas містить малюнки, які НЕ
@@ -2044,6 +2105,11 @@ class WotAssistantHQ:
             import copy
             scheme_map_id, elements = result
             self.painter.drawings[scheme_map_id] = copy.deepcopy(elements)
+            # Вміст canvas замінено повністю — індекси Shift-множини
+            # стають неактуальними (старі індекси вказували б на інші елементи).
+            self.painter._multi_sel = set()
+            if hasattr(self, 'drawing_palette'):
+                self.drawing_palette.update_multi_selection()
             self.data_mgr.save_drawings(self.painter.drawings)
             if self.current_map_eng == scheme_map_id:
                 self.painter.redraw()
@@ -2091,7 +2157,7 @@ class WotAssistantHQ:
                         config.SCHEMES_FILE, map_id, map_name,
                         self.scheme_save_mode(),
                         self.painter.drawings, scheme_name=es.get('name'),
-                        description=es.get('desc', ''), source='local')
+                        description=es.get('desc', ''), source='local', section='tactic' if self.active_view == 'tactic' else 'maps')
                     saved = ok
             else:
                 cset = {tuple(e.get("coords", [])) for e in current}
@@ -2106,7 +2172,7 @@ class WotAssistantHQ:
         ok, drawing_id = tactics_manager.save_scheme_to_db(
             config.SCHEMES_FILE, map_id, map_name, mode,
             self.painter.drawings, scheme_name=name,
-            description=desc, source='local')
+            description=desc, source='local', section='tactic' if self.active_view == 'tactic' else 'maps')
         if not ok:
             self._show_custom_message("Error", "Failed to save scheme")
             return
@@ -2114,6 +2180,9 @@ class WotAssistantHQ:
         self.painter.drawings[map_id] = []
         self.painter._undo_stack.clear()
         self.painter._editing_idx = -1
+        self.painter._multi_sel = set()
+        if hasattr(self, 'drawing_palette'):
+            self.drawing_palette.update_multi_selection()
         self.data_mgr.save_drawings(self.painter.drawings)
         self.painter.redraw()
         # 5. Нова активна схема + палітра відкривається одразу
@@ -2534,6 +2603,56 @@ class WotAssistantHQ:
         self.root.after(100, lambda m=user_msg: dialog_utils.dark_messagebox(
             self.root, self.t("ui", "log_error_title"), m, is_error=True
         ))
+
+    def _on_mod_error(self, snippet):
+        """LogWatcher: помилка sm_tactics у логу (16.10.2026). Три канали за
+        #1889: Firebase (admin.html Errors) + messagebox раз за сесію + console.
+        Watcher мовчить у цьому випадку (координація — _notify_mod_error).
+        """
+        try:
+            firebase_reporter.report_fallback(
+                source="mod_sm_tactics",
+                context="game_log",
+                error_text=str(snippet or "")[:500],
+                level="critical",
+            )
+        except Exception:
+            pass
+        print(f"[MOD] mod error in game.log: {str(snippet or '')[:200]}")
+        self.root.after(100, lambda: dialog_utils.dark_messagebox(
+            self.root,
+            self.t("ui", "mod_error_title"),
+            self.t("ui", "mod_error_hint"),
+            is_error=True,
+        ))
+
+    def _process_mod_error_flag(self):
+        """Прапорець від tray_watcher (config.MOD_ERROR_FLAG_FILE): помилка
+        мода була помічена поки програма не запущена → тихий Firebase-репорт
+        (без messagebox — balloon вже показав watcher) + видалення прапорця.
+        """
+        flag = config.MOD_ERROR_FLAG_FILE
+        if not os.path.isfile(flag):
+            return
+        try:
+            with open(flag, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            snippet = str(data.get("snippet", "") or "")
+            ver = str(data.get("game_version", "") or "")
+            print(f"[MOD] pending mod error from watcher (game {ver or '?'}): {snippet[:200]}")
+            firebase_reporter.report_fallback(
+                source="mod_sm_tactics",
+                context="watcher_flag",
+                error_text=(f"game {ver}: {snippet}" if ver else snippet)[:500],
+                level="critical",
+            )
+        except Exception as e:
+            print(f"[MOD] flag process error: {e}")
+        finally:
+            try:
+                os.remove(flag)
+            except OSError:
+                pass
 
     def safe_battle_sync(self, map_id, ui_mode):
         if not self.settings.get("log_path", ""):
@@ -3107,6 +3226,8 @@ class WotAssistantHQ:
         self.root.after(200, self.finish_startup_splash)
         # Start background Firebase sync
         self.root.after(1000, self._start_firebase_sync)
+        # Mod integrity self-heal (Aslain wipes mods/* on modpack update)
+        self.root.after(60000, self._mod_integrity_check)
 
     def _start_firebase_sync(self):
         """Background sync of popular tanks + builds from Firebase."""
@@ -3299,6 +3420,38 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.deiconify()
             self._sync_po_pos()
+        self._maybe_migrate_legacy_norm()
+
+    def _maybe_migrate_legacy_norm(self):
+        """One-shot: convert pre-02.10 canvas-fraction scheme coords into the
+        image-rect space (commit 8085639 caused the ~10% center-pull and the
+        window-size-dependent shift). Needs a rendered map (_map_img_rect) +
+        live canvas geometry. Idempotent via the norm marker; backups are
+        written by the migration itself (*.bak_pre_norm)."""
+        if getattr(self, "_norm_migrated", False):
+            return
+        if not getattr(self, "painter", None) or not getattr(self, "_map_img_rect", None):
+            return
+        try:
+            if self.canvas.winfo_width() < 50 or self.canvas.winfo_height() < 50:
+                return
+        except Exception:
+            return
+        self._norm_migrated = True
+        try:
+            import tactics_manager
+            n_draw = self.painter.migrate_legacy_coords()
+            org_x, org_y, img_w, img_h = self._map_img_rect
+            cw = float(self.canvas.winfo_width())
+            ch = float(self.canvas.winfo_height())
+            n_schemes, n_sch_els = tactics_manager.migrate_schemes_db(
+                config.SCHEMES_FILE, cw, ch, org_x, org_y, img_w, img_h)
+            if n_draw or n_sch_els:
+                print(f"[NORM] migrated {n_draw} drawings + {n_sch_els} scheme elements "
+                      f"(canvas {int(cw)}x{int(ch)}, img {int(img_w)}x{int(img_h)})")
+                self.painter.redraw()
+        except Exception as e:
+            print(f"[NORM] migration failed: {e}")
 
     def show_small_loading_splash(self):
         self.splash = tk.Toplevel(self.root)

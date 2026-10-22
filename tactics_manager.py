@@ -114,32 +114,114 @@ import re as _re
 import config
 
 
+def migrate_legacy_elements(items, cw, ch, org_x, org_y, img_w, img_h):
+    """One-time conversion of pre-02.10 scheme coords into the image-rect space.
+
+    Commit 8085639 (02.10.2026) changed the scheme coordinate space from
+    canvas fractions (x/canvas) to image-rect fractions ((x-org)/img_size).
+    Legacy elements render ~5-10% toward the map centre (border inset) and
+    their pixel error scales with the window — the reported "schemes shift
+    with edit-window size". Restore the drawn position with the exact
+    inverse: u_new = (u_old * canvas - org) / img_size. No clamping.
+    Idempotent: elements already stamped norm:"img" are skipped.
+    Returns the number of converted elements."""
+    if not items or img_w < 10 or img_h < 10 or cw < 10 or ch < 10:
+        return 0
+
+    def _conv_pair_list(vals):
+        out = list(vals)
+        for i in range(0, len(out) - 1, 2):
+            out[i] = (out[i] * cw - org_x) / img_w
+            out[i + 1] = (out[i + 1] * ch - org_y) / img_h
+        return out
+
+    n = 0
+    for obj in items:
+        if not isinstance(obj, dict) or obj.get("norm"):
+            continue
+        changed = False
+        c = obj.get("coords")
+        if isinstance(c, list) and len(c) >= 2:
+            obj["coords"] = _conv_pair_list(c)
+            changed = True
+        elif not c and "x1" in obj:
+            # ancient x1/y1/x2/y2 format (normalized to coords at painter load)
+            x1 = (obj.get("x1", 0.0) * cw - org_x) / img_w
+            y1 = (obj.get("y1", 0.0) * ch - org_y) / img_h
+            x2 = (obj.get("x2", obj.get("x1", 0.0)) * cw - org_x) / img_w
+            y2 = (obj.get("y2", obj.get("y1", 0.0)) * ch - org_y) / img_h
+            obj["coords"] = [x1, y1, x2, y2]
+            changed = True
+        tc = obj.get("text_coords")
+        if isinstance(tc, list) and len(tc) >= 2:
+            obj["text_coords"] = _conv_pair_list(tc)
+            changed = True
+        cic = obj.get("class_icon_coords")
+        if isinstance(cic, list) and len(cic) >= 2:
+            obj["class_icon_coords"] = _conv_pair_list(cic)
+            changed = True
+        if changed:
+            obj["norm"] = "img"
+            n += 1
+    return n
+
+
+def migrate_schemes_db(db_path, cw, ch, org_x, org_y, img_w, img_h):
+    """File-level migration of saved_schemes.json (one-shot, idempotent).
+
+    Creates <db_path>.bak_pre_norm once before the first rewrite — the
+    rollback point. Elements already carrying norm:"img" are skipped, so
+    re-running is a no-op. Returns (schemes_touched, elements_converted)."""
+    db = _load_db(db_path)
+    if not db:
+        return 0, 0
+    total_els = 0
+    touched = 0
+    for scheme in db.values():
+        if not isinstance(scheme, dict):
+            continue
+        els = scheme.get("elements")
+        if not isinstance(els, list):
+            continue
+        n = migrate_legacy_elements(els, cw, ch, org_x, org_y, img_w, img_h)
+        if n:
+            total_els += n
+            touched += 1
+    if not touched:
+        return 0, 0
+    import shutil
+    bak = db_path + ".bak_pre_norm"
+    try:
+        if os.path.isfile(db_path) and not os.path.isfile(bak):
+            shutil.copy2(db_path, bak)
+    except Exception as e:
+        print(f"[NORM] backup failed ({e}) — schemes DB NOT migrated")
+        return 0, 0
+    if not _save_db(db_path, db):
+        return 0, 0
+    return touched, total_els
+
+
 def _load_db(db_path):
     """Load the saved_schemes.json database. Returns dict of schemes keyed by drawing_id."""
-    try:
-        if not os.path.isfile(db_path):
-            return {}
-        with open(db_path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
+    import safe_io
+    data = safe_io.read_json(db_path, {})
+    if isinstance(data, dict):
+        return data
     return {}
 
 
 def _save_db(db_path, db):
     """Save the saved_schemes.json database."""
+    import safe_io
     try:
         os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        with open(db_path, "w", encoding="utf-8") as f:
-            json.dump(db, f, indent=2, ensure_ascii=False)
-        return True
-    except Exception as e:
-        return False
+    except Exception:
+        pass
+    return safe_io.write_json(db_path, db, indent=2)
 
 
-def save_scheme_to_db(db_path, map_id, map_name, mode, drawings, scheme_name=None, description="", source="local"):
+def save_scheme_to_db(db_path, map_id, map_name, mode, drawings, scheme_name=None, description="", source="local", section="maps"):
     """Save current map's drawings into the single JSON DB.
     Upserts by (map_id, mode, scheme_name) — replaces if same name exists for same map+mode.
     Returns (ok, display_name)."""
@@ -171,6 +253,9 @@ def save_scheme_to_db(db_path, map_id, map_name, mode, drawings, scheme_name=Non
         "description": description,
         "elements": drawings[map_id],
         "source": source,
+        # "maps" | "tactic": recorded on create, PRESERVED on update;
+        # the minimap mod never shows section=="tactic" (user spec 09.10)
+        "section": old.get("section") or section,
         "is_base": old.get("is_base", False),
         "is_default": old.get("is_default", False),
         "saved_at": old.get("saved_at", now),

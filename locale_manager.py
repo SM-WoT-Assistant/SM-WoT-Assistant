@@ -51,11 +51,10 @@ class LocaleManager:
         return {}
         
     def save_locales(self):
-        try:
-            with open(self.locales_file, "w", encoding="utf-8") as f:
-                json.dump(self.languages, f, indent=4, ensure_ascii=False)
-        except Exception as e:
-            print(f"[LOCALE] Save error {self.locales_file}: {e}")
+        # safe_io: атомарний запис — обрив живлення не обнуляє кеш перекладів
+        import safe_io
+        if not safe_io.write_json(self.locales_file, self.languages, indent=4):
+            print(f"[LOCALE] Save error {self.locales_file}")
 
     def set_language(self, lang_code):
         self.lang = lang_code

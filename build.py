@@ -336,6 +336,14 @@ def copy_data_files():
     if os.path.exists(icon):
         _cp(icon, "icon.ico")
 
+    # sm_tactics.wotmod (мод-рендерер схем; джерело для map_manager.apply_mod_mode
+    # та tray_watcher mod-sync). Збирається build_mod.py, файл у root (gitignored).
+    wotmod = os.path.join(BASE_DIR, "sm_tactics.wotmod")
+    if os.path.isfile(wotmod):
+        _cp(wotmod, "sm_tactics.wotmod")
+    else:
+        print("[BUILD] WARNING: sm_tactics.wotmod not found — mod NOT bundled (run build_mod.py first)")
+
     # maps/ (TACTIC mode images)
     maps_dir = os.path.join(BASE_DIR, "maps")
     if os.path.exists(maps_dir):
