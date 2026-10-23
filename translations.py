@@ -270,7 +270,7 @@ TRANSLATIONS = {
             "status_update_available": "[UPDATE] Version v{latest} available (you have v{current})",
             "status_update_error": "[UPDATE] Error: {error}",
             "tactic_maps_source": "TACTIC maps from",
-            "tactic_no_map": "This map is not yet available for TACTIC mode",
+            "tactic_no_map": "No tactical scheme for this map yet",
             "tactic_no_maps": "No maps for this mode",
             "text_label": "Caption",
             "text_type": "Text/Sign",

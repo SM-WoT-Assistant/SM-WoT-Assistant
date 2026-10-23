@@ -351,6 +351,20 @@ def _rtdb_get(path: str, timeout: int = 10, use_admin_token: bool = False) -> An
     return None
 
 
+def read_site_map_events(limit: int = 100) -> list:
+    """service_events (category=site_maps) — клієнтські події додавання/зміни
+    тактичних мап на сайті wotmapsbyyaya. Потрібен admin token (read: auth != null)."""
+    data = _rtdb_get(
+        'service_events?orderBy=%22category%22&equalTo=%22site_maps%22&limitToLast='
+        + str(limit),
+        timeout=10, use_admin_token=True)
+    if isinstance(data, dict):
+        return [e for e in data.values() if isinstance(e, dict)]
+    if isinstance(data, list):
+        return [e for e in data if isinstance(e, dict)]
+    return []
+
+
 def get_community_stats() -> Dict[str, Any]:
     """Aggregate community stats from RTDB + public APIs."""
     stats: Dict[str, Any] = {}

@@ -3,6 +3,70 @@
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
 
+## 23.10.2026
+
+- **Тактичні мапи сайту: Нібельбурґ у TACTIC + трекінг додавань/змін + сповіщення адмінки.**
+  - **Причина:** `212_epic_random_valley` (Нібельбурґ) є в клієнті (PNG у `extracted_maps/`), але
+    ховався з TACTIC: (1) у `MAP_NAMES_EN` була лише event-версія `_sm25`; (2) фільтр
+    `_tactic_image_exists` виключав мапи без `maps/<folder>/map.webp`; (3) сайт
+    `images.wotmapsbyyaya.com/maps/nibelburg.webp` → 404 (мапи на сервері ще немає).
+    Спека користувача: якщо мапа у клієнті є, а на сайті ні — показувати порожнє вікно з написом
+    «тактичної схеми для цієї мапи ще нема», а не ховати мапу зі списку.
+  - **`config.MAP_NAMES_EN`:** додано `"212_epic_random_valley": "Nibelburg"` (до першого успішного
+    probe — інакше URL без назви → 404 → постійний `unavailable_tactic_maps.json`; список наразі
+    `["59_asia_great_wall"]` — Нібельбурґ ще не отруєний).
+  - **`map_manager.load_map_list`:** TACTIC-фільтр замінено на стабільний розподіл «з картинкою
+    перші, без — в кінці» (двічі: до дедупу за display-назвою, щоб дедуп віддав перевагу
+    зображеному, і після сортування, яке розриває порядок). `_tactic_image_exists` лишився для
+    розподілу. У не-Public групах мапа без схем у групі як і раніше фільтрується.
+  - **`translations.tactic_no_map`:** «This map is not yet available for TACTIC mode» →
+    «No tactical scheme for this map yet» (кеш locales.json самозагоюється за en_snapshot).
+  - **`map_updater.py` — лені-імпорти selenium:** `from selenium import ...` (рядки 8-12) перенесено
+    всередину `sync_all()` — єдиного споживача webdriver. `import map_updater` тепер працює без
+    Chrome: `download_single_map()` (requests) та клієнтський трекінг мап не залежать від selenium.
+    Корінь-фікс класу помилок `map_manager.py:541 No module named 'selenium'` (мережеві
+    HEAD-перевірки помирали ще до запиту).
+  - **Інцидент (той самий power-loss клас):** робоча копія `map_updater.py` (незакомічена спроба
+    переписування, 8207 байт) знищена до нулів. Відновлено з git (v1.0.54, 193 рядки, повна
+    версія з `download_single_map`) + лені-імпорти. Джерельні .py захищені git; користувацькі
+    JSON — `safe_io` (22.10).
+  - **Трекінг змін на сайті (`_detect_pending_tactic_maps`):** окрім наявного «додавання» (HEAD →
+    200: завантаження; 404 → unavailable) додано детект **змін**: умовний HEAD `If-None-Match` за
+    маніфестом `USER_DATA_DIR/site_maps_manifest.json` (`{etag,last_modified,size}`, атомарно через
+    `safe_io`); baseline першого запуску пише ETag **без** події; різні ETag → перекачка + подія
+    `map_changed`. Мережева помилка HEAD більше НЕ додає в unavailable (раніше таймаут = постійне
+    отруєння; добовий sweep має шанс повторити). **404 теж НЕ додає в unavailable**: з добовим
+    sweep постійний blacklist отруїв би Нібельбурґ першим ранковим запуском (сайт його ще не має),
+    і після появи мапи на сайті завантаження ніколи б не відбулось — наявний skip-список
+    (legacy `59_asia_great_wall`) лишається для старих записів, нові не записуються.
+    Гард `_sweep_running` — без накладань потоків
+    (startup + добовий цикл). Скидання `unavailable` при зміні версії сайту не додається
+    (захист від деніалу).
+  - **Події → адмінка:** `service_messages.log_event_now()` (новий) — `log_event` + негайний
+    `try_flush_service_messages()` у фоновому потоці (подія досить у чергу перед flush —
+    durability). Категорія `site_maps`, RTDB `service_events` (`.write: true` без токена,
+    `.read: auth != null` — правила НЕ мінялись, деплою немає). Клієнт додає/оновлює мапу →
+    POST → адмінка балоном+логом за життя сесії.
+  - **Адмінка (`admin_ui`, `admin_version` 1.0.50 → 1.0.51):** `admin_backend/data.py:
+    read_site_map_events()` (GET `service_events` з admin-токеном, фільтр category=site_maps);
+    `AdminApp._check_site_map_events()` у `_loop` з гейтом 86400s (`site_events_last_seen` в
+    `admin_settings.json`; ключ `timestamp|message`; без стану → всі наявні; перший тік — одразу
+    при старті). Доставка worker→main через `_site_events_result` + `_bg_poll` (пам'ятник #1598 —
+    жодних Tk-викликів з потоку). Балон групується: 1 подія → її текст, N → «N site map updates»
+    (унікалізовані, ≤5 у тексті).
+  - **Живе перемикання вікна:** якщо додана/оновлена мапа зараз показана (`current_map_eng`) —
+    `root.after(0)` → `show_main_splash()` (без аргументу: картинка вже існує → мапа) +
+    `painter.redraw()`. Порожнє вікно змінюється на мапу без перезавантаження вікна і без
+    крадіжки фокусу. #2006 (es/undo) недоторканий — on_map_select НЕ викликається.
+  - **Кадентність (спека користувача):** клієнт — sweep при старті (наявні місця:
+    check_game_version + швидкий шлях) + раз на добу (`after(86400000, _daily_site_map_sweep)` у
+    `_on_startup_ready` з re-arm); адмінка — при старті + раз на добу. Щогодинні/щохвилинні
+    перевірки відхилені.
+  - **Не чіпалось (свідомо):** мертва retry-черга `_check_pending_tactic_maps` (main.py) —
+    `pending_tactic_maps.json` не існує, `_tactic_sync_needed` ніколи не True; `sync_all()` сайту
+    (окремий механізм, не трекінг); `database.rules.json` (service_events вже `.write: true`).
+
+
 
 ## 22.10.2026
 

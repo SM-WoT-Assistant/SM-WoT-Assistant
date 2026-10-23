@@ -5,11 +5,6 @@ import time
 import requests
 import html
 import urllib3
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 
 # Імпорт нашого модуля конфігурації
 import config as config
@@ -20,7 +15,17 @@ def sync_all(callback_status=None):
     """
     Виконує повний цикл оновлення мап.
     callback_status: функція для передачі тексту статусу в консоль або GUI.
+
+    Selenium імпортується ЛИВЕ всередину (лені): модуль має бути доступний
+    через `import map_updater` без Chrome — download_single_map() та клієнтський
+    трекінг мап (map_manager) працюють на requests без selenium.
     """
+    from selenium import webdriver
+    from selenium.webdriver.chrome.options import Options
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
+
     def log(text):
         print(text)
         if callback_status:

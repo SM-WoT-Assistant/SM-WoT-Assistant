@@ -3228,6 +3228,9 @@ class WotAssistantHQ:
         self.root.after(1000, self._start_firebase_sync)
         # Mod integrity self-heal (Aslain wipes mods/* on modpack update)
         self.root.after(60000, self._mod_integrity_check)
+        # Раз на добу: HEAD-перевірка нових/змінених тактичних мап на сайті
+        # (стартовий sweep вже був у check_game_version; ланцюг повторює)
+        self.root.after(86400000, self._daily_site_map_sweep)
 
     def _start_firebase_sync(self):
         """Background sync of popular tanks + builds from Firebase."""
@@ -3254,6 +3257,20 @@ class WotAssistantHQ:
                 self.safe_execute(self.reload_tank_data)
             except Exception as e:
                 print(f"[Firebase] Reload tank data error: {e}")
+
+    def _daily_site_map_sweep(self):
+        """Раз на добу (ланцюг after від _on_startup_ready): додавання/зміни
+        тактичних мап на сайті. Працює у фоновому потоці (#2005)."""
+        def _bg():
+            try:
+                self.map_mgr._detect_pending_tactic_maps()
+            except Exception as e:
+                print(f"[MAP_MGR] Daily site sweep error: {e}")
+        threading.Thread(target=_bg, daemon=True).start()
+        try:
+            self.root.after(86400000, self._daily_site_map_sweep)
+        except RuntimeError:
+            pass  # mainloop зупинено (вихід із програми)
 
     def _check_pending_tactic_maps(self):
         """HEAD-перевірка pending мап на сайті. Chrome не використовується."""

@@ -107,6 +107,8 @@ class AdminApp(customtkinter.CTk):
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
         self._errors_count = 0
+        self._last_site_poll: float = 0
+        self._site_events_result = None  # пакет для _bg_poll (worker → main)
         self._gen_progress: dict = {
             "running": False, "queue": [], "current_tag": None,
             "results": {}, "progress": (0, 0),
@@ -409,6 +411,11 @@ class AdminApp(customtkinter.CTk):
                     if now - self._last_errors_poll > 86400:
                         self._last_errors_poll = now
                         self._bg_reload_data = True
+                    # Сповіщення про нові/змінені тактичні мапи на сайті
+                    # (раз на добу; перший тік — одразу при старті)
+                    if now - self._last_site_poll > 86400:
+                        self._last_site_poll = now
+                        self._check_site_map_events()
                 except Exception:
                     pass
                 time.sleep(10)
@@ -419,6 +426,17 @@ class AdminApp(customtkinter.CTk):
             if getattr(self, "_bg_reload_data", False):
                 self._bg_reload_data = False
                 self._do_reload_data()
+            res = self._site_events_result
+            if res is not None:
+                self._site_events_result = None
+                for line in res.get("lines", []):
+                    self.log(line)
+                self.notify("Site maps", res.get("text", ""))
+                self._settings["site_events_last_seen"] = res.get("key", "")
+                try:
+                    _save_settings(self._settings)
+                except Exception:
+                    pass
             self.after(1000, _bg_poll)
 
         threading.Thread(target=_loop, daemon=True).start()
@@ -435,6 +453,41 @@ class AdminApp(customtkinter.CTk):
                 {"version": ver, "last_seen": int(time.time()), "status": status})
         except Exception:
             pass
+
+    def _check_site_map_events(self) -> None:
+        """service_events (site_maps): фільтр новіших за site_events_last_seen
+        → пакет для балону+логу. Викликається з _loop (worker) — НІЯКИХ
+        Tk-викликів тут; доставка через _site_events_result у _bg_poll
+        (main thread, #1598). Дедуп між запусками — по ключу timestamp|message."""
+        try:
+            from admin_backend.data import read_site_map_events
+            events = read_site_map_events()
+        except Exception as e:
+            print(f"[SITE] Poll error: {e}")
+            return
+        if not events:
+            return
+        last = str(self._settings.get("site_events_last_seen", ""))
+        keys = set()
+        fresh_msgs = []
+        newest = last
+        for e in events:
+            key = f"{e.get('timestamp', '')}|{e.get('message', '')}"
+            if key > last and key not in keys:
+                keys.add(key)
+                fresh_msgs.append(str(e.get("message", "")))
+                if key > newest:
+                    newest = key
+        if not fresh_msgs:
+            return
+        msgs = sorted(set(fresh_msgs))
+        if len(msgs) == 1:
+            text = msgs[0]
+        else:
+            text = (f"{len(msgs)} site map updates: "
+                    + "; ".join(msgs[:5]) + ("..." if len(msgs) > 5 else ""))
+        self._site_events_result = {
+            "lines": [f"SITE: {m}" for m in msgs], "text": text, "key": newest}
 
     def _tray_open(self) -> None:
         self.after(0, self._restore_from_tray)

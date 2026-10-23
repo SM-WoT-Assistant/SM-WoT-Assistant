@@ -47,6 +47,21 @@ def log_event(category, message, level="info"):
     print(f"[SERVICE] [{level.upper()}] {category}: {message}")
 
 
+def log_event_now(category, message, level="info"):
+    """log_event + НЕГАЙНЕ відправлення черги в RTDB service_events.
+
+    Викликати ТІЛЬКИ з фонового потоку (сінхронний POST, ~секунди).
+    Подія спершу досить у чергу (durability переживає невдалий flush),
+    потім try_flush_service_messages() доставляє її зараз, а не при виході
+    з програми — адмінка бачить подію за життя сесії."""
+    log_event(category, message, level)
+    try:
+        import firebase_reporter
+        firebase_reporter.try_flush_service_messages()
+    except Exception as e:
+        print(f"[SERVICE] Immediate flush failed: {e}")
+
+
 def get_pending():
     """Повертає всі undelivered події для відправки на сервер."""
     return [m for m in _load() if not m.get("delivered")]
