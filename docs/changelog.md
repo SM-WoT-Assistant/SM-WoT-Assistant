@@ -3,6 +3,37 @@
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
 
+## 24.10.2026
+
+- **Адмінка v1.0.51: перезбір + інцидент втрати admin_settings.json + фікс класу.**
+  - **Перезбір:** запущена адмінка була старою dist-збіркою від 11.09.2026 (Ver 1.0.50 — на скрині),
+    у якій не було ні `service_events`-опитування (b4f2148), ні секції «Tactic Map Updates»
+    (a645bb5). Старий процес закрито → `python build_admin.py` (локально, гейта git нема) →
+    EXE 31.6 MB, `_internal` 107, бандл `admin_version.txt=1.0.51`. Жива перевірка на скрині:
+    **Info → Ver 1.0.51** + заголовок **«Tactic Map Updates»** в самому низу стека (збережений
+    порядок панелей не містить нової → додається в кінець; шапка перетягується drag-to-reorder,
+    `admin_panels_layout.json`). Секція порожня («No site map updates yet») — очікувано:
+    `service_events` поки без подій.
+  - **Інцидент (моя помилка верифікації):** тимчасовий фіп `start_minimized` через PowerShell
+    `Set-Content -Encoding UTF8` записав файл з **BOM** → Python `json.loads('\ufeff...')` кидав →
+    `_load_settings()` мовчки повертав `{}` → стартовий авто-детект `wot_path`
+    (main_window.py:101-102) зберіг **порожній dict + wot_path** → `admin_settings.json`
+    знищено до 56 байт (втрачено: `start_with_windows`, `lang`, `community_linked`, `language`,
+    `window_w/h/x/y`, `launch_on_game_start`; відомі значення відновлено: `wot_path` +
+    `start_minimized=true`; геометрія перезапишеться при ресайзі, решту — перечілити в Settings).
+  - **Фікс класу (`_load_settings`):** читання `encoding="utf-8-sig"` (BOM більше не вбиває
+    парсинг) + пошкоджений файл більше НЕ знищується мовчки — перейменовується в
+    `admin_settings.json.corrupt-<ts>` (патерн safe_io; доказ зберігається, далі працює свіжий
+    dict). Тест-фірст (#1471): `_archive/scripts/harness_settings_bom_2026_10_24.py`
+    (AST-виділення, APPDATA в тимчасову папку) — **ДО фіксу 5/3** (BOM → `{}`, без rename),
+    **ПІСЛЯ 8/0 PASS**; AST + смоук-імпорт `admin_ui.main_window` OK. Фікс у наступній збірці
+    `build_admin.py` (запущений процес працює зі старим кодом — перезапуск адмінки підхопить
+    і фікс, і відновлений файл налаштувань).
+  - **Правило (див. пам'ять):** JSON у `%APPDATA%` ніколи не писати PowerShell
+    `Set-Content -Encoding UTF8` (BOM) — або Python, або
+    `[IO.File]::WriteAllText($path, $t, [Text.UTF8Encoding]::new($false))`.
+
+
 ## 23.10.2026
 
 - **Тактичні мапи сайту: Нібельбурґ у TACTIC + трекінг додавань/змін + сповіщення адмінки.**

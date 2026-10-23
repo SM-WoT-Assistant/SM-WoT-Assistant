@@ -43,9 +43,20 @@ SETTINGS_FILE = APPDATA_DIR / "admin_settings.json"
 def _load_settings() -> dict:
     try:
         if SETTINGS_FILE.exists():
-            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
+            # utf-8-sig: PS Set-Content -Encoding UTF8 пише BOM — звичайний utf-8
+            # давав json.loads виняток → мовчазний {} → стартовий save wot_path
+            # знищував усі ключі (інцидент 24.10.2026).
+            return json.loads(SETTINGS_FILE.read_text(encoding="utf-8-sig"))
     except Exception:
-        pass
+        # Пошкоджений файл: не знищувати мовчки — відкласти доказ
+        # (.corrupt-<ts>, патерн safe_io), далі працюємо зі свіжим dict.
+        try:
+            corrupt = SETTINGS_FILE.with_name(
+                f"{SETTINGS_FILE.name}.corrupt-{time.strftime('%Y%m%d_%H%M%S')}")
+            SETTINGS_FILE.rename(corrupt)
+            logger.warning("admin_settings.json corrupt, moved to %s", corrupt.name)
+        except Exception:
+            pass
     return {}
 
 
