@@ -30,6 +30,7 @@ from admin_ui.panels_content import (
     community_controller,
     errors_controller,
     log_controller,
+    site_maps_controller,
 )
 from admin_ui.tray import AdminTray
 
@@ -109,6 +110,8 @@ class AdminApp(customtkinter.CTk):
         self._errors_count = 0
         self._last_site_poll: float = 0
         self._site_events_result = None  # пакет для _bg_poll (worker → main)
+        self._site_events_list: list = []  # кеш історії для секції Tactic Map Updates
+        self._site_events_ping: bool = False  # worker → _bg_poll: оновити секцію
         self._gen_progress: dict = {
             "running": False, "queue": [], "current_tag": None,
             "results": {}, "progress": (0, 0),
@@ -376,6 +379,12 @@ class AdminApp(customtkinter.CTk):
             width=350,
         )
         self.panel_dock.add_panel(
+            "sitemaps", "Tactic Map Updates", "sitemaps",
+            build=site_maps_controller(self)["build"],
+            refresh=site_maps_controller(self)["refresh"],
+            width=350,
+        )
+        self.panel_dock.add_panel(
             "errors", "Errors", "errors",
             build=errors_controller(self)["build"],
             refresh=errors_controller(self)["refresh"],
@@ -426,6 +435,17 @@ class AdminApp(customtkinter.CTk):
             if getattr(self, "_bg_reload_data", False):
                 self._bg_reload_data = False
                 self._do_reload_data()
+            # Оновлення секції "Tactic Map Updates" з кешу воркера —
+            # точково ТІЛЬКИ своя панель (не весь dock: не форсуємо
+            # важкий errors-фетч), мережі нема (рендер з пам'яті).
+            if getattr(self, "_site_events_ping", False):
+                self._site_events_ping = False
+                try:
+                    body = self.panel_dock.panels.get("sitemaps", {}).get("body")
+                    if body is not None and hasattr(body, "refresh"):
+                        body.refresh()
+                except Exception:
+                    pass
             res = self._site_events_result
             if res is not None:
                 self._site_events_result = None
@@ -464,7 +484,12 @@ class AdminApp(customtkinter.CTk):
             events = read_site_map_events()
         except Exception as e:
             print(f"[SITE] Poll error: {e}")
-            return
+            return  # кеш НЕ чистимо — тимчасова мережева помилка
+        # Кеш історії для секції "Tactic Map Updates" — оновлюється ЗАВЖДИ
+        # при успішному fetch (секція показує все, навіть якщо балон уже
+        # бачив ці події — дедуп стосується ТІЛЬКИ сповіщень).
+        self._site_events_list = list(events)
+        self._site_events_ping = True
         if not events:
             return
         last = str(self._settings.get("site_events_last_seen", ""))

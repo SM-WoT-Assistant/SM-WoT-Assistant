@@ -65,6 +65,20 @@
   - **Не чіпалось (свідомо):** мертва retry-черга `_check_pending_tactic_maps` (main.py) —
     `pending_tactic_maps.json` не існує, `_tactic_sync_needed` ніколи не True; `sync_all()` сайту
     (окремий механізм, не трекінг); `database.rules.json` (service_events вже `.write: true`).
+  - **Секція «Tactic Map Updates» в адмінпрограмі (спека користувача: «будь-яке оновлення на
+    сайті з тактиками повинно відображатись в адмінпрограмі»):** нова панель `SiteMapsPanel`
+    (`admin_ui/panels_content.py`, за зразком ErrorsPanel) — Treeview Time|Event, newest-first,
+    cap 50, empty-state «No site map updates yet»; реєстрація `add_panel("sitemaps", "Tactic Map
+    Updates", ..., width=350)` між Community і Errors. Рендер **тільки з кешу**
+    `app._site_events_list` — без мережі на головному потоці. Кеш оновлює той самий добовий
+    воркер `_check_site_map_events` (старт + 86400s — кадентність не змінена): успішний fetch →
+    кеш=події + `_site_events_ping=True` **незалежно від дедупу балонів** (секція показує всю
+    історію, навіть якщо сповіщення вже бачили ці події); помилка мережі → кеш НЕ чиститься.
+    Доставка через `_bg_poll`: ping → `after(0)` → точковий refresh ТІЛЬКИ своєї панелі (не весь
+    dock — не форсує важкий errors-фетч). Балон/лог-дедуп недоторканий. Верифікація #1471:
+    харнесс `harness_site_maps_2026_10_23.py` розширено розділами 8-10 (кеш/ping, панель з
+    customtkinter/ttk-стабами, AST-реєстрація) — **60/0 PASS**; смоук-імпорт обох модулів OK
+    (customtkinter у .venv-1).
 
 
 

@@ -964,6 +964,66 @@ class ErrorsPanel(customtkinter.CTkFrame):
             pass
 
 
+class SiteMapsPanel(customtkinter.CTkFrame):
+    """Tactic Map Updates: історія подій service_events (category=site_maps).
+
+    Рендерить КЕШ app._site_events_list (оновлює добовий воркер через ping
+    у _bg_poll) — без власних мережевих запитів на головному потоці (#1598).
+    Дедуп балонів (site_events_last_seen) на секцію НЕ впливає: показується
+    вся історія з RTDB."""
+
+    def __init__(self, parent: Any, app: Any = None) -> None:
+        super().__init__(parent, fg_color="transparent")
+        self.app = app
+        self._tree = None
+        self._build()
+
+    def _build(self) -> None:
+        self._tree_frame = customtkinter.CTkFrame(self, fg_color="#12141C")
+        self._tree_frame.pack(fill="both", expand=True, padx=6, pady=6)
+
+    def refresh(self) -> None:
+        if self._tree is None:
+            try:
+                from tkinter import ttk
+                style = ttk.Style()
+                style.theme_use("clam")
+                style.configure("SiteMap.Treeview",
+                                background="#12141C", foreground="#DDE0EA",
+                                fieldbackground="#12141C", borderwidth=0,
+                                font=("Segoe UI", 10))
+                self._tree = ttk.Treeview(
+                    self._tree_frame,
+                    columns=("time", "event"),
+                    show="headings",
+                    style="SiteMap.Treeview",
+                    height=12,
+                )
+                self._tree.heading("time", text="Time")
+                self._tree.heading("event", text="Event")
+                self._tree.column("time", width=120, stretch=False)
+                self._tree.column("event", width=380)
+                scroll = customtkinter.CTkScrollbar(
+                    self._tree_frame, command=self._tree.yview)
+                self._tree.configure(yscrollcommand=scroll.set)
+                self._tree.pack(side="left", fill="both", expand=True)
+                scroll.pack(side="right", fill="y")
+            except Exception:
+                return
+        for item in self._tree.get_children():
+            self._tree.delete(item)
+        events = list(getattr(self.app, "_site_events_list", []) or []) if self.app else []
+        # Найновіші зверху: timestamp у подіях — ISO-рядок (рядкове desc ок)
+        events.sort(key=lambda e: str(e.get("timestamp", "")), reverse=True)
+        if not events:
+            self._tree.insert("", "end", values=("", "No site map updates yet"))
+            return
+        for e in events[:50]:
+            ts = str(e.get("timestamp", ""))[:19].replace("T", " ")
+            msg = str(e.get("message", "-"))
+            self._tree.insert("", "end", values=(ts, msg[:160]))
+
+
 class LogPanel(customtkinter.CTkFrame):
     """Log viewer: newest first, 1000 line cap."""
 
@@ -1025,3 +1085,7 @@ def errors_controller(app: Any = None):
 
 def log_controller(app: Any = None):
     return _controller("Log", "log", LogPanel, app)
+
+
+def site_maps_controller(app: Any = None):
+    return _controller("Tactic Map Updates", "sitemaps", SiteMapsPanel, app)
