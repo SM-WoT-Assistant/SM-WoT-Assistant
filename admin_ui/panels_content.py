@@ -35,6 +35,23 @@ def _make_divider(parent, orient="h"):
         return customtkinter.CTkFrame(parent, width=1, fg_color="#2E3240")
 
 
+def _admin_tree_style(style, name: str) -> None:
+    """Єдиний темний стиль ttk.Treeview для всієї адмінки (одне джерело правди).
+
+    Тіло: #12141C/#DDE0EA; шапка: #181B26/#D4A843 bold, relief flat —
+    без білого дефолтного clam-заголовка (#dcdad5) та його 3D-обводки.
+    """
+    style.theme_use("clam")
+    style.configure(f"{name}.Treeview", background="#12141C", foreground="#DDE0EA",
+                    fieldbackground="#12141C", borderwidth=0, font=("Segoe UI", 10))
+    style.configure(f"{name}.Treeview.Heading", background="#181B26", foreground="#D4A843",
+                    borderwidth=0, relief="flat", font=("Segoe UI", 10, "bold"))
+    # Treeview.field малює 2px світло-сіру 3D-обводку НАВІТЬ при borderwidth=0
+    # (relief/lightcolor/layout-border не допомагають — перевірено піксельними
+    # зондами 25.10.2026); без field фон дає style background, рядки — fieldbackground.
+    style.layout(f"{name}.Treeview", [("Treeview.treearea", {"sticky": "nswe"})])
+
+
 def _bind_copy(dlg):
     """Bind Ctrl+C / right-click Copy on all widgets in a popup dialog.
 
@@ -339,8 +356,7 @@ class StatusPanel(customtkinter.CTkFrame):
         search.pack(fill="x", padx=12, pady=(0, 4))
         from tkinter import ttk
         style = ttk.Style()
-        style.configure("Drill.Treeview", background="#12141C", foreground="#DDE0EA",
-                        fieldbackground="#12141C", font=("Segoe UI", 10))
+        _admin_tree_style(style, "Drill")
         tree = ttk.Treeview(dlg, columns=("tag", "name", "tier"), show="headings",
                             style="Drill.Treeview", height=20)
         tree.heading("tag", text="Tag")
@@ -426,10 +442,7 @@ class StatusPanel(customtkinter.CTkFrame):
                                text_color="#D4A843").pack(pady=(0, 4), anchor="w", padx=12)
 
         style = ttk.Style()
-        style.configure("Queue.Treeview", background="#12141C", foreground="#DDE0EA",
-                        fieldbackground="#12141C", borderwidth=0, font=("Segoe UI", 10))
-        style.configure("Queue.Treeview.Heading", background="#181B26", foreground="#D4A843",
-                        borderwidth=0, font=("Segoe UI", 10, "bold"))
+        _admin_tree_style(style, "Queue")
 
         tree = ttk.Treeview(dlg, columns=("tag", "name", "tier", "status"), show="headings",
                             style="Queue.Treeview", height=14)
@@ -542,7 +555,10 @@ class StatusPanel(customtkinter.CTkFrame):
                                font=customtkinter.CTkFont(size=14, weight="bold"),
                                text_color="#D4A843").pack(pady=(12, 4))
         from tkinter import ttk
-        tree = ttk.Treeview(dlg, columns=("time", "type", "stage", "text"), show="headings", height=18)
+        style = ttk.Style()
+        _admin_tree_style(style, "ErrDrill")
+        tree = ttk.Treeview(dlg, columns=("time", "type", "stage", "text"), show="headings",
+                            style="ErrDrill.Treeview", height=18)
         tree.heading("time", text="Time")
         tree.heading("type", text="Type")
         tree.heading("stage", text="Stage")
@@ -674,8 +690,7 @@ class InfoPanel(customtkinter.CTkFrame):
                                text_color="#D4A843").pack(pady=(12, 4))
         from tkinter import ttk
         style = ttk.Style()
-        style.configure("ErrDrill.Treeview", background="#12141C", foreground="#DDE0EA",
-                        fieldbackground="#12141C", font=("Segoe UI", 10))
+        _admin_tree_style(style, "ErrDrill")
         tree = ttk.Treeview(dlg, columns=("type", "stage", "text", "time"), show="headings",
                             style="ErrDrill.Treeview", height=20)
         tree.heading("type", text="Type")
@@ -767,14 +782,7 @@ class BuildsPanel(customtkinter.CTkFrame):
             try:
                 from tkinter import ttk
                 style = ttk.Style()
-                style.theme_use("clam")
-                style.configure("Admin.Treeview",
-                                background="#12141C", foreground="#DDE0EA",
-                                fieldbackground="#12141C", borderwidth=0,
-                                font=("Segoe UI", 10))
-                style.configure("Admin.Treeview.Heading",
-                                background="#181B26", foreground="#D4A843",
-                                borderwidth=0, font=("Segoe UI", 10, "bold"))
+                _admin_tree_style(style, "Admin")
                 self._tree = ttk.Treeview(
                     self._tree_frame,
                     columns=("tag", "name", "status"),
@@ -916,11 +924,7 @@ class ErrorsPanel(customtkinter.CTkFrame):
             try:
                 from tkinter import ttk
                 style = ttk.Style()
-                style.theme_use("clam")
-                style.configure("Err.Treeview",
-                                background="#12141C", foreground="#DDE0EA",
-                                fieldbackground="#12141C", borderwidth=0,
-                                font=("Segoe UI", 10))
+                _admin_tree_style(style, "Err")
                 self._tree = ttk.Treeview(
                     self._tree_frame,
                     columns=("time", "type", "stage", "text"),
@@ -987,11 +991,7 @@ class SiteMapsPanel(customtkinter.CTkFrame):
             try:
                 from tkinter import ttk
                 style = ttk.Style()
-                style.theme_use("clam")
-                style.configure("SiteMap.Treeview",
-                                background="#12141C", foreground="#DDE0EA",
-                                fieldbackground="#12141C", borderwidth=0,
-                                font=("Segoe UI", 10))
+                _admin_tree_style(style, "SiteMap")
                 self._tree = ttk.Treeview(
                     self._tree_frame,
                     columns=("time", "event"),

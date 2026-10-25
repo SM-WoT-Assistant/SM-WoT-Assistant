@@ -3,6 +3,38 @@
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
 
+## 25.10.2026
+
+- **Адмінка v1.0.52: єдиний стиль Treeview (шапка+обводка) по всій адмінці.**
+  - **Привід:** у новій секції <Tactic Map Updates> титул-бар і обводка були БІЛІ
+    (дефолтний clam `#dcdad5` + 3D-рамка) — у той час як усі інші секції темні
+    з золотими заголовками. Аудит: той самий білий дефолт мали ще `Err.Treeview`,
+    діалоги Queue drill і ErrDrill — тобто проблема була класовою, не локальною.
+  - **Єдине джерело правди:** хелпер `_admin_tree_style(style, name)` у
+    `admin_ui/panels_content.py` (темний стиль: тіло `#12141C`/`#DDE0EA`,
+    шапка `#181B26`/`#D4A843` bold, borderwidth 0) — застосовано до ВСІХ 8
+    Treeview панелі/діалогів (SiteMaps, Errors, Builds + queue-drill повторно,
+    `_drilldown_errors`, ErrDrill ×2).
+  - **Корінь білої обводки (піксельні зонди 25.10.2026):** 2px світло-сіра
+    рамка навколо тіла дерева малюється **елементом `Treeview.field`** у
+    темі clam — НЕЯВНО, незалежно від `borderwidth=0`, `relief`, `lightcolor`/
+    `darkcolor` чи ключа `border` у layout (усі варіанти перевірено зондами:
+    білий вбивається лише lightcolor/darkcolor, сірий — лишається). Рішення:
+    `style.layout(f"{name}.Treeview", [("Treeview.treearea", {"sticky":"nswe"})])`
+    — без field рамки не малюється, фон дає style `background=#12141C`,
+    рядки — `fieldbackground`; шапка не залежить від field. Доказ: зонди
+    `D:\TMP\probe6_sweep.py` / `probe7_treearea.py` (CLEAN на всіх ребрах).
+  - **Верифікація (#1471):** AST ×2 + smoke-імпорт `admin_ui` OK; харнесь
+    `_archive/scripts/harness_site_maps_2026_10_23.py` **60/0 PASS**
+    (стаб `_StyleStub` доповнено методом `layout`); зонд через РЕАЛЬНИЙ
+    хелпер — CLEAN (0 білих/сірих пікселів). Перезбірка `build_admin.py` →
+    **v1.0.52** (guard `_internal` OK, 107 entries); PrintWindow-знімок
+    підтвердив: Ver 1.0.52, Time/Event золотом, обводки немає, інші секції
+    без змін.
+  - **Правило (надалі):** будь-який новий Treeview в адмінці — ТІЛЬКИ через
+    `_admin_tree_style` (жодного самостійного `style.configure(...Treeview...)`).
+
+
 ## 24.10.2026
 
 - **Адмінка v1.0.51: перезбір + інцидент втрати admin_settings.json + фікс класу.**
