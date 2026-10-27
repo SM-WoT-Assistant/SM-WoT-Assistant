@@ -4,6 +4,53 @@
 
 ---
 
+## Моніторинг зображень мап на сайті (28.10.2026, адмінка v1.0.54)
+
+**Мета** (рішення користувача 27.10.2026): повна синхронізація фонів не потрібна —
+тільки відстежувати зміни зображень мап на wotmapsbyyaya і **повідомляти про них
+в адмінці**.
+
+**Чому цього не робив клієнтський sweep:** сайт заливає нову версію фону як НОВИЙ
+timestamped-об'єкт (`pilsen<ts>.webp`), а старий URL лишається незмінним →
+клієнтський If-None-Match отримує 304 → `map_changed` не спрацьовує. Тому детекція
+живе в адмінці, де вже є Chrome.
+
+**Модуль:** `admin_backend/site_watch.py` (стандартна пара з іншими
+`admin_backend/*` — самодостатній, парсер карток свідомо дублює клієнтський
+`map_updater._card_entry`: клієнтські модулі не входять до адмін-бандлу, два
+незалежні deployment-таргети, як для іконок #1904).
+
+- **Що відстежує** — лише HEAD/URL, жодного завантаження зображень:
+  `url_changed` (головний клас: новий timestamped-об'єкт), `content_changed`
+  (той самий URL — інший ETag/size), `new_map`, `removed_map`.
+- **Chrome:** headless, іЗОЛЬОВАНИЙ профіль `%TEMP%\sm_wot_site_watch_profile`
+  (дефолтний user-data-dir заблокується запущеним Chrome користувача), 3-спробовий
+  retry з `_kill_chrome_matching` (патерн `admin_build_generator`).
+- **Маніфест:** `%APPDATA%/SM WoT Assistant/site_maps_watch.json` — для кожної
+  мапи `{url, etag, size}` + `last_checked` + `last_attempt`.
+- **Гейт `should_run()`:** базлайн (маніфесту немає) або `now - last_checked ≥
+  7 днів` **І** `now - last_attempt ≥ 1 год` (після збою повтор не частіше ніж
+  раз на годину). Перший запуск = **baseline**: пише маніфест, тільки Log, без
+  балона.
+- **Захист від хибних сповіщень:** 0 карток зі сторінки або менше 80% від
+  попередньої кількості (частковий рендер) → `status=error`, маніфест НЕ
+  перезаписується (старі URL/ETag збережені) + `report_fallback` → admin.html
+  Errors. Урок із зламаного `sync_all` (розмітка без `id` давала 0 мап мовчки).
+- **Інтеграція (#1598):** виклик із воркер-циклу `_loop` →
+  `AdminApp._check_site_watch()` → `site_watch.check()` на worker →
+  `self._site_watch_result` → `_bg_poll` (main thread) → `self.log(...)` +
+  `self.notify("Site maps", text)`. Повторення тієї ж помилки не спамить балоном
+  (`_last_site_watch_err`), але лишається в Log; успішні зміни завжди балонять.
+
+**Верифікація (#1471, 28.10.2026):** ast ×2; ізольований харнесс **20/0**
+(6 — `_diff`, 5 — `should_run`, 9 — `check()` з підміненим fetch/HEAD: baseline /
+unchanged / changed / fetch-error / partial-parse / summary балона); живий прогін
+**baseline 45 maps, 26.1s** (Pilsen → `pilsen1779159262103.webp` — правильний
+timestamped URL), живий **run2: unchanged 45, 21.1s**, `should_run → False`;
+імпорт-смоук `admin_ui.main_window` + `admin_backend.site_watch`.
+
+---
+
 ## Admin Build Pipeline — перенесення з клієнта (v1.0.73, 09.09.2026)
 
 ### Архітектура "Client ← Firebase ← Admin"

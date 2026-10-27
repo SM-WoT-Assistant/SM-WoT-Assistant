@@ -123,6 +123,8 @@ class AdminApp(customtkinter.CTk):
         self._site_events_result = None  # пакет для _bg_poll (worker → main)
         self._site_events_list: list = []  # кеш історії для секції Tactic Map Updates
         self._site_events_ping: bool = False  # worker → _bg_poll: оновити секцію
+        self._site_watch_result = None  # пакет site_watch для _bg_poll (worker → main)
+        self._last_site_watch_err: str = ""  # дедуп балона при повторі тієї ж помилки
         self._gen_progress: dict = {
             "running": False, "queue": [], "current_tag": None,
             "results": {}, "progress": (0, 0),
@@ -436,6 +438,9 @@ class AdminApp(customtkinter.CTk):
                     if now - self._last_site_poll > 86400:
                         self._last_site_poll = now
                         self._check_site_map_events()
+                    # Монітор змін зображень мап на сайті (тижневий тік;
+                    # gate — site_watch.should_run(), помилка → повтор за годину)
+                    self._check_site_watch()
                 except Exception:
                     pass
                 time.sleep(10)
@@ -468,6 +473,23 @@ class AdminApp(customtkinter.CTk):
                     _save_settings(self._settings)
                 except Exception:
                     pass
+            # Результат тижневого монітора зображень (site_watch): Log завжди,
+            # балон — на зміни та на НОВУ помилку (повтор того самого збою не
+            # спамить балоном, але лишається в Log).
+            res_w = self._site_watch_result
+            if res_w is not None:
+                self._site_watch_result = None
+                for line in res_w.get("lines", []):
+                    self.log(line)
+                text = res_w.get("text", "")
+                if res_w.get("status") == "error":
+                    if text and text != self._last_site_watch_err:
+                        self.notify("Site maps", text)
+                    self._last_site_watch_err = text
+                else:
+                    if text:
+                        self.notify("Site maps", text)
+                    self._last_site_watch_err = ""
             self.after(1000, _bg_poll)
 
         threading.Thread(target=_loop, daemon=True).start()
@@ -524,6 +546,26 @@ class AdminApp(customtkinter.CTk):
                     + "; ".join(msgs[:5]) + ("..." if len(msgs) > 5 else ""))
         self._site_events_result = {
             "lines": [f"SITE: {m}" for m in msgs], "text": text, "key": newest}
+
+    def _check_site_watch(self) -> None:
+        """Тижневий монітор змін зображень мап на сайті (site_watch).
+
+        Викликається з _loop (worker) — НІЯКИХ Tk-викликів тут (#1598);
+        доставка через _site_watch_result у _bg_poll (main thread). Gate
+        should_run(): базлайн → раз на тиждень, після помилки → за годину."""
+        try:
+            from admin_backend import site_watch
+            if not site_watch.should_run():
+                return
+            self._site_watch_result = site_watch.check()
+        except Exception as e:
+            # status="error" обов'язковий: без нього _bg_poll піде в else-гілку
+            # і балонитиме без дедупу.
+            self._site_watch_result = {
+                "status": "error",
+                "lines": [f"SITE WATCH error: {e}"],
+                "text": f"Site watch failed: {str(e)[:160]}",
+            }
 
     def _tray_open(self) -> None:
         self.after(0, self._restore_from_tray)
