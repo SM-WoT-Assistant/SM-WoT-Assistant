@@ -555,6 +555,36 @@ class MapManager:
                 finish()
         threading.Thread(target=checker, daemon=True).start()
 
+    def _tactic_candidate_ids(self, maps_dict):
+        """Арени, що реально можуть потрапити у TACTIC-список (Standard).
+
+        Ті самі фільтри, що в load_map_list (map_manager.py:937-950):
+        службові/евентні виключаються, має бути ctf-геймплей — інакше
+        створились би фони для comp7-варіантів і hangar_v4_fortrush,
+        які в TACTIC ніколи не показуються. map_data.json відсутній →
+        арена лишається кандидатом (як і в load_map_list).
+        """
+        if not isinstance(maps_dict, dict):
+            return []
+        data_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_data.json")
+        try:
+            with open(data_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception:
+            data = {}
+        out = []
+        for m in maps_dict:
+            if m.startswith("type/") or m.startswith("h33_"):
+                continue
+            if m in ("invalid_map", "hangar_v4", "_default_"):
+                continue
+            if m in _EVENT_MAP_IDS:
+                continue
+            if m in data and "ctf" not in (data[m].get("gameplayTypes") or {}):
+                continue
+            out.append(m)
+        return out
+
     def _detect_pending_tactic_maps(self):
         """HEAD-перевірка сайту: додавання + зміни тактичних мап.
 
@@ -586,6 +616,23 @@ class MapManager:
                 except Exception:
                     pass
                 return
+
+            # ── Локальна верифікація фонів (офлайн, ДО мережі) ──────
+            # Клієнт гри — джерело істини: фони, що не збігаються з
+            # мінікартою (сайт віддав чужу мапу), ремонтується з
+            # extracted_maps; відсутні — створюються. Після цього папка
+            # з'являється в existing_folders і мапа рухається з хвоста
+            # списку на алфавітне місце (Нібельбурґ, 26.10.2026).
+            try:
+                import map_updater
+                rep = map_updater.ensure_local_backgrounds(
+                    self._tactic_candidate_ids(maps_maps))
+                if rep.get("repaired") or rep.get("created"):
+                    print(f"[MAP_MGR] IMAGE GUARD: created={rep['created']} "
+                          f"repaired={rep['repaired']} ok={rep['ok']} "
+                          f"checked={rep['checked']}")
+            except Exception as e:
+                print(f"[MAP_MGR] IMAGE GUARD error: {e}")
 
             existing_folders = set()
             if os.path.isdir(config.MAPS_DIR):
@@ -675,6 +722,16 @@ class MapManager:
                         self._save_site_manifest(manifest)
                         self._on_site_map_event("map_changed", map_id, eng)
                         print(f"[MAP_MGR] TACTIC map updated: {eng} ({map_id})")
+                    else:
+                        # Відмова валідації (сайт віддав чужу мапу) або мережа.
+                        # Локальна копія вже пройшла guard і валідна — фіксуємо
+                        # ETag, щоб не качати ті самі байти щодня; якщо сайт
+                        # виправиться, ETag зміниться і перекачка відбудеться.
+                        local_ok, _ = map_updater.verify_map_background(map_id)
+                        if local_ok:
+                            manifest[map_id] = self._site_entry_from_headers(r.headers)
+                            self._save_site_manifest(manifest)
+                        print(f"[MAP_MGR] Download rejected/failed, local copy kept: {eng}")
                 except Exception as e:
                     print(f"[MAP_MGR] HEAD error for {eng}: {e}")
 

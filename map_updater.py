@@ -2,9 +2,11 @@
 import os
 import json
 import time
+import io
 import requests
 import html
 import urllib3
+from PIL import Image
 
 # Імпорт нашого модуля конфігурації
 import config as config
@@ -119,9 +121,25 @@ def sync_all(callback_status=None):
             try:
                 res = requests.get(url, headers=config.HEADERS, timeout=15, verify=False)
                 if res.status_code == 200 and len(res.content) > 1000:
-                    # Перевірка, чи це не помилка "Access Denied" у форматі XML
+                    # Перевірка, чи це не помилка "AccessDenied" у форматі XML
                     if b"AccessDenied" not in res.content[:150]:
-                        with open(file_path, "wb") as f: 
+                        ok, score = verify_image_for_name(name, res.content)
+                        if not ok:
+                            errors += 1
+                            _guard_report(
+                                "sync_all",
+                                f"{name}: сайт віддав картинку, що не збігається "
+                                f"з мінікартою клієнта (corr={score:.2f}) — відмова")
+                            # Старий файл могло бути видалено вище (зміна URL),
+                            # а байти ми відхилили — відновлюємо фон з клієнта
+                            # одразу, а не чекаючи наступного старту.
+                            for _mid in _folder_owners(
+                                    _safe_folder(_resolve_tactic_folder(name))):
+                                if ensure_map_background(_mid) != "skipped":
+                                    break
+                            time.sleep(0.1)
+                            continue
+                        with open(file_path, "wb") as f:
                             f.write(res.content)
                         downloaded += 1
                         log(f"  [{i+1}/{len(map_list)}] Завантажено: {name}")
@@ -159,6 +177,15 @@ def download_single_map(eng_name: str, url: str) -> bool:
         res = requests.get(url, headers=config.HEADERS, timeout=15, verify=False)
         if res.status_code == 200 and len(res.content) > 1000:
             if b"AccessDenied" not in res.content[:150]:
+                # Verifікація вмісту проти мінікарти клієнта: байти НЕ
+                # пишемо, якщо це не та мапа (див. image_guard в кінці файлу).
+                ok, score = verify_image_for_name(eng_name, res.content)
+                if not ok:
+                    _guard_report(
+                        "download_single_map",
+                        f"{eng_name}: сайт віддав картинку, що не збігається "
+                        f"з мінікартою клієнта (corr={score:.2f}) — відмова")
+                    return False
                 with open(file_path, "wb") as f:
                     f.write(res.content)
 
@@ -194,5 +221,216 @@ def download_single_map(eng_name: str, url: str) -> bool:
     except Exception as e:
         print(f"[MAP_DOWNLOAD] Помилка завантаження {eng_name}: {e}")
     return False
+
+
+# ══════════════════════════════════════════════════════════════════════
+# IMAGE GUARD — верифікація тактичних фонів проти мінікарти клієнта
+# ══════════════════════════════════════════════════════════════════════
+# Чому: фони TACTIC-режиму беруться зі стороннього сайту
+# (wotmapsbyyaya.com) за назвою мапи і приймались будь-які байти —
+# достатньо HTTP 200 + >1000 байт. Звірки з грою не було, тому:
+#   * pilsen.webp містив терен Редширу (corr 0.186 проти 0.879 у
+#     валідних) — у TACTIC замість Промзони малювався Редшир;
+#   * мап, яких немає на сайті (44 з 91 арени), лишалось без фону і
+#     з 23.10.2026 вони переносились у кінець списку (Нібельбурґ).
+# Правило: клієнт гри — джерело істини, сайт дає ТІЛЬКИ накреслення
+# поверх мінікарти. Тому фон звіряється з extracted_maps/<id>.png;
+# невалідний відхиляється при завантаженні (байти не пишуться),
+# відсутній/битий відновлюється з мінікарти клієнта.
+#
+# Виміряні значення Pearson (96×96 сірих, 43 фони): валідні
+# 0.730..0.968 (медіана 0.908), чужі 0.186 і 0.397 → поріг 0.5.
+_GUARD_THRESHOLD = 0.5
+_GUARD_SIZE = 96
+_GUARD_OUT = 1024
+_GUARD_REPORTED = set()
+_ref_cache = {}
+
+
+def _guard_report(stage, detail, level="warning"):
+    """Одне повідомлення на унікальний випадок: консоль + error_reports."""
+    if detail in _GUARD_REPORTED:
+        return
+    _GUARD_REPORTED.add(detail)
+    print(f"[MAP_GUARD] {level.upper()}: {detail}")
+    try:
+        import firebase_reporter
+        firebase_reporter.report_fallback(
+            "map_updater.image_guard", stage, detail, level)
+    except Exception:
+        pass
+
+
+def _signature(image, size=_GUARD_SIZE):
+    """Відцентрована сигнатура: 96×96 сірих мінус середнє."""
+    px = list(image.convert("L").resize((size, size)).tobytes())
+    mean = sum(px) / len(px)
+    return [p - mean for p in px]
+
+
+def _corr(a, b):
+    num = sum(x * y for x, y in zip(a, b))
+    da = sum(x * x for x in a) ** 0.5
+    db = sum(x * x for x in b) ** 0.5
+    return num / (da * db) if da and db else 0.0
+
+
+def _safe_folder(name):
+    """Той самий трансформ, що й у download_single_map/sync_all."""
+    return (name.replace('?', '').replace(':', '').replace('|', '')
+                .replace("'", '').replace(' - ', '_').replace(' ', '_'))
+
+
+def _resolve_tactic_folder(eng_key):
+    """Дзеркало MapManager._resolve_tactic_folder (map_manager.py:1036).
+
+    Потрібне без імпорту map_manager: той лени-імпортує цей модуль
+    (selenium), тож прямий імпорт був би циклічним. Обидві функції
+    читають лише config.TECH_MAPS_STAGING — міняти разом.
+    """
+    f = config.TECH_MAPS_STAGING.get(eng_key)
+    if f:
+        return f
+    for suf in ('_v', '_big', '_sm24', '_sm25', '_nom', '_scc', '_ctf'):
+        if eng_key.endswith(suf):
+            f = config.TECH_MAPS_STAGING.get(eng_key[:-len(suf)])
+            if f:
+                return f
+    return eng_key
+
+
+def _folder_owners(folder):
+    """Арени, чий TACTIC-фон лежить у цій папці (буває спільна: Nordskar)."""
+    return [mid for mid, eng in config.MAP_NAMES_EN.items()
+            if _safe_folder(_resolve_tactic_folder(eng)) == folder]
+
+
+def _client_ref(map_id):
+    """Сигнатура мінікарти клієнта extracted_maps/<id>.png (кеш у пам'яті)."""
+    if map_id in _ref_cache:
+        return _ref_cache[map_id]
+    ref = None
+    path = os.path.join(config.BASE_DIR, "extracted_maps", f"{map_id}.png")
+    if os.path.exists(path):
+        try:
+            with Image.open(path) as im:
+                ref = _signature(im)
+        except Exception:
+            ref = None
+    _ref_cache[map_id] = ref
+    return ref
+
+
+def _background_path(folder, eng_name):
+    """Як і MapRenderer.load_and_resize_map: map.webp, потім <eng>.jpg/.png."""
+    base = os.path.join(config.MAPS_DIR, folder)
+    for name in ("map.webp", f"{eng_name}.jpg", f"{eng_name}.png"):
+        p = os.path.join(base, name)
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _score(path, ref):
+    """corr фону з еталоном; -1 якщо файл битий/нечитабельний."""
+    if not path:
+        return -1.0
+    try:
+        with Image.open(path) as im:
+            return _corr(_signature(im), ref)
+    except Exception:
+        return -1.0
+
+
+def verify_image_for_name(eng_name, data):
+    """(ok, score) для ЗАВАНТАЖЕНИХ байтів: чи це справді мапа eng_name.
+
+    ok=True зі score=-1, якщо еталона в клієнті немає (перевірити не можемо).
+    """
+    try:
+        with Image.open(io.BytesIO(data)) as im:
+            sig = _signature(im)
+    except Exception:
+        return False, -1.0
+    best = -1.0
+    for mid in _folder_owners(_safe_folder(_resolve_tactic_folder(eng_name))):
+        ref = _client_ref(mid)
+        if ref is not None:
+            best = max(best, _corr(sig, ref))
+    if best < 0:
+        return True, -1.0
+    return best >= _GUARD_THRESHOLD, best
+
+
+def verify_map_background(map_id):
+    """(ok, score) для вже наявного локального фону арени."""
+    ref = _client_ref(map_id)
+    if ref is None:
+        return True, -1.0
+    eng = config.MAP_NAMES_EN.get(map_id, map_id)
+    path = _background_path(_safe_folder(_resolve_tactic_folder(eng)), eng)
+    if path is None:
+        return False, -1.0
+    score = _score(path, ref)
+    return score >= _GUARD_THRESHOLD, score
+
+
+def ensure_map_background(map_id):
+    """Створює або ремонтує maps/<folder>/map.webp з мінікарти клієнта.
+
+    Повертає 'created' | 'repaired' | 'ok' | 'skipped'.
+    """
+    ref = _client_ref(map_id)
+    if ref is None:
+        return "skipped"
+    eng = config.MAP_NAMES_EN.get(map_id, map_id)
+    folder = _safe_folder(_resolve_tactic_folder(eng))
+    base = os.path.join(config.MAPS_DIR, folder)
+    target = os.path.join(base, "map.webp")
+    existing = _background_path(folder, eng)
+    if existing is not None:
+        score = _score(existing, ref)
+        if score >= _GUARD_THRESHOLD:
+            return "ok"
+        action = "repaired"
+    else:
+        score, action = -1.0, "created"
+    try:
+        src = os.path.join(config.BASE_DIR, "extracted_maps", f"{map_id}.png")
+        with Image.open(src) as im:
+            out = im.convert("RGB").resize(
+                (_GUARD_OUT, _GUARD_OUT), Image.Resampling.LANCZOS)
+            buf = io.BytesIO()
+            out.save(buf, format="WEBP", quality=90)
+        os.makedirs(base, exist_ok=True)
+        with open(target, "wb") as f:
+            f.write(buf.getvalue())
+    except Exception as e:
+        _guard_report("ensure_map_background", f"{map_id}: фон не відновлено — {e}")
+        return "skipped"
+    if action == "repaired":
+        _guard_report(
+            "ensure_map_background",
+            f"{map_id}: невалідний фон (corr={score:.2f}) замінено мінікартою клієнта")
+    return action
+
+
+def ensure_local_backgrounds(map_ids):
+    """Валідація всіх наявних фонів + відсутніх з мінікарти клієнта.
+
+    Працює офлайн (мережа не потрібна) — викликається перед
+    мережевим sweep у MapManager._detect_pending_tactic_maps.
+    """
+    rep = {"checked": 0, "ok": 0, "created": 0, "repaired": 0, "skipped": 0}
+    for mid in map_ids:
+        rep["checked"] += 1
+        try:
+            st = ensure_map_background(mid)
+        except Exception as e:
+            _guard_report("ensure_local_backgrounds", f"{mid}: {e}")
+            st = "skipped"
+        rep[st] = rep.get(st, 0) + 1
+    return rep
+
 
 # map_updater_4_01.py
