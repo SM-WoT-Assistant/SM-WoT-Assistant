@@ -53,6 +53,45 @@
 
 ## 26.10.2026
 
+**Реліз v1.0.80 Beta (27.10.2026):** останній реліз лінії v1. Увійшли: IMAGE GUARD
+(26.10) + синхронізація допомоги/міні-допомоги (27.10) + адмінка 1.0.53.
+
+**Білд:** `python build.py 1.0.80` — Python 3.12.7 / PyInstaller 6.20.0, 3257
+дата-файлів; EXE 31.2 MB, Launcher 35.8 MB (bundle verification PASSED), Tray
+Watcher 7.9 MB, NSIS `SM_WoT_Assistant_Setup_v1.0.80_Beta.exe` 318.4 MB, Portable
+ZIP 358.6 MB, маніфест 374,833 B; verification PASSED (maps 53 / extracted_maps 111 /
+icons 1286); **GitHub release `v1.0.80 Beta`** (audit PASSED) → **RTDB
+`versions/1_0_80` + `latest`** (HTTP 200, audit PASSED, `download_url` збігається) →
+news (HTTP 200).
+
+**Smoke:** `dist/SM WoT Assistant v1.0.80/` → заголовок `<SM WoT Assistant v1.0.80 Beta>`,
+вікно створене, чистий kill.
+
+**Release Cleanup Protocol (#1497):** dist → 5 (1.0.76–1.0.80); GitHub → 5 релізів
+(v1.0.75 видалено, тег лишився); RTDB `versions/` → 6 ключів (1_0_75 → null
+адмін-токеном, перевірено GET=null).
+
+**Адмінка:** `admin_version.txt` → 1.0.53 (#1446) → `python build_admin.py` —
+EXE 31.6 MB, `_internal` 107 entries + `python312.dll` ✓,
+`_internal/admin_version.txt` = 1.0.53 (guard PASSED); запущену адмінку перед
+збіркою вбито (docs/release.md:64).
+
+**Знайдено під час релізу (не регресія):** `build.py:pull_base_schemes()` отримує
+**401** на RTDB `base_schemes` — і з API-ключем, і з адмін ID-токеном, хоча
+локальний `database.rules.json:77` задекларований як `".read": true`. Тобто
+задеплоєні правила RTDB не збігаються з файлом у репозиторії (остання правка
+`database.rules.json` — 01f4ec7, 23.09.2026). Наслідок: у бандл іде локальний
+`base_schemes.json` (`{}`, 3 байти) — **так само було і в 1.0.79**
+(`dist/SM WoT Assistant v1.0.79/_internal/base_schemes.json` = `{}`), тобто
+реліз не гірший за попередній. Потрібне окреме рішення: або deploy правил, або
+pull через токен/інший вузол.
+
+**Стан:** тег `v1.0.80` (коміт 0966902 = VERSION bump) — точка відкату релізу;
+`api-integration` фіксується як фінальний стан v1, подальша робота над v2 іде на
+новій гілці `v2` (v1-стан лишається недоторканим).
+
+## 26.10.2026
+
 - **IMAGE GUARD: системна верифікація тактичних фонів проти мінікарти клієнта.**
   - **Привід (дві скарги):** у TACTIC замість Промзони малювався Редшир; Нібельбурґ
     у TACTIC стояв останнім у списку (у MAPS — 23-й), через що виглядав як дубль
