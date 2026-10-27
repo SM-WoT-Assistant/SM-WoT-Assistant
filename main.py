@@ -3283,11 +3283,18 @@ class WotAssistantHQ:
             try:
                 import requests
                 import map_updater
+                import json
                 remaining = list(pending)
+                # URL-и з map_links.json — реальні об'єкти сайту (заповнює
+                # sync_all з DOM), fallback — шаблон від назви (resolve_site_url).
+                links = {}
+                try:
+                    with open(config.MAP_LINKS_FILE, "r", encoding="utf-8") as f:
+                        links = json.load(f)
+                except Exception:
+                    pass
                 for i, eng_name in enumerate(pending):
-                    clean = eng_name.replace('?', '').replace(':', '').replace('|', '')
-                    safe = clean.replace(' - ', '_').replace(' ', '_').lower()
-                    url = f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
+                    url = map_updater.resolve_site_url(eng_name, links)
                     try:
                         r = requests.head(url, timeout=5)
                         if r.status_code == 200:

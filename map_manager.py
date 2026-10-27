@@ -666,12 +666,21 @@ class MapManager:
 
             manifest = self._load_site_manifest()
 
+            # URL-и з map_links.json — реальні об'єкти сайту (заповнює
+            # sync_all з DOM: name<ts>.webp). Шаблон від назви всередині
+            # resolve_site_url лишається fallback'ом — він вказував на чужий
+            # об'єкт (maps/pilsen.webp = Редшир, 26.10.2026).
+            links = {}
+            try:
+                with open(config.MAP_LINKS_FILE, "r", encoding="utf-8") as f:
+                    links = json.load(f)
+            except Exception:
+                pass
+
             # ── Додавання: локальної картинки немає ──
             for map_id in new_maps:
                 eng = config.MAP_NAMES_EN.get(map_id, map_id)
-                clean = eng.replace('?', '').replace(':', '').replace('|', '')
-                safe = clean.replace(' - ', '_').replace(' ', '_').lower()
-                url = f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
+                url = map_updater.resolve_site_url(eng, links)
                 try:
                     r = requests.head(url, timeout=5)
                     if r.status_code == 200:
@@ -698,9 +707,7 @@ class MapManager:
             # ── Зміни: локальна картинка є → умовний HEAD за ETag ──
             for map_id in have_maps:
                 eng = config.MAP_NAMES_EN.get(map_id, map_id)
-                clean = eng.replace('?', '').replace(':', '').replace('|', '')
-                safe = clean.replace(' - ', '_').replace(' ', '_').lower()
-                url = f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
+                url = map_updater.resolve_site_url(eng, links)
                 entry = manifest.get(map_id) or {}
                 etag = entry.get("etag")
                 try:

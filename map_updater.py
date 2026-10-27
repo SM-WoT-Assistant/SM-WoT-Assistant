@@ -6,12 +6,54 @@ import io
 import requests
 import html
 import urllib3
+from urllib.parse import unquote
 from PIL import Image
 
 # Імпорт нашого модуля конфігурації
 import config as config
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+def _name_from_href(href):
+    """/map/El%20Halluf → «El Halluf» (fallback, коли data-name/id немає)."""
+    if not href or "/map/" not in href:
+        return None
+    seg = href.split("/map/")[-1].strip("/")
+    return html.unescape(unquote(seg)) if seg else None
+
+
+def _card_entry(card):
+    """(назва, URL) з картки списку мап або None, якщо назви немає.
+
+    Назва: data-name (поточна розмітка сайту) → href → id (legacy); 27.10.2026
+    картки вже без id, тож старий ланцюжок лише через id давав 0 мап і
+    sync_all падав у «МАПИ НЕ ЗНАЙДЕНО».
+    URL: <img src> — реальний об'єкт сайту (name<ts>.webp у R2); суфікс Card —
+    прев'ю того ж об'єкта, повнорозмірне зображення = той самий ключ без Card.
+    Шаблон від назви — лише fallback: він вказував на чужий об'єкт
+    (maps/pilsen.webp = терен Редширу, ETag 18.05.2026).
+    """
+    map_name = (card.get_attribute("data-name")
+                or _name_from_href(card.get_attribute("href"))
+                or card.get_attribute("id"))
+    if not map_name:
+        return None
+    clean_name = html.unescape(map_name.strip())
+    img_url = None
+    try:
+        imgs = card.find_elements("css selector", "img")
+        src = imgs[0].get_attribute("src") if imgs else None
+        if src:
+            img_url = (src[:-len("Card.webp")] + ".webp"
+                       if src.endswith("Card.webp") else src)
+    except Exception:
+        img_url = None
+    if not img_url:
+        safe_url_name = clean_name.lower().replace(' - ', '_').replace(' ', '_')
+        img_url = f"https://images.wotmapsbyyaya.com/maps/{safe_url_name}.webp"
+    return clean_name, img_url
+
 
 def sync_all(callback_status=None):
     """
@@ -70,12 +112,9 @@ def sync_all(callback_status=None):
         new_links = {}
         for card in cards:
             try:
-                map_name = card.get_attribute("id")
-                if map_name:
-                    clean_name = html.unescape(map_name.strip())
-                    safe_url_name = clean_name.lower().replace(' - ', '_').replace(' ', '_')
-                    img_url = f"https://images.wotmapsbyyaya.com/maps/{safe_url_name}.webp"
-                    new_links[clean_name] = img_url
+                entry = _card_entry(card)
+                if entry:
+                    new_links[entry[0]] = entry[1]
             except: 
                 continue
                 
@@ -221,6 +260,28 @@ def download_single_map(eng_name: str, url: str) -> bool:
     except Exception as e:
         print(f"[MAP_DOWNLOAD] Помилка завантаження {eng_name}: {e}")
     return False
+
+
+def resolve_site_url(eng_name, links=None):
+    """URL фону мапи на сайті: реальний запис із map_links.json → шаблон.
+
+    map_links.json заповнюється sync_all з DOM сайту (data-name + <img src>),
+    бо об'єкти лежать як name<ts>.webp, а не name.webp — шаблон від назви
+    вказував на чужий об'єкт (maps/pilsen.webp = Редшир, ETag 18.05.2026).
+    Ключі зіставляються нормалізовано: назва сайту може відрізнятись від
+    назви клієнта (Empires Border vs Empire's Border). Без запису — той самий
+    legacy-шаблон, що й раніше (поведінка без змін).
+    """
+    clean = eng_name.replace('?', '').replace(':', '').replace('|', '')
+    safe = clean.replace(' - ', '_').replace(' ', '_').lower()
+    if links:
+        target = safe.replace("'", "")
+        for key, url in links.items():
+            k = key.replace('?', '').replace(':', '').replace('|', '')
+            k = k.replace(' - ', '_').replace(' ', '_').lower().replace("'", "")
+            if k == target and url:
+                return url
+    return f"https://images.wotmapsbyyaya.com/maps/{safe}.webp"
 
 
 # ══════════════════════════════════════════════════════════════════════
