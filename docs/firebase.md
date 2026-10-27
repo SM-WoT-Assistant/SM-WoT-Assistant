@@ -101,3 +101,14 @@
 5. **`_exit_app`** пише `status=offline` (daemon thread — не блокує вихід). При hard-kill статус застаріє через 5 хв за `last_seen`.
 6. **RTDB rules** — змін не треба (`.read/.write: true` відкриті). Вузол `admin_app/` не конфліктує з клієнтським синком (stats_ai читає тільки `builds/` та `popular_tanks/`).
 
+
+## RTDB rules = джерело істини + обов'язковий deploy (27.10.2026)
+1. **`database.rules.json` у репозиторії — єдине джерело правил.** Правка файлу НЕ змінює прод, доки не зроблено:
+   `firebase deploy --only database --project sm-wot-assistant`
+   (firebase CLI 15.19.1, залогінений акаунтом проєкту; синтаксис перевіряється CLI перед release).
+2. **Інцидент 27.10.2026 — вузол `base_schemes`.** Коміт 01f4ec7 (23.09.2026) додав у `database.rules.json` блок `base_schemes` (`.read: true`) РАЗОМ з `news`, але deploy після цього коміту не робився. У живих правилах `base_schemes` не існував → діяв root `.read: false` → **HTTP 401 на `base_schemes.json`**: і з API-ключем у `build.py:pull_base_schemes()`, і з адмін ID-токеном (токен сам по собі валідний — `installations` з ним → 200). Наслідки: бандл їхав з порожнім `base_schemes.json` (`{}`, 3 байти — **і в 1.0.79, і в 1.0.80**), а клієнтський `firebase_drawings.fetch_base_schemes_sync()` (main.py:431) мовчки повертав `{}`. Вузол після деплою виявився порожнім (`null`) — 27 локальних `is_base`-схем у нього не потрапляли.
+3. **Верифікація правил — поведінковий дифф, бо REST не дає прочитати самі правила.** `GET /.settings/rules.json` → 401 навіть з адмін ID-токеном, тому живі правила звіряються по поведінці: GET по кожному вузлу + очікування з `database.rules.json` (200 = `.read: true`, 401 = `.read: auth != null`, інакше — розбіжність). До деплою 27.10: **17/18** збігались, відрізнявся лише `base_schemes`; після деплою: **18/18, 0 розбіжностей**. Такий самий probe запускати після КОЖНОГО майбутнього деплою правил.
+4. **`build.py:pull_base_schemes()` тепер FATAL на 401/403** (build.py:238): білд зупиняється з підказкою `firebase deploy --only database` замість того, щоб мовчки запакувати застарілий `{}`. Решта мережевих збоїв (5xx, таймаут) — попередження, як і раніше; порожній вузол (`null`) — це легальний випадок, він пише `{}`.
+5. **`base_schemes.json` у репозиторії — реальний seed** (27 схем, ~900 КБ після `pull_base_schemes()`). Оновлює його сам build.py: `pull_base_schemes()` → `commit_version_files()` (`git add -A` + commit) перед PyInstaller, тому дерево не лишається брудним після збірки.
+6. **Зміни 27.10.2026:** deploy правил (18/18), сідування 27 локальних `is_base`-схем у RTDB адмін-токеном, `base_schemes.json` = 27 схем, FATAL-гард у `build.py`.
+

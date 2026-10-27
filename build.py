@@ -236,8 +236,15 @@ def clean_dist():
 
 
 def pull_base_schemes():
-    """Pull base_schemes from RTDB into base_schemes.json for bundling."""
+    """Pull base_schemes from RTDB into base_schemes.json for bundling.
+
+    401/403 is FATAL: it means the deployed RTDB rules drifted from
+    database.rules.json (rule never deployed / node not readable), and the
+    stale local file would silently ship as an empty seed - exactly how
+    v1.0.79/v1.0.80 went out with base_schemes.json = {}.
+    """
     import urllib.request
+    import urllib.error
     RTDB_URL = "https://sm-wot-assistant-default-rtdb.europe-west1.firebasedatabase.app"
     out_path = os.path.join(BASE_DIR, "base_schemes.json")
     try:
@@ -250,8 +257,16 @@ def pull_base_schemes():
             json.dump(data, f, ensure_ascii=False, indent=2)
         print(f"[BUILD] base_schemes.json: {len(data)} schemes from RTDB")
         return True
+    except urllib.error.HTTPError as e:
+        if e.code in (401, 403):
+            print(f"[BUILD] FATAL: base_schemes pull HTTP {e.code} - RTDB rules "
+                  f"drift (database.rules.json not deployed?). "
+                  f"Fix: firebase deploy --only database")
+            sys.exit(1)
+        print(f"[BUILD] base_schemes pull failed (HTTP {e.code}) - keeping existing file")
+        return False
     except Exception as e:
-        print(f"[BUILD] base_schemes pull failed ({e}) — keeping existing file")
+        print(f"[BUILD] base_schemes pull failed ({e}) - keeping existing file")
         return False
 
 
