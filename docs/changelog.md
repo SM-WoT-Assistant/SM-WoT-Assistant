@@ -116,6 +116,29 @@ probe → 18/18. Патч-реліз 1.0.81 **не робимо** — оновл
 білд v2 (рішення користувача). Документація: `docs/firebase.md`, секція
 «RTDB rules = джерело істини + обов'язковий deploy».
 
+**Реліз 1.0.81 Beta (27.10.2026, патч-реліз — рішення користувача після
+фінального v1):** зібрано на гілці `v2`, дельта від 1.0.80 = **0 змін коду
+клієнта** (тільки сід + гард білду + документи).
+- **Зміст:** `base_schemes.json` = 27 схем у бандлі (904 581 байт) замість `{}` —
+  базові схеми нарешті доходять до звичайних користувачів (єдиний шлях
+  доставки — бандл, `main.py:359`); FATAL-гард `build.py:pull_base_schemes`
+  на 401/403; секція RTDB rules у `docs/firebase.md`.
+- **Білд:** префлайт `test_scheme_coords.py` 14/14; PyInstaller 6.20.0/Py3.12.7,
+  3257 датафайлів; EXE 31.2 MB, Launcher 35.8 MB (bundle verification PASSED),
+  Tray Watcher 7.9 MB, NSIS 318.5 MB, Portable ZIP 361.7 MB; у лозі ключовий
+  рядок `[BUILD] base_schemes.json: 27 schemes from RTDB`; Verification PASSED;
+  GitHub release audit PASSED (`name='v1.0.81 Beta'`, `prerelease=True`) →
+  RTDB `1_0_81` + `latest` audit PASSED (download_url) → news (HTTP 200).
+- **Смоук:** титул `<SM WoT Assistant v1.0.81 Beta>`, чистий kill; у бандлі
+  `_internal\base_schemes.json` = 904 581 байт, 27 схем, усі з `elements`;
+  AppData не зачіпався (saved_schemes.json: 34 записи / 27 `is_base`, mtime 24.10).
+- **Cleanup #1497:** dist → 5 (1.0.77–1.0.81); GitHub → 5 (реліз **v1.0.76**
+  видалено, тег лишається); RTDB → `1_0_76` = null (5 + `latest`).
+- **Теги:** `v1.0.81` (від білду) + **`v1.0.81-final`** — точка відкату v1
+  перенесена з `v1.0.80-final` (той видалено local+remote; коміт 80-го залишається
+  під тегом `v1.0.80`). Гілка `api-integration` не чіпалась; робота триває на `v2`
+  (HEAD `e9a75cc chore: bump to v1.0.81`).
+
 ## 26.10.2026
 
 - **IMAGE GUARD: системна верифікація тактичних фонів проти мінікарти клієнта.**
