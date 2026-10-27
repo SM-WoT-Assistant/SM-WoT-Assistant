@@ -40,6 +40,9 @@ prompt_*.txt
 # Backup-файли (генеруються при помилках)
 *.broken_fallback_backup.json
 
+# One-shot migration backups (схеми перед wipe'ом, #2033) — тільки локально
+*.bak_pre_wipe
+
 # Runtime артефакти вбудованого браузера (cache/history/logs)
 browser_profile/
 
