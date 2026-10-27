@@ -44,7 +44,7 @@ class HelpManager:
 
     def _make_helpers(self, parent, bg, hotkey_fg, desc_fg, title_fg, hint_fg):
         _r = [0]
-        def row(hotkey, desc, first=False, wrap=280):
+        def row(hotkey, desc, first=False, wrap=460):
             p = (6, 0) if first else (0, 0)
             tk.Label(parent, text=hotkey, bg=bg, fg=hotkey_fg, font=("Arial", 9, "bold"),
                      anchor="w").grid(row=_r[0], column=0, sticky="w", pady=p, padx=(0, 8))
@@ -63,11 +63,12 @@ class HelpManager:
             _r[0] += 1
         def hint(text):
             tk.Label(parent, text=text, bg=bg, fg=hint_fg, font=("Arial", 8),
-                     anchor="w").grid(row=_r[0], column=0, columnspan=2, sticky="w", pady=(0, 2))
+                     anchor="w", justify="left", wraplength=700).grid(row=_r[0], column=0, columnspan=2, sticky="w", pady=(0, 2))
             _r[0] += 1
         def frow(fr_left, desc):
             fr_left.grid(row=_r[0], column=0, sticky="w", pady=(6, 0), padx=(0, 8))
-            tk.Label(parent, text=desc, bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w").grid(row=_r[0], column=1, sticky="w", pady=(6, 0))
+            tk.Label(parent, text=desc, bg=bg, fg=desc_fg, font=("Arial", 9), anchor="w",
+                     justify="left", wraplength=540).grid(row=_r[0], column=1, sticky="w", pady=(6, 0))
             _r[0] += 1
         def final_sep():
             tk.Frame(parent, bg="#333", height=1).grid(row=_r[0], column=0, columnspan=2, sticky="ew", pady=(8, 4))
@@ -126,7 +127,10 @@ class HelpManager:
         l_frow(fr, self.app.t('ui', 'help_f8'))
         l_row("TAB", self.app.t('ui', 'help_e'))
         l_row("F1", self.app.t('ui', 'help_f1'))
-        l_row(self.app.t('ui', 'help_size_slider'), "")
+        l_row("LMB / Ctrl+LMB", self.app.t('ui', 'help_ctrl_lmb_drag'))
+        l_row("↑ / ↓", self.app.t('ui', 'help_window_resize'))
+        l_row("← / →", self.app.t('ui', 'help_ctrl_leftright'))
+        l_hint(self.app.t('ui', 'help_armed_hint'))
 
         l_section(self.app.t('ui', 'help_section_battle'))
         fr_b = tk.Frame(left_col, bg=bg)
@@ -143,11 +147,14 @@ class HelpManager:
 
         l_section(self.app.t('ui', 'help_section_draw'))
         l_row("LMB + drag", self.app.t('ui', 'help_lmb_drag'))
-        l_row("Ctrl + LMB + drag", self.app.t('ui', 'help_ctrl_lmb_drag'))
-        l_row("Ctrl + drag arrow", self.app.t('ui', 'help_ctrl_arrow_drag'))
+        l_row("V", self.app.t('ui', 'help_tool_v'))
+        l_row("Move tool / Alt", self.app.t('ui', 'help_tool_move'))
+        l_row("Shift + LMB", self.app.t('ui', 'help_multi_select'))
+        l_row("Arrow tip", self.app.t('ui', 'help_ctrl_arrow_drag'))
         l_row(self.app.t('ui', 'help_hotkey_right_click'), self.app.t('ui', 'help_right_click'))
-        l_row("Ctrl + \u2191", self.app.t('ui', 'help_ctrl_up'))
-        l_row("Ctrl + \u2193", self.app.t('ui', 'help_ctrl_down'))
+        l_row("Ctrl + ↑", self.app.t('ui', 'help_ctrl_up'))
+        l_row("Ctrl + ↓", self.app.t('ui', 'help_ctrl_down'))
+        l_row("Del / Esc", self.app.t('ui', 'help_del_esc'))
         l_row("Ctrl + Z", self.app.t('ui', 'help_ctrl_z'))
         l_row("Ctrl + A", self.app.t('ui', 'help_select_all'))
         l_row("Ctrl + C", self.app.t('ui', 'help_copy'))
@@ -156,6 +163,7 @@ class HelpManager:
         l_section(self.app.t('ui', 'help_section_palette'))
         l_row(self.app.t('ui', 'help_hotkey_row1'), self.app.t('ui', 'help_palette_row1'))
         l_row(self.app.t('ui', 'help_hotkey_row2'), self.app.t('ui', 'help_palette_row2'))
+        l_row("Size", self.app.t('ui', 'help_size_slider'))
         l_row(self.app.t('ui', 'help_hotkey_delete'), self.app.t('ui', 'help_palette_delete'))
         l_row(self.app.t('ui', 'help_hotkey_status_row'), self.app.t('ui', 'help_palette_status'))
         l_row(self.app.t('ui', 'help_hotkey_click_empty'), self.app.t('ui', 'help_palette_click_empty'))
@@ -240,6 +248,22 @@ class HelpManager:
         tk.Label(fr_s9, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
         tk.Label(fr_s9, text=" " + self.app.t('ui', 'close_with_game'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
         r_frow(fr_s9, self.app.t('ui', 'help_setting_close_with_game'))
+        fr_s10 = tk.Frame(right_col, bg=bg)
+        tk.Label(fr_s10, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
+        tk.Label(fr_s10, text=" " + self.app.t('ui', 'set_wot_path'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
+        r_frow(fr_s10, self.app.t('ui', 'help_setting_set_wot_path'))
+        fr_s11 = tk.Frame(right_col, bg=bg)
+        tk.Label(fr_s11, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
+        tk.Label(fr_s11, text=" " + self.app.t('ui', 'auto_window_size'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
+        r_frow(fr_s11, self.app.t('ui', 'help_setting_auto_window_size'))
+        fr_s12 = tk.Frame(right_col, bg=bg)
+        tk.Label(fr_s12, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
+        tk.Label(fr_s12, text=" " + self.app.t('ui', 'mode_overlay'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
+        r_frow(fr_s12, self.app.t('ui', 'help_setting_mode_overlay'))
+        fr_s13 = tk.Frame(right_col, bg=bg)
+        tk.Label(fr_s13, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
+        tk.Label(fr_s13, text=" " + self.app.t('ui', 'use_mod'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
+        r_frow(fr_s13, self.app.t('ui', 'help_setting_use_mod'))
         r_sep()
         fr_warn = tk.Frame(right_col, bg=bg)
         tk.Label(fr_warn, text="\u26A0", font=("Arial", 10), bg=bg, fg="#ff6b6b").pack(side="left")

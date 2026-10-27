@@ -331,7 +331,7 @@ class MapRenderer:
             elif app.mode == "edit":
                 version = config.load_version()
                 app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
-                line1 = f"LMB: {app.t('ui', 'help_ctrl_lmb')}"
+                line1 = f"LMB: {app.t('ui', 'help_ctrl_lmb')}{app.t('ui', 'mini_unlock_hint')}"
                 line2 = f"\u2195: {app.t('ui', 'help_ctrl_updown')} | \u2194: {app.t('ui', 'help_ctrl_leftright')}"
                 line3 = f"Shift+\u2195: {app.t('ui', 'help_ctrlshift_updown')}"
                 app.canvas.create_text(cw//2, ch - 90, text=line1, fill="#aaaaaa", font=("Arial", 9), tags="map")
@@ -358,6 +358,8 @@ class MapRenderer:
                 fill="#888888", font=("Arial", 12), tags="map")
             app.canvas.create_text(cw//2, ch - 232, text="wotmapsbyyaya.com/maps",
                 fill="#888888", font=("Arial", 10), tags="map")
+            app.canvas.create_text(cw//2, ch - 216, text=app.t('ui', 'tactic_source_note'),
+                fill="#666666", font=("Arial", 8), tags="map")
             app.canvas.create_text(cw//2, ch - 165, text=app.t('ui', 'borderless_warning'),
                 fill="red", font=("Arial", 10), tags="map")
             
