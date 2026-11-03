@@ -120,7 +120,7 @@ class WotAssistantHQ:
         self.root.attributes("-topmost", True)
 
         self.mode = "edit" 
-        self.map_mode = 1 
+        self.map_mode = 2 
         self.dialog_open = False 
         self.edit_focus_lock = False
         self._last_mode_hotkey_ts = 0.0
@@ -128,7 +128,7 @@ class WotAssistantHQ:
         self._startup_complete = False
         self._tray_icon = None
         self._hidden_by_f10 = False
-        self._hidden_by_battle = False  # mod ON: window withdrawn for the battle
+        self._hidden_by_battle = False  # battle: window withdrawn (mod draws on the minimap)
         self._restored_by_battle = False
         self._battle_edit_return = None  # after-id повернення в edit після бою (скасовується при новому бою)
         self._restore_button = None
@@ -164,31 +164,17 @@ class WotAssistantHQ:
         self.ai_icons = {} # Кеш іконок для Treeview
         self.ai_filters = {"nation": None, "class": None, "tier": None}
         
-        self.compact_descr_map = {
-            v["compact_descr"]: {"key": k, "class": v["class"], "name": v["name"]}
-            for k, v in self.tank_db.items()
-            if v.get("compact_descr")
-        }
-        
         self.w = self.settings.get("edit_w", 800)
         self.h = self.w + 160
         self.alpha = self.settings.get("edit_alpha", 1.0)
-        self.contrast = self.settings.get("edit_contrast", 1.0)
         
         self._start_to_tray = "--tray" in sys.argv
-        self.auto_sync_var = tk.BooleanVar(value=self.settings.get("auto_sync", False))
-        self.auto_battle_var = tk.BooleanVar(value=self.settings.get("auto_battle", False))
         self._unhide_on_battle_var = tk.BooleanVar(value=self.settings.get("unhide_on_battle", True))
-        self.auto_mode_filter_var = tk.BooleanVar(value=self.settings.get("auto_mode_filter", True))
-        self.auto_vehicle_filter_var = tk.BooleanVar(value=self.settings.get("auto_vehicle_filter", True))
         self.auto_update_var = tk.BooleanVar(value=self.settings.get("auto_update", True))
         self._launch_on_game_start_var = tk.BooleanVar(value=self.settings.get("launch_on_game_start", False))
         self._start_minimized_var = tk.BooleanVar(value=self.settings.get("start_minimized", False))
         self._close_with_game_var = tk.BooleanVar(value=self.settings.get("close_with_game", False))
-        self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", True))
-        self._use_mod_var = tk.BooleanVar(value=self.settings.get("use_mod", False))
-        # Похідна змінна режиму показу схем: оверлей = НЕ мод (єдине джерело правди — use_mod)
-        self._use_overlay_var = tk.BooleanVar(value=not self.settings.get("use_mod", False))
+        self._auto_window_size_var = tk.BooleanVar(value=self.settings.get("auto_window_size", False))
 
         # Оновити HKCU\Run на кожному старті — щоб старий launcher.exe --tray
         # замінився на tray_watcher.exe після оновлення.
@@ -282,7 +268,6 @@ class WotAssistantHQ:
             self.on_battle_ended,
             self.on_minimap_appeared,
             self.on_battle_countdown_started,
-            self.on_vehicle_detected,
             # 17.10: staleness-гейт backward-скана помилок мода — game.log
             # append-only, у вікні лежать помилки старих білдів (#2053).
             wot_path=self.settings.get("wot_path", ""),
@@ -515,11 +500,30 @@ class WotAssistantHQ:
         except Exception:
             pass
 
+    def _po_place_top(self):
+        """Підняти оверлей над грою, а потім власні topmost-вікна над ним.
+
+        Оверлей і панелі (палітра, F1-довідка, налаштування) — усі topmost,
+        тому порядок визначає останній lift: без цього перепідняття оверлей
+        накриває елементами схеми вікно налаштувань (скрін 01.11.2026).
+        """
+        if not hasattr(self, '_po_win') or not self._po_win.winfo_exists():
+            return
+        self._po_win.lift()
+        for w in (getattr(self, 'drawing_palette', None),
+                  getattr(getattr(self, 'help_manager', None), '_help_win', None),
+                  getattr(getattr(self, 'ui_mgr', None), '_settings_win', None)):
+            try:
+                if w is not None and w.winfo_exists() and w.state() != 'withdrawn':
+                    w.lift()
+            except Exception:
+                pass
+
     def _lift_overlay(self):
         if self._hidden_by_f10:
             return
         if hasattr(self, '_po_win') and self._po_win.winfo_exists() and self._po_win.state() != "withdrawn":
-            self._po_win.lift()
+            self._po_place_top()
 
     def _on_root_focus_in(self, event=None):
         self.root.after_idle(self._lift_overlay)
@@ -538,13 +542,11 @@ class WotAssistantHQ:
                 return
             if not self.current_map_eng:
                 return
-            if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
-                return
-            if not self._overlay_display_allowed():  # mod ON + norm: never over the game
+            if self._hidden_by_battle:  # battle: overlay stays off (#1355)
                 return
             self._po_win.deiconify()
             self._sync_po_pos()
-            self._po_win.lift()
+            self._po_place_top()
 
     def get_edit_extra_height(self):
         """Висота службових панелей у режимі редагування (щоб мапа залишалася квадратною)."""
@@ -597,17 +599,12 @@ class WotAssistantHQ:
             self.settings[f"{prefix}x"] = cx
             self.settings[f"{prefix}y"] = cy
         self.settings[f"{prefix}alpha"] = self.alpha
-        self.settings[f"{prefix}contrast"] = self.contrast
-        self.settings["auto_sync"] = self.auto_sync_var.get()
-        self.settings["auto_battle"] = self.auto_battle_var.get()
         self.settings["unhide_on_battle"] = self._unhide_on_battle_var.get()
-        self.settings["auto_mode_filter"] = self.auto_mode_filter_var.get()
-        self.settings["auto_vehicle_filter"] = self.auto_vehicle_filter_var.get()
         self.settings["auto_update"] = self.auto_update_var.get()
         self.settings["launch_on_game_start"] = self._launch_on_game_start_var.get()
         self.settings["start_minimized"] = self._start_minimized_var.get()
         self.settings["close_with_game"] = self._close_with_game_var.get()
-        self.settings["use_mod"] = self._use_mod_var.get()
+        self.settings["auto_window_size"] = self._auto_window_size_var.get()
         self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
         
         if hasattr(self, 'log_watcher'):
@@ -843,11 +840,6 @@ class WotAssistantHQ:
 
     def reload_tank_data(self):
         self.tank_db = self.data_mgr.load_tank_db()
-        self.compact_descr_map = {
-            v["compact_descr"]: {"key": k, "class": v["class"], "name": v["name"]}
-            for k, v in self.tank_db.items()
-            if v.get("compact_descr")
-        }
         if hasattr(self, "stats_ai_module") and self.stats_ai_module:
             self.stats_ai_module.tank_db = self.tank_db
             self.stats_ai_module.reload_tth_data()
@@ -919,9 +911,9 @@ class WotAssistantHQ:
         self._last_mode_hotkey_ts = 0
 
     def _battle_hide_window(self, source='?'):
-        """Mod ON: the app must not appear over the battle at all - the user
-        rule is "either the overlay or the minimap mod, never both"
-        (01.10.2026). Skipped when the window is already in the tray (F10)."""
+        """The app must not appear over the battle at all - the schemes in
+        battle are drawn by the mod on the minimap (v2.0: always on).
+        Skipped when the window is already in the tray (F10)."""
         if self._hidden_by_f10 or self._hidden_by_battle:
             _win_dbg('hide skipped (f10=%s already=%s)'
                      % (self._hidden_by_f10, self._hidden_by_battle))
@@ -931,7 +923,7 @@ class WotAssistantHQ:
             if hasattr(self, '_po_win') and self._po_win.winfo_exists():
                 self._po_win.withdraw()
             self._hidden_by_battle = True
-            _win_dbg('hide OK src=%s (use_mod=%s)' % (source, bool(self._use_mod_var.get())))
+            _win_dbg('hide OK src=%s' % source)
         except Exception as _e:
             _win_dbg('hide FAILED src=%s: %r' % (source, _e))
 
@@ -952,147 +944,8 @@ class WotAssistantHQ:
         except Exception as _e:
             _win_dbg('show FAILED src=%s: %r' % (source, _e))
 
-    def _overlay_display_allowed(self):
-        """Mod ON -> nothing of the app may stand over the game in NORM mode
-        (hangar/battle): schemes are drawn by the mod on the minimap only.
-        The editor (edit mode) always shows. Mod OFF -> legacy overlay."""
-        if self._use_mod_var.get() and self.mode != "edit":
-            return False
-        return True
-
-    def toggle_editor(self):
-        if self.dialog_open: return
-        # Tab explicitly asks for the editor: show a battle-hidden window back
-        self._battle_show_window('toggle_tab')
-
-        if self.mode == "edit" and self.active_view in ("stats", "ai_stats"):
-            msg = self.t('ui', 'status_auto_mode_unavailable')
-            print(msg)
-            return
-
-        self.save_settings() 
-        if hasattr(self, '_rsz_timer'):
-            self.root.after_cancel(self._rsz_timer)
-        self.battle_status_top.pack_forget()
-        self.top_bar.pack_forget()
-        if hasattr(self, 'identity_bar'): self.identity_bar.pack_forget()
-        if hasattr(self, 'second_row'): self.second_row.pack_forget()
-        self.map_toolbar.pack_forget()
-        self.filter_panel.pack_forget()
-        self.status_label.pack_forget()
-        self.canvas.pack_forget()
-        self.browser_frame.pack_forget()
-        if hasattr(self, 'ai_frame'): self.ai_frame.pack_forget()
-
-        if self.mode == "edit":
-            self.mode = "norm"
-            self.win_mgr.set_clickthrough(False)
-            if self.active_view == "maps":
-                self.battle_status_top.pack(side="top", fill="x")
-                self.canvas.pack(side="top", fill="both", expand=True)
-            elif self.active_view in ("stats", "ai_stats"):
-                self.mode = "edit"
-                self.win_mgr.set_clickthrough(False)
-                self.top_bar.pack(side="top", fill="x")
-                if hasattr(self, 'identity_bar'): self.identity_bar.pack(side="top", fill="x")
-        else:
-            self.mode = "edit"
-            self.win_mgr.set_clickthrough(False)
-            self.top_bar.pack(side="top", fill="x")
-            if hasattr(self, 'identity_bar'): self.identity_bar.pack(side="top", fill="x")
-
-        if self.active_view == "maps":
-            self.status_label.pack_forget()
-            if self.mode == "edit":
-                self.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
-                if hasattr(self, 'second_row') and firebase_identity.is_registered() and hasattr(self, '_cached_groups') and len(self._cached_groups) > 1:
-                    self.second_row.pack(side="top", fill="x")
-                    self.ui_mgr._refresh_group_selector()
-                self.filter_panel.pack(side="bottom", fill="x")
-                self.status_label.pack(side="bottom", fill="x")
-                self.status_label.config(height=2, bg="#1a1a1a")
-            self.canvas.pack(side="top", fill="both", expand=True)
-            self.painter.redraw()
-        elif self.active_view == "stats":
-            if hasattr(self, 'drawing_palette'):
-                self.drawing_palette.exit_edit_mode()
-                if self.drawing_palette.state() != 'withdrawn':
-                    self.drawing_palette.withdraw()
-            self.status_label.pack(side="bottom", fill="x")
-            self.browser_frame.pack(side="top", fill="both", expand=True)
-        elif self.active_view == "ai_stats":
-            if hasattr(self, 'drawing_palette'):
-                self.drawing_palette.exit_edit_mode()
-                if self.drawing_palette.state() != 'withdrawn':
-                    self.drawing_palette.withdraw()
-            self.ai_frame.pack(side="top", fill="both", expand=True)
-            self.status_label.pack(side="bottom", fill="x")
-
-        prefix = "edit_" if self.mode == "edit" else "norm_"
-        self.w = self.settings.get(f"{prefix}w", 800 if self.mode=="edit" else 500)
-        if self.mode == "edit":
-            self.h = self.w + self.get_edit_extra_height()
-        else:
-            self.h = self.w + 18
-        self.settings[f"{prefix}w"] = self.w
-        self.settings[f"{prefix}h"] = self.h
-        self.alpha = self.settings.get(f"{prefix}alpha", 0.5 if self.mode == "norm" else 1.0)
-        self.contrast = self.settings.get(f"{prefix}contrast", 1.0)
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        if self.mode == "edit":
-            px = self.settings.get(f"{prefix}x", (sw - self.w) // 2)
-            py = self.settings.get(f"{prefix}y", (sh - self.h) // 2)
-        else:
-            default_x = max(-10, sw - self.w + 10)
-            default_y = max(-10, sh - self.h + 10)
-            px = self.settings.get(f"{prefix}x", default_x)
-            py = self.settings.get(f"{prefix}y", default_y)
-            px = max(-10, min(int(px), max(-10, sw - self.w + 10)))
-            py = max(-10, min(int(py), max(-10, sh - self.h + 10)))
-        
-        self.root.geometry(f"{self.w}x{self.h}+{px}+{py}")
-        self.root.attributes("-alpha", 0.0)
-        if self.mode == "norm":
-            if not self.settings.get("norm_pos_v2", False):
-                px = max(-10, sw - self.w + 10)
-                py = max(-10, sh - self.h + 10)
-                self.settings["norm_x"] = px
-                self.settings["norm_y"] = py
-                self.settings["norm_cx"] = px + self.w // 2
-                self.settings["norm_cy"] = py + self.h // 2
-                self.settings["norm_alpha"] = 0.5
-                self.settings["norm_pos_v2"] = True
-                self.alpha = 0.5
-                self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
-                self.root.geometry(f"{self.w}x{self.h}+{int(px)}+{int(py)}")
-            self.root.aspect(1, 1, 1, 1)
-            self.root.minsize(1, 1)
-        elif self.mode == "edit":
-            self.root.aspect(1, 1, 100, 1)
-            self.root.minsize(500, 500 + self.get_edit_extra_height())
-        if not hasattr(self, '_canvas_cfg_bound'):
-            self.canvas.bind("<Configure>", self._on_canvas_resize, "+")
-            self._canvas_cfg_bound = True
-        self.map_renderer.show_main_splash()
-        # Перезаписуємо позицію в settings — це єдине чесне джерело: будь-який
-        # race-запис (drag-потік, save_settings з чужого потоку) перезапишеться
-        # тут актуальною edit/norm-позицією, яку ми щойно встановили.
-        self.settings[f"{prefix}x"] = int(px)
-        self.settings[f"{prefix}y"] = int(py)
-        if self.mode == "edit":
-            self.settings[f"{prefix}cx"] = int(px) + self.w // 2
-            self.settings[f"{prefix}cy"] = int(py) + self.h // 2
-        # Mod ON + norm: instead of showing the overlay over the game the
-        # window is turned OFF (вимикання, user rule 03.10.2026). Tab back to
-        # edit shows it again via _battle_show_window.
-        if self.mode == "norm" and not self._overlay_display_allowed():
-            self._battle_hide_window('toggle_norm')
-        self.root.attributes("-alpha", self.alpha)
-        self.refresh_mode_indicator()
-        self.root.after(0, self._adjust_for_canvas)
-
     def _adjust_for_canvas(self):
-        if self.mode != "edit" or self.active_view not in ("maps", "tactic"):
+        if self.mode != "edit" or self.active_view != "maps":
             return
         self.root.update_idletasks()
         cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
@@ -1109,7 +962,7 @@ class WotAssistantHQ:
         if hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._po_win.withdraw()
             self.root.update_idletasks()
-            if not self._hidden_by_battle and self._overlay_display_allowed():
+            if not self._hidden_by_battle:
                 self._po_win.deiconify()
             self._sync_po_pos()
             self.painter.redraw()
@@ -1119,8 +972,6 @@ class WotAssistantHQ:
             return
         if getattr(self, '_redrawing', False):
             return
-        if self.mode == "norm":
-            self.root.attributes("-alpha", 0.0)
         if hasattr(self, '_rsz_timer'):
             self.root.after_cancel(self._rsz_timer)
         self._rsz_timer = self.root.after(200, self._do_canvas_redraw)
@@ -1132,13 +983,6 @@ class WotAssistantHQ:
         if hasattr(self, '_rsz_timer'):
             self.root.after_cancel(self._rsz_timer)
         try:
-            if self.mode == "norm":
-                use_w = getattr(self, 'w', self.root.winfo_width())
-                target_h = use_w + 18
-                if abs(self.root.winfo_height() - target_h) > 1:
-                    cur_x, cur_y = self.root.winfo_x(), self.root.winfo_y()
-                    self.root.geometry(f"{use_w}x{int(target_h)}+{cur_x}+{cur_y}")
-                    self.root.update_idletasks()
             self.root.update_idletasks()
             self.map_renderer.show_main_splash()
             self.root.attributes("-alpha", self.alpha)
@@ -1151,35 +995,13 @@ class WotAssistantHQ:
         fmt_enabled = self.win_mgr.format_mode_enabled
         fmt_text = "ON" if fmt_enabled else "OFF"
         text = f"[{self.t('ui', 'format_label')}] {fmt_text}"
-        fg = "cyan" if self.mode == "edit" else "#bbbbbb"
         if hasattr(self, "status_label"):
-            self.status_label.config(text=text, fg=fg)
-        if hasattr(self, "battle_status_label"):
-            self.battle_status_label.config(text=text, fg=fg)
+            self.status_label.config(text=text, fg="cyan")
         if hasattr(self, "btn_format_lock"):
             self.btn_format_lock.config(
                 text=chr(0xF09C) if fmt_enabled else chr(0xF023),
                 fg="#ffaa00" if fmt_enabled else "#bbbbbb"
             )
-        if hasattr(self, "btn_format_lock_battle"):
-            self.btn_format_lock_battle.config(
-                text=chr(0xF09C) if fmt_enabled else chr(0xF023),
-                bg="#2a5a2a" if fmt_enabled else "#333",
-                fg="white" if fmt_enabled else "#bbbbbb"
-            )
-
-    def _reset_norm_position(self):
-        if self.mode != "norm":
-            return
-        sw, sh = self.root.winfo_screenwidth(), self.root.winfo_screenheight()
-        default_x = max(-10, sw - self.w + 10)
-        default_y = max(-10, sh - self.h + 10)
-        self.settings["norm_x"] = default_x
-        self.settings["norm_y"] = default_y
-        self.settings["norm_cx"] = default_x + self.w // 2
-        self.settings["norm_cy"] = default_y + self.h // 2
-        self.data_mgr.save_json(config.SETTINGS_FILE, self.settings)
-        self.root.geometry(f"{self.w}x{self.h}+{int(default_x)}+{int(default_y)}")
 
     def toggle_formatting_mode(self, from_lock_button=False):
         """F8: вмикає/вимикає тільки режим форматування (без перемикання edit/norm)."""
@@ -1191,35 +1013,19 @@ class WotAssistantHQ:
         self._last_mode_hotkey_ts = now
 
         new_state = not self.win_mgr.format_mode_enabled
-        # Бойове вікно під замком прозоре для кліків: кнопка замка досяжна
-        # тільки з затиснутою Ctrl (поллер _update_lock_clickthrough тимчасово
-        # знімає WS_EX_TRANSPARENT). Гард відсікає випадковий клік без Ctrl.
-        if (from_lock_button and new_state and self.mode == "norm"):
-            import ctypes as _ctypes
-            if not (_ctypes.windll.user32.GetAsyncKeyState(0x11) & 0x8000):
-                return
         self.win_mgr.set_format_mode(new_state)
 
         if new_state:
-            self.win_mgr.set_clickthrough(False)
             self.root.lift()
             self.root.focus_force()
-        else:
-            if self.mode == "norm":
-                if from_lock_button:
-                    self.root.lift()
-                    self.root.focus_force()
-                else:
-                    self.win_mgr.set_clickthrough(True)
-                    self.win_mgr.focus_game_window()
-            elif from_lock_button:
-                self.root.lift()
-                self.root.focus_force()
+        elif from_lock_button:
+            self.root.lift()
+            self.root.focus_force()
         self.refresh_mode_indicator()
         if self.active_view == "maps" and hasattr(self, '_po_win') and self._po_win.winfo_exists():
             self._sync_po_pos()
             if self._po_win.state() != "withdrawn":
-                self._po_win.lift()
+                self._po_place_top()
 
     def toggle_visibility(self):
         """Приховати/Показати вікно (F10) — згортання в системний трей"""
@@ -1256,7 +1062,7 @@ class WotAssistantHQ:
         if not self.active_view:
             saved_view = self.settings.get("_saved_view")
             if saved_view == "maps":
-                self.ui_mgr.show_view("maps", mode=self.settings.get("_saved_map_mode", 1))
+                self.ui_mgr.show_view("maps", mode=2)
             elif saved_view in ("stats", "ai_stats"):
                 self.ui_mgr.show_view(saved_view)
             else:
@@ -1269,37 +1075,28 @@ class WotAssistantHQ:
         self._refresh_saved_schemes_list()
         if self.active_view == "maps" and self.active_group_id != firebase_groups.PUBLIC_GROUP_ID:
             self._start_group_sync()
-        # Battle with mod ON: the window was withdrawn at battle start and
+        # During a battle the window was withdrawn at countdown and
         # safe_battle_sync may re-enter show_view afterwards - restoring it
         # here would put the app back over the game (and steal focus with
         # focus_force). Only _battle_show_window may bring it back.
-        if not self._hidden_by_battle and self._overlay_display_allowed():
+        if not self._hidden_by_battle:
             self.root.deiconify()
             self.root.lift()
             self.root.focus_force()
         else:
-            _win_dbg('show_view: main BLOCKED (battle=%s overlay_allowed=%s)'
-                     % (self._hidden_by_battle, self._overlay_display_allowed()))
+            _win_dbg('show_view: main BLOCKED (battle=%s)' % self._hidden_by_battle)
         if (self.active_view == "maps" and not self._hidden_by_battle
-                and self._overlay_display_allowed()
                 and hasattr(self, '_po_win') and self._po_win.winfo_exists()):
             self._po_win.deiconify()
             self._sync_po_pos()
-            self._po_win.lift()
-        elif (self._hidden_by_battle or not self._overlay_display_allowed()) \
-                and hasattr(self, '_po_win') and self._po_win.winfo_exists():
-            _win_dbg('show_view: _po_win BLOCKED (battle=%s overlay_allowed=%s)'
-                     % (self._hidden_by_battle, self._overlay_display_allowed()))
+            self._po_place_top()
+        elif self._hidden_by_battle and hasattr(self, '_po_win') and self._po_win.winfo_exists():
+            _win_dbg('show_view: _po_win BLOCKED (battle=%s)' % self._hidden_by_battle)
 
     def _battle_restore_from_tray(self):
-        """Старт бою з трею: показуємо вікно редагування з картою бою незалежно
-        від того, в якому режимі програма була згорнута. Перемикання в бойовий
-        режим відбувається на відліку (countdown) — «перед самим боєм»."""
+        """Старт бою з трею: показуємо вікно редагування з картою бою.
+        На відліку вікно ховається — схему в бою малює мод."""
         self._restore_from_tray()
-        if self.mode != "edit":
-            self.toggle_editor()
-        else:
-            pass
 
     def _on_tray_click(self):
         """Колбек при кліку на іконку в треї"""
@@ -1401,26 +1198,6 @@ class WotAssistantHQ:
             pass
         self.root.after(250, self._ensure_edit_focus)
 
-    def toggle_editor_backspace(self):
-        """Чітке перемикання режиму для бою: Tilde."""
-        if self.dialog_open:
-            return
-        now = time.time()
-        if now - self._last_mode_hotkey_ts < 0.2:
-            return
-        self._last_mode_hotkey_ts = now
-
-        going_to_edit = self.mode != "edit"
-        self.toggle_editor()
-
-        if going_to_edit:
-            self.edit_focus_lock = True
-            self._edit_focus_attempts = 0
-            self.root.after(10, self._ensure_edit_focus)
-        else:
-            self.edit_focus_lock = False
-            self.win_mgr.focus_game_window()
-
     def on_map_select(self, event=None):
         self.root.focus_set()
         selected_ua = self.map_var.get()
@@ -1444,13 +1221,12 @@ class WotAssistantHQ:
             self.drawing_palette.exit_edit_mode()
         self.map_renderer.show_main_splash()
         if (self.active_view == "maps" and not self._hidden_by_battle
-                and self._overlay_display_allowed()
                 and hasattr(self, '_po_win') and self._po_win.winfo_exists() and not self._hidden_by_f10):
             if self._po_win.state() == "withdrawn":
                 self._po_win.deiconify()
                 self._sync_po_pos()
             else:
-                self._po_win.lift()
+                self._po_place_top()
         self.painter.redraw()
         self._refresh_saved_schemes_list()
 
@@ -1479,14 +1255,12 @@ class WotAssistantHQ:
             return
         if self._po_win.state() != "withdrawn":
             return
-        if self._hidden_by_battle:  # battle + mod: overlay stays off (#1355)
-            return
-        if not self._overlay_display_allowed():  # mod ON + norm: never over the game
+        if self._hidden_by_battle:  # battle: overlay stays off (#1355)
             return
         self.root.update_idletasks()
         self._po_win.deiconify()
         self._sync_po_pos()
-        self._po_win.lift()
+        self._po_place_top()
 
     def _handle_ctrl_up(self):
         if hasattr(self, 'drawing_palette') and self.drawing_palette.state() != 'withdrawn' and self.drawing_palette.is_in_edit_mode():
@@ -1539,32 +1313,10 @@ class WotAssistantHQ:
             self.painter.redraw()
         self.save_settings()
 
-    def _on_overlay_mode_toggle(self):
-        # Взаємовиключні чекбокси Оверлей/Мод: один режим завжди активний
-        if self._use_overlay_var.get():
-            self._use_mod_var.set(False)
-            self._after_mode_change()
-        else:
-            self._use_overlay_var.set(True)
-
-    def _on_mod_mode_toggle(self):
-        if self._use_mod_var.get():
-            self._use_overlay_var.set(False)
-            self._after_mode_change()
-        else:
-            self._use_mod_var.set(True)
-
-    def _after_mode_change(self):
-        self.save_settings()
-        if hasattr(self, 'map_mgr'):
-            self.map_mgr.apply_mod_mode()
-        if hasattr(self, 'painter'):
-            self.painter.redraw()
-
     def _mod_integrity_check(self):
-        """Періодична перевірка (5 хв): use_mod увімкнено + sm_tactics.wotmod
-        відсутній у поточній версії → перевстановити (Aslain-модпак стирає
-        mods/* при перевстановленні — самовідновлення без перезапуску застосунку)."""
+        """Періодична перевірка (5 хв): sm_tactics.wotmod відсутній у поточній
+        версії → перевстановити (Aslain-модпак стирає mods/* при
+        перевстановленні — самовідновлення без перезапуску застосунку)."""
         try:
             if hasattr(self, 'map_mgr'):
                 self.map_mgr.ensure_mod_installed()
@@ -1640,48 +1392,17 @@ class WotAssistantHQ:
     def on_minimap_appeared(self, map_id, mode):
         pass  # Silent
 
-    def on_vehicle_detected(self, compact_descr):
-        if not self.auto_sync_var.get():
-            return
-        if not self.auto_vehicle_filter_var.get():
-            return
-        info = self.compact_descr_map.get(compact_descr)
-        if not info:
-            return
-
-        cls = info["class"]
-        cls_map = {"LT": "LT", "MT": "MT", "HT": "HT", "TD": "TD", "SPG": "SPG"}
-        ui_cls = cls_map.get(cls)
-        if not ui_cls:
-            return
-
-        def apply_class_filter():
-            for c, var in self.selected_classes.items():
-                var.set(c == ui_cls)
-
-        self.root.after(0, apply_class_filter)
-
     def on_battle_countdown_started(self, map_id, arena_type):
-        if not self.auto_battle_var.get():
-            return
         # Fallback: якщо arena-виявлення не встигло показати вікно з трею
         # (загублена/запізніла лінія Loading space), показуємо вікно тут —
         # перед боєм воно завжди має бути на екрані.
         if self._hidden_by_f10 and self._unhide_on_battle_var.get():
             self._restored_by_battle = True
             self.root.after(0, self._restore_from_tray)
-        if self._use_mod_var.get():
-            # Mod ON: instead of switching to the battle overlay (norm) the
-            # window is turned OFF right before the battle - the mod draws the
-            # scheme on the minimap (user sequence 03.10.2026). Mode stays
-            # "edit"; Tab brings the editor back on demand.
-            if not self._hidden_by_f10:
-                self.root.after(150, lambda: self._battle_hide_window('countdown'))
-            return
-        if self.mode != "norm":
-            self.root.after(100, self.toggle_editor)
-        else:
-            pass
+        # Схему в бою малює ТІЛЬКИ мод (мінікарта): вікно застосунку
+        # ховається перед самим боєм безумовно. _battle_hide_window сам
+        # пропускає випадок, коли вікно вже в треї.
+        self.root.after(150, lambda: self._battle_hide_window('countdown'))
 
 
     def _on_battle_mode_changed(self):
@@ -2003,7 +1724,7 @@ class WotAssistantHQ:
         """Режим бою для збереження поточної прив'язаної схеми.
 
         Повертає ВЛАСНИЙ режим схеми (_editing_scheme.battle_mode), а не
-        поточний UI-фільтр: auto_mode_filter автоскидає selected_battle_mode
+        поточний UI-фільтр: авто-синхронізація змінює selected_battle_mode
         під час бою, і збереження за UI-фільтром створювало дублікат тієї ж
         схеми під іншим режимом (схема «переходила» і зникала зі списку)."""
         es = getattr(self, '_editing_scheme', None)
@@ -2518,25 +2239,19 @@ class WotAssistantHQ:
                     pass
                 self._battle_edit_return = None
 
-            # Battle start: show the EDITOR from the tray EVEN with the mod ON
-            # (user sequence: tray -> editor window -> OFF right before the
-            # battle (countdown) -> the mod draws the scheme on the minimap;
-            # 03.10.2026). The countdown handler does the turning off.
+            # Battle start: show the EDITOR from the tray (user sequence:
+            # tray -> editor window -> OFF right before the battle (countdown)
+            # -> the mod draws the scheme on the minimap; 03.10.2026).
+            # The countdown handler does the turning off.
             if self._unhide_on_battle_var.get() and self._hidden_by_f10:
                 self._restored_by_battle = True
                 self._battle_restore_from_tray()
 
-            # Старт бою: з увімкненим модом гейт (painter.redraw, умова
-            # use_mod+бій+norm) одразу знімає оверлей — без цього виклику
-            # на екрані зависало б застаріле малювання; з вимкненим модом
-            # це просто освіження показу.
+            # Освіжити показ схем у редакторі для мапи бою.
             if hasattr(self, 'painter'):
                 self.painter.redraw()
 
         self.root.after(0, _apply_battle_detection)
-
-        if not self.auto_sync_var.get():
-            return
 
         self.root.after(0, lambda: self.safe_battle_sync(normalized_map_id, ui_mode))
 
@@ -2547,9 +2262,8 @@ class WotAssistantHQ:
         # run overwrites it at the next battle start.
         # Raw id бою більше не актуальний — малювання повертається на current_map_eng
         self.battle_map_data_id = None
-        # Гейт вимикається разом з battle_map_data_id → показ схем треба
-        # відновити одразу (напр., auto_battle вимкнено і режим лишається
-        # norm). Потік LogWatcher — ТІЛЬКИ через after (#2005).
+        # Показ схем треба відновити одразу після бою.
+        # Потік LogWatcher — ТІЛЬКИ через after (#2005).
         def _redraw_after_battle():
             if hasattr(self, 'painter'):
                 self.painter.redraw()
@@ -2561,19 +2275,17 @@ class WotAssistantHQ:
             self.root.after(200, self._minimize_to_tray)
             return
         
-        if not self.last_battle_map or not self.auto_battle_var.get():
+        if not self.last_battle_map:
             return
         
         self._battle_edit_return = self.root.after(200, lambda: self._return_to_editor_with_map(self.last_battle_map, self.last_battle_mode, self.last_battle_map_mode))
     
     def _return_to_editor_with_map(self, map_id, mode, map_source_mode=2):
-        if self.mode != "edit":
-            self.toggle_editor()
-            self.root.after(100, lambda: self._sync_battle_map_after_return(map_id, mode, map_source_mode))
+        self._sync_battle_map_after_return(map_id, mode, map_source_mode)
     
     def _sync_battle_map_after_return(self, map_id, mode, map_source_mode=2):
         """Синхронізуємо фільтри після повернення до редагування"""
-        target_map_mode = map_source_mode if map_source_mode in (1, 2) else 2
+        target_map_mode = 2  # TACTIC-режим прибрано у v2.0 — завжди MAPS
         self.switch_to_maps(target_map_mode)
         
         mode_map = {
@@ -2661,11 +2373,8 @@ class WotAssistantHQ:
         if self.active_view != "maps" or self.map_mode != 2:
             self.switch_to_maps(2)
 
-        if self.auto_mode_filter_var.get():
-            self.selected_battle_mode.set(ui_mode)
-        else:
-            print(f"[SYNC] Авто-вибір режиму бою вимкнено (auto_mode_filter={self.auto_mode_filter_var.get()})")
-        
+        self.selected_battle_mode.set(ui_mode)
+
         target_name = self.translate_map_name(map_id)
         
         tmaps = self.map_selector.cget("values")
@@ -2693,7 +2402,7 @@ class WotAssistantHQ:
 
 
 
-    def switch_to_maps(self, mode=1):
+    def switch_to_maps(self, mode=2):
         self.ui_mgr.show_view("maps", mode=mode)
 
     def switch_to_stats(self):
@@ -2923,13 +2632,14 @@ class WotAssistantHQ:
             text=f"You have v{current_ver}",
             fill="#aaa", font=("Arial", 9))
 
-        # Мінімалістичні кнопки — тонка обводка без заливки
+        # Мінімалістичні кнопки — тонка обводка без заливки.
+        # by = sh-46: під кнопками лишається смуга для дисклеймера (sh-18).
         btn_w, btn_h = 90, 20
         btn_gap = 20
         total = btn_w * 2 + btn_gap
         lx = sw // 2 - total // 2
         rx = lx + btn_w + btn_gap
-        by = sh - 25
+        by = sh - 46
 
         self._splash_update_rect = self.splash_canvas.create_rectangle(
             lx, by, lx + btn_w, by + btn_h,
@@ -3134,22 +2844,17 @@ class WotAssistantHQ:
     def bind_events(self):
         keyboard.add_hotkey('F1', lambda: self.safe_execute(self.help_manager.toggle_overlay))
         keyboard.add_hotkey('F10', lambda: self.safe_execute(self.toggle_visibility))  # F10: Показати/Приховати вікно
-        keyboard.add_hotkey('tab', lambda: self.safe_execute(self.toggle_editor) if self.current_map_eng else None, suppress=False)
         try:
             keyboard.add_hotkey('f8', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
         except Exception as e:
-            keyboard.add_hotkey('ctrl+e', lambda: self.safe_execute(self.toggle_formatting_mode), suppress=False)
+            print(f"[HOTKEY] F8 registration failed: {e}")
         keyboard.add_hotkey('ctrl+right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
-        keyboard.add_hotkey('ctrl+shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
-        keyboard.add_hotkey('ctrl+shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
         # Без Ctrl — працюють тільки коли format_mode_enabled (замок відчинено)
         keyboard.add_hotkey('up', lambda: self.safe_execute(self._handle_up_key_noctrl), suppress=False)
         keyboard.add_hotkey('down', lambda: self.safe_execute(self._handle_down_key_noctrl), suppress=False)
         keyboard.add_hotkey('left', lambda: self.safe_execute(self.win_mgr.alpha_down_hotkey), suppress=False)
         keyboard.add_hotkey('right', lambda: self.safe_execute(self.win_mgr.alpha_up_hotkey), suppress=False)
-        keyboard.add_hotkey('shift+up', lambda: self.safe_execute(self.win_mgr.contrast_up_hotkey), suppress=False)
-        keyboard.add_hotkey('shift+down', lambda: self.safe_execute(self.win_mgr.contrast_down_hotkey), suppress=False)
         keyboard.add_hotkey('ctrl+z', lambda: self.safe_execute(self.painter.ctrl_z_undo), suppress=True)
         keyboard.add_hotkey('ctrl+a', lambda: self.safe_execute(self._toggle_select_all), suppress=True)
         self.root.bind_all("<Control-Up>", lambda e: self._handle_ctrl_up())
@@ -3213,7 +2918,6 @@ class WotAssistantHQ:
     def _on_startup_ready(self):
         """Startup data checks complete → close splash → background Firebase sync."""
         self._startup_ready_at = time.time()
-        self.root.after(0, self._check_pending_tactic_maps)
         try:
             sw = int(self.splash_canvas["width"])
             sh = int(self.splash_canvas["height"])
@@ -3228,9 +2932,6 @@ class WotAssistantHQ:
         self.root.after(1000, self._start_firebase_sync)
         # Mod integrity self-heal (Aslain wipes mods/* on modpack update)
         self.root.after(60000, self._mod_integrity_check)
-        # Раз на добу: HEAD-перевірка нових/змінених тактичних мап на сайті
-        # (стартовий sweep вже був у check_game_version; ланцюг повторює)
-        self.root.after(86400000, self._daily_site_map_sweep)
 
     def _start_firebase_sync(self):
         """Background sync of popular tanks + builds from Firebase."""
@@ -3257,81 +2958,6 @@ class WotAssistantHQ:
                 self.safe_execute(self.reload_tank_data)
             except Exception as e:
                 print(f"[Firebase] Reload tank data error: {e}")
-
-    def _daily_site_map_sweep(self):
-        """Раз на добу (ланцюг after від _on_startup_ready): додавання/зміни
-        тактичних мап на сайті. Працює у фоновому потоці (#2005)."""
-        def _bg():
-            try:
-                self.map_mgr._detect_pending_tactic_maps()
-            except Exception as e:
-                print(f"[MAP_MGR] Daily site sweep error: {e}")
-        threading.Thread(target=_bg, daemon=True).start()
-        try:
-            self.root.after(86400000, self._daily_site_map_sweep)
-        except RuntimeError:
-            pass  # mainloop зупинено (вихід із програми)
-
-    def _check_pending_tactic_maps(self):
-        """HEAD-перевірка pending мап на сайті. Chrome не використовується."""
-        pending = self.map_mgr._load_pending_tactic_maps()
-        sync_needed = self.map_mgr._tactic_sync_needed
-        if not pending and not sync_needed:
-            return
-        print(f"[INIT] {len(pending)} pending TACTIC maps — HEAD-checking website...")
-        def _bg_sync():
-            try:
-                import requests
-                import map_updater
-                import json
-                remaining = list(pending)
-                # URL-и з map_links.json — реальні об'єкти сайту (заповнює
-                # sync_all з DOM), fallback — шаблон від назви (resolve_site_url).
-                links = {}
-                try:
-                    with open(config.MAP_LINKS_FILE, "r", encoding="utf-8") as f:
-                        links = json.load(f)
-                except Exception:
-                    pass
-                for i, eng_name in enumerate(pending):
-                    url = map_updater.resolve_site_url(eng_name, links)
-                    try:
-                        r = requests.head(url, timeout=5)
-                        if r.status_code == 200:
-                            map_updater.download_single_map(eng_name, url)
-                            print(f"[TACTIC] Downloaded: {eng_name}")
-                            remaining.remove(eng_name)
-                        else:
-                            print(f"[TACTIC] Not found on site: {eng_name} ({r.status_code})")
-                    except Exception as e:
-                        print(f"[TACTIC] HEAD check error for {eng_name}: {e}")
-                if len(remaining) != len(pending):
-                    self.map_mgr._save_pending_tactic_maps(remaining)
-                self.map_mgr._tactic_sync_needed = False
-                self.root.after(0, self._refresh_pending_tactic_maps)
-            except Exception as e:
-                print(f"[TACTIC] Background check error: {e}")
-        threading.Thread(target=_bg_sync, daemon=True).start()
-
-    def _refresh_pending_tactic_maps(self):
-        """Оновити стан pending після HEAD-перевірки."""
-        self.map_mgr._tactic_sync_needed = False
-        pending = self.map_mgr._load_pending_tactic_maps()
-        if not pending:
-            return
-        remaining = []
-        for eng_name in pending:
-            folder = self.map_mgr._resolve_tactic_folder(eng_name)
-            safe = folder.replace('?', '').replace(':', '').replace('|', '').replace(' - ', '_').replace(' ', '_')
-            img_path = os.path.join(config.MAPS_DIR, safe, "map.webp")
-            if os.path.exists(img_path) and os.path.getsize(img_path) > 1000:
-                print(f"[TACTIC] Map now available: {eng_name}")
-            else:
-                remaining.append(eng_name)
-        if len(remaining) != len(pending):
-            self.map_mgr._save_pending_tactic_maps(remaining)
-            if hasattr(self, 'painter'):
-                self.painter.redraw()
 
     def update_startup_progress(self, percent, text=None):
         if not hasattr(self, "splash") or not self.splash or not self.splash.winfo_exists():
@@ -3514,9 +3140,17 @@ class WotAssistantHQ:
             fill="#ffaa00",
             font=("Arial", 8),
         )
+        self.splash_canvas.create_text(
+            sw//2,
+            sh - 18,
+            text=self.t('ui', 'wargaming_disclaimer'),
+            fill="#666666",
+            font=("Arial", 7),
+            tags="wargaming_disc",
+        )
         self.splash_percent_text = self.splash_canvas.create_text(
             sw - 34,
-            sh - 20,
+            sh - 34,
             text="0%",
             fill="#dddddd",
             font=("Arial", 9),

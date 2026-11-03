@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.0.0] - 2026-11-02
+
+### Changed
+- **TACTIC mode removed.** The editor now works with a single MAPS mode; website map sync and the `maps/` backgrounds are no longer part of the client. Map site monitoring lives only in the Admin app (weekly `site_watch` check).
+- **Battle window removed.** Scheme rendering in battle is done exclusively by the bundled `sm_tactics.wotmod`, which is installed/updated automatically on startup. The app hides itself when the countdown starts and follows the battle map and mode.
+- **Battle sync is unconditional** (map + battle mode); the redundant `auto_sync`, `auto_mode_filter` and `auto_vehicle_filter` settings were removed. Vehicle-class filtering is manual.
+- **Settings cleanup.** Map contrast (`Shift+Up/Down`, `Ctrl+Shift+Up/Down`) removed; DPI drawing scale (`auto_window_size`) defaults to OFF and is now persisted.
+- **Help (F1) rewritten for v2.0** — sections match the current UI, labels are translated into the client language; the `Ctrl+E` fallback hotkey was removed (F8 only).
+- **Disclaimer** ("Unofficial fan-made app, not affiliated with Wargaming") moved to the very bottom on every screen: main splash, launcher, admin splash, F1 help and website pages.
+- **Admin:** the "Tactic Map Updates" panel is fed only by the weekly site-image monitor; RTDB site-event polling was removed.
+
+### Fixed
+- Scheme elements no longer cover the Settings panel, drawing palette or Help window (overlay z-order).
+- Outdated cached translations are no longer shown after English source changes (snapshot guard in `locale_manager`).
+- `WinError 32` noise on startup when the game holds `sm_tactics.wotmod` open (copy skipped when the file is already current).
+- Mod arrows scale identically to the editor at any thickness and DPI.
+
+### Added
+- Bundled mod (`sm_tactics.wotmod`) is always included in the build, so the minimap renderer works without manual installation.
+- F10 minimize-to-tray with a floating restore button; the app is restored automatically on battle start when enabled.
+
+---
+
 ## [1.0.78] - 2026-09-14
 
 ### Fixed

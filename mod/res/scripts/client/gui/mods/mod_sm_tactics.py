@@ -67,6 +67,7 @@ _g = {
     'scheme_name': None,
     'mode': MODE_ALWAYS,
     'elemScale': 100,   # ModsSettingsAPI slider, percent
+    'schemeOpacity': 80,  # ModsSettingsAPI slider, percent (transparency)
     'alt': False,
     'listeners': False,
     'keys': None,
@@ -102,6 +103,7 @@ class SmTacticsOverlay(View):
             self.as_register()
             status = self.as_setElements(json.dumps(elements))
             self.as_setUserScale(_g['elemScale'] / 100.0)
+            self.as_setAlpha(_g['schemeOpacity'] / 100.0)
             LOG.info('%s setElements=%s', TAG, status)
             # Visibility BEFORE diagnostics: a failing debug call must never
             # abort the layer becoming visible (02.10.2026 lesson).
@@ -147,6 +149,9 @@ class SmTacticsOverlay(View):
 
     def as_setUserScale(self, v):
         self.flashObject.as_setUserScale(v)
+
+    def as_setAlpha(self, v):
+        self.flashObject.as_setAlpha(v)
 
     def as_showWarning(self, text):
         # View base class does NOT auto-forward unknown as_* attributes to
@@ -487,6 +492,12 @@ def _settings_template(templates):
                          'Uniform size factor for all scheme elements'
                          ' on the minimap: 50%..200%, step 5. Positions stay unchanged.{/BODY}'),
                 width=200),
+            templates.createSlider(
+                'Scheme opacity', 'schemeOpacity', 80, 0, 100, 5,
+                tooltip=('{HEADER}Scheme opacity{/HEADER}{BODY}'
+                         'Opacity of the scheme on the minimap: 100% - fully'
+                         ' opaque, 0% - invisible. Default: 80%.{/BODY}'),
+                width=200),
         ],
     }
 
@@ -497,12 +508,14 @@ def _on_settings_changed(linkage, new_settings):
     try:
         _g['mode'] = int(new_settings.get('displayMode', MODE_ALWAYS))
         _g['elemScale'] = int(new_settings.get('elemScale', 100))
+        _g['schemeOpacity'] = int(new_settings.get('schemeOpacity', 80))
         _apply_visibility()
         view = _g.get('view')
         if view is not None:
             view.as_setUserScale(_g['elemScale'] / 100.0)   # live apply
-        LOG.info('%s settings: mode=%d elemScale=%d%%', TAG,
-                 _g['mode'], _g['elemScale'])
+            view.as_setAlpha(_g['schemeOpacity'] / 100.0)   # live apply
+        LOG.info('%s settings: mode=%d elemScale=%d%% opacity=%d%%', TAG,
+                 _g['mode'], _g['elemScale'], _g['schemeOpacity'])
     except Exception:
         LOG.warning('%s settings change:\n%s', TAG, traceback.format_exc())
 
@@ -528,7 +541,9 @@ def _load_settings():
             LINKAGE, template, _on_settings_changed, _on_settings_button)
         _g['mode'] = int(st.get('displayMode', MODE_ALWAYS))
         _g['elemScale'] = int(st.get('elemScale', 100))
-        LOG.info('%s settings registered (mode=%d elemScale=%d%%)', TAG, _g['mode'], _g['elemScale'])
+        _g['schemeOpacity'] = int(st.get('schemeOpacity', 80))
+        LOG.info('%s settings registered (mode=%d elemScale=%d%% opacity=%d%%)', TAG,
+                 _g['mode'], _g['elemScale'], _g['schemeOpacity'])
     except Exception:
         LOG.warning('%s settings registration:\n%s', TAG, traceback.format_exc())
 

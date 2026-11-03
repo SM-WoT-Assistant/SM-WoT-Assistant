@@ -1811,16 +1811,6 @@ class MapPainter:
 
     def redraw(self, cw=None, ch=None):
         if not self.app.current_map_eng: return
-        # Взаємовиключність мод/оверлей діє ТІЛЬКИ в бойовому контексті
-        # (режим norm поверх гри, поки бій триває) — там мод малює натомість.
-        # У редакторі (mode == "edit") та в hangar схеми малюються ЗАВЖДИ:
-        # раніше гейт вимикав показ скрізь при use_mod і схеми зникали з
-        # мапи редактора саме в момент перемикання чекбокса (скарга 30.09.2026).
-        if (getattr(self.app, '_use_mod_var', None) and self.app._use_mod_var.get()
-                and getattr(self.app, 'battle_map_data_id', None)
-                and getattr(self.app, 'mode', 'edit') == "norm"):
-            self.canvas.delete("painter_obj")
-            return
         map_id = self.app.current_map_eng
 
         # Scheme space = the map image rect (map_renderer may letterbox the

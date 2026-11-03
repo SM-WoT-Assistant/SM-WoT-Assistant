@@ -62,6 +62,7 @@ package com.sm.tactics
         private var _rh:Number = 0;
         private var _watchOn:Boolean = false;
         private var _userScale:Number = 1;   // settings slider 50..200%
+        private var _userAlpha:Number = 0.8; // settings slider 0..100%, 80% default
 
         private static const FA_TREE:String = String.fromCharCode(0xF18C);
         private static const XVM_SCALE:Object = {
@@ -278,6 +279,10 @@ package com.sm.tactics
         {
             _registered = true;
             setup();
+            // Transparency persists across re-parenting in setup(): the
+            // _layer object survives, but keep it explicit for the default
+            // 80% before the python side pushes its saved value.
+            _layer.alpha = _userAlpha;
             // Live minimap resize: the game re-lays the background out
             // LOCALLY (no ancestor scale), so the cached rect goes stale
             // and the scheme stops following the map (06.10.2026).
@@ -699,6 +704,18 @@ package com.sm.tactics
             {
                 _userScale = s;
                 redraw();
+            }
+        }
+
+        // ModsSettingsAPI slider: scheme transparency (f 0..1, 80% default).
+        // Applied to _layer so every child sprite inherits the alpha.
+        public function as_setAlpha(f:Number):void
+        {
+            var a:Number = Number(f);
+            if (a >= 0.0 && a <= 1.0)
+            {
+                _userAlpha = a;
+                _layer.alpha = a;
             }
         }
 

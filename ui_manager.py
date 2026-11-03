@@ -51,9 +51,6 @@ class UIManager:
         self.app.btn_mode_maps_2 = tk.Button(btn_frame, text="MAPS", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(2))
         self.app.btn_mode_maps_2.pack(side="left", padx=1, fill="y")
 
-        self.app.btn_mode_maps_1 = tk.Button(btn_frame, text="TACTIC", padx=10, bg="#444", fg="#bbbbbb", bd=0, font=("Arial", 8, "bold"), anchor='center', command=lambda: self.app.switch_to_maps(1))
-        self.app.btn_mode_maps_1.pack(side="left", padx=(1, 0), fill="y")
-
         # Content frame for horizontal space between mode buttons and right buttons
         content_frame = tk.Frame(self.app.top_bar, bg="#222")
         content_frame.pack(side="left", fill="both", expand=True)
@@ -109,22 +106,6 @@ class UIManager:
 
         self._build_identity_bar()
         self._refresh_identity_bar()
-
-        self.app.battle_status_top = tk.Frame(self.app.root, bg="#111", height=18)
-        self.app.battle_status_top.pack_propagate(False)
-
-        self.app.btn_format_lock_battle = tk.Button(self.app.battle_status_top, text=chr(0xF023),
-            font=("FontAwesome", 8), bg="#333", fg="#bbbbbb", bd=0, width=2,
-            command=lambda: self.app.toggle_formatting_mode(True))
-        self.app.btn_format_lock_battle.pack(side="left", padx=(3, 1))
-
-        self.app.btn_reset_position = tk.Button(self.app.battle_status_top,
-            text=chr(0xF0E2), font=("FontAwesome", 8), bg="#333", fg="#888",
-            bd=0, width=2, command=self.app._reset_norm_position)
-        self.app.btn_reset_position.pack(side="left", padx=(1, 0))
-
-        self.app.battle_status_label = tk.Label(self.app.battle_status_top, text="", bg="#111", fg="#bbbbbb", font=("Arial", 8))
-        self.app.battle_status_label.pack(side="left", padx=6)
 
         self.app.status_label = tk.Label(self.app.root, text=self.app.t('ui', 'hangar_status'), bg="#222", fg="gray", font=("Arial", 8))
         self.app.filter_panel = tk.Frame(self.app.root, bg="#222", bd=1, relief="solid")
@@ -412,6 +393,18 @@ class UIManager:
                            padx=12, pady=4)
             btn.pack(fill="x")
 
+        def make_link(text, url):
+            """Site rows: clickable link styling (blue + hand cursor + hover)."""
+            btn = tk.Button(menu, text=text, command=lambda: webbrowser.open(url),
+                           anchor="w", bg="#252525", fg="#66aaff",
+                           activebackground="#444", activeforeground="#99ccff",
+                           bd=0, font=("Arial", 9), padx=12, pady=4,
+                           cursor="hand2")
+            btn.pack(fill="x")
+            btn.bind("<Enter>", lambda e: btn.config(fg="#99ccff"))
+            btn.bind("<Leave>", lambda e: btn.config(fg="#66aaff"))
+            return btn
+
         def make_chk(text, var):
             cb = tk.Checkbutton(menu, text=text, variable=var, command=self.app.save_settings,
                                anchor="w", bg="#252525", fg="#cccccc",
@@ -426,11 +419,7 @@ class UIManager:
 
         make_btn(self.app.t('ui', 'set_wot_path'), self.app.ask_wot_path)
         sep()
-        make_chk(self.app.t('ui', 'auto_sync'), self.app.auto_sync_var)
         make_chk(self.app.t('ui', 'unhide_on_battle'), self.app._unhide_on_battle_var)
-        make_chk(self.app.t('ui', 'auto_mode_filter'), self.app.auto_mode_filter_var)
-        make_chk(self.app.t('ui', 'auto_vehicle_filter'), self.app.auto_vehicle_filter_var)
-        make_chk(self.app.t('ui', 'auto_battle'), self.app.auto_battle_var)
         chk_auto_size = make_chk(self.app.t('ui', 'auto_window_size'), self.app._auto_window_size_var)
         chk_auto_size.configure(command=self.app._on_auto_window_size_toggle)
         sep()
@@ -453,15 +442,10 @@ class UIManager:
         chk_launch_game.configure(command=_on_launch_on_game_start)
 
         sep()
-        chk_mode_overlay = make_chk(self.app.t('ui', 'mode_overlay'), self.app._use_overlay_var)
-        chk_mode_overlay.configure(command=self.app._on_overlay_mode_toggle)
-        chk_mode_mod = make_chk(self.app.t('ui', 'use_mod'), self.app._use_mod_var)
-        chk_mode_mod.configure(command=self.app._on_mod_mode_toggle)
-        sep()
         make_btn(self.app.t('ui', 'help_btn'), self.app.help_manager.toggle_overlay)
         sep()
-        make_btn(self.app.t('ui', 'help_website'), lambda: webbrowser.open("https://sm-wot-assistant.web.app"))
-        make_btn("TACTIC maps: wotmapsbyyaya.com", lambda: webbrowser.open("https://wotmapsbyyaya.com/maps"))
+        make_link(self.app.t('ui', 'help_website'), "https://sm-wot-assistant.web.app")
+        make_link("Basic tactical schemes: wotmapsbyyaya.com", "https://wotmapsbyyaya.com/maps")
         sep()
 
         ver_label = tk.Label(menu, text=f"v{config.load_version()}",
@@ -487,6 +471,7 @@ class UIManager:
         menu.bind("<FocusOut>", lambda e: self.app.root.after(100, close))
         menu.bind("<Escape>", lambda e: close())
         menu.focus_set()
+        menu.lift()
 
     def _confirm_disconnect(self):
         dlg, hdr = dialog_utils.make_custom_dialog(self.app.root, self.app.t('ui', 'confirm_disconnect_title'))
@@ -790,9 +775,8 @@ class UIManager:
         self.app.active_view = view_name
         self.app.settings["_saved_view"] = view_name
         if view_name == "maps":
-            self.app.settings["_saved_map_mode"] = kwargs.get("mode", 1)
+            self.app.settings["_saved_map_mode"] = 2
 
-        self.app.btn_mode_maps_1.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_maps_2.config(bg="#444", fg="#bbbbbb")
         self.app.btn_mode_ai_stats.config(bg="#444", fg="#bbbbbb")
         
@@ -803,7 +787,6 @@ class UIManager:
             self.app.status_label.pack_forget()
             self.app.ai_frame.pack_forget()
             self.app.map_toolbar.pack_forget()
-            self.app.battle_status_top.pack_forget()
 
             self.app.top_bar.pack_forget()
             self.app.identity_bar.pack_forget()
@@ -821,12 +804,9 @@ class UIManager:
             )
             if show_second:
                 self.app.second_row.pack(side="top", fill="x")
-            mode = kwargs.get('mode', 1)
+            mode = 2  # TACTIC-режим прибрано у v2.0 — завжди MAPS
             self.app.map_mode = mode
-            if mode == 1:
-                self.app.btn_mode_maps_1.config(bg="#ff4500", fg="white")
-            else:
-                self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
+            self.app.btn_mode_maps_2.config(bg="#ff4500", fg="white")
             self.app.map_toolbar.pack(side="left", fill="x", expand=True, padx=(0, 10))
             self.app.filter_panel.pack(side="bottom", fill="x")
             self.app.status_label.pack(side="bottom", fill="x")
@@ -888,7 +868,6 @@ class UIManager:
                     self.app.status_label.pack_forget()
                     self.app.ai_frame.pack_forget()
                     self.app.map_toolbar.pack_forget()
-                    self.app.battle_status_top.pack_forget()
                     self.app.top_bar.pack_forget()
                     self.app.identity_bar.pack_forget()
                     self.app.top_bar.pack(side="top", fill="x")

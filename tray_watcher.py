@@ -287,9 +287,9 @@ def _sync_mod(settings):
     Патч гри стирає mods/<стара версія>/ і створює порожню нову; основна
     програма може не бути запущена (launch_on_game_start=false) — тому
     синхронізація робиться тут: на старті та раз на ~60s. Логіка повторює
-    map_manager.apply_mod_mode (use_mod gate, нормалізація версії регекстом,
-    prefer-наявна-папка на диску). Джерело відсутнє → нічого не робимо
-    (без half-sync). Повертає True, якщо щось змінено.
+    map_manager.apply_mod_mode (мод завжди ввімкнений, нормалізація версії
+    регекстом, prefer-наявна-папка на диску). Джерело відсутнє → нічого не
+    робимо (без half-sync). Повертає True, якщо щось змінено.
     """
     wot_path = settings.get("wot_path", "")
     if not wot_path:
@@ -297,22 +297,6 @@ def _sync_mod(settings):
     mods_root = os.path.join(wot_path, "mods")
     if not os.path.isdir(mods_root):
         return False
-    if not settings.get("use_mod", False):
-        # мод вимкнено користувачем — прибрати наш файл з усіх версійних папок
-        removed = False
-        try:
-            for entry in os.listdir(mods_root):
-                p = os.path.join(mods_root, entry, "sm_tactics.wotmod")
-                if os.path.isfile(p):
-                    try:
-                        os.remove(p)
-                        removed = True
-                        if DEBUG: print(f"[DEBUG] _sync_mod: use_mod=off removed {p}")
-                    except Exception as e:
-                        if DEBUG: print(f"[DEBUG] _sync_mod: remove failed {p}: {e}")
-        except Exception as e:
-            if DEBUG: print(f"[DEBUG] _sync_mod sweep error: {e}")
-        return removed
     game_version = _resolve_game_version(settings)
     if not game_version:
         return False
@@ -683,9 +667,6 @@ def _check_mod_delivery(settings, state):
     Повертає "source"|"notinstalled"|None.
     """
     try:
-        if not settings.get("use_mod", False):
-            state["counter"] = 0
-            return None
         wot_path = settings.get("wot_path", "")
         mods_root = os.path.join(wot_path, "mods") if wot_path else ""
         if not mods_root or not os.path.isdir(mods_root):

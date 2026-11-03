@@ -1,4 +1,4 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 import os, sys, glob
 
 root = os.path.dirname(os.path.abspath(SPECPATH))
@@ -46,14 +46,6 @@ for f in ["artefacts_en.mo", "crew_perks_en.mo", "item_types_en.mo"]:
 logo = _rp("logo.png")
 if os.path.exists(logo):
     datas.append((logo, "."))
-
-maps_dir = _rp("maps")
-if os.path.exists(maps_dir):
-    for folder in os.listdir(maps_dir):
-        fpath = os.path.join(maps_dir, folder)
-        if os.path.isdir(fpath):
-            for f in os.listdir(fpath):
-                datas.append((os.path.join(fpath, f), os.path.join("maps", folder)))
 
 em_dir = _rp("extracted_maps")
 if os.path.exists(em_dir):
@@ -132,3 +124,4 @@ coll = COLLECT(
     upx_exclude=[],
     name="SM WoT Assistant",
 )
+

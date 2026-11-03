@@ -15,16 +15,16 @@
 ### Фази білду (build.py)
 1. **Pre-flight** — валідація semver (X.Y.Z), Python 3.12+PyInstaller, NSIS (makensis.exe), gh CLI, критичні файли (main.py, VERSION, wot_assistant.spec, logo.png), git status
 2. **Clean** — видалення `dist/SM WoT Assistant/` та `build/`
-3. **PyInstaller** (onedir) → `copy_data_files()` (3065 data files) → NSIS installer
+3. **PyInstaller** (onedir) → `copy_data_files()` (root JSONs, fonts, `.mo`, logo/icon, `sm_tactics.wotmod`, `extracted_maps/`, `extracted_icons/`, `extracted_data/common/post_progression/`) → NSIS installer
 4. **Rename** onedir: `dist/SM WoT Assistant/` → `dist/SM WoT Assistant vX.Y.Z/`
 5. **Portable ZIP**: `SM_WoT_Assistant_Portable_vX.Y.Z.zip` (~390 MB)
-6. **Verify**: EXE, 10 critical JSONs, VERSION, fonts, maps/≥50, extracted_maps/≥60, extracted_icons/≥8
+6. **Verify**: EXE, Launcher EXE, Tray Watcher EXE, 10 critical JSONs, VERSION, fonts, `extracted_maps/`≥60, `extracted_icons/`≥8, `extracted_data/`≥1
 7. **Manifest**: `dist/build_manifest_vX.Y.Z.txt` (усі файли + розміри)
 
 ### Артефакти релізу в dist/
-- `SM WoT Assistant vX.Y.Z/` — версіонований onedir (~5795 файлів, ~750 MB)
-- `SM_WoT_Assistant_Setup_vX.Y.Z.exe` — NSIS інсталер (~320 MB, lzma 42.4%)
-- `SM_WoT_Assistant_Portable_vX.Y.Z.zip` — portable ZIP (~390 MB)
+- `SM WoT Assistant vX.Y.Z/` — версіонований onedir (~750 MB)
+- `SM_WoT_Assistant_Setup_vX.Y.Z_Beta.exe` — NSIS інсталер (~335 MB, lzma 42.4%)
+- `SM_WoT_Assistant_Portable_vX.Y.Z_Beta.zip` — portable ZIP (~380 MB)
 - `build_manifest_vX.Y.Z.txt` — маніфест білду
 
 ### Інструменти для білду
@@ -35,22 +35,24 @@
 
 ### Включення файлів у бандл (copy_data_files)
 - Усі `*.json` з кореня проєкту, КРІМ: `opencode.json`, `magic-context.jsonc`, `_fill_progress.json`, `.*_manifest.json` (3), `tomato_*.json` (6), `ukrainian_map_names.json`, `vehicle_slots_*.json` (2)
-- `VERSION`, TTF шрифти (xvmsymbol.ttf, fontawesome-webfont.ttf), .mo файли (3), `logo.png`
-- `maps/` (51 папка), `extracted_maps/` (63 файли), `extracted_icons/` (8 піддиректорій), `extracted_data/common/post_progression/`
+- `VERSION`, TTF шрифти (xvmsymbol.ttf, fontawesome-webfont.ttf), .mo файли (3), `logo.png`, `icon.ico`
+- `sm_tactics.wotmod` (збирається `build_mod.py`; без нього білд попереджає, що мод НЕ включено)
+- `extracted_maps/` (63 файли, крім `ukrainian_map_names_cache.json` і `.map_extract_manifest.json`), `extracted_icons/` (8 піддиректорій), `extracted_data/common/post_progression/`
+- `maps/` (TACTIC) більше НЕ входить у бандл (видалено у v2.0)
 - `wot_assistant.spec` — синхронізований exclusion-list (довідково, не використовується через баг)
 
 ### Версія у вікнах програми
-- Головне вікно: `main.py:1107` — `root.title(f"SM WoT Assistant v{config.load_version()}")`
-- Splash: `main.py:1045` — `config.load_version()`
-- Редактор (водяний знак): `map_renderer.py:249` — `config.load_version()`
-- Довідка (F1): `help_system.py:49` — `config.load_version()` (через import config)
+- Головне вікно: `main.py:3468` — `root.title(f"SM WoT Assistant v{config.load_version()}")`
+- Splash: `main.py:3125` — `config.load_version()`
+- Редактор (водяний знак): `map_renderer.py:315` — `config.load_version()`
+- Довідка (F1): `help_system.py:96` — `config.load_version()` (через import config)
 
 ### Seeding файлів у AppData (перший запуск)
 - `config.DEFAULT_FILES` (config.py:34) = `["settings.json", "locales.json", "map_drawings.json", "service_messages.json", "popular_tanks_cache.json", "ai_builds_cache.json"]`
 - `main.py:1093-1101` — копіює з `config.BUNDLE_DIR` в `config.USER_DATA_DIR` якщо файл ще не існує
 ### Auto-commit версії
 
-build.py автоматично комітить VERSION та installer.nsi після оновлення версії (build.py:commit_version_files). Окремо комітити не треба — це робить build.py перед білдом.
+build.py автоматично комітить усі змінені файли (`git add -A`) перед білдом через `commit_version_files()` — VERSION, installer.nsi, `public/verify.json`, `popular_tanks_seed.json`, `base_schemes.json` тощо. Окремо комітити не треба; до запуску білда робоче дерево має бути чистим (preflight).
 
 ### Порядок дій для нового релізу
 
@@ -69,13 +71,15 @@ build.py автоматично комітить VERSION та installer.nsi пі
 
 1. **Локально dist/** — лишити 5 останніх версіонованих папок (`SM WoT Assistant vX.Y.Z/`) + їх Setup/Portable/manifest; видалити:
    ```powershell
-   $keep = @("1.0.62","1.0.63","1.0.64","1.0.65","1.0.66")  # поточні 5
+   $keep = @("1.0.79","1.0.80","1.0.81","1.0.82","2.0.0")  # поточні 5
    Get-ChildItem dist -Directory | Where-Object { $_.Name -match "v(\d+\.\d+\.\d+)" -and $matches[1] -notin $keep -and $_.Name -notmatch "Admin" } | Remove-Item -Recurse -Force
    Get-ChildItem dist -File | Where-Object { $_.Name -match "v(\d+\.\d+\.\d+)" -and $matches[1] -notin $keep } | Remove-Item -Force
    ```
 2. **GitHub** — видалити релізи старші 5 останніх (assets видаляються разом з релізом; теги лишаються):
    ```powershell
-   gh api "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases?per_page=100" --jq ".[] | select(.tag_name != \"v1.0.66\") | .id" | ForEach-Object { gh api -X DELETE "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases/$_" }
+   $keep = @("v1.0.79","v1.0.80","v1.0.81","v1.0.82","v2.0.0")
+   gh api "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases?per_page=100" --jq ".[] | select(.name | split(\" Beta\")[0] as \$n | ($keep | index(\$n)) | not) | .tag_name" 
+   # після перевірки списку — видалити кожен: gh api -X DELETE "repos/SM-WoT-Assistant/SM-WoT-Assistant/releases/$id"
    ```
 3. **RTDB versions/** — лишити 5 останніх + `latest`, решту PUT null (правило #1470):
    ```python

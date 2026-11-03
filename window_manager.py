@@ -102,7 +102,6 @@ class WindowManager:
         self.app.h = self.app.settings.get("edit_h", self.app.w + 160)
         self.app.alpha = self.app.settings.get("edit_alpha", 1.0)
         self.app.alpha = max(0.1, min(float(self.app.alpha), 1.0))
-        self.app.contrast = self.app.settings.get("edit_contrast", 1.0)
         
         px = self.app.settings.get("edit_x", (sw - self.app.w) // 2)
         py = self.app.settings.get("edit_y", (sh - self.app.h) // 2)
@@ -301,8 +300,6 @@ class WindowManager:
         root.bind("<Control-Down>", self.resize_down)
         root.bind("<Control-Right>", self.alpha_up)
         root.bind("<Control-Left>", self.alpha_down)
-        root.bind("<Control-Shift-Up>", self.contrast_up)
-        root.bind("<Control-Shift-Down>", self.contrast_down)
         top_bar.bind("<Control-Button-1>", self.start_win_move)
         top_bar.bind("<Control-B1-Motion>", self.do_win_move)
         top_bar.bind("<Control-ButtonRelease-1>", self.stop_win_move)
@@ -492,34 +489,6 @@ class WindowManager:
         self.app.alpha = max(0.1, self.app.alpha - 0.05)
         self.app.root.attributes("-alpha", self.app.alpha)
         self.app.save_settings()
-
-    def contrast_up(self, e):
-        if self.app.dialog_open or not self._is_ctrl_armed(): return "break"
-        self.app.contrast = min(2.0, self.app.contrast + 0.1)
-        self.app.save_settings()
-        self.app.map_renderer.show_main_splash()
-        return "break"
-    
-    def contrast_up_hotkey(self):
-        """Обгортка для глобального hotkey (без event)"""
-        if self.app.dialog_open or not self._is_ctrl_armed(): return
-        self.app.contrast = min(2.0, self.app.contrast + 0.1)
-        self.app.save_settings()
-        self.app.map_renderer.show_main_splash()
-
-    def contrast_down(self, e):
-        if self.app.dialog_open or not self._is_ctrl_armed(): return "break"
-        self.app.contrast = max(0.5, self.app.contrast - 0.1)
-        self.app.save_settings()
-        self.app.map_renderer.show_main_splash()
-        return "break"
-    
-    def contrast_down_hotkey(self):
-        """Обгортка для глобального hotkey (без event)"""
-        if self.app.dialog_open or not self._is_ctrl_armed(): return
-        self.app.contrast = max(0.5, self.app.contrast - 0.1)
-        self.app.save_settings()
-        self.app.map_renderer.show_main_splash()
 
     def set_clickthrough(self, enabled):
         """WS_EX_TRANSPARENT для root І overlay _po_win (накриває канвас —

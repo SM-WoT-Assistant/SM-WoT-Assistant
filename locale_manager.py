@@ -141,7 +141,12 @@ class LocaleManager:
         en_val = translations.TRANSLATIONS.get("en", {}).get("ui", {}).get(key, key)
         if self._batch_ui_done:
             val = self.languages.get(self.lang, {}).get("ui", {}).get(key)
-            if val and val != en_val:
+            stored_en = self.languages.get("en", {}).get("ui", {}).get(key)
+            # Кеш чинний лише для ПОТОЧНОГО EN-джерела: якщо джерело змінилось
+            # (snapshot розійшовся), старий переклад не можна віддавати вічно,
+            # коли батч Google падає («TACTIC карти від» після зміни тексту).
+            # stored_en is None — старий формат кешу без snapshot: віддаємо як є.
+            if val and val != en_val and (stored_en is None or stored_en == en_val):
                 return val
         return en_val if en_val != key else default
         

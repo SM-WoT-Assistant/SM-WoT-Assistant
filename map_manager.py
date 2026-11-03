@@ -48,9 +48,6 @@ _EVENT_MAP_IDS = {
     "212_epic_random_valley_sm25",
     "250_br_battle_city2-1", "251_br_battle_city3", "252_br_battle_city4",
 }
-_UNAVAILABLE_FILE = os.path.join(config.USER_DATA_DIR, "unavailable_tactic_maps.json")
-# Маніфест ETag тактичних мап сайту (детект змін через If-None-Match)
-_SITE_MANIFEST_FILE = os.path.join(config.USER_DATA_DIR, "site_maps_manifest.json")
 
 try:
     import tank_extractor
@@ -63,85 +60,7 @@ class MapManager:
         self._update_lock = threading.Lock()
         self._update_in_progress = False
         self._last_changed_ids = []
-        self._unavailable_maps = set(self._load_unavailable())
-        self._tactic_sync_needed = False
-        self._pending_tactic_path = os.path.join(config.USER_DATA_DIR, "pending_tactic_maps.json")
         self._mod_restart_warned = False
-        self._sweep_running = False
-
-    def _load_unavailable(self):
-        try:
-            if os.path.exists(_UNAVAILABLE_FILE):
-                with open(_UNAVAILABLE_FILE, "r", encoding="utf-8") as f:
-                    d = json.load(f)
-                return d if isinstance(d, list) else []
-        except Exception:
-            pass
-        return []
-
-    def _save_unavailable(self):
-        try:
-            with open(_UNAVAILABLE_FILE, "w", encoding="utf-8") as f:
-                json.dump(list(self._unavailable_maps), f)
-        except Exception as e:
-            print(f"[MAP_MGR] Failed to save unavailable maps: {e}")
-
-    def _load_site_manifest(self):
-        """Маніфест ETag тактичних мап сайту (детект змін). Атомарно через safe_io."""
-        try:
-            import safe_io
-            data = safe_io.read_json(_SITE_MANIFEST_FILE, {})
-            return data if isinstance(data, dict) else {}
-        except Exception:
-            return {}
-
-    def _save_site_manifest(self, manifest):
-        try:
-            import safe_io
-            safe_io.write_json(_SITE_MANIFEST_FILE, manifest)
-        except Exception as e:
-            print(f"[MAP_MGR] Site manifest save error: {e}")
-
-    @staticmethod
-    def _site_entry_from_headers(headers):
-        """ETag/Last-Modified/Content-Length з HEAD-відповіді як маніфест-запис."""
-        return {
-            "etag": (headers.get("ETag") or "").strip(),
-            "last_modified": (headers.get("Last-Modified") or "").strip(),
-            "size": (headers.get("Content-Length") or "").strip(),
-        }
-
-    def _on_site_map_event(self, kind, map_id, eng_name):
-        """Подія сайту → service_events (сповіщення адмінки) + живий rerender.
-
-        Викликається з фонового потоку sweep: log_event_now = файл + POST;
-        rerender — ТІЛЬКИ через root.after (Tk-безпека, #2005)."""
-        try:
-            import service_messages
-            verb = "added" if kind == "map_added" else "updated"
-            service_messages.log_event_now(
-                "site_maps", f"TACTIC map {verb}: {eng_name} ({map_id})")
-        except Exception as e:
-            print(f"[MAP_MGR] Site event report error: {e}")
-        try:
-            if getattr(self.app, "current_map_eng", None) == map_id:
-                self.app.root.after(0, self._rerender_current_map)
-        except Exception:
-            pass
-
-    def _rerender_current_map(self):
-        """Показати щойно завантажену мапу замість порожнього вікна.
-
-        show_main_splash() без аргументу: картинка вже існує → мапа;
-        painter.redraw() перепокладає схеми на новий _map_img_rect.
-        Без крадіжки фокусу/exit_edit_mode."""
-        app = self.app
-        try:
-            app.map_renderer.show_main_splash()
-            if hasattr(app, "painter"):
-                app.painter.redraw()
-        except Exception as e:
-            print(f"[MAP_MGR] Rerender error: {e}")
 
     def _try_begin_update(self):
         with self._update_lock:
@@ -269,7 +188,6 @@ class MapManager:
                     if self.fast_integrity_check():
                         print(f"[MAP_MGR] Fast path: version {current_v} unchanged, local data OK — skipping extraction")
                         emit(100, "version_unchanged", "lime", version=current_v)
-                        self._detect_pending_tactic_maps()
                         self.apply_mod_mode()
                         return
 
@@ -544,7 +462,6 @@ class MapManager:
                 else:
                     emit(100, "update_failed", "red")
 
-                self._detect_pending_tactic_maps()
                 self.apply_mod_mode()
             except Exception as e:
                 import traceback
@@ -555,228 +472,18 @@ class MapManager:
                 finish()
         threading.Thread(target=checker, daemon=True).start()
 
-    def _tactic_candidate_ids(self, maps_dict):
-        """Арени, що реально можуть потрапити у TACTIC-список (Standard).
-
-        Ті самі фільтри, що в load_map_list (map_manager.py:937-950):
-        службові/евентні виключаються, має бути ctf-геймплей — інакше
-        створились би фони для comp7-варіантів і hangar_v4_fortrush,
-        які в TACTIC ніколи не показуються. map_data.json відсутній →
-        арена лишається кандидатом (як і в load_map_list).
-        """
-        if not isinstance(maps_dict, dict):
-            return []
-        data_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_data.json")
-        try:
-            with open(data_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-        except Exception:
-            data = {}
-        out = []
-        for m in maps_dict:
-            if m.startswith("type/") or m.startswith("h33_"):
-                continue
-            if m in ("invalid_map", "hangar_v4", "_default_"):
-                continue
-            if m in _EVENT_MAP_IDS:
-                continue
-            if m in data and "ctf" not in (data[m].get("gameplayTypes") or {}):
-                continue
-            out.append(m)
-        return out
-
-    def _detect_pending_tactic_maps(self):
-        """HEAD-перевірка сайту: додавання + зміни тактичних мап.
-
-        Додавання: мапи без локальної картинки → HEAD → 200: завантаження +
-        подія map_added; 404 → unavailable (наявний негативний кеш); мережева
-        помилка — НЕ unavailable (добовий sweep має шанс повторити).
-        Зміни: умовний HEAD If-None-Match за маніфестом site_maps_manifest.json
-        (ETag сервера); baseline першого запуску — лише запис ETag без події;
-        різні ETag → перекачка + подія map_changed.
-        Події → RTDB service_events (category=site_maps) → сповіщення адмінки;
-        якщо мапа зараз показана — живий rerender без перезавантаження вікна.
-        Гард _sweep_running: без накладань потоків (startup + добовий цикл)."""
-        if getattr(self, "_sweep_running", False):
-            return
-        self._sweep_running = True
-        try:
-            dict_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_dictionary.json")
-            if not os.path.exists(dict_path):
-                return
-            try:
-                with open(dict_path, "r", encoding="utf-8") as f:
-                    maps_maps = json.load(f)
-            except Exception:
-                try:
-                    import firebase_reporter
-                    firebase_reporter.report_fallback(
-                        "map_manager._detect_pending_tactic_maps", "map_dictionary.json",
-                        "Failed to load map dictionary")
-                except Exception:
-                    pass
-                return
-
-            # ── Локальна верифікація фонів (офлайн, ДО мережі) ──────
-            # Клієнт гри — джерело істини: фони, що не збігаються з
-            # мінікартою (сайт віддав чужу мапу), ремонтується з
-            # extracted_maps; відсутні — створюються. Після цього папка
-            # з'являється в existing_folders і мапа рухається з хвоста
-            # списку на алфавітне місце (Нібельбурґ, 26.10.2026).
-            try:
-                import map_updater
-                rep = map_updater.ensure_local_backgrounds(
-                    self._tactic_candidate_ids(maps_maps))
-                if rep.get("repaired") or rep.get("created"):
-                    print(f"[MAP_MGR] IMAGE GUARD: created={rep['created']} "
-                          f"repaired={rep['repaired']} ok={rep['ok']} "
-                          f"checked={rep['checked']}")
-            except Exception as e:
-                print(f"[MAP_MGR] IMAGE GUARD error: {e}")
-
-            existing_folders = set()
-            if os.path.isdir(config.MAPS_DIR):
-                for fname in os.listdir(config.MAPS_DIR):
-                    if os.path.exists(os.path.join(config.MAPS_DIR, fname, "map.webp")):
-                        existing_folders.add(fname.lower().replace(' ', '_'))
-
-            # Кандидати: new_maps — без локальної картинки; have_maps — з нею
-            new_maps = []
-            have_maps = []
-            for map_id in maps_maps:
-                if map_id.startswith("type/") or map_id in ("invalid_map", "hangar_v4", "_default_") or map_id.startswith("h33_"):
-                    continue
-                if map_id in _EVENT_MAP_IDS:
-                    continue
-                eng = config.MAP_NAMES_EN.get(map_id, map_id)
-                folder = self._resolve_tactic_folder(eng)
-                safe = folder.replace(' ', '_').lower()
-                if safe in existing_folders:
-                    have_maps.append(map_id)
-                    continue
-                if map_id in self._unavailable_maps or eng in self._unavailable_maps:
-                    continue
-                new_maps.append(map_id)
-
-            if not new_maps and not have_maps:
-                return
-
-            import requests
-            import map_updater  # selenium — лені-імпорт усередині sync_all
-
-            manifest = self._load_site_manifest()
-
-            # URL-и з map_links.json — реальні об'єкти сайту (заповнює
-            # sync_all з DOM: name<ts>.webp). Шаблон від назви всередині
-            # resolve_site_url лишається fallback'ом — він вказував на чужий
-            # об'єкт (maps/pilsen.webp = Редшир, 26.10.2026).
-            links = {}
-            try:
-                with open(config.MAP_LINKS_FILE, "r", encoding="utf-8") as f:
-                    links = json.load(f)
-            except Exception:
-                pass
-
-            # ── Додавання: локальної картинки немає ──
-            for map_id in new_maps:
-                eng = config.MAP_NAMES_EN.get(map_id, map_id)
-                url = map_updater.resolve_site_url(eng, links)
-                try:
-                    r = requests.head(url, timeout=5)
-                    if r.status_code == 200:
-                        if map_updater.download_single_map(eng, url):
-                            # Маніфест ПЕРЕД подією: crash-вікно без дублікатів
-                            manifest[map_id] = self._site_entry_from_headers(r.headers)
-                            self._save_site_manifest(manifest)
-                            self._on_site_map_event("map_added", map_id, eng)
-                            print(f"[MAP_MGR] Downloaded TACTIC map: {eng} ({map_id})")
-                        else:
-                            print(f"[MAP_MGR] Download failed: {eng}")
-                    else:
-                        # 404: мапи на сайті ще немає — НЕ додаємо в unavailable.
-                        # Постійний blacklist зламав би добовий sweep: перший sweep
-                        # отруїв би мапу (сайт ще не додав), і «коли з'явиться»
-                        # завантаження вже ніколи не відбулось би. Наявний
-                        # unavailable (legacy) лишається skip-списком.
-                        print(f"[MAP_MGR] Map not on site: {eng} ({r.status_code})")
-                except Exception as e:
-                    # Мережева помилка (таймаут/офлайн) — НЕ позначаємо
-                    # unavailable: наступний sweep має шанс повторити.
-                    print(f"[MAP_MGR] HEAD error for {eng}: {e}")
-
-            # ── Зміни: локальна картинка є → умовний HEAD за ETag ──
-            for map_id in have_maps:
-                eng = config.MAP_NAMES_EN.get(map_id, map_id)
-                url = map_updater.resolve_site_url(eng, links)
-                entry = manifest.get(map_id) or {}
-                etag = entry.get("etag")
-                try:
-                    r = requests.head(url, headers={"If-None-Match": etag} if etag else {}, timeout=5)
-                    if r.status_code == 304:
-                        continue
-                    if r.status_code != 200:
-                        continue  # сайт недоступний — локальна копія лишається
-                    new_etag = (r.headers.get("ETag") or "").strip()
-                    if not etag:
-                        # Baseline першого запуску: запис ETag без події/перекачки
-                        manifest[map_id] = self._site_entry_from_headers(r.headers)
-                        self._save_site_manifest(manifest)
-                        continue
-                    if not new_etag or new_etag == etag:
-                        continue  # без ETag немає доказу зміни → не перекачуємо
-                    if map_updater.download_single_map(eng, url):
-                        manifest[map_id] = self._site_entry_from_headers(r.headers)
-                        self._save_site_manifest(manifest)
-                        self._on_site_map_event("map_changed", map_id, eng)
-                        print(f"[MAP_MGR] TACTIC map updated: {eng} ({map_id})")
-                    else:
-                        # Відмова валідації (сайт віддав чужу мапу) або мережа.
-                        # Локальна копія вже пройшла guard і валідна — фіксуємо
-                        # ETag, щоб не качати ті самі байти щодня; якщо сайт
-                        # виправиться, ETag зміниться і перекачка відбудеться.
-                        local_ok, _ = map_updater.verify_map_background(map_id)
-                        if local_ok:
-                            manifest[map_id] = self._site_entry_from_headers(r.headers)
-                            self._save_site_manifest(manifest)
-                        print(f"[MAP_MGR] Download rejected/failed, local copy kept: {eng}")
-                except Exception as e:
-                    print(f"[MAP_MGR] HEAD error for {eng}: {e}")
-
-            self._save_unavailable()
-            self._last_changed_ids = []
-        finally:
-            self._sweep_running = False
-
-    def _load_pending_tactic_maps(self):
-        if not os.path.exists(self._pending_tactic_path):
-            return []
-        try:
-            with open(self._pending_tactic_path, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return []
-
-    def _save_pending_tactic_maps(self, pending):
-        try:
-            with open(self._pending_tactic_path, "w", encoding="utf-8") as f:
-                json.dump(pending, f)
-        except Exception:
-            pass
-
     def apply_mod_mode(self):
-        """Install sm_tactics.wotmod if use_mod enabled; remove it from every mods/<ver>/ when disabled.
+        """Install sm_tactics.wotmod into mods/<game_version>/ (v2.0: always).
 
-        Версія гри читається з version.xml на диску (fallback — settings.game_version),
-        щоб папка mods/<ver>/ була актуальною навіть до оновлення settings після
-        екстракції. Після встановлення наш застарілий wotmod прибирається з інших
-        версійних папок. Якщо гра запущена і файл щойно (ре)встановлено — показується
-        одноразове за сесію не-модальне вікно «перезапусти гру» (моди вантажаться
-        тільки при старті гри; Aslain-модпак стирає mods/* при перевстановленні).
+        Мод — єдиний рендерер схем у бою, тому гілку use_mod/uninstall прибрано
+        (30.10.2026). Версія гри читається з version.xml на диску (fallback —
+        settings.game_version), щоб папка mods/<ver>/ була актуальною навіть до
+        оновлення settings після екстракції. Після встановлення наш застарілий
+        wotmod прибирається з інших версійних папок. Якщо гра запущена і файл
+        щойно (ре)встановлено — показується одноразове за сесію не-модальне
+        вікно «перезапусти гру» (моди вантажаться тільки при старті гри;
+        Aslain-модпак стирає mods/* при перевстановленні).
         """
-        try:
-            use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
-        except Exception:
-            use_mod = False
         wot_path = self.app.settings.get("wot_path", "")
         # Stale folder created by the old raw-version bug (path from
         # version.xml with leading/trailing spaces, Win32-mangled name).
@@ -790,9 +497,6 @@ class MapManager:
                     print("[MAP_MGR] Removed stale version folder:", _junk)
                 except Exception as _je:
                     print("[MAP_MGR] Stale folder cleanup failed:", _je)
-        if not use_mod:
-            self._uninstall_tactics_mod(wot_path)
-            return
         wotmod_src = config.MOD_WOTMOD_FILE
         if not os.path.isfile(wotmod_src):
             print("[MAP_MGR] sm_tactics.wotmod not found, skipping install")
@@ -816,6 +520,10 @@ class MapManager:
             os.makedirs(mods_dir, exist_ok=True)
             dst = os.path.join(mods_dir, "sm_tactics.wotmod")
             was_missing = not os.path.isfile(dst)
+            if not was_missing and os.path.getsize(dst) == os.path.getsize(wotmod_src):
+                # Файл уже на місці (гра може тримати його відкритим —
+                # WinError 32 на copy2). Перезапис не потрібен.
+                return
             import shutil
             shutil.copy2(wotmod_src, dst)
             print(f"[MAP_MGR] Installed sm_tactics.wotmod -> {mods_dir}")
@@ -890,13 +598,7 @@ class MapManager:
             print(f"[MAP_MGR] Restart notice error: {e}")
 
     def ensure_mod_installed(self):
-        """Періодична самоперевірка (5 хв): use_mod увімкнено + файл відсутній/порожній → перевстановити."""
-        try:
-            use_mod = bool(getattr(self.app, "_use_mod_var", None) and self.app._use_mod_var.get())
-        except Exception:
-            return
-        if not use_mod:
-            return
+        """Періодична самоперевірка (5 хв): файл відсутній/порожній → перевстановити."""
         wot_path = self.app.settings.get("wot_path", "")
         if not wot_path:
             return
@@ -919,62 +621,28 @@ class MapManager:
         print("[MAP_MGR] sm_tactics.wotmod missing — reinstalling (integrity check)")
         self.apply_mod_mode()
 
-    def _uninstall_tactics_mod(self, wot_path):
-        """Remove our sm_tactics.wotmod from every mods/<ver>/ folder (exact name only, other mods untouched)."""
-        if not wot_path:
-            return
-        mods_root = os.path.join(wot_path, "mods")
-        if not os.path.isdir(mods_root):
-            return
-        try:
-            for entry in os.listdir(mods_root):
-                dst = os.path.join(mods_root, entry, "sm_tactics.wotmod")
-                if os.path.isfile(dst):
-                    try:
-                        os.remove(dst)
-                        print(f"[MAP_MGR] Removed sm_tactics.wotmod -> {os.path.dirname(dst)}")
-                    except Exception as e:
-                        print(f"[MAP_MGR] Mod removal error ({dst}): {e}")
-        except Exception as e:
-            print(f"[MAP_MGR] Mod sweep error: {e}")
-
     def run_map_updater(self):
-        if self.app.btn_mode_maps_1.cget("bg") == "#ff4500":
-            try: import map_updater
-            except ImportError:
-                return
-            def update_thread():
+        # TACTIC-синхронізація з сайтом прибрана у v2.0 (розділу TACTIC нема) —
+        # лишилась тільки екстракція мап із клієнта для режиму MAPS.
+        if not map_extractor:
+            return
+        if not self._try_begin_update():
+            return
+        def update_thread():
+            try:
+                ext = map_extractor.MapExtractor()
                 def status_cb(text): pass
-                success = False
-                try: success = map_updater.sync_all(callback_status=status_cb)
-                except Exception as e: print(f"[MAP_MGR] Updater error: {e}")
+                success = ext.extract(callback_status=status_cb)
+                self._last_changed_ids = ext.last_changed_ids
                 def on_finish():
                     if success:
                         self.load_map_list()
                     else:
                         pass
                 self.app.safe_execute(on_finish)
-            threading.Thread(target=update_thread, daemon=True).start()
-        else:
-            if not map_extractor:
-                return
-            if not self._try_begin_update():
-                return
-            def update_thread():
-                try:
-                    ext = map_extractor.MapExtractor()
-                    def status_cb(text): pass
-                    success = ext.extract(callback_status=status_cb)
-                    self._last_changed_ids = ext.last_changed_ids
-                    def on_finish():
-                        if success:
-                            self.load_map_list()
-                        else:
-                            pass
-                    self.app.safe_execute(on_finish)
-                finally:
-                    self._end_update()
-            threading.Thread(target=update_thread, daemon=True).start()
+            finally:
+                self._end_update()
+        threading.Thread(target=update_thread, daemon=True).start()
 
     def load_map_list(self):
         ui_mode = self.app.selected_battle_mode.get()
@@ -986,7 +654,6 @@ class MapManager:
             "OnslaughtLight": "comp7",
         }
         internal_mode = mode_mapping.get(ui_mode, "ctf")
-        is_tactic = self.app.btn_mode_maps_1.cget("bg") == "#ff4500"
 
         dict_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_dictionary.json")
         data_path = os.path.join(config.BASE_DIR, "extracted_maps", "map_data.json")
@@ -1014,12 +681,6 @@ class MapManager:
                         continue
                 filtered_maps.append(m)
             self.app.map_list_eng = filtered_maps
-            if is_tactic and ui_mode != "Standard":
-                self.app.map_list_eng = []
-                self.app.map_var.set("")
-                self.app.current_map_eng = None
-                self.app.map_renderer.show_main_splash(message=self.app.t('ui', 'tactic_no_maps'))
-                return
         else:
             self.app.extractor_names = {}
             self.app.map_list_eng = []
@@ -1030,16 +691,6 @@ class MapManager:
                     "Map dictionary empty or missing")
             except Exception:
                 pass
-
-        if is_tactic:
-            # Розподіл замість виключення: мапи З тактичною картинкою перші,
-            # без — в кінці списку (показуються з написом «no scheme yet»,
-            # а не ховаються — спека користувача 23.10.2026). Дедуп нижче
-            # віддає перевагу першому входженню → зображеному.
-            _img = {m for m in self.app.map_list_eng if self._tactic_image_exists(m)}
-            self.app.map_list_eng = (
-                [m for m in self.app.map_list_eng if m in _img]
-                + [m for m in self.app.map_list_eng if m not in _img])
 
         # Filter by active group schemes
         import firebase_groups
@@ -1067,13 +718,6 @@ class MapManager:
         self.app.map_list_eng = unique_maps
 
         self._sort_map_list_eng_by_display()
-        if is_tactic:
-            # Сортування розриває розподіл «без картинки в кінці» — відновлюємо
-            _img = {m for m in self.app.map_list_eng if self._tactic_image_exists(m)}
-            _with = [m for m in self.app.map_list_eng if m in _img]
-            _without = [m for m in self.app.map_list_eng if m not in _img]
-            if _without:
-                self.app.map_list_eng = _with + _without
         tmaps = [self.app.translate_map_name(m) for m in self.app.map_list_eng]
         self.app.map_selector.config(values=tmaps)
         
@@ -1087,27 +731,3 @@ class MapManager:
             self.app.map_renderer.show_main_splash()
 
 
-    def _resolve_tactic_folder(self, eng_key):
-        folder = config.TECH_MAPS_STAGING.get(eng_key)
-        if folder:
-            return folder
-        for suffix in ['_v', '_big', '_sm24', '_sm25', '_nom', '_scc', '_ctf']:
-            if eng_key.endswith(suffix):
-                base = eng_key[:-len(suffix)]
-                folder = config.TECH_MAPS_STAGING.get(base)
-                if folder:
-                    return folder
-        return eng_key
-
-    def _tactic_image_exists(self, eng_key):
-        eng_name = config.MAP_NAMES_EN.get(eng_key, eng_key)
-        folder_name = self._resolve_tactic_folder(eng_name)
-        safe_folder = folder_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
-        webp_path = os.path.join(config.MAPS_DIR, safe_folder, "map.webp")
-        if os.path.exists(webp_path):
-            return True
-        jpg_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.jpg")
-        png_path = os.path.join(config.MAPS_DIR, f"{safe_folder}.png")
-        if os.path.exists(jpg_path) or os.path.exists(png_path):
-            return True
-        return False

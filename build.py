@@ -359,15 +359,6 @@ def copy_data_files():
     else:
         print("[BUILD] WARNING: sm_tactics.wotmod not found — mod NOT bundled (run build_mod.py first)")
 
-    # maps/ (TACTIC mode images)
-    maps_dir = os.path.join(BASE_DIR, "maps")
-    if os.path.exists(maps_dir):
-        for folder in os.listdir(maps_dir):
-            fpath = os.path.join(maps_dir, folder)
-            if os.path.isdir(fpath):
-                for f in os.listdir(fpath):
-                    _cp(os.path.join(fpath, f), os.path.join("maps", folder, f))
-
     # extracted_maps/ (MAPS mode images + data)
     em_dir = os.path.join(BASE_DIR, "extracted_maps")
     if os.path.exists(em_dir):
@@ -677,7 +668,6 @@ def verify_build(version):
 
     # Directory checks
     checks = [
-        ("maps", os.path.join(internal, "maps"), 50),
         ("extracted_maps", os.path.join(internal, "extracted_maps"), 60),
         ("extracted_icons", os.path.join(internal, "extracted_icons"), 8),
         ("extracted_data", os.path.join(internal, "extracted_data"), 1),

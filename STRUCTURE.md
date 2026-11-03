@@ -22,14 +22,14 @@
 ├── data_manager.py             # JSON file I/O, tank DB loading with fallback chain (tank_db.json → tank_tth.json → extracted_data/ filenames), each level calls firebase_reporter.report_fallback(); load_json returns empty defaults on error
 ├── dialog_utils.py             # Dark-themed dialog utilities: make_custom_dialog() (overrideredirect Toplevel with dark header + close), dark_messagebox(), dark_confirmbox(), dark_promptbox() — all use make_custom_dialog + _DragHelper internally; _set_dark_title_bar(), _center_on_root(), _DragHelper class for window dragging
 ├── locale_manager.py           # Translation system, map name resolution (t_ui, t_map)
-├── map_manager.py              # Map list loading (unified TACTIC↔MAPS from extracted_maps/map_dictionary.json), game version check, data updates, TACTIC image partition (maps with image first, imageless at end — shown with no-scheme splash), site-map sweep (_detect_pending_tactic_maps: additions via HEAD + changes via If-None-Match on site_maps_manifest.json, service_events site_maps notifications, live rerender via after(0), daily chain from _on_startup_ready), _EVENT_MAP_IDS (18 event/onboarding/removed maps — Empire's Border + Mountain Pass live since 04.08.2026); group scheme map filtering; battle mode filtering; TACTIC no-maps message for non-Standard modes; on game version change runs GameEntitiesExtractor + update_compact_descr() + signals pending_updates/builds
+├── map_manager.py              # Map list loading (single MAPS mode since v2.0 — list from extracted_maps/map_dictionary.json), game version check, data updates, _EVENT_MAP_IDS (18 event/onboarding/removed maps — Empire's Border + Mountain Pass live since 04.08.2026); group scheme map filtering; battle mode filtering; on game version change runs GameEntitiesExtractor + update_compact_descr() + signals pending_updates/builds; mod install (apply_mod_mode always installs sm_tactics.wotmod; skips copy when same size — game may hold the file); the TACTIC list/partition/site-sweep were removed 01.11.2026
 ├── map_renderer.py             # Map image rendering, 10×10 grid, draw_frame() border, _resolve_tactic_folder(), arena bases (assault2 gameplay type fallback for Storm); show_main_splash(message=None); _report_fallback_async() for missing boundingBox
 ├── painter.py                  # Canvas drawing: markers, arrows, brush (freehand), text, tree icons, undo (creation + deletion history stacks), edit mode, class icon filtering, overlay (_po_win Toplevel) with transient/Unmap/focus management, _po_sync_timer (500ms); _group_schemes dict for read-only linked group scheme overlay; _scheme_downloaded_at timestamps; _hidden_download_schemes set; select-all toggle (Ctrl+A); _render_elements(screen_scale) DPI-aware; scale property 0.3–3.0
 ├── painting_palette.py         # Floating DrawingPalette (tk.Toplevel): toolbar (marker + arrow + brush + XVMSymbol + tree FontAwesome icons), arrow start/end checkboxes for brush, live-sync editing, 12-color history, status bar, delete button, Publish/Publish All/Save/Save All/Import/Download; community schemes download dialog with search + multi-select; group management section (Create/Join/Manage) with overrideredirect(True) dialogs; group-aware publish; linked schemes list with hide/show; thickness slider + ALL select-all + size slider (0.3–3.0)
 ├── log_reader.py               # python.log/game.log tailing for battle event detection; type-to-mode mapping from arenaType (1→ctf, 2→domination, 3→assault, 4/5 legacy, 30/33/34→comp7 Onslaught, 35→comp7_light Onslaught Light); hangar_re matches client hangars + event spaces (h<N>_* like h33_comp7, h42_Wot_Bday_2026), both excluded from arena detection
 ├── help_system.py              # F1 help overlay via Toplevel grid of Label widgets; auto-sized; all text via app.t(); FontAwesome icons
 ├── tactics_manager.py          # Import/export of tactical drawings as JSON; import_unified() auto-detects single-map vs all-maps format; dark-themed modals via dialog_utils
-├── service_messages.py         # Internal event logging queue (undelivered messages to service_messages.json); log_event/get_pending/mark_delivered; log_event_now = log_event + immediate try_flush_service_messages (background threads only — site_maps events notify the admin app live)
+├── service_messages.py         # Internal event logging queue (undelivered messages to service_messages.json); log_event/get_pending/mark_delivered; log_event_now = log_event + immediate try_flush_service_messages (background threads only — used for events that must reach the server without waiting for quit)
 ├── translations.py             # Default UI/map translations (English-only authoritative source); class labels (LT/MT/HT/TD/SPG) kept English
 ├── stats_ai.py                 # AI tank build browser (Treeview + Firebase RTDB sync), popular tanks (tiers 8-11), version-tracked caches, _sync_popular_tanks() and _sync_builds(); _report_fallback() deduplicated via _REPORTED_FALLBACKS set; _is_build_complete(); _save_ai_build_cache_bulk(); imports generate_prompt_v2 for local prompt generation
 ├── stats_data.py               # Equipment, consumable, crew skill ID mappings; generates EQUIP_MAP/CONS_MAP/CREW_SKILL_MAP at runtime from .mo files via generate_mo_maps() (called from language_module.setup()), cached per language to mo_maps_{lang}.json; EQUIP_SLOT_TAGS, SLOT_TYPE_NAMES
@@ -48,7 +48,7 @@
 ├── language_module.py          # .mo file parser, game language detection, locale JSON exporter; global _lang_module via get_lang_module()/reset_lang_module(); regenerate_map_dictionary() called on EVERY startup (with _lang_module); regenerate_game_entities(); setup() calls stats_data.generate_mo_maps()
 ├── ui_translator.py            # Runtime UI translation via Google Translate (deep_translator) with shortcut/symbol shielding; per-language cache in localization/<lang>/ui_cache.json
 ├── map_extractor.py            # Map extraction from game client (MAPS mode); manifest tracking
-├── map_updater.py              # Map sync for TACTIC mode: sync_all() (full site scraping via selenium — lazy imports INSIDE the function so `import map_updater` works without Chrome) + download_single_map(eng_name, url) (requests-only single image → maps/<folder>/map.webp); used by map_manager site sweep
+├── map_updater.py              # REMOVED (01.11.2026) — archived to _archive/scripts/map_updater.py (0 runtime importers). Was TACTIC map sync: sync_all() (selenium site scraping) + download_single_map() → maps/<folder>/map.webp. Site monitoring now lives in admin_backend/site_watch.py
 ├── tank_extractor.py           # Tank data extraction from game client; update_compact_descr() populates missing compact_descr fields; _sanitize_list_xml() escapes raw '&'/'<' markers + strips UTF-8 BOM for both list.xml parse sites; uses name_localizer + tth_updater
 ├── wot_decoder.py              # XML decoder for game client .pkg files (wraps decode_xml.WotXmlParser)
 ├── decode_xml.py               # Bounds-checked XML decoding (WotXmlParser) — guards against malformed data with offset/child_count/id bounds
@@ -74,7 +74,7 @@
 ├── service_messages.json       # Service message queue (root copy seeds AppData)
 ├── icon_mapping.json           # Icon mapping data
 ├── ukrainian_map_names.json    # Map name translations (extractor output)
-├── map_list.json               # TACTIC map list (legacy)
+├── map_list.json               # DEPRECATED 2026-11-01 (TACTIC legacy, 0 importers; sidecar map_list.json.deprecated)
 ├── map_links.json              # Map links data
 ├── database.rules.json         # RTDB security rules: root deny; versions/builds/prompts/popular_tanks write only for admin uid; installations/service_events/admin_app auth-gated reads; error_reports append-only (create open, delete auth); drawings read-only; indexes (versions, schemes, error_reports, installations, service_events, groups, user_groups)
 ├── firebase.json               # Firebase Hosting + Database configuration
@@ -87,7 +87,7 @@
 ├── logo.png                    # App/website logo
 ├── icon.ico                    # App icon
 ├── public/                     # Firebase Hosting static website (sm-wot-assistant.web.app), English-only
-├── maps/                       # Map images for TACTIC mode (webp/jpg/png, 52 map folders)
+├── maps/                       # DEPRECATED 2026-11-01 — TACTIC backgrounds (webp/jpg/png, 52 folders, ~14.5 MB); no longer bundled, not read at runtime
 ├── extracted_maps/             # Map images + data from game client (MAPS mode; map_data.json, map_dictionary.json, 65 PNGs)
 ├── extracted_icons/            # Tank/loadout icons extracted from client (8 category dirs)
 ├── extrated_icons/             # Additional tank icon set (1223 PNGs per tank)
@@ -120,8 +120,8 @@
 - Contains: English-only landing page (`index.html`, `lang="en"`) with logo, download button linking to the latest versioned GitHub release (button text from RTDB `display_version`), YouTube video embed (`video-wrap` iframe), screenshot gallery with lightbox (5 WebP screens in `img/`: start/setup/maps/tactic/minimap, click-to-zoom via `openLightbox()`), community schemes promo, borderless window warning, "Support the project" section (Ko-fi widget + Ko-fi/Monobank/PayPal QR cards — `img/qr_kofi.png`, `img/qr_monobank.png`, `img/paypal_qr.png`), footer with Reddit profile link; `schemes.html` community schemes browser (map filter, authors filter, invite-code groups, PIN-based auth; publishing is app-only — upload modal removed); `drawings.html` gallery; `admin.html` admin dashboard (stats, schemes management, version management, live Admin App (Desktop) section reading the `admin_app/` RTDB node via `loadAdminAppData()` polled every 60s); `verify.json` bundle verification manifest (version, popular_tanks, prompt_date_format) generated by `build.py` and fetched by `main.py:_run_verification` Phase 3; `404.html`; static assets (`logo.png`, `favicon.ico`, `example_map.png`); `img/` (WebP app screenshots); `locale/` subdirectory with exported locale JSON (e.g., `en.json`)
 - Key files: `index.html`, `schemes.html`, `verify.json`
 
-**maps/:**
-- Purpose: Map images for TACTIC mode (sourced from website, not game client)
+**maps/ (DEPRECATED 2026-11-01):**
+- Purpose: TACTIC map backgrounds sourced from wotmapsbyyaya.com — the TACTIC section was removed in v2.0; folder kept on disk for 30 days per the soft-delete protocol (`maps/.deprecated`), excluded from the bundle
 - Contains: 52 subdirectories named after maps (e.g., `Karelia/`, `Malinovka/`, `Empires_Border/`, `Mountain_Pass/`), each containing `map.webp`, `map.jpg`, or `map.png`
 - Key files: Organized by human-readable folder names
 
@@ -196,7 +196,7 @@
 
 **Files:** Python scripts use `snake_case.py` for modules (e.g., `map_renderer.py`, `log_reader.py`, `stats_ai.py`). Admin/support scripts follow the same convention (`admin_app.py`, `admin_build_generator.py`, `build_admin.py`). Debug/check/test/patch scripts were prefixed `debug_`, `check_`, `test_`, `patch_` and are archived in `_archive/scripts/`.
 
-**Directories:** Extracted data uses lowercase with underscores: `extracted_maps/`, `extracted_icons/`, `extracted_data/`. Map folders under `maps/` use capitalized human-readable names (`Empires_Border/`, `Mountain_Pass/`).
+**Directories:** Extracted data uses lowercase with underscores: `extracted_maps/`, `extracted_icons/`, `extracted_data/`. The legacy TACTIC `maps/` folders used capitalized human-readable names (`Empires_Border/`) — that tree is deprecated since v2.0 and no longer bundled.
 
 **Classes:** PascalCase: `WotAssistantHQ`, `WindowManager`, `MapRenderer`, `LogWatcher`, `StatsAI`, `MapExtractor`, `TankExtractor`, `MapPainter`, `DrawingPalette`, `LocaleManager`, `DataManager`, `HelpManager`, `UIManager`, `LanguageModule`, `AIEngine`
 

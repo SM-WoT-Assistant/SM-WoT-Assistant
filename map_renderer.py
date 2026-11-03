@@ -1,6 +1,7 @@
 import os
 import tkinter as tk
-from PIL import Image, ImageTk, ImageEnhance
+import webbrowser
+from PIL import Image, ImageTk
 import config
 
 class MapRenderer:
@@ -14,27 +15,18 @@ class MapRenderer:
         if not self.app.current_map_eng: return None
 
         paths = []
-        if self.app.btn_mode_maps_2.cget("bg") == "#ff4500":
-            base_id = self._resolve_map_data_id()
-            base_dir = os.path.join(config.BASE_DIR, "extracted_maps")
-            ui_mode = self.app.selected_battle_mode.get()
-            # Натиск: окрема мінікарта mmap_comp7 → {space_id}_comp7.png
-            # Для _comp7_nb арен свій space pkg і свій mmap_comp7 (назва зберігає суфікс)
-            if ui_mode in ("Onslaught", "OnslaughtLight"):
-                paths.append(os.path.join(base_dir, f"{base_id}_comp7.png"))
-            paths.append(os.path.join(base_dir, f"{base_id}.png"))
-            # Якщо raw nb-арена не має свого comp7 png — базовий comp7 тієї ж мапи
-            if base_id.endswith("_comp7_nb"):
-                paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}_comp7.png"))
-                paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}.png"))
-        else:
-            map_nice = config.MAP_NAMES_EN.get(self.app.current_map_eng, self.app.current_map_eng)
-            eng_name = self.app.map_mgr._resolve_tactic_folder(map_nice)
-            safe_folder = eng_name.replace('?', '').replace(':', '').replace('|', '').replace("'", "").replace(' - ', '_').replace(' ', '_')
-            paths = [os.path.join(config.MAPS_DIR, safe_folder, "map.webp"),
-                     os.path.join(config.MAPS_DIR, f"{eng_name}.jpg"),
-                     os.path.join(config.MAPS_DIR, f"{eng_name}.png")]
-                     
+        base_id = self._resolve_map_data_id()
+        base_dir = os.path.join(config.BASE_DIR, "extracted_maps")
+        ui_mode = self.app.selected_battle_mode.get()
+        # Натиск: окрема мінікарта mmap_comp7 → {space_id}_comp7.png
+        # Для _comp7_nb арен свій space pkg і свій mmap_comp7 (назва зберігає суфікс)
+        if ui_mode in ("Onslaught", "OnslaughtLight"):
+            paths.append(os.path.join(base_dir, f"{base_id}_comp7.png"))
+        paths.append(os.path.join(base_dir, f"{base_id}.png"))
+        # Якщо raw nb-арена не має свого comp7 png — базовий comp7 тієї ж мапи
+        if base_id.endswith("_comp7_nb"):
+            paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}_comp7.png"))
+            paths.append(os.path.join(base_dir, f"{base_id[:-len('_comp7_nb')]}.png"))
         for p in paths:
             if os.path.exists(p):
                 try:
@@ -44,10 +36,6 @@ class MapRenderer:
                         border_raw = max(5, int(border_raw * min(cw, ch) / 800))
                     s = max(1, min(cw, ch) - 2 * border_raw)
                     img = img.resize((s, s), Image.Resampling.LANCZOS)
-                    
-                    if hasattr(self.app, 'contrast') and self.app.contrast != 1.0:
-                        enhancer = ImageEnhance.Contrast(img)
-                        img = enhancer.enhance(self.app.contrast)
                     
                     return ImageTk.PhotoImage(img)
                 except: pass
@@ -315,13 +303,8 @@ class MapRenderer:
                     self.draw_grid(cw, ch)
                     self.draw_arena_bases(cw, ch)
             else:
-                is_tactic = app.btn_mode_maps_1.cget("bg") == "#ff4500"
-                if is_tactic:
-                    msg = f"{app.t('ui', 'tactic_maps_source')} wotmapsbyyaya.com/maps\n{app.t('ui', 'tactic_no_map')}"
-                    app.canvas.create_text(cw//2, ch//2, text=msg, fill="#888888", font=("Arial", 10), justify="center", tags="map")
-                else:
-                    msg = app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
-                    app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
+                msg = app.t('ui', 'map_not_found_msg').format(app.t('maps', app.current_map_eng))
+                app.canvas.create_text(cw//2, ch//2, text=msg, fill="red", font=("Arial", 10), tags="map")
                 map_drawn = True 
 
                 
@@ -330,18 +313,16 @@ class MapRenderer:
                 app.canvas.create_text(cw//2, ch//2, text=message, fill="#888888", font=("Arial", 18), tags="map")
             elif app.mode == "edit":
                 version = config.load_version()
-                app.canvas.create_text(cw//2, ch - 20, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
-                line1 = f"LMB: {app.t('ui', 'help_ctrl_lmb')}{app.t('ui', 'mini_unlock_hint')}"
+                app.canvas.create_text(cw//2, ch - 38, text=f"SM WoT Assistant {version}", fill="#ff4500", font=("Arial", 9, "bold"), tags="map")
+                line1 = f"LMB: {app.t('ui', 'help_ctrl_lmb')}"
                 line2 = f"\u2195: {app.t('ui', 'help_ctrl_updown')} | \u2194: {app.t('ui', 'help_ctrl_leftright')}"
-                line3 = f"Shift+\u2195: {app.t('ui', 'help_ctrlshift_updown')}"
-                app.canvas.create_text(cw//2, ch - 90, text=line1, fill="#aaaaaa", font=("Arial", 9), tags="map")
-                app.canvas.create_text(cw//2, ch - 70, text=line2, fill="#aaaaaa", font=("Arial", 9), tags="map")
-                app.canvas.create_text(cw//2, ch - 50, text=line3, fill="#aaaaaa", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 100, text=line1, fill="#aaaaaa", font=("Arial", 9), tags="map")
+                app.canvas.create_text(cw//2, ch - 72, text=line2, fill="#aaaaaa", font=("Arial", 9), tags="map")
                 h2_frame = tk.Frame(app.canvas, bg="black")
                 tk.Label(h2_frame, text=chr(0xF023), font=("FontAwesome", 11), bg="black", fg="white").pack(side="left")
                 tk.Label(h2_frame, text=chr(0xF09C), font=("FontAwesome", 11), bg="black", fg="white").pack(side="left")
                 tk.Label(h2_frame, text="  " + app.t('ui', 'h2'), font=("Arial", 11, "bold"), bg="black", fg="white").pack(side="left")
-                app.canvas.create_window(cw//2, ch - 115, window=h2_frame, tags="map")
+                app.canvas.create_window(cw//2, ch - 136, window=h2_frame, tags="map")
             if app.logo_image_object:
                     try:
                         mw, mh = int(cw * 0.55), ch - 110
@@ -351,17 +332,25 @@ class MapRenderer:
                         app.logo_img = ImageTk.PhotoImage(app.logo_image_object.resize((lw, lh), Image.Resampling.LANCZOS))
                         app.canvas.create_image(cw//2, 10 + mh//2, image=app.logo_img, tags="map")
                     except: pass
-            else: 
-                app.canvas.create_text(cw//2, ch//2, text=f"{app.t('ui', 'battle_mode')}\n{app.t('ui', 'press_e_to_exit')}", fill="#555", font=("Arial", 12, "bold"), justify="center", tags="map")
-            app.canvas.create_text(cw//2, ch - 140, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
-            app.canvas.create_text(cw//2, ch - 250, text=app.t('ui', 'tactic_maps_source'),
+            app.canvas.create_text(cw//2, ch - 164, text=app.t('ui', 'h1'), fill="white", font=("Arial", 11, "bold"), tags="map")
+            app.canvas.create_text(cw//2, ch - 252, text=app.t('ui', 'tactic_maps_source'),
                 fill="#888888", font=("Arial", 12), tags="map")
-            app.canvas.create_text(cw//2, ch - 232, text="wotmapsbyyaya.com/maps",
-                fill="#888888", font=("Arial", 10), tags="map")
-            app.canvas.create_text(cw//2, ch - 216, text=app.t('ui', 'tactic_source_note'),
-                fill="#666666", font=("Arial", 8), tags="map")
-            app.canvas.create_text(cw//2, ch - 165, text=app.t('ui', 'borderless_warning'),
+            link_item = app.canvas.create_text(cw//2, ch - 234, text="wotmapsbyyaya.com/maps",
+                fill="#66aaff", font=("Arial", 10), tags=("map", "site_link"))
+            _lb = app.canvas.bbox(link_item)
+            if _lb and _lb[2] > _lb[0]:
+                app.canvas.create_line(_lb[0], _lb[3], _lb[2], _lb[3],
+                                       fill="#66aaff", tags=("map", "site_link"))
+            app.canvas.tag_bind("site_link", "<Button-1>",
+                                lambda e: webbrowser.open("https://wotmapsbyyaya.com/maps"))
+            app.canvas.tag_bind("site_link", "<Enter>", lambda e: app.canvas.config(cursor="hand2"))
+            # Restore the painter's cursor, not a hardcoded "": move-tool keeps "fleur".
+            app.canvas.tag_bind("site_link", "<Leave>", lambda e: app.canvas.config(
+                cursor="fleur" if getattr(getattr(app, 'painter', None), 'active_tool', None) == 'move' else ""))
+            app.canvas.create_text(cw//2, ch - 196, text=app.t('ui', 'borderless_warning'),
                 fill="red", font=("Arial", 10), tags="map")
+            app.canvas.create_text(cw//2, ch - 12, text=app.t('ui', 'wargaming_disclaimer'),
+                fill="#666666", font=("Arial", 8), tags="map")
             
         if hasattr(app, 'painter'):
             app.painter.redraw(cw, ch)

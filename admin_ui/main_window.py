@@ -119,8 +119,6 @@ class AdminApp(customtkinter.CTk):
         self._last_heartbeat: float = 0
         self._last_errors_poll: float = 0
         self._errors_count = 0
-        self._last_site_poll: float = 0
-        self._site_events_result = None  # пакет для _bg_poll (worker → main)
         self._site_events_list: list = []  # кеш історії для секції Tactic Map Updates
         self._site_events_ping: bool = False  # worker → _bg_poll: оновити секцію
         self._site_watch_result = None  # пакет site_watch для _bg_poll (worker → main)
@@ -278,8 +276,15 @@ class AdminApp(customtkinter.CTk):
 
         # Percent text
         self._splash_percent_text = self._splash_canvas.create_text(
-            sw - 34, sh - 20, text="0%",
+            sw - 34, sh - 40, text="0%",
             fill="#dddddd", font=("Segoe UI", 9))
+
+        # Wargaming disclaimer — самий низ сплеша (як у клієнтському)
+        self._splash_canvas.create_text(
+            sw // 2, sh - 20,
+            text=("Unofficial fan-made app \u2014 not affiliated with, "
+                  "endorsed by or sponsored by Wargaming."),
+            fill="#666666", font=("Segoe UI", 7))
 
         # Progress bar
         self._splash_pbar = self._splash_canvas.create_rectangle(
@@ -433,13 +438,10 @@ class AdminApp(customtkinter.CTk):
                     if now - self._last_errors_poll > 86400:
                         self._last_errors_poll = now
                         self._bg_reload_data = True
-                    # Сповіщення про нові/змінені тактичні мапи на сайті
-                    # (раз на добу; перший тік — одразу при старті)
-                    if now - self._last_site_poll > 86400:
-                        self._last_site_poll = now
-                        self._check_site_map_events()
                     # Монітор змін зображень мап на сайті (тижневий тік;
-                    # gate — site_watch.should_run(), помилка → повтор за годину)
+                    # gate — site_watch.should_run(), помилка → повтор за годину).
+                    # Джерело для секції "Tactic Map Updates" (v2.0: клієнт
+                    # більше не робить site-sweep і не шле service_events).
                     self._check_site_watch()
                 except Exception:
                     pass
@@ -462,25 +464,20 @@ class AdminApp(customtkinter.CTk):
                         body.refresh()
                 except Exception:
                     pass
-            res = self._site_events_result
-            if res is not None:
-                self._site_events_result = None
-                for line in res.get("lines", []):
-                    self.log(line)
-                self.notify("Site maps", res.get("text", ""))
-                self._settings["site_events_last_seen"] = res.get("key", "")
-                try:
-                    _save_settings(self._settings)
-                except Exception:
-                    pass
-            # Результат тижневого монітора зображень (site_watch): Log завжди,
-            # балон — на зміни та на НОВУ помилку (повтор того самого збою не
-            # спамить балоном, але лишається в Log).
             res_w = self._site_watch_result
             if res_w is not None:
                 self._site_watch_result = None
-                for line in res_w.get("lines", []):
+                lines = list(res_w.get("lines", []))
+                for line in lines:
                     self.log(line)
+                if lines:
+                    # Секція "Tactic Map Updates" годується ТІЛЬКИ цим
+                    # монітором (v2.0: клієнтський site-sweep прибрано).
+                    stamp = time.strftime("%Y-%m-%dT%H:%M:%S")
+                    self._site_events_list = [
+                        {"timestamp": stamp, "message": ln.replace("[SITE WATCH] ", "")}
+                        for ln in lines] + list(self._site_events_list)[:200]
+                    self._site_events_ping = True
                 text = res_w.get("text", "")
                 if res_w.get("status") == "error":
                     if text and text != self._last_site_watch_err:
@@ -506,46 +503,6 @@ class AdminApp(customtkinter.CTk):
                 {"version": ver, "last_seen": int(time.time()), "status": status})
         except Exception:
             pass
-
-    def _check_site_map_events(self) -> None:
-        """service_events (site_maps): фільтр новіших за site_events_last_seen
-        → пакет для балону+логу. Викликається з _loop (worker) — НІЯКИХ
-        Tk-викликів тут; доставка через _site_events_result у _bg_poll
-        (main thread, #1598). Дедуп між запусками — по ключу timestamp|message."""
-        try:
-            from admin_backend.data import read_site_map_events
-            events = read_site_map_events()
-        except Exception as e:
-            print(f"[SITE] Poll error: {e}")
-            return  # кеш НЕ чистимо — тимчасова мережева помилка
-        # Кеш історії для секції "Tactic Map Updates" — оновлюється ЗАВЖДИ
-        # при успішному fetch (секція показує все, навіть якщо балон уже
-        # бачив ці події — дедуп стосується ТІЛЬКИ сповіщень).
-        self._site_events_list = list(events)
-        self._site_events_ping = True
-        if not events:
-            return
-        last = str(self._settings.get("site_events_last_seen", ""))
-        keys = set()
-        fresh_msgs = []
-        newest = last
-        for e in events:
-            key = f"{e.get('timestamp', '')}|{e.get('message', '')}"
-            if key > last and key not in keys:
-                keys.add(key)
-                fresh_msgs.append(str(e.get("message", "")))
-                if key > newest:
-                    newest = key
-        if not fresh_msgs:
-            return
-        msgs = sorted(set(fresh_msgs))
-        if len(msgs) == 1:
-            text = msgs[0]
-        else:
-            text = (f"{len(msgs)} site map updates: "
-                    + "; ".join(msgs[:5]) + ("..." if len(msgs) > 5 else ""))
-        self._site_events_result = {
-            "lines": [f"SITE: {m}" for m in msgs], "text": text, "key": newest}
 
     def _check_site_watch(self) -> None:
         """Тижневий монітор змін зображень мап на сайті (site_watch).

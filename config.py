@@ -22,13 +22,9 @@ def load_version():
 
 ICON_FILE = os.path.join(BASE_DIR, "icon.ico")
 LOGO_FILE = os.path.join(BUNDLE_DIR, "logo.png")
-MAPS_DIR = os.path.join(BUNDLE_DIR, "maps")
 
 SETTINGS_FILE = os.path.join(USER_DATA_DIR, "settings.json")
 DRAWINGS_FILE = os.path.join(USER_DATA_DIR, "map_drawings.json")
-MAP_LIST_FILE = os.path.join(BUNDLE_DIR, "map_list.json")
-MAP_LINKS_FILE = os.path.join(BUNDLE_DIR, "map_links.json")
-TECH_IDS_FILE = os.path.join(BUNDLE_DIR, "map_tech_ids.json")
 CUSTOM_NAMES_FILE = os.path.join(USER_DATA_DIR, "custom_names.json")
 LOCALES_FILE = os.path.join(USER_DATA_DIR, "locales.json")
 

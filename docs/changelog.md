@@ -2,6 +2,224 @@
 
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
+## 02.11.2026
+
+- **v2.0 Beta — F1-довідка приведена у відповідність до v2.0, Ctrl+E прибрано.**
+  - **`main.py`:** видалено fallback-хоткей `ctrl+e` на `toggle_formatting_mode` — лишився
+    тільки F8 (при помилці реєстрації F8 тепер print, а не друга комбінація).
+  - **Секції:** «Window Control (EDITOR Mode)» → «Window Control», «Drawing (EDITOR -> MAPS)»
+    → «Drawing (MAPS)», «Drawing Palette (brush button)» → «Drawing Palette (DRAW button)».
+  - **Рядок Download → COMMUNITY** (`community_btn`, опис «browse & import community schemes»).
+  - **Тексти:** `help_copy` → «click it to select»; `help_armed_hint` уточнено (після F8 Unlock:
+    LMB drag, ↑/↓ resize, ←/→ opacity; подвійний Ctrl тимчасово озброює ←/→ і Ctrl+LMB drag,
+    ↑/↓ resize лише з F8); `help_group_filter_desc` → «after you sign in and create or join a
+    group»; `help_scheme_rclick` → «set Default (Base — admin only)».
+  - **Новий рядок** «Scheme list — select a scheme to load it» (задіяно наявний ключ
+    `help_saved_schemes`); 8 захардкожених англійських підписів → ключі `help_hotkey_*` через
+    `t('ui', …)`; видалено мертвий `help_mode_column`.
+  - **Переклад:** нові/змінені ключі автоматично йдуть у стартовий batch; застарілі кешовані
+    uk-рядки не показуються (snapshot-guard `locale_manager.t_ui`), AppData не чіпав (#1219).
+  - **Верифікація:** AST+імпорт OK; аудит ключів 0 missing / 0 dead; F1-харнес 129 підписів,
+    1500×932 (≤1920×1200), 0 сирих ключів, жодного EDITOR/TACTIC/TAB/contrast, дисклеймер
+    side=bottom; grep `ctrl+e` → 0; живий запуск 22 с — stderr порожній.
+
+- **v2.0 Beta — TACTIC-залишки прибрано з клієнта, моніторинг сайту тільки в адмінці,
+  дисклеймер Wargaming — унизу скрізь.**
+  - **Клієнт більше НЕ перевіряє мапи на сайті.** `map_manager`: видалено `_tactic_candidate_ids`,
+    `_detect_pending_tactic_maps`, `_load/_save_site_manifest`, `_load/_save_unavailable`,
+    `_site_entry_from_headers`, `_on_site_map_event`, `_rerender_current_map`, `_resolve_tactic_folder`
+    та обидва виклики в `check_game_version` (fast-path на старті + після оновлення версії);
+    `main`: `_daily_site_map_sweep` і добове планування `after(86400000, ...)`.
+    Причина: розділ TACTIC видалено, клієнт не показує `maps/*/map.webp`, тож HEAD-свіп був
+    чистим спадком (рядки `[MAP_MGR] Map not on site` у кожному старті).
+  - **`map_updater.py`** (0 runtime-імпортерів після цього) → `_archive/scripts/` (git mv).
+  - **Конфіг:** прибрано `MAPS_DIR`, `MAP_LIST_FILE`, `MAP_LINKS_FILE`. `maps/` (53 файли, ~14.5 MB)
+    виключено з бандла (`build.py` + `wot_assistant.spec`); soft-delete `maps/.deprecated`
+    (видалення після 30 днів). `map_list.json`, `map_links.json`, `ukrainian_map_names.json` →
+    `.deprecated` sidecars.
+  - **Адмінка:** панель «Tactic Map Updates» тепер годується ТІЛЬКИ тижневим
+    `admin_backend/site_watch.py` (результат `check()` → `_site_events_list` через `_bg_poll`);
+    видалено добовий RTDB-полінг `_check_site_map_events`, `_site_events_result`,
+    `_last_site_poll` і `admin_backend.data.read_site_map_events`.
+  - **Дисклеймер — самий низ екранів:**
+    - стартовий сплеш `main.py`: disclaimer `sh-18`, percent `sh-34`; у режимі апдейту кнопки
+      піднято на `by=sh-46` (раніше `sh-25` — накривали б disclaimer);
+    - `launcher.py`: disclaimer `H-18`, percent `H-33`; у режимі апдейту status → `H-100`,
+      «You have v» → `H-76`, кнопки `by=H-62`, disclaimer БІЛЬШЕ НЕ видаляється (`delete("disc")`
+      прибрано);
+    - адмін-сплеш (`admin_ui/main_window.py`): disclaimer `sh-20`, percent → `sh-40`
+      (на `sh-34` відсоток накладався на дисклеймер — перевірено Tk-виміром);
+    - F1-довідка: футер-рядок знизу вікна;
+    - сайт: той самий рядок у кінці `schemes.html`, `drawings.html`, `admin.html`
+      (index/news мали раніше).
+  - **`apply_mod_mode`:** пропуск copy2, якщо `sm_tactics.wotmod` уже на місці з тим самим
+    розміром — прибрано шум `WinError 32` із живого запуску, коли гра тримає файл відкритим.
+  - **Верифікація:** AST + імпорт (client), grep залишків (`_detect_pending_tactic_maps`,
+    `map_updater`, `MAPS_DIR`, `site_events_last_seen`, `read_site_map_events`) → 0;
+    харнес лаунчера (обидва стани, дисклеймер — найнижчий текст, без перетинів з percent/bar/
+    кнопками); F1-харнес 126 підписів / 0 сирих ключів; `test_scheme_coords.py` 14/14;
+    живий запуск 30 с — stderr порожній, рядків site-sweep немає.
+
+## 01.11.2026
+
+- **v2.0 Beta - схеми більше не накривають вікно налаштувань + чистка 3 чекбоксів.**
+  - **Баг (скрін 01.11.2026):** елементи схеми малювалися поверх вікна налаштувань.
+    Причина: `_po_win` (topmost) і панель налаштувань (`ui_manager._show_settings_menu`,
+    теж topmost) - порядок визначає останній `lift`; оверлей перепіднімався на
+    кожному `painter.redraw()` (`_lift_overlay`) і на `FocusIn` root, а панель -
+    ніколи. Той самий клас - F1-довідка (topmost) і палітра малювання.
+  - **Фікс z-order:** новий `main._po_place_top()` - піднімає `_po_win`, потім
+    замаплені `drawing_palette`, `help_manager._help_win`, `ui_mgr._settings_win`
+    (остання - зверху). Усі 6 голих `_po_win.lift()` замінено на нього
+    (main.py:518, 541, 1028, 1092, 1229, 1263); `_show_settings_menu` додає
+    `menu.lift()` після `focus_set()`.
+  - **Прибрано чекбокси `auto_sync`, `auto_mode_filter`, `auto_vehicle_filter`**
+    (усі впливали лише на редактор, мод працює незалежно):
+    - `auto_sync` + `auto_mode_filter` -> синхронізація мапи й режиму бою тепер
+      БЕЗУМОВНА: `on_battle_detected` без гейта, `safe_battle_sync()` завжди
+      `selected_battle_mode.set(ui_mode)`. При OFF редактор лишався в
+      неузгодженому стані (combobox оновлено для мапи бою, канвас - попередньої).
+    - `auto_vehicle_filter` -> прибрано разом з авто-фільтром класу:
+      `on_vehicle_detected`, `compact_descr_map` (2 місця побудови), передача
+      `vehicle_callback` у `LogWatcher`; клас-фільтр став повністю ручним.
+      `log_reader.py` не змінювався (`vehicle_callback=None` default).
+    - translations: `auto_sync`, `auto_mode_filter`, `auto_vehicle_filter`,
+      `help_setting_auto_sync`, `help_setting_auto_mode_filter`,
+      `help_setting_auto_vehicle_filter`; help_system: блоки `fr_s1`, `fr_s3`, `fr_s4`.
+  - **Наслідок:** на старті бою редактор ЗАВЖДИ перемикається на мапу+режим бою
+    (раніше `auto_sync` default = False). Старі ключі в AppData settings.json
+    ігноруються, файл не чіпався (#1219).
+  - **Верифікація (#1471):** ast-parse 7 файлів OK; імпорт main/ui_manager/
+    help_system/translations/log_reader/painter/map_renderer OK;
+    `test_scheme_coords.py` 14/14; F1-харнесс: 125 підписів (було 134),
+    0 сирих ключів; z-order харнесс на реальному WinAPI (`GW_HWNDPREV` +
+    `GetAncestor(GA_ROOT)`, 3/3): панель зверху -> `lift()` оверлея відтворює
+    баг -> `_po_place_top()` повертає панель зверху; grep `auto_sync|
+    auto_mode_filter|auto_vehicle_filter|on_vehicle_detected|
+    compact_descr_map` - 0 посилань; живий запуск `python main.py` 30с -
+    stderr порожній. Білд не запускався.
+
+- **v2.0 Beta - дрібниці налаштувань і посилань.**
+  - `auto_window_size` («Scale drawing to screen (DPI)») - default тепер **OFF**
+    (`main.py:178`); додано запис у `save_settings()` (`main.py:609`) - раніше
+    ключ не зберігався взагалі, тож чекбокс скидався при кожному запуску.
+  - Посилання в порожньому редакторі (`map_renderer.show_main_splash`) -
+    `wotmapsbyyaya.com/maps` тепер клікабельне: тег `site_link`, синій `#66aaff`,
+    підкреслення лінією, курсор `hand2`, клік -> `webbrowser.open(...)`.
+  - Рядки сайтів у меню налаштувань (`Website: ...`, `Basic tactical schemes: ...`)
+    оформлено як посилання (`make_link`: синій текст + hand2 + hover) - поведінка
+    відкриття та сама.
+  - **Верифікація:** ast+імпорт main/map_renderer/ui_manager OK; харнесс сплеша
+    (реальний Canvas + підміна `webbrowser.open`): 2 елементи `site_link`,
+    клік по тексту -> `https://wotmapsbyyaya.com/maps`; `test_scheme_coords.py`
+    14/14; живий запуск 25с - stderr порожній.
+
+- **v2.0 Beta - стартовий екран редактора: нові тексти, чистка контрасту, розрядка рядків.**
+  - **Тексти:** `tactic_maps_source` -> "Basic schemes from" (EN-джерело; uk - перекладом);
+    рядок `LMB: ...` без «(after F8 / double Ctrl)» (`mini_unlock_hint` видалено);
+    рядок «Shift+↑/↓: map contrast» прибрано (`help_ctrlshift_updown` видалено);
+    `h1` лишається "F10: Show/Hide" (без TAB).
+  - **Функцію контрасту прибрано повністю:** hotkeys `shift+up/down` і
+    `ctrl+shift+up/down` (main.py), Tk-бінди `<Control-Shift-Up/Down>`,
+    методи `contrast_up/down` + `_hotkey` (window_manager.py), стан `app.contrast`,
+    запис `edit_contrast` у settings, `ImageEnhance.Contrast` у map_renderer;
+    `help_armed_hint` без речення про контраст. AppData-ключі не чіпались (#1219).
+  - **Розрядка стартового екрана:** disclaimer ch-12 (самий низ), версія ch-38,
+    ↕/↔ ch-72, LMB ch-100, F8 ch-136, F10 ch-164, borderless ch-196, лінк ch-234,
+    джерело ch-252; інтервали 26-36px (було 15-25 і disclaimer над версією).
+  - **Stale-переклади (корінь «TACTIC карти від» / «TAB: Битва\Редактор»):**
+    `locale_manager.t_ui()` віддає кеш лише якщо `en_snapshot[key]` відсутній або
+    дорівнює поточному EN; інакше - англійська, поки батч Google не перекладе.
+    AppData не редагувався.
+  - **Верифікація:** ast+імпорт 6 файлів OK; grep `contrast|mini_unlock_hint|
+    help_ctrlshift_updown` у .py - 0; layout-харнесс (реальний Canvas): тексти без
+    TAB/double Ctrl/contrast, disclaimer - найнижчий, інтервали 28/36/28/34/26;
+    t_ui-харнесс: stale -> EN, свіжий -> кеш, старий кеш без snapshot -> кеш;
+    F1-харнесс 125 підписів, 0 сирих ключів; `test_scheme_coords.py` 14/14;
+    живий запуск 25с - stderr порожній.
+
+## 30.10.2026
+
+- **v2.0 Beta - бойове вікно (norm) прибрано: у бою працює тільки мод.**
+  - **Причина:** користувач вирішив, що окреме напівпрозоре вікно режиму бою
+    більше не потрібне - схеми в бою малює мод на мінікарті. Мод стає єдиним
+    рендерером у бою і вмикається завжди (без чекбокса).
+  - **main.py:** видалено `toggle_editor` (перемикання edit<->norm), мертвий
+    `toggle_editor_backspace`, hotkey `Tab`, `_overlay_display_allowed`
+    (+2 виклики), norm-блок ініціалізації геометрії (alpha 0.5 / E_SIZE / E_POS /
+    paint 1050x700), `_reset_norm_position`, `_on_overlay_mode_toggle`,
+    `_on_mod_mode_toggle`, `_after_mode_change`, `_use_overlay_var`,
+    `_use_mod_var`; `refresh_mode_indicator` без `battle_status_label` /
+    `btn_format_lock_battle`; `toggle_formatting_mode` без norm-гілок.
+  - **Безумовний бойовий потік:** `on_battle_countdown_started` - fallback-
+    відновлення з трею під чекбоксом `unhide_on_battle`, потім ЗАВЖДИ
+    `after(150, _battle_hide_window('countdown'))` (вікно не висить над боєм;
+    if already trayed - no-op). `on_battle_ended` без гейта auto_battle:
+    завжди повертає карту бою, `_restored_by_battle` -> назад у трей.
+  - **Чекбокси:** видалено `mode_overlay`, `use_mod`, `auto_battle`;
+    лишився `unhide_on_battle` (default True) з новим текстом
+    «Show editor window before battle (if hidden in tray)»; ключ settings
+    не перейменовано (без міграції). Старі ключі в settings.json ігноруються.
+  - **ui_manager.py:** видалено `battle_status_top` + 3 віджети (замок,
+    reset position, індикатор формату), `pack_forget` батл-бару в show_view
+    (2 місця), 3 чекбокси.
+  - **painter.py:** прибрано redraw-гейт (`use_mod and battle_map_data_id and
+    mode=="norm"`) - гілка недосяжна, бо norm-режиму більше нема.
+  - **help_system.py:** прибрано рядок TAB та секцію
+    «Window Control (BATTLE Mode)» (F8-рядок лишається).
+  - **translations.py:** мертві ключі `help_e`, `help_section_battle`,
+    `help_ctrl_lmb_battle`, `help_battle_reset`, `help_unhide_battle`,
+    `mode_overlay`, `help_setting_mode_overlay`, `help_setting_use_mod`,
+    `use_mod`, `auto_battle`, `help_setting_auto_battle`; переписано
+    `unhide_on_battle`, `help_setting_unhide_on_battle`.
+  - **Мод завжди:** `map_manager.apply_mod_mode` без use_mod-гейта і без
+    uninstall-гілки (ставиться/оновлюється завжди); `_uninstall_tactics_mod`
+    видалено (0 викликів); `ensure_mod_installed` без гейта;
+    `tray_watcher._sync_mod` без uninstall-сweep і `_check_mod_delivery` без
+    use_mod-гейта (B2-доставка працює завжди).
+  - **window_manager.py НЕ чіпався:** norm-гілки (drag/click-through) лишились
+    як мертвий код - прибрати окремим кроком після перевірки в грі.
+  - **Застарілі тексти порожнього редактора (map_renderer.show_main_splash):**
+    прибрано fallback-напис по центру «BATTLE MODE / Press [ TAB ] to exit»
+    (він же показувався при відсутньому logo.png); `h1` ->
+    «F10: Show/Hide» (без «TAB: Battle\Editor»); мертві ключі
+    `battle_mode`, `press_e_to_exit` видалено.
+  - **Верифікація (#1471):** ast-parse 8 файлів OK; імпорт main/ui_manager/
+    painter/help_system/translations/map_manager/map_renderer/tray_watcher OK;
+    `test_scheme_coords.py` 14/14; перевірка ключів локалізації (271
+    використаний ключ проти словника) - 0 відсутніх, 0 видалених у вжитку;
+    ізольований харнесс HelpManager: 134 підписи, 0 сирих ключів, без TAB;
+    живий запуск `python main.py` 30с - stderr порожній, старт до log_watcher
+    + base schemes + map fast-path, force-kill без слідів. Білд не запускався.
+
+## 29.10.2026
+
+- **v2.0 Beta - старт: TACTIC прибрано, дислеймер Wargaming, opacity схем у моді.**
+  - **TACTIC видалено скрізь:** кнопка режиму (ui_manager), map_mode=2 за замовчуванням (main.py),
+    гілки is_tactic у map_manager.load_map_list (партиція + tactic_no_maps) і map_renderer,
+    main._check_pending_tactic_maps + _load/_save_pending_tactic_maps + їх виклики,
+    4 секції тактик у map_manager.run_map_updater (лишився інкрементальний site-sweep).
+    Мертві ключі translations видалено: tactic_no_map, tactic_no_maps, tactic_source_note.
+    Сайт: картка TACTIC -> 'Tactical schemes' (index.html), schemes.html без 'TACTIC mode'.
+  - **Залишено навмисно:** _detect_pending_tactic_maps (оновлення зображень мап з сайту) +
+    подія site_maps для адмінки; tactics_manager (імпорт/експорт схем) без змін.
+  - **Дислеймер:** 'Unofficial fan-made app - not affiliated with, endorsed by or sponsored by Wargaming.'
+    Стартовий сплеш (main.py, Arial 7), редактор (map_renderer, Arial 8), сплеш лаунчера
+    (launcher.py, Arial 7), футери public/index.html + public/news.html.
+    Ширина перевірена Tk-виміром: 371px @7 (полотно 450), 425px @8. У стані апдейта
+    лаунчера підпис ховається (кнопки займають смугу y292..328).
+  - **Атрибуція:** tactic_maps_source -> 'Basic tactical schemes from'; кнопка в налаштуваннях
+    -> 'Basic tactical schemes: wotmapsbyyaya.com'; index.html -> 'Basic tactical schemes from ...'.
+  - **Мод (opacity):** слайдер ModsSettingsAPI 'Scheme opacity' 0..100, крок 5, default 80
+    (mod_sm_tactics.py: _g['schemeOpacity'], _settings_template, _on_settings_changed live apply,
+    _load_settings, register_and_push); AS3 as_setAlpha (SmTacticsOverlay.as: _userAlpha=0.8,
+    _layer.alpha, re-apply у as_register). SWF перекомпільовано mxmlc (Flex SDK 4.16.1 відновлено
+    у %TEMP%\opencode + playerglobal 32.0, токени flex-config.xml замінені); as_setAlpha
+    присутній у SWF (перевірено після розпакування CWS).
+  - **Верифікація (#1471):** ast-parse main/ui_manager/map_manager/map_renderer/translations/
+    launcher/painting_palette OK + мод py3-parse OK; test_scheme_coords.py 14/14;
+    grep мертвих tactic-ключів - 0; wotmod перезібрано (pyc magic b'\x03\xf3', SWF v36,
+    3 entries STORED). Повний білд НЕ запускався (v2.0 ще в роботі).
 
 ## 28.10.2026
 

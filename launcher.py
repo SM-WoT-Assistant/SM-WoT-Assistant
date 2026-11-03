@@ -59,6 +59,8 @@ def compare_versions(current, latest):
         return False
 
 SPLASH_W, SPLASH_H = 450, 350
+WARGAMING_DISCLAIMER = ("Unofficial fan-made app \u2014 not affiliated with, "
+                        "endorsed by or sponsored by Wargaming.")
 
 
 class Launcher:
@@ -154,8 +156,12 @@ class Launcher:
             SPLASH_W // 2, SPLASH_H - 80,
             text="Checking for updates...", fill="#bbbbbb", font=("Arial", 9))
 
+        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 18,
+                                text=WARGAMING_DISCLAIMER, fill="#666666",
+                                font=("Arial", 7), tags="disc")
+
         self.pct_text = self.canvas.create_text(
-            SPLASH_W - 34, SPLASH_H - 20,
+            SPLASH_W - 34, SPLASH_H - 33,
             text="0%", fill="#dddddd", font=("Arial", 9))
 
         self.pbar = self.canvas.create_rectangle(
@@ -223,17 +229,20 @@ class Launcher:
     def _show_update_prompt(self, latest):
         latest_ver = latest.get("version", "")
 
+        self.canvas.coords(self.status_text, SPLASH_W // 2, SPLASH_H - 100)
         self._set_status(f"New version v{latest_ver} available!", "#ffaa00", ("Arial", 13, "bold"))
         self.canvas.itemconfigure(self.pct_text, text="")
         self.canvas.coords(self.pbar, 0, 0, 0, 0)
+        # Дисклеймер лишається внизу (H-16): кнопки підняті вище (H-62),
+        # щоб не накривати його — «неофіційний додаток» видно завжди.
 
-        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 64,
+        self.canvas.create_text(SPLASH_W // 2, SPLASH_H - 76,
                                  text=f"You have v{self.installed_version}", fill="#aaa", font=("Arial", 9))
 
         btn_w, btn_h = 140, 36
         lx = SPLASH_W // 2 - btn_w - 14
         rx = SPLASH_W // 2 + 14
-        by = SPLASH_H - 58
+        by = SPLASH_H - 62
 
         self.canvas.create_rectangle(lx, by, lx + btn_w, by + btn_h,
                                       fill="#335533", outline="#66aa66", tags="btn")

@@ -24,7 +24,28 @@
 
 ---
 
-## IMAGE GUARD: звірка тактичних фонів з клієнтом (26.10.2026)
+## v2.0 Beta (01.11.2026): TACTIC-інфраструктуру прибрано повністю
+
+Розділ TACTIC видалено назавжди: клієнт показує лише MAPS (`extracted_maps/`). Разом з ним
+прибрано весь site-sweep і все, що його обслуговувало:
+
+- `map_manager`: `_tactic_candidate_ids`, `_detect_pending_tactic_maps`, `_load/_save_site_manifest`,
+  `_load/_save_unavailable`, `_on_site_map_event`, `_rerender_current_map`, `_resolve_tactic_folder`,
+  виклики в `check_game_version` (старт + після оновлення версії);
+- `main`: `_daily_site_map_sweep` і добове планування (`after(86400000, ...)`);
+- `map_updater.py` → `_archive/scripts/` (0 runtime-імпортерів);
+- `config`: `MAPS_DIR`, `MAP_LIST_FILE`, `MAP_LINKS_FILE`; `maps/` (53 файли, ~14.5 MB) більше не
+  входить у бандл (`build.py`/`wot_assistant.spec`), soft-delete: `maps/.deprecated`;
+- `map_list.json`, `map_links.json`, `ukrainian_map_names.json` → `.deprecated` sidecars.
+
+Моніторинг сайту лишився ТІЛЬКИ в адмінці: `admin_backend/site_watch.py` (тижневий Chrome-diff
+сторінок мап → балон + Log + панель «Tactic Map Updates»). Клієнтські `service_events`
+(category=site_maps) більше не пишуться; панель адмінки годується напряму з `site_watch`.
+
+Нижче — історичні записи (26-27.10.2026) про IMAGE GUARD і URL фонів: код видалено, залишено
+як довідку про те, як влаштований сайт.
+
+## IMAGE GUARD: звірка тактичних фонів з клієнтом (26.10.2026, ІСТОРІЯ)
 
 **Два джерела фону залежно від режиму:**
 - **MAPS** — завжди `extracted_maps/<id>.png` (піксель-у-піксель `mmap.dds` з `spaces/*.pkg`). Тут помилок не буває.
@@ -75,3 +96,18 @@
 
 **Обмеження:** повний `sync_all` після цього фіксу оновив би URL всіх 44 мап на timestamped-об'єкти (видалення + перекачка з перевіркою гварда) — під час релізу **не запускався** навмисно, щоб не переписувати працюючі фони.
 
+
+
+## v2.0 Beta (29.10.2026): режим TACTIC видалено
+
+- Єдиний режим мап - **MAPS** (зображення з клієнта гри, `extracted_maps/`). Кнопки/перемикача
+  TACTIC більше немає; `map_mode` завжди 2 (`_saved_map_mode` примусово = 2 у `show_view`).
+- Прибрано: `is_tactic`-гілки в `load_map_list` (партиція «мапи з картинкою в кінці»,
+  `tactic_no_map(s)` повідомлення) і в `map_renderer` (фолбек на `maps/<folder>/map.webp`),
+  `main._check_pending_tactic_maps` + `_load/_save_pending_tactic_maps`, 4 секції тактичних
+  свіпів у `map_manager.run_map_updater`.
+- ~~**Залишено навмисно:** `map_manager._detect_pending_tactic_maps` ...~~ — **01.11.2026 прибрано
+  повністю** (див. секцію вище): клієнт більше не робить site-sweep, моніторинг сайту — тільки
+  адмінський `site_watch`. `tactics_manager` (імпорт/експорт схем) без змін.
+- Атрибуція переписана: `tactic_maps_source` = "Basic schemes from" (редактор),
+  кнопка в налаштуваннях = "Basic tactical schemes: wotmapsbyyaya.com".

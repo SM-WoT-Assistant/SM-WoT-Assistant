@@ -969,12 +969,12 @@ class ErrorsPanel(customtkinter.CTkFrame):
 
 
 class SiteMapsPanel(customtkinter.CTkFrame):
-    """Tactic Map Updates: історія подій service_events (category=site_maps).
+    """Tactic Map Updates: результати монітора змін мап на сайті (site_watch).
 
-    Рендерить КЕШ app._site_events_list (оновлює добовий воркер через ping
-    у _bg_poll) — без власних мережевих запитів на головному потоці (#1598).
-    Дедуп балонів (site_events_last_seen) на секцію НЕ впливає: показується
-    вся історія з RTDB."""
+    Рендерить КЕШ app._site_events_list, який наповнює тижневий site_watch
+    через ping у _bg_poll — без власних мережевих запитів на головному потоці
+    (#1598). v2.0: клієнтський site-sweep прибрано, джерело даних — лише
+    admin_backend.site_watch."""
 
     def __init__(self, parent: Any, app: Any = None) -> None:
         super().__init__(parent, fg_color="transparent")
