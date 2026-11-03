@@ -2,6 +2,23 @@
 
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
+## 03.11.2026
+
+- **Реліз v2.0.0 Beta.** Повний цикл `build.py 2.0.0 --date=2026-11-02`:
+  Python 3.12.7 + PyInstaller 6.20.0; EXE 30.9 MB, launcher 35.8 MB, tray watcher 7.9 MB,
+  3204 data files, onedir 510 MB (5409 файлів), NSIS installer 297.7 MB, Portable ZIP 338.5 MB.
+  GitHub release `v2.0.0` (prerelease, installer + portable + manifest) — audit PASSED;
+  RTDB `versions/2_0_0` + `latest` — audit PASSED; news `v2.0.0 Beta` опубліковано.
+- **Перед білдом:** перезібрано `sm_tactics.wotmod` (292.6 KB, 3 entries, all STORED);
+  у кореневий `CHANGELOG.md` додано секцію `[2.0.0] - 2026-11-02`; `docs/release.md`
+  оновлено (maps/ не в бандлі, реальні розміри артефактів, актуальні line-refs).
+- **Верифікація (#1471):** AST 51/51, імпорт 35/35, `test_scheme_coords.py` 14/14,
+  grep залишків TACTIC → 0 (лише `_archive/`), живий запуск 22 с — stderr порожній;
+  frozen smoke — title `SM WoT Assistant v2.0.0 Beta`, чисте закриття.
+- **Сайт:** `firebase deploy --only hosting` (21 file, 7 new), live `verify.json` → `2.0.0`.
+- **Release Cleanup (#1497):** dist / GitHub / RTDB → 5 останніх; видалено `1.0.78`
+  у всіх трьох (тег `v1.0.78` лишився); лишились `1.0.79`–`1.0.82` + `2.0.0`.
+
 ## 02.11.2026
 
 - **v2.0 Beta — F1-довідка приведена у відповідність до v2.0, Ctrl+E прибрано.**

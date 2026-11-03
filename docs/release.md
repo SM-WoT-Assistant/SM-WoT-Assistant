@@ -17,14 +17,14 @@
 2. **Clean** — видалення `dist/SM WoT Assistant/` та `build/`
 3. **PyInstaller** (onedir) → `copy_data_files()` (root JSONs, fonts, `.mo`, logo/icon, `sm_tactics.wotmod`, `extracted_maps/`, `extracted_icons/`, `extracted_data/common/post_progression/`) → NSIS installer
 4. **Rename** onedir: `dist/SM WoT Assistant/` → `dist/SM WoT Assistant vX.Y.Z/`
-5. **Portable ZIP**: `SM_WoT_Assistant_Portable_vX.Y.Z.zip` (~390 MB)
+5. **Portable ZIP**: `SM_WoT_Assistant_Portable_vX.Y.Z.zip` (~340 MB)
 6. **Verify**: EXE, Launcher EXE, Tray Watcher EXE, 10 critical JSONs, VERSION, fonts, `extracted_maps/`≥60, `extracted_icons/`≥8, `extracted_data/`≥1
 7. **Manifest**: `dist/build_manifest_vX.Y.Z.txt` (усі файли + розміри)
 
 ### Артефакти релізу в dist/
-- `SM WoT Assistant vX.Y.Z/` — версіонований onedir (~750 MB)
-- `SM_WoT_Assistant_Setup_vX.Y.Z_Beta.exe` — NSIS інсталер (~335 MB, lzma 42.4%)
-- `SM_WoT_Assistant_Portable_vX.Y.Z_Beta.zip` — portable ZIP (~380 MB)
+- `SM WoT Assistant vX.Y.Z/` — версіонований onedir (~510 MB, ~5400 файлів)
+- `SM_WoT_Assistant_Setup_vX.Y.Z_Beta.exe` — NSIS інсталер (~298 MB)
+- `SM_WoT_Assistant_Portable_vX.Y.Z_Beta.zip` — portable ZIP (~339 MB)
 - `build_manifest_vX.Y.Z.txt` — маніфест білду
 
 ### Інструменти для білду
