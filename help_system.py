@@ -231,8 +231,3 @@ class HelpManager:
         tk.Label(fr_s11, text=chr(0xF14A), font=("FontAwesome", 10), bg=bg, fg="#aaa").pack(side="left")
         tk.Label(fr_s11, text=" " + self.app.t('ui', 'auto_window_size'), font=("Arial", 9, "bold"), bg=bg, fg=hotkey_fg).pack(side="left")
         r_frow(fr_s11, self.app.t('ui', 'help_setting_auto_window_size'))
-        r_sep()
-        fr_warn = tk.Frame(right_col, bg=bg)
-        tk.Label(fr_warn, text="\u26A0", font=("Arial", 10), bg=bg, fg="#ff6b6b").pack(side="left")
-        tk.Label(fr_warn, text=" " + self.app.t('ui', 'borderless_warning'), font=("Arial", 9, "bold"), bg=bg, fg="#ff6b6b").pack(side="left")
-        r_frow(fr_warn, "")

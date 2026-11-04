@@ -347,8 +347,6 @@ class MapRenderer:
             # Restore the painter's cursor, not a hardcoded "": move-tool keeps "fleur".
             app.canvas.tag_bind("site_link", "<Leave>", lambda e: app.canvas.config(
                 cursor="fleur" if getattr(getattr(app, 'painter', None), 'active_tool', None) == 'move' else ""))
-            app.canvas.create_text(cw//2, ch - 196, text=app.t('ui', 'borderless_warning'),
-                fill="red", font=("Arial", 10), tags="map")
             app.canvas.create_text(cw//2, ch - 12, text=app.t('ui', 'wargaming_disclaimer'),
                 fill="#666666", font=("Arial", 8), tags="map")
             

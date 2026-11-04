@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.0.1] - 2026-11-04
+
+### Changed
+- **Website updated for 2.0:** TACTIC screenshot and overlay wording removed, new "What's new in 2.0" section, screenshots refreshed from the current build, battle modes labeled Onslaught 10 / Onslaught 8.
+- **Borderless-window warning removed** from the editor splash, main splash and F1 help — in battle the bundled mod draws on the minimap, so the old overlay requirement no longer applies.
+
+### Fixed
+- Website community-scheme instructions no longer mention a removed Import button; they point to the COMMUNITY dialog.
+
+---
+
 ## [2.0.0] - 2026-11-02
 
 ### Changed

@@ -3135,13 +3135,6 @@ class WotAssistantHQ:
         )
         self.splash_canvas.create_text(
             sw//2,
-            sh - 35,
-            text=self.t('ui', 'borderless_warning'),
-            fill="#ffaa00",
-            font=("Arial", 8),
-        )
-        self.splash_canvas.create_text(
-            sw//2,
             sh - 18,
             text=self.t('ui', 'wargaming_disclaimer'),
             fill="#666666",

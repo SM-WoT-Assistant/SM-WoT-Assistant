@@ -9,7 +9,6 @@ TRANSLATIONS = {
             "auto_update": "Auto-check updates",
             "auto_window_size": "Scale drawing to screen (DPI)",
             "battle_mode_label": "Battle mode",
-            "borderless_warning": "Set game to borderless window mode!",
             "brush_type": "Brush",
             "btn_cancel": "Cancel",
             "btn_close": "Close",

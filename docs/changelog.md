@@ -2,6 +2,26 @@
 
 > Джерело: AGENTS.md (реорганізація документації, 04.08.2026). Секції перенесені вербатім.
 
+## 04.11.2026
+
+- **v2.0.1 Beta — оновлення сайту під v2.0 і чистка borderless-попередження.**
+  - **Сайт `public/index.html`:** прибрано картку TACTIC і `img/tactic.webp`, YouTube-відео та його CSS,
+    червоне попередження про borderless; підзаголовок → «maps, schemes on the minimap, AI builds»;
+    оновлено описи карток (SETUP 1,100+ танків, MAPS 45 карт + Onslaught-мінімапи, підпис палітри,
+    In-battle minimap замість Overlay); додано секцію «What's new in 2.0»; «How to update» — під лаунчер.
+  - **Сайт `schemes.html`:** підписи режимів «Onslaught 10» / «Onslaught 8» (значення без змін),
+    «community schemes» замість «tactical schemes», інструкція завантаження → COMMUNITY у палітрі
+    (кнопки Import у застосунку немає).
+  - **Клієнт — borderless-попередження прибрано повністю:** ключ `borderless_warning` у `translations.py`,
+    червоний рядок у `map_renderer.show_main_splash`, рядок на стартовому сплеші `main.py`, блок
+    `fr_warn` у `help_system.py`. У бою малює мод на мінімапі, вимога overlay-режиму неактуальна.
+  - **Документація:** `ARCHITECTURE.md` / `STRUCTURE.md` — опис сайту без відео/tactic/borderless,
+    з новою секцією What's new.
+  - **Верифікація:** AST+імпорт 4 файлів — OK; F1-харнес 127 підписів, 1500×932 (≤1920×1200),
+    0 сирих ключів, 0 стейл-фраз; `grep borderless` → 0 у коді; живий запуск 22 с — stderr порожній.
+  - **Далі за планом:** білд 2.0.1, скріншоти з frozen-збірки → `img/*.webp`, деплой hosting,
+    Release Cleanup (#1497).
+
 ## 03.11.2026
 
 - **Реліз v2.0.0 Beta.** Повний цикл `build.py 2.0.0 --date=2026-11-02`:
