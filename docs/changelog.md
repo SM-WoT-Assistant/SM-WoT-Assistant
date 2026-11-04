@@ -7,7 +7,7 @@
 - **v2.0.1 Beta — оновлення сайту під v2.0 і чистка borderless-попередження.**
   - **Сайт `public/index.html`:** прибрано картку TACTIC і `img/tactic.webp`, YouTube-відео та його CSS,
     червоне попередження про borderless; підзаголовок → «maps, schemes on the minimap, AI builds»;
-    оновлено описи карток (SETUP 1,100+ танків, MAPS 45 карт + Onslaught-мінімапи, підпис палітри,
+    оновлено описи карток (SETUP 1,000+ танків, MAPS 45 карт + Onslaught-мінімапи, підпис палітри,
     In-battle minimap замість Overlay); додано секцію «What's new in 2.0»; «How to update» — під лаунчер.
   - **Сайт `schemes.html`:** підписи режимів «Onslaught 10» / «Onslaught 8» (значення без змін),
     «community schemes» замість «tactical schemes», інструкція завантаження → COMMUNITY у палітрі
@@ -19,8 +19,12 @@
     з новою секцією What's new.
   - **Верифікація:** AST+імпорт 4 файлів — OK; F1-харнес 127 підписів, 1500×932 (≤1920×1200),
     0 сирих ключів, 0 стейл-фраз; `grep borderless` → 0 у коді; живий запуск 22 с — stderr порожній.
-  - **Далі за планом:** білд 2.0.1, скріншоти з frozen-збірки → `img/*.webp`, деплой hosting,
-    Release Cleanup (#1497).
+  - **Скріншоти:** знято з поточного коду 2.0.1 (ізольований AppData, справжній `locales.json`):
+    start/setup/maps 800×960, палітра 580×498; конвертовано у WEBP q85 і замінено `img/start|setup|maps|draw.webp`,
+    `width`/`height` в `index.html` оновлено; `img/minimap.webp` лишено (мод візуально не змінився).
+  - **Реліз:** GitHub `v2.0.1` + RTDB `versions/2_0_1`/`latest` (audit PASSED), `firebase deploy --only hosting`
+    → живі `verify.json` 2.0.1, нові знімки й підписи режимів; Release Cleanup (#1497) — лишили 5
+    (1.0.80–1.0.82, 2.0.0, 2.0.1), `1.0.79` видалено локально/GitHub/RTDB.
 
 ## 03.11.2026
 
